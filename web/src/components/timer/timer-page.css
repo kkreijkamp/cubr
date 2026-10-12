@@ -47,3 +47,177 @@
 .tp-hint kbd {
   font-size: 0.75rem;
 }
+
+/* ------------------------------------------------------------ bottom panels */
+.tp-bottom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr) minmax(0, 1.1fr);
+  gap: 2rem;
+  margin-top: 1.75rem;
+  align-items: start;
+}
+.tp-bottom.cols-2 {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.tp-bottom.cols-1 {
+  grid-template-columns: minmax(0, 28rem);
+  justify-content: center;
+}
+.tp-panel {
+  min-width: 0;
+  display: grid;
+  gap: 0.6rem;
+  align-content: start;
+}
+.tp-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  color: var(--sub-color);
+  font-size: 0.8rem;
+  min-height: 1.5rem;
+}
+.tp-empty {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: center;
+  text-align: center;
+  color: var(--sub-color);
+  font-size: 0.85rem;
+  padding: 2.5rem 1rem;
+  border-radius: var(--roundness);
+  box-shadow: inset 0 0 0 2px var(--sub-alt-color);
+}
+.tp-empty span {
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+/* stats table */
+.tp-stats {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+}
+.tp-stats th,
+.tp-stats td {
+  padding: 0;
+  height: 2rem;
+  font-weight: 400;
+  white-space: nowrap;
+}
+.tp-stats thead th {
+  color: var(--sub-color);
+  font-size: 0.7rem;
+  height: 1.4rem;
+  text-align: right;
+  padding-right: 0.75rem;
+}
+.tp-stats tbody th {
+  text-align: left;
+  color: var(--sub-color);
+  padding-left: 0.75rem;
+  font-size: 0.8rem;
+}
+.tp-stats tbody td {
+  text-align: right;
+  color: var(--text-color);
+  padding-right: 0.75rem;
+}
+.tp-stats tbody td.best {
+  color: var(--main-color);
+}
+.tp-stats tbody td.na {
+  color: var(--sub-color);
+}
+.tp-stats tbody tr:nth-child(odd) > * {
+  background: var(--sub-alt-color);
+}
+.tp-stats tbody tr > :first-child {
+  border-radius: var(--roundness) 0 0 var(--roundness);
+}
+.tp-stats tbody tr > :last-child {
+  border-radius: 0 var(--roundness) var(--roundness) 0;
+}
+.tp-stat-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  padding: 0.5rem 0.75rem 0;
+}
+.tp-stat-summary .value {
+  font-size: 1.35rem;
+}
+.tp-of {
+  color: var(--sub-color);
+  font-size: 0.75em;
+}
+
+/* solve list */
+.tp-solve-head,
+.tp-solve-row {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+}
+.tp-solve-head {
+  color: var(--sub-color);
+  font-size: 0.7rem;
+  padding: 0 0.75rem;
+  height: 1.4rem;
+}
+.tp-solve-head > span,
+.tp-solve-row > span {
+  text-align: right;
+}
+.tp-solve-head .idx,
+.tp-solve-row .idx {
+  text-align: left;
+}
+.tp-solve-scroll {
+  position: relative;
+  max-height: 20.6rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: var(--roundness);
+}
+.tp-solve-row {
+  height: 30px;
+  padding: 0 0.75rem;
+  border-radius: var(--roundness);
+  color: var(--text-color);
+  transition: background var(--dur), color var(--dur);
+}
+.tp-solve-row > span:not(.idx):not(.time) {
+  color: var(--sub-color);
+}
+.tp-solve-row.odd {
+  background: var(--sub-alt-color);
+}
+.tp-solve-row .idx {
+  color: var(--sub-color);
+}
+.tp-solve-row.best .time {
+  color: var(--main-color);
+}
+.tp-solve-row .time.dnf {
+  color: var(--error-color);
+}
+
+/* ------------------------------------------------------------ responsive */
+@media (max-width: 720px) {
+  .tp-bottom,
+  .tp-bottom.cols-2,
+  .tp-bottom.cols-1 {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.75rem;
+  }
+  .tp-solve-scroll {
+    max-height: 50vh;
+  }
+}
