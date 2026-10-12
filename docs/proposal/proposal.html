@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>cubetype — INFS3208 Individual Project Proposal</title>
+<style>
+  @page { size: A4; margin: 13mm 14mm 12mm 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 9.3pt; line-height: 1.32; color: #1d1f21; margin: 0; }
+  header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #1d1f21; padding-bottom: 4px; margin-bottom: 6px; }
+  h1 { font-size: 15pt; margin: 0; letter-spacing: -0.01em; }
+  h1 span { color: #b8920c; }
+  .meta { text-align: right; font-size: 8.3pt; color: #444; line-height: 1.3; }
+  h2 { font-size: 10.6pt; margin: 7px 0 2px; border-bottom: 1px solid #ccc; padding-bottom: 1px; }
+  h3 { font-size: 9.5pt; margin: 5px 0 1px; }
+  p { margin: 0 0 4px; text-align: justify; hyphens: auto; }
+  ul { margin: 0 0 4px; padding-left: 15px; }
+  li { margin: 0 0 1.5px; text-align: justify; }
+  b { font-weight: 600; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+  table { width: 100%; border-collapse: collapse; font-size: 8.2pt; margin: 3px 0 3px; }
+  th, td { border-bottom: 1px solid #ddd; padding: 2px 4px; text-align: left; vertical-align: top; }
+  th { background: #f1f1f1; font-weight: 600; }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  tr.total td { font-weight: 700; border-top: 1.5px solid #1d1f21; border-bottom: none; }
+  figure { margin: 4px 0 2px; }
+  figcaption { font-size: 8pt; color: #444; text-align: center; margin-top: 1px; }
+  .small { font-size: 8pt; color: #444; }
+  .page-break { break-before: page; }
+  svg text { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<header>
+  <h1>cube<span>type</span>: a cloud-native speedcubing timer</h1>
+  <div class="meta">INFS3208 Project Proposal · Type I<br>Koen Kreijkamp · s4890458</div>
+</header>
+
+<h2>1. Introduction</h2>
+<p><b>Background.</b> Speedcubing is the sport of solving the Rubik's Cube and related puzzles as fast as possible. The World Cube Association (WCA) lists over 300,000 official competitors, who practise with timer software that generates official scrambles and tracks statistics such as the average of five (ao5). The most popular tool, csTimer, is a client-only web page; Monkeytype, its typing-practice counterpart, is admired for its minimal design, accounts and leaderboards. <b>cubetype</b> combines csTimer's functionality with Monkeytype's polish, delivered as microservices on Google Kubernetes Engine (GKE).</p>
+<p><b>Motivation.</b> Serious cubers log tens of thousands of solves, yet csTimer keeps them only in browser storage: there are no accounts or cross-device sync, and users regularly report losing entire histories. It also lacks leaderboards, shared challenges and live races, and feels dated on mobile. A dependable cloud service protects this data and makes practice social.</p>
+<p><b>Objective and features.</b> A fast timer that keeps working under load and through failures, offering: (1) WCA-compliant timing with 15-second inspection, +2/DNF penalties, sessions and ao5/ao12/ao100 statistics; (2) official random-state scrambles for 16 events with previews; (3) accounts with cloud-synced solves and csTimer import; (4) all-time, weekly and daily leaderboards; (5) a daily challenge where everyone gets the same five scrambles; (6) real-time multiplayer races; (7) analytics such as PB history, activity heatmaps and streaks; (8) a "where would I rank?" comparison with official WCA rankings.</p>
+<div class="cols">
+<div>
+<p><b>Limitations of traditional computing.</b> A single on-premises server must be sized for peaks such as the daily-challenge reset, so it idles most of the time yet still fails when demand exceeds it. CPU-intensive scramble generation slows every other request in a monolith. One machine is a single point of failure: a crash or an update means downtime, and manual deployments are hard to roll back.</p>
+</div>
+<div>
+<p><b>Benefits of cloud computing.</b> Each feature is a containerised microservice that scales independently: Kubernetes adds scramble or solve pods when CPU rises and removes them afterwards. Failed containers are restarted on healthy nodes, a managed load balancer spreads traffic across replicas, and rolling updates ship versions with zero downtime and instant rollback, all on pay-as-you-go infrastructure.</p>
+</div>
+</div>
+
+<h2>2. Technical Solutions</h2>
+<ul>
+  <li><b>Frontend:</b> React/TypeScript single-page app served by nginx; cubing.js scramble previews, Chart.js statistics, Socket.IO races and a themeable, keyboard-first Monkeytype-style interface.</li>
+  <li><b>Backend microservices</b> (Node.js/TypeScript, Fastify), each with its own image, Deployment and Service: <i>auth</i> (accounts, JWT, settings), <i>scramble</i> (cubing.js random-state generation, pre-filled Redis pool, CPU-bound and autoscaled), <i>solve</i> (sessions/solves CRUD, csTimer import, transactional outbox), <i>stats</i> (event-driven read model for PBs, heatmap and streaks), <i>leaderboard</i> (Redis sorted sets, rebuildable), <i>race</i> (WebSocket rooms with state in Redis, so any pod serves any player) and <i>wca</i> (rank, percentile and record queries).</li>
+  <li><b>Data storage:</b> PostgreSQL 17 managed by the CloudNativePG operator (one primary plus streaming replicas with automatic failover), using one schema per service. A Kubernetes CronJob imports the public WCA export (about 2.3 million rows in seven tables: persons, rankings, competitions, countries…), and seeded users add ~100,000 solves. Redis 7 provides a Streams event bus with consumer groups, leaderboards, caching and race pub/sub.</li>
+  <li><b>Cloud platform:</b> Docker multi-stage builds, Cloud Build, Artifact Registry, GKE Standard (3 × e2-standard-2), Ingress with Google's external Application Load Balancer, Horizontal Pod Autoscalers, PodDisruptionBudgets, probes, ConfigMaps/Secrets, rolling updates and rollback.</li>
+</ul>
+<p><b>Monthly cost estimate</b> (Google Cloud pricing, australia-southeast1, 730 hours):</p>
+<table>
+  <tr><th>Resource</th><th>Configuration</th><th class="num">USD/month</th></tr>
+  <tr><td>GKE cluster management</td><td>1 zonal cluster (covered by the free-tier credit)</td><td class="num">0.00</td></tr>
+  <tr><td>Worker nodes</td><td>3 × e2-standard-2 (2 vCPU, 8 GB), on-demand</td><td class="num">208.23</td></tr>
+  <tr><td>Node boot disks + external IPs</td><td>3 × 30 GB pd-balanced; 3 ephemeral IPv4 addresses</td><td class="num">23.10</td></tr>
+  <tr><td>Persistent volumes</td><td>PostgreSQL 3 × 5 GB + Redis 1 GB (pd-balanced)</td><td class="num">2.16</td></tr>
+  <tr><td>Load balancing</td><td>1 global forwarding rule + ~20 GB processed</td><td class="num">18.47</td></tr>
+  <tr><td>Artifact Registry, Cloud Build</td><td>~2 GB images; builds within 2,500 free minutes</td><td class="num">0.15</td></tr>
+  <tr><td>Internet egress</td><td>~20 GB to clients</td><td class="num">3.80</td></tr>
+  <tr class="total"><td>Total</td><td>running 24/7</td><td class="num">≈ 255.91</td></tr>
+</table>
+<p class="small">Scaling the node pool to zero when idle (~200 h/month) cuts this to ≈ USD 86. Managed Cloud SQL (HA) plus Memorystore would add ≈ USD 185, so both databases run in-cluster.</p>
+
+<h2 class="page-break">3. Architecture Design</h2>
+<figure>
+<svg viewBox="0 0 760 404" width="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="cubetype architecture">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#333"/></marker>
+    <marker id="arY" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b8920c"/></marker>
+  </defs>
+  <rect x="8" y="10" width="128" height="46" rx="7" fill="#fff" stroke="#333"/>
+  <text x="72" y="29" text-anchor="middle" font-size="11" font-weight="600">Users</text>
+  <text x="72" y="44" text-anchor="middle" font-size="8.5">browser / mobile</text>
+  <line x1="136" y1="33" x2="190" y2="33" stroke="#333" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="163" y="47" text-anchor="middle" font-size="7.5">HTTPS/WSS</text>
+  <rect x="192" y="10" width="200" height="46" rx="7" fill="#fdf6dc" stroke="#b8920c" stroke-width="1.4"/>
+  <text x="292" y="28" text-anchor="middle" font-size="10.5" font-weight="600">Cloud Load Balancer (Ingress)</text>
+  <text x="292" y="43" text-anchor="middle" font-size="8.3">static IP · L7 path routing · health checks</text>
+  <rect x="470" y="10" width="120" height="40" rx="7" fill="#fff" stroke="#333"/>
+  <text x="530" y="27" text-anchor="middle" font-size="10" font-weight="600">Cloud Build</text>
+  <text x="530" y="41" text-anchor="middle" font-size="8">builds 10 images</text>
+  <line x1="590" y1="30" x2="626" y2="30" stroke="#333" stroke-width="1.4" marker-end="url(#ar)"/>
+  <rect x="628" y="10" width="124" height="40" rx="7" fill="#fff" stroke="#333"/>
+  <text x="690" y="27" text-anchor="middle" font-size="10" font-weight="600">Artifact Registry</text>
+  <text x="690" y="41" text-anchor="middle" font-size="8">versioned images</text>
+  <line x1="690" y1="50" x2="690" y2="94" stroke="#333" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#ar)"/>
+  <text x="696" y="76" font-size="7.5">image pull</text>
+  <line x1="292" y1="56" x2="292" y2="134" stroke="#b8920c" stroke-width="1.6" marker-end="url(#arY)"/>
+  <text x="300" y="67" font-size="7.6" fill="#7a6008">/ → web · /api/auth, /api/users → auth · /api/scrambles → scramble ·</text>
+  <text x="300" y="77" font-size="7.6" fill="#7a6008">/api/sessions, /api/solves → solve · /api/stats → stats · /api/leaderboards →</text>
+  <text x="300" y="87" font-size="7.6" fill="#7a6008">leaderboard · /api/race, /socket.io → race · /api/wca → wca</text>
+  <rect x="8" y="96" width="744" height="300" rx="10" fill="#f7f8fa" stroke="#555" stroke-dasharray="6 4"/>
+  <text x="20" y="111" font-size="9.5" font-weight="600">GKE Standard cluster · 3 × e2-standard-2 · australia-southeast1-a</text>
+  <text x="20" y="123" font-size="8">Deployments (≥ 2 replicas spread over nodes) · HPA · PDBs · probes · rolling update / rollback</text>
+  <g font-size="8">
+    <g transform="translate(20,138)"><rect x="4" y="-4" width="82" height="58" rx="6" fill="#e9ebef" stroke="#999"/><rect width="82" height="58" rx="6" fill="#fff" stroke="#333"/><text x="41" y="19" text-anchor="middle" font-size="10.5" font-weight="600">web</text><text x="41" y="33" text-anchor="middle">nginx · React SPA</text><text x="41" y="45" text-anchor="middle">HPA 2–6</text></g>
+    <g transform="translate(111,138)"><rect x="4" y="-4" width="82" height="58" rx="6" fill="#e9ebef" stroke="#999"/><rect width="82" height="58" rx="6" fill="#fff" stroke="#333"/><text x="41" y="19" text-anchor="middle" font-size="10.5" font-weight="600">auth</text><text x="41" y="33" text-anchor="middle">accounts · JWT</text><text x="41" y="45" text-anchor="middle">settings</text></g>
+    <g transform="translate(202,138)"><rect x="4" y="-4" width="82" height="58" rx="6" fill="#e9ebef" stroke="#999"/><rect width="82" height="58" rx="6" fill="#fdf6dc" stroke="#b8920c" stroke-width="1.3"/><text x="41" y="19" text-anchor="middle" font-size="10.5" font-weight="600">scramble</text><text x="41" y="33" text-anchor="middle">cubing.js (CPU)</text><text x="41" y="45" text-anchor="middle">HPA 2–8</text></g>
+    <g transform="translate(293,138)"><rect x="4" y="-4" width="82" height="58" rx="6" fill="#e9ebef" stroke="#999"/><rect width="82" height="58" rx="6" fill="#fff" stroke="#333"/><text x="41" y="19" text-anchor="middle" font-size="10.5" font-weight="600">solve</text><text x="41" y="33" text-anchor="middle">CRUD · import</text><text x="41" y="45" text-anchor="middle">outbox · HPA 2–6</text></g>
+    <g transform="translate(384,138)"><rect x="4" y="-4" width="82" height="58" rx="6" fill="#e9ebef" stroke="#999"/><rect width="82" height="58" rx="6" fill="#fff" stroke="#333"/><text x="41" y="19" text-anchor="middle" font-size="10.5" font-weight="600">stats</text><text x="41" y="33" text-anchor="middle">PBs · heatmap</text><text x="41" y="45" text-anchor="middle">event consumer</text></g>
+    <g transform="translate(475,138)"><rect x="4" y="-4" width="82" height="58" rx="6" fill="#e9ebef" stroke="#999"/><rect width="82" height="58" rx="6" fill="#fff" stroke="#333"/><text x="41" y="19" text-anchor="middle" font-size="10.5" font-weight="600">leaderboard</text><text x="41" y="33" text-anchor="middle">sorted sets</text><text x="41" y="45" text-anchor="middle">event consumer</text></g>
+    <g transform="translate(566,138)"><rect x="4" y="-4" width="82" height="58" rx="6" fill="#e9ebef" stroke="#999"/><rect width="82" height="58" rx="6" fill="#fdf6dc" stroke="#b8920c" stroke-width="1.3"/><text x="41" y="19" text-anchor="middle" font-size="10.5" font-weight="600">race</text><text x="41" y="33" text-anchor="middle">Socket.IO rooms</text><text x="41" y="45" text-anchor="middle">HPA 2–6</text></g>
+    <g transform="translate(657,138)"><rect x="4" y="-4" width="82" height="58" rx="6" fill="#e9ebef" stroke="#999"/><rect width="82" height="58" rx="6" fill="#fff" stroke="#333"/><text x="41" y="19" text-anchor="middle" font-size="10.5" font-weight="600">wca</text><text x="41" y="33" text-anchor="middle">ranks · records</text><text x="41" y="45" text-anchor="middle">percentiles</text></g>
+  </g>
+  <g stroke="#666" stroke-width="1.1" fill="none">
+    <path d="M152 196 V222 M243 196 V222 M334 196 V222 M425 196 V222 M516 196 V222 M607 196 V222 M698 196 V222 M152 222 H698"/>
+  </g>
+  <text x="425" y="234" text-anchor="middle" font-size="7.6" fill="#555">SQL · Redis commands · internal HTTP between services (ClusterIP Services)</text>
+  <line x1="199" y1="222" x2="199" y2="256" stroke="#666" stroke-width="1.1" marker-end="url(#ar)"/>
+  <line x1="569" y1="222" x2="569" y2="256" stroke="#666" stroke-width="1.1" marker-end="url(#ar)"/>
+  <rect x="40" y="258" width="318" height="74" rx="8" fill="#eef4ff" stroke="#2d539e" stroke-width="1.3"/>
+  <text x="199" y="276" text-anchor="middle" font-size="10.5" font-weight="600">PostgreSQL 17 (CloudNativePG operator)</text>
+  <text x="199" y="291" text-anchor="middle" font-size="8.3">primary + 2 streaming replicas · automatic failover</text>
+  <text x="199" y="304" text-anchor="middle" font-size="8.3">schema per service: auth · solve (+ outbox) · stats · scramble · wca</text>
+  <text x="199" y="317" text-anchor="middle" font-size="8.3">WCA export ≈ 2.3 M rows in 7 tables + ~100k seeded solves</text>
+  <rect x="398" y="258" width="342" height="74" rx="8" fill="#fdeeee" stroke="#b03a3a" stroke-width="1.3"/>
+  <text x="569" y="276" text-anchor="middle" font-size="10.5" font-weight="600">Redis 7 (StatefulSet + PVC)</text>
+  <text x="569" y="291" text-anchor="middle" font-size="8.3">Streams event bus: solve.created → stats &amp; leaderboard</text>
+  <text x="569" y="304" text-anchor="middle" font-size="8.3">leaderboard sorted sets · scramble pool · cache · rate limits</text>
+  <text x="569" y="317" text-anchor="middle" font-size="8.3">race room state + Socket.IO pub/sub adapter (cross-pod)</text>
+  <path d="M358 304 H396" stroke="#b8920c" stroke-width="1.6" fill="none" marker-end="url(#arY)"/>
+  <text x="377" y="298" text-anchor="middle" font-size="7.5" fill="#7a6008">outbox</text>
+  <rect x="40" y="344" width="318" height="40" rx="7" fill="#fff" stroke="#333"/>
+  <text x="199" y="361" text-anchor="middle" font-size="9.5" font-weight="600">CronJob wca-import (weekly)</text>
+  <text x="199" y="375" text-anchor="middle" font-size="8">downloads WCA export → staging schema → atomic swap</text>
+  <line x1="199" y1="344" x2="199" y2="334" stroke="#333" stroke-width="1.1" marker-end="url(#ar)"/>
+  <rect x="398" y="344" width="342" height="40" rx="7" fill="#fff" stroke="#333"/>
+  <text x="569" y="361" text-anchor="middle" font-size="9.5" font-weight="600">Jobs: seed · loadgen</text>
+  <text x="569" y="375" text-anchor="middle" font-size="8">synthetic users &amp; solves via the APIs · HPA load test</text>
+</svg>
+<figcaption>Figure 1. cubetype microservice architecture on Google Kubernetes Engine.</figcaption>
+</figure>
+
+<p><b>Workflow.</b> The Cloud Load Balancer, configured by the Ingress, routes each path prefix to its microservice. Every service runs at least two replicas spread across nodes, so traffic is balanced and a failed pod or node is bypassed while Kubernetes replaces it. When a solve is saved, <i>solve</i> writes it and an outbox event to PostgreSQL in one transaction; a relay publishes the event to a Redis Stream, where the <i>stats</i> and <i>leaderboard</i> consumer groups update personal bests and rankings asynchronously, so solves survive even a Redis outage. CPU-bound <i>scramble</i> pods keep a Redis pool full and are scaled from two to eight replicas by the HPA. Race rooms live in Redis and broadcast through the Socket.IO Redis adapter, so players on different <i>race</i> pods share a room. New versions are built by Cloud Build and rolled out pod by pod (maxUnavailable 0), with <code>kubectl rollout undo</code> for rollback. An in-app status page shows which pod served each request, making scaling, load balancing and rollouts visible live.</p>
+<p class="small">Data source: WCA results export, owned and maintained by the World Cube Association (worldcubeassociation.org/results).</p>
+</body>
+</html>
