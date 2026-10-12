@@ -2,3 +2,6 @@ export * from './config.js';
 export * from './errors.js';
 export * from './validate.js';
 export * from './server.js';
+export * from './db.js';
+export * from './redis.js';
+export * from './auth.js';
