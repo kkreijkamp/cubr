@@ -96,6 +96,17 @@ services:
     image: cubetype/solve:dev
     build: { context: ., dockerfile: services/solve/Dockerfile, args: *build-args }
 
+  # ---- frontend ----------------------------------------------------------------------------------
+  web:
+    image: cubetype/web:dev
+    build: { context: ., dockerfile: web/Dockerfile, args: *build-args }
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
   # ---- gateway: local stand-in for the GKE Ingress ----------------------------------------------
   gateway:
     image: nginx:1.27-alpine
@@ -104,6 +115,15 @@ services:
       - ./deploy/gateway/nginx.conf:/etc/nginx/nginx.conf:ro   # routing rules (see file header)
     ports:
       - "8080:8080"                   # THE entry point: http://localhost:8080
+    depends_on:
+      # Only web is required; API services are resolved per request (Docker DNS), so the gateway
+      # starts even if some of them are down and simply answers 502 JSON for their routes.
+      web: { condition: service_started }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
 
 volumes:
   pgdata:

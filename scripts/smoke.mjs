@@ -46,6 +46,10 @@ for (const p of ['/api/auth/_info', '/api/scrambles/_info', '/api/solves/_info']
 const internal = await req('GET', '/internal/users/00000000-0000-4000-8000-000000000000/solves');
 check('/internal/* is NOT exposed publicly', internal.status === 404 || internal.status === 403, `status ${internal.status}`);
 
+console.log('\nfrontend:');
+const html = await fetch(BASE + '/leaderboards').then((r) => r.text());
+check('SPA served for client routes', html.includes('<div id="root">'));
+
 console.log('\nauth:');
 const username = `smoke_${Date.now().toString(36)}`;
 const reg = await req('POST', '/api/auth/register', { username, email: `${username}@example.com`, password: 'smoke-test-pw' });
