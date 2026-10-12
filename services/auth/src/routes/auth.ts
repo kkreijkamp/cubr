@@ -1,7 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import type { FastifyInstance } from 'fastify';
-import { HttpError, conflict, parse, signToken, unauthorized, withTx } from '@cubetype/common';
+import {
+  HttpError,
+  conflict,
+  parse,
+  rateLimited,
+  revokedKey,
+  signToken,
+  unauthorized,
+  unavailable,
+  withTx,
+} from '@cubetype/common';
 import type { Deps } from './index.js';
 import {
   SETTINGS_MAX_BYTES,
@@ -17,6 +27,7 @@ import {
   toPrivateUser,
   type UserRow,
 } from '../users.js';
+import { allow, withTimeout } from '../safe.js';
 
 const BCRYPT_COST = 10;
 
@@ -26,7 +37,7 @@ const DUMMY_HASH = bcrypt.hash(randomUUID(), BCRYPT_COST);
 
 const pgCode = (err: unknown) => (err as { code?: string }).code;
 
-export async function registerAuthRoutes(app: FastifyInstance, { config, pool, auth }: Deps) {
+export async function registerAuthRoutes(app: FastifyInstance, { config, pool, redis, auth }: Deps) {
   /** Loads the authenticated user's row or rejects the (stale) token. */
   async function currentUser(userId: string): Promise<UserRow> {
     if (!UUID_RE.test(userId)) throw unauthorized();
@@ -37,6 +48,9 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, a
 
   // ---- POST /api/auth/register ----------------------------------------------------------------
   app.post('/api/auth/register', async (req, reply) => {
+    if (!(await allow(redis, `register:${req.ip}`, 20, 3600))) {
+      throw rateLimited('Too many registrations from this address, try again later');
+    }
     const body = parse(registerSchema, req.body);
     const passwordHash = await bcrypt.hash(body.password, BCRYPT_COST);
 
@@ -62,6 +76,9 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, a
 
   // ---- POST /api/auth/login -------------------------------------------------------------------
   app.post('/api/auth/login', async (req) => {
+    if (!(await allow(redis, `login:${req.ip}`, 10, 60))) {
+      throw rateLimited('Too many login attempts, try again in a minute');
+    }
     const body = parse(loginSchema, req.body);
     // Usernames cannot contain '@' and emails always do, so at most one row matches.
     const { rows } = await pool.query<UserRow & { password_hash: string }>(
@@ -81,6 +98,26 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, a
     const user = toPrivateUser(updated.rows[0] ?? found);
     const { token } = await signToken(config.jwtSecret, user);
     return { token, user };
+  });
+
+  // ---- POST /api/auth/logout ------------------------------------------------------------------
+  // Encapsulated so it can accept (and ignore) any body, including an empty body sent with
+  // `Content-Type: application/json`, which Fastify's default parser would reject with a 400.
+  await app.register(async (scope) => {
+    scope.removeAllContentTypeParsers();
+    scope.addContentTypeParser('*', { parseAs: 'string' }, (_req, _body, done) => done(null, undefined));
+    scope.post('/api/auth/logout', { preHandler: auth.requireAuth }, async (req, reply) => {
+      const user = req.user!;
+      // Revocation must outlive the token, so the TTL is the token's remaining lifetime.
+      const ttl = Math.max(1, user.exp - Math.floor(Date.now() / 1000));
+      const ok = await withTimeout(
+        redis.set(revokedKey(user.jti), '1', 'EX', ttl).then(() => true),
+        2000,
+        false,
+      );
+      if (!ok) throw unavailable('Could not revoke the token right now, please retry');
+      return reply.status(204).send();
+    });
   });
 
   // ---- GET /api/auth/me -----------------------------------------------------------------------

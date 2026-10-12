@@ -5,6 +5,7 @@ import {
   createPool,
   waitForPostgres,
   migrate,
+  createRedis,
   makeAuth,
 } from '@cubetype/common';
 import { migrations } from './migrations.js';
@@ -21,15 +22,18 @@ const server = createServer(config, {
       if (!migrated) throw new Error('migrations pending');
     },
   },
+  // Redis only backs rate limits and logout revocation → degrade, don't gate.
+  softChecks: { redis: () => redis.ping() },
 });
 const { app } = server;
 const pool = createPool(config.databaseUrl, { log: app.log });
-const auth = makeAuth(config.jwtSecret);
+const redis = createRedis(config.redisUrl, app.log);
+const auth = makeAuth(config.jwtSecret, redis);
 
-await registerRoutes(app, { config, pool, auth });
+await registerRoutes(app, { config, pool, redis, auth });
 
 // Listen first so liveness passes while Postgres boots; readiness stays 503 until migrated.
-await start(server, config, [() => pool.end()]);
+await start(server, config, [() => pool.end(), () => redis.quit()]);
 await waitForPostgres(pool, app.log);
 await migrate(pool, 'auth', migrations, app.log);
 migrated = true;

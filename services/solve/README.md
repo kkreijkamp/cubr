@@ -15,6 +15,7 @@ The core write path of cubetype: sessions and solves CRUD. Owns the Postgres sch
 | `GET /api/solves/_info`, `/api/sessions/_info` | info |
 
 Users only ever see their own rows; foreign ids return 404. A solve always gets the event of its session.
+Tokens revoked by logout are rejected (Redis lookup via common's `makeAuth`; fails open while Redis is down).
 
 ## Choices worth knowing
 - `id` and `scramble`/`penalty` on `POST /api/solves` are optional (server generates the id; defaults `''`/`OK`). `source` may be
@@ -24,10 +25,10 @@ Users only ever see their own rows; foreign ids return 404. A solve always gets 
 - Empty bodies sent with `Content-Type: application/json` (for example a DELETE from a fetch wrapper) are accepted.
 
 ## Env / run
-Standard vars (SPEC §4): `PORT DATABASE_URL JWT_SECRET APP_VERSION POD_NAME NODE_NAME LOG_LEVEL`.
+Standard vars (SPEC §4): `PORT DATABASE_URL REDIS_URL JWT_SECRET APP_VERSION POD_NAME NODE_NAME LOG_LEVEL`.
 ```
-docker compose up -d postgres
-PORT=8083 DATABASE_URL=postgres://cubetype:cubetype@localhost:55433/cubetype npm run dev -w services/solve
+docker compose up -d postgres redis
+PORT=8083 DATABASE_URL=postgres://cubetype:cubetype@localhost:55433/cubetype REDIS_URL=redis://localhost:56380 npm run dev -w services/solve
 npx vitest run services/solve        # unit tests: mapping, schemas
 docker build -f services/solve/Dockerfile -t cubetype/solve:dev .
 ```

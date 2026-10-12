@@ -1,9 +1,10 @@
 import type { FastifyRequest } from 'fastify';
-import { unauthorized, type AuthUser, type BaseConfig, type Pool, makeAuth } from '@cubetype/common';
+import { unauthorized, type AuthUser, type BaseConfig, type Pool, type Redis, makeAuth } from '@cubetype/common';
 
 export interface RouteContext {
   config: BaseConfig;
   pool: Pool;
+  redis: Redis;
   auth: ReturnType<typeof makeAuth>;
 }
 

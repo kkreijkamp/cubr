@@ -78,6 +78,10 @@ check('6 solves saved', saved === times.length, `${saved}/${times.length}`);
 console.log('\ncleanup:');
 const sessDel = await req('DELETE', `/api/sessions/${session.id}`);
 check('delete test session', sessDel.status === 204);
+const out = await req('POST', '/api/auth/logout');
+check('logout', out.status === 204);
+const after = await req('GET', '/api/auth/me');
+check('token revoked after logout', after.status === 401);
 
 console.log(failures ? `\n${failures} check(s) FAILED` : '\nall checks passed ✓');
 process.exit(failures ? 1 : 0);

@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 // ---------------------------------------------------------------------------------------------
 // Pure domain helpers for the auth service: request schemas, row → API mapping, small parsers.
-// Everything here is side-effect free so it can be unit-tested without Postgres.
+// Everything here is side-effect free so it can be unit-tested without Postgres/Redis.
 // ---------------------------------------------------------------------------------------------
 
 export const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/;
