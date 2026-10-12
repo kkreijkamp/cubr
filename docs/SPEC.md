@@ -415,7 +415,7 @@ React SPA, routes: `/` timer, `/leaderboards`, `/daily`, `/race`, `/race/:roomId
 Guest mode works fully offline in localStorage; logged-in users sync to solve-service with an
 optimistic local store + retry queue (idempotent ids). Monkeytype-style theme system via CSS
 custom properties, command palette (Esc / Ctrl+K), focus mode while timing, toasts.
-The design system and the page layouts are described in a separate frontend guide.
+The design system and the page layouts are described in `docs/FRONTEND.md`.
 
 ## 11. Kubernetes overview (deploy/k8s)
 
