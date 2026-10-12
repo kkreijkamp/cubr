@@ -1,6 +1,6 @@
 # auth service
 
-Accounts, JWT login and per-user settings (SPEC §7.1, §9.1). Owns Postgres schema `auth`
+Accounts, JWT login, profile and per-user settings (SPEC §7.1, §9.1). Owns Postgres schema `auth`
 (`users`, `user_settings`), migrated at startup. Fastify on :8080.
 
 | Route | Auth | Notes |
@@ -8,7 +8,11 @@ Accounts, JWT login and per-user settings (SPEC §7.1, §9.1). Owns Postgres sch
 | `POST /api/auth/register` | – | `{username, email, password}` → 201 `{token, user}`; 409 if username/email taken (case-insensitive) |
 | `POST /api/auth/login` | – | `{login, password}` (username or email) → `{token, user}`; 401 |
 | `GET /api/auth/me` | req | `{user: PrivateUser, settings}` |
-| `GET /api/auth/_info` | – | info |
+| `PATCH /api/auth/me` | req | `{displayName?, bio?, country?, wcaId?}`; `null` or `""` clears; country/wcaId are uppercased |
+| `PUT /api/auth/me/settings` | req | `{settings: object}`; > 16 KB JSON → 413 `PAYLOAD_TOO_LARGE` |
+| `GET /api/users/:username` | – | `{user: PublicUser}` (case-insensitive), 404 |
+| `GET /api/users?ids=a,b` | – | ≤ 100 ids (400 above), invalid uuids ignored, order preserved |
+| `GET /api/auth/_info`, `/api/users/_info` | – | info |
 
 - Passwords: bcryptjs cost 10 (async). Unknown logins still run a bcrypt compare against a dummy hash
   so response time doesn't reveal whether an account exists.

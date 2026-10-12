@@ -14,7 +14,7 @@ const config = loadConfig('auth');
 
 let migrated = false;
 const server = createServer(config, {
-  infoPrefixes: ['/api/auth'],
+  infoPrefixes: ['/api/auth', '/api/users'],
   checks: {
     postgres: () => pool.query('select 1'),
     migrations: async () => {

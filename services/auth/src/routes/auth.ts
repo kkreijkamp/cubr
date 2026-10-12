@@ -1,14 +1,19 @@
 import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import type { FastifyInstance } from 'fastify';
-import { conflict, parse, signToken, unauthorized, withTx } from '@cubetype/common';
+import { HttpError, conflict, parse, signToken, unauthorized, withTx } from '@cubetype/common';
 import type { Deps } from './index.js';
 import {
+  SETTINGS_MAX_BYTES,
   USER_COLUMNS,
   UUID_RE,
+  buildUserUpdate,
   conflictMessage,
+  jsonBytes,
   loginSchema,
+  patchMeSchema,
   registerSchema,
+  settingsSchema,
   toPrivateUser,
   type UserRow,
 } from '../users.js';
@@ -22,6 +27,14 @@ const DUMMY_HASH = bcrypt.hash(randomUUID(), BCRYPT_COST);
 const pgCode = (err: unknown) => (err as { code?: string }).code;
 
 export async function registerAuthRoutes(app: FastifyInstance, { config, pool, auth }: Deps) {
+  /** Loads the authenticated user's row or rejects the (stale) token. */
+  async function currentUser(userId: string): Promise<UserRow> {
+    if (!UUID_RE.test(userId)) throw unauthorized();
+    const { rows } = await pool.query<UserRow>(`select ${USER_COLUMNS} from auth.users where id = $1`, [userId]);
+    if (!rows[0]) throw unauthorized('Account no longer exists');
+    return rows[0];
+  }
+
   // ---- POST /api/auth/register ----------------------------------------------------------------
   app.post('/api/auth/register', async (req, reply) => {
     const body = parse(registerSchema, req.body);
@@ -82,5 +95,42 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, a
     );
     if (!rows[0]) throw unauthorized('Account no longer exists');
     return { user: toPrivateUser(rows[0]), settings: rows[0].settings };
+  });
+
+  // ---- PATCH /api/auth/me ---------------------------------------------------------------------
+  app.patch('/api/auth/me', { preHandler: auth.requireAuth }, async (req) => {
+    const patch = parse(patchMeSchema, req.body ?? {});
+    const { sets, values } = buildUserUpdate(patch);
+    if (sets.length === 0) return { user: toPrivateUser(await currentUser(req.user!.id)) };
+    if (!UUID_RE.test(req.user!.id)) throw unauthorized();
+
+    values.push(req.user!.id);
+    const { rows } = await pool.query<UserRow>(
+      `update auth.users set ${sets.join(', ')} where id = $${values.length} returning ${USER_COLUMNS}`,
+      values,
+    );
+    if (!rows[0]) throw unauthorized('Account no longer exists');
+    return { user: toPrivateUser(rows[0]) };
+  });
+
+  // ---- PUT /api/auth/me/settings --------------------------------------------------------------
+  app.put('/api/auth/me/settings', { preHandler: auth.requireAuth }, async (req) => {
+    const { settings } = parse(settingsSchema, req.body);
+    if (jsonBytes(settings) > SETTINGS_MAX_BYTES) {
+      throw new HttpError(413, 'PAYLOAD_TOO_LARGE', `settings must be at most ${SETTINGS_MAX_BYTES} bytes of JSON`);
+    }
+    if (!UUID_RE.test(req.user!.id)) throw unauthorized();
+    try {
+      const { rows } = await pool.query<{ settings: Record<string, unknown> }>(
+        `insert into auth.user_settings (user_id, settings, updated_at) values ($1, $2::jsonb, now())
+         on conflict (user_id) do update set settings = excluded.settings, updated_at = now()
+         returning settings`,
+        [req.user!.id, JSON.stringify(settings)],
+      );
+      return { settings: rows[0].settings };
+    } catch (err) {
+      if (pgCode(err) === '23503') throw unauthorized('Account no longer exists'); // FK: user gone
+      throw err;
+    }
   });
 }

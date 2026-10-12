@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, ApiError, getToken, onUnauthorized, setToken } from './api';
+import { mergeServerSettings, setSettingsServerSync } from './settings';
 import { toast } from './toast';
 import type { PrivateUser } from './types';
 
@@ -35,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     currentUser = u;
     setUserState(u);
     setStatus(u ? 'authed' : 'guest');
+    setSettingsServerSync(u ? (s) => api.auth.saveSettings(s as unknown as Record<string, unknown>) : null);
     listeners.forEach((l) => l(u));
   }, []);
 
@@ -52,7 +54,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const ctrl = new AbortController();
     api.auth
       .me(ctrl.signal)
-      .then(({ user: u }) => {
+      .then(({ user: u, settings }) => {
+        mergeServerSettings(settings);
         applyUser(u);
       })
       .catch((err) => {
@@ -71,6 +74,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       async login(login, password) {
         const res = await api.auth.login({ login, password });
         setToken(res.token);
+        try {
+          const me = await api.auth.me();
+          mergeServerSettings(me.settings);
+        } catch {
+          /* settings are optional */
+        }
         applyUser(res.user);
       },
       async register(username, email, password) {

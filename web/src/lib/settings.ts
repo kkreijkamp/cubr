@@ -1,4 +1,5 @@
-// User settings, persisted in localStorage.
+// User settings: persisted in localStorage for everyone, synced to the auth service
+// (PUT /api/auth/me/settings) for logged-in users so they follow you across devices.
 import { applyTheme, DEFAULT_THEME } from './themes';
 import { createStore, loadJson, saveJson, useStore } from './store';
 
@@ -69,13 +70,37 @@ export function applyVisualSettings(): void {
   applyFont(s.font);
 }
 
-export function updateSettings(patch: Partial<Settings>): void {
+let serverSync: ((s: Settings) => Promise<unknown>) | null = null;
+let syncTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** The auth layer installs a function that pushes settings to the server (or null when logged out). */
+export function setSettingsServerSync(fn: ((s: Settings) => Promise<unknown>) | null): void {
+  serverSync = fn;
+}
+
+export function updateSettings(patch: Partial<Settings>, opts: { sync?: boolean } = {}): void {
   const prev = settingsStore.get();
   const next = { ...prev, ...patch };
   settingsStore.set(next);
   saveJson(KEY, next);
   if (patch.theme && patch.theme !== prev.theme) applyTheme(next.theme);
   if (patch.font && patch.font !== prev.font) applyFont(next.font);
+  if (opts.sync !== false && serverSync) {
+    if (syncTimer) clearTimeout(syncTimer);
+    const fn = serverSync;
+    syncTimer = setTimeout(() => {
+      fn(settingsStore.get()).catch(() => {
+        /* offline — local copy is still saved */
+      });
+    }, 800);
+  }
+}
+
+/** Server settings win over local ones when you log in. */
+export function mergeServerSettings(remote: Record<string, unknown> | null | undefined): void {
+  if (!remote || Object.keys(remote).length === 0) return;
+  updateSettings(sanitize({ ...settingsStore.get(), ...(remote as Partial<Settings>) }), { sync: false });
+  applyVisualSettings();
 }
 
 export function useSettings(): Settings {

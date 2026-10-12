@@ -3,6 +3,7 @@
 import type {
   Penalty,
   PrivateUser,
+  PublicUser,
   Session,
   Solve,
 } from './types';
@@ -122,6 +123,9 @@ export const api = {
     login: (body: { login: string; password: string }) => request<{ token: string; user: PrivateUser }>('POST', '/api/auth/login', body),
     logout: () => request<void>('POST', '/api/auth/logout'),
     me: (signal?: AbortSignal) => get<{ user: PrivateUser; settings: Record<string, unknown> }>('/api/auth/me', signal),
+    updateMe: (body: Partial<Pick<PublicUser, 'displayName' | 'bio' | 'country' | 'wcaId'>>) =>
+      request<{ user: PrivateUser }>('PATCH', '/api/auth/me', body),
+    saveSettings: (settings: Record<string, unknown>) => request<{ settings: Record<string, unknown> }>('PUT', '/api/auth/me/settings', { settings }),
   },
   scrambles: {
     get: (event: string, count = 1) => get<{ event: string; scrambles: string[]; source: string }>(`/api/scrambles/${enc(event)}${qs({ count })}`),

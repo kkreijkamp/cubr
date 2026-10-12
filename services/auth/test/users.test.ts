@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildUserUpdate,
   conflictMessage,
+  jsonBytes,
   loginSchema,
+  parseIdList,
+  patchMeSchema,
   registerSchema,
+  settingsSchema,
   toPrivateUser,
   toPublicUser,
   type UserRow,
@@ -46,6 +51,46 @@ describe('loginSchema', () => {
   });
 });
 
+describe('patchMeSchema', () => {
+  it('uppercases country and wcaId', () => {
+    expect(patchMeSchema.parse({ country: 'au', wcaId: '2015abcd01' })).toEqual({ country: 'AU', wcaId: '2015ABCD01' });
+  });
+  it('treats null and blank strings as clear', () => {
+    expect(patchMeSchema.parse({ country: null, bio: '  ', displayName: '' })).toEqual({
+      country: null,
+      bio: null,
+      displayName: null,
+    });
+  });
+  it('leaves missing fields undefined', () => {
+    expect(patchMeSchema.parse({})).toEqual({});
+  });
+  it.each([
+    [{ country: 'AUS' }],
+    [{ country: 'A1' }],
+    [{ wcaId: '15ABCD01' }],
+    [{ wcaId: '2015KRE101' }],
+    [{ displayName: 'x'.repeat(41) }],
+    [{ bio: 'x'.repeat(281) }],
+    [{ bio: 42 }],
+  ])('rejects %j', (input) => {
+    expect(patchMeSchema.safeParse(input).success).toBe(false);
+  });
+});
+
+describe('settingsSchema / jsonBytes', () => {
+  it('accepts objects, rejects arrays and primitives', () => {
+    expect(settingsSchema.safeParse({ settings: { theme: 'serika' } }).success).toBe(true);
+    expect(settingsSchema.safeParse({ settings: [1, 2] }).success).toBe(false);
+    expect(settingsSchema.safeParse({ settings: 'x' }).success).toBe(false);
+    expect(settingsSchema.safeParse({ settings: null }).success).toBe(false);
+  });
+  it('measures UTF-8 bytes of the JSON', () => {
+    expect(jsonBytes({ a: 1 })).toBe(7);
+    expect(jsonBytes({ a: 'é' })).toBe(10);
+  });
+});
+
 describe('row mapping', () => {
   it('maps to PublicUser without email or password', () => {
     const u = toPublicUser(row);
@@ -71,6 +116,30 @@ describe('row mapping', () => {
     const u = toPublicUser({ ...row, country: '  ', created_at: '2026-01-02T03:04:05Z' });
     expect(u.country).toBeNull();
     expect(u.createdAt).toBe('2026-01-02T03:04:05.000Z');
+  });
+});
+
+describe('buildUserUpdate', () => {
+  it('only includes provided fields with positional params', () => {
+    expect(buildUserUpdate({ bio: 'hi', country: null })).toEqual({
+      sets: ['bio = $1', 'country = $2'],
+      values: ['hi', null],
+    });
+    expect(buildUserUpdate({})).toEqual({ sets: [], values: [] });
+  });
+});
+
+describe('parseIdList', () => {
+  const a = '6f1c1b5e-1f3a-4f7e-9a51-2b8f3c4d5e6f';
+  const b = '00000000-0000-4000-8000-000000000001';
+  it('drops invalid ids and duplicates, keeps order, lowercases', () => {
+    expect(parseIdList(`${b}, nope ,${a.toUpperCase()},${b},`)).toEqual([b, a]);
+  });
+  it('returns [] for empty input and null when over the limit', () => {
+    expect(parseIdList(undefined)).toEqual([]);
+    expect(parseIdList('')).toEqual([]);
+    expect(parseIdList(Array(101).fill(a).join(','))).toBeNull();
+    expect(parseIdList(Array(100).fill(a).join(','))).toEqual([a]);
   });
 });
 
