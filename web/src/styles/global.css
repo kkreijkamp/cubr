@@ -348,6 +348,33 @@ textarea:focus-visible {
   grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
 }
 
+/* test-config style card of text buttons (event picker etc.) */
+.config-bar {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+.config-card {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  background: var(--sub-alt-color);
+  border-radius: var(--roundness);
+  padding: 0 0.5em;
+}
+.config-card .btn-text {
+  padding: 0.6rem 0.5em;
+}
+.config-card .divider {
+  width: 0.25em;
+  height: 1.5em;
+  border-radius: 0.25em;
+  background: var(--bg-color);
+  margin: 0 0.5em;
+}
+
 /* ---------------------------------------------------------------- inputs */
 input,
 textarea,

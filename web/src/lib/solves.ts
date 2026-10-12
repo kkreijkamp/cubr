@@ -174,3 +174,24 @@ export async function addSolve(input: AddSolveInput): Promise<Solve> {
   commit();
   return solve;
 }
+
+export async function switchSession(sessionId: string): Promise<void> {
+  const s = sessionById(sessionId);
+  if (!s) throw new Error('Unknown session');
+  model.current = sessionId;
+  model.lastByEvent = { ...model.lastByEvent, [s.event]: sessionId };
+  commit();
+}
+
+function findSessionFor(event: string): Session | undefined {
+  const last = sessionById(model.lastByEvent[event]);
+  if (last && last.event === event) return last;
+  return model.sessions.find((s) => s.event === event);
+}
+
+/** Switch to the first session of `event`, creating one if none exists. */
+export async function switchEvent(event: string): Promise<void> {
+  if (!isEventId(event)) throw new Error(`Unknown event ${event}`);
+  const s = findSessionFor(event) ?? createSessionInternal(suggestSessionNameFor(event), event);
+  await switchSession(s.id);
+}
