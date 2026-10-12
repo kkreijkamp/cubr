@@ -263,6 +263,9 @@ export default function TimerPage() {
         inspection={settings.inspection}
         onToggleInspection={() => updateSettings({ inspection: !settings.inspection })}
         onOverlayChange={onOverlayChange}
+        mode={st.mode}
+        pending={st.pending}
+        syncError={st.syncError}
       />
 
       <ScrambleBar scramble={scr.current} onNext={scr.next} />
@@ -300,7 +303,7 @@ export default function TimerPage() {
       <div className={`tp-bottom cols-${cols}`}>
         <StatsPanel stats={stats} ns={ns} solves={solves} precision={settings.precision} onOpenSolve={openSolve} />
         {settings.showSolveList && (
-          <SolveList solves={solves} ao5={ao5} ao12={ao12} bestIndex={stats.bestIndex} precision={settings.precision} onOpen={openSolve} />
+          <SolveList solves={solves} ao5={ao5} ao12={ao12} bestIndex={stats.bestIndex} precision={settings.precision} loading={st.loading || !st.ready} onOpen={openSolve} />
         )}
       </div>
 

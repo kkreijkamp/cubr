@@ -1,6 +1,19 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { decodeLocalDb, encodeLocalDb, insertChrono, sortChrono, uuid } from '../storeUtils';
-import type { Solve } from '../../lib/types';
+import {
+  backoffDelay,
+  coalesce,
+  decodeLocalDb,
+  decodeQueue,
+  encodeLocalDb,
+  insertChrono,
+  overlaySessions,
+  overlaySolves,
+  sortChrono,
+  uuid,
+  type QueuedOp,
+  type SyncOp,
+} from '../storeUtils';
+import type { Session, Solve } from '../../lib/types';
 
 const isEvent = (id: string) => ['333', '222', 'pyram'].includes(id);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -8,6 +21,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f
 function solve(id: string, at: number, extra: Partial<Solve> = {}): Solve {
   return { id, sessionId: 's1', event: '333', timeMs: 10_000 + at, penalty: 'OK', scramble: 'R U', comment: null, source: 'timer', createdAt: new Date(at).toISOString(), ...extra };
 }
+const op = (o: SyncOp, opId = Math.random().toString(36).slice(2)): QueuedOp => ({ opId, userId: 'u1', op: o, attempts: 0, createdAt: 0 });
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -84,5 +98,100 @@ describe('local db codec', () => {
     expect(again.dropped).toBe(0);
     expect(again.db.solves.get('s1')).toEqual(list);
     expect(again.db.sessions).toEqual(db.sessions);
+  });
+
+  it('decodeQueue filters malformed entries', () => {
+    expect(decodeQueue('x')).toEqual([]);
+    const good = op({ kind: 'deleteSolve', id: 'a', sessionId: 's' });
+    expect(decodeQueue([good, { opId: 1 }, null, { ...good, op: { kind: 'evil' } }])).toEqual([good]);
+  });
+});
+
+describe('queue coalescing', () => {
+  const create = op(
+    { kind: 'createSolve', solve: { id: 'a', sessionId: 's1', event: '333', timeMs: 1000, penalty: 'OK', scramble: 'R', createdAt: 'x' } },
+    'c1',
+  );
+
+  it('folds edits into an unsent create', () => {
+    const q = coalesce([create], op({ kind: 'updateSolve', id: 'a', sessionId: 's1', patch: { penalty: 'DNF' } }), null);
+    expect(q).toHaveLength(1);
+    expect((q[0].op as Extract<SyncOp, { kind: 'createSolve' }>).solve.penalty).toBe('DNF');
+  });
+
+  it('does not touch the op that is in flight', () => {
+    const q = coalesce([create], op({ kind: 'updateSolve', id: 'a', sessionId: 's1', patch: { penalty: '+2' } }), 'c1');
+    expect(q).toHaveLength(2);
+    expect((q[0].op as Extract<SyncOp, { kind: 'createSolve' }>).solve.penalty).toBe('OK');
+  });
+
+  it('drops everything about a solve deleted before it was sent', () => {
+    let q = coalesce([create], op({ kind: 'updateSolve', id: 'a', sessionId: 's1', patch: { comment: 'x' } }), null);
+    q = coalesce(q, op({ kind: 'deleteSolve', id: 'a', sessionId: 's1' }), null);
+    expect(q).toEqual([]);
+  });
+
+  it('merges consecutive updates and keeps deletes of synced solves', () => {
+    let q = coalesce([], op({ kind: 'updateSolve', id: 'z', sessionId: 's1', patch: { penalty: '+2' } }), null);
+    q = coalesce(q, op({ kind: 'updateSolve', id: 'z', sessionId: 's1', patch: { comment: 'hi' } }), null);
+    expect(q).toHaveLength(1);
+    expect(q[0].op).toMatchObject({ patch: { penalty: '+2', comment: 'hi' } });
+    q = coalesce(q, op({ kind: 'deleteSolve', id: 'z', sessionId: 's1' }), null);
+    expect(q.map((x) => x.op.kind)).toEqual(['deleteSolve']);
+  });
+
+  it('handles sessions the same way', () => {
+    const cs = op({ kind: 'createSession', session: { id: 's9', name: 'a', event: '333', createdAt: 'x' } });
+    let q = coalesce([cs], op({ kind: 'renameSession', id: 's9', name: 'b' }), null);
+    expect(q[0].op).toMatchObject({ session: { name: 'b' } });
+    q = coalesce(q, op({ kind: 'createSolve', solve: { id: 'q', sessionId: 's9', event: '333', timeMs: 1, penalty: 'OK', scramble: '', createdAt: 'x' } }), null);
+    q = coalesce(q, op({ kind: 'deleteSession', id: 's9' }), null);
+    expect(q).toEqual([]);
+  });
+});
+
+describe('backoff', () => {
+  it('grows exponentially with jitter and caps at a minute', () => {
+    expect(backoffDelay(0, () => 0.5)).toBe(1000);
+    expect(backoffDelay(3, () => 0.5)).toBe(8000);
+    expect(backoffDelay(30, () => 0.5)).toBe(60_000);
+    expect(backoffDelay(0, () => 0)).toBe(750);
+    expect(backoffDelay(0, () => 0.9999)).toBeLessThanOrEqual(1250);
+  });
+});
+
+describe('optimistic overlays', () => {
+  const session: Session = { id: 's1', name: 'main', event: '333', createdAt: 'x', updatedAt: 'x', solveCount: 2 };
+  it('applies session ops', () => {
+    const out = overlaySessions(
+      [session],
+      [
+        { kind: 'createSession', session: { id: 's2', name: 'new', event: '222', createdAt: 'y' } },
+        { kind: 'renameSession', id: 's1', name: 'renamed' },
+        { kind: 'createSession', session: { id: 's1', name: 'dup', event: '333', createdAt: 'y' } },
+      ],
+    );
+    expect(out.map((s) => [s.id, s.name])).toEqual([
+      ['s1', 'renamed'],
+      ['s2', 'new'],
+    ]);
+    expect(overlaySessions(out, [{ kind: 'deleteSession', id: 's2' }]).map((s) => s.id)).toEqual(['s1']);
+  });
+
+  it('applies solve ops idempotently', () => {
+    const server = [solve('a', 1), solve('b', 3)];
+    const ops: SyncOp[] = [
+      { kind: 'createSolve', solve: { id: 'c', sessionId: 's1', event: '333', timeMs: 5, penalty: 'OK', scramble: '', createdAt: new Date(2).toISOString() } },
+      { kind: 'createSolve', solve: { id: 'a', sessionId: 's1', event: '333', timeMs: 5, penalty: 'OK', scramble: '', createdAt: new Date(9).toISOString() } },
+      { kind: 'createSolve', solve: { id: 'other', sessionId: 's2', event: '333', timeMs: 5, penalty: 'OK', scramble: '', createdAt: new Date(9).toISOString() } },
+      { kind: 'updateSolve', id: 'b', sessionId: 's1', patch: { penalty: 'DNF' } },
+      { kind: 'deleteSolve', id: 'a', sessionId: 's1' },
+    ];
+    const out = overlaySolves('s1', server, ops);
+    expect(out.map((s) => [s.id, s.penalty])).toEqual([
+      ['c', 'OK'],
+      ['b', 'DNF'],
+    ]);
+    expect(overlaySolves('s1', out, ops)).toEqual(out);
   });
 });

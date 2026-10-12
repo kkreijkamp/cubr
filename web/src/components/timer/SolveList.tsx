@@ -3,6 +3,7 @@ import { List, MessageSquareText } from 'lucide-react';
 import type { Precision } from '@cubetype/cubestats';
 import type { Solve } from '../../lib/types';
 import { fmtAvg, fmtSolveShort } from './statsUtil';
+import { Loading } from '../Spinner';
 
 interface Props {
   solves: Solve[];
@@ -10,11 +11,12 @@ interface Props {
   ao12: (number | null)[];
   bestIndex: number | null;
   precision: Precision;
+  loading: boolean;
   onOpen: (index: number) => void;
 }
 
 /** Newest-first solve list with the rolling ao5 / ao12 after each solve. */
-export const SolveList = memo(function SolveList({ solves, ao5, ao12, bestIndex, precision, onOpen }: Props) {
+export const SolveList = memo(function SolveList({ solves, ao5, ao12, bestIndex, precision, loading, onOpen }: Props) {
   const n = solves.length;
   const rows = [];
   for (let r = 0; r < n; r++) {
@@ -45,7 +47,9 @@ export const SolveList = memo(function SolveList({ solves, ao5, ao12, bestIndex,
       <div className="tp-panel-title">
         <List size={14} /> solves
       </div>
-      {n === 0 ? (
+      {loading && n === 0 ? (
+        <Loading />
+      ) : n === 0 ? (
         <div className="tp-empty">
           no solves in this session yet
           <span>your times will appear here</span>

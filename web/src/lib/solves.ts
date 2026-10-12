@@ -2,23 +2,58 @@
 //
 // CONTRACT (other pages rely on these exports):
 //  - Guest mode ("local"): everything persists in localStorage; works with no backend at all.
+//  - Logged-in mode ("cloud"): data lives in solve-service. Writes are optimistic (UI updates
+//    immediately) and queued; failed requests (network / 5xx) are retried with backoff — solve
+//    and session ids are generated client-side, so retries are idempotent. 4xx → revert + toast.
+//  - Switches automatically on login/logout (onAuthChange from ./auth).
 //
 // Implementation notes
 //  - Local data: `cubetype.local.v1` (compact tuples, see timer/storeUtils.ts), written debounced
 //    and flushed on pagehide.
+//  - Cloud writes go through a persistent FIFO queue (`cubetype.queue.v1`) processed one op at a
+//    time; unsent edits are coalesced into their create. Network/5xx/429 → exponential backoff
+//    (1 s … 60 s, retried immediately on `online`). Server reads are overlaid with queued ops so
+//    optimistic changes survive reloads.
 import { getEvent, isEventId, type Penalty } from '@cubetype/cubestats';
+import { api, ApiError, getToken } from './api';
+import { getCurrentUser, onAuthChange } from './auth';
 import { settingsStore, updateSettings } from './settings';
-import { createStore, useStore } from './store';
-import type { Session, Solve } from './types';
-import { decodeLocalDb, emptyLocalDb, encodeLocalDb, insertChrono, LOCAL_KEY, uuid, type LocalDb } from '../timer/storeUtils';
+import { createStore, loadJson, saveJson, useStore } from './store';
+import { toast } from './toast';
+import type { PrivateUser, Session, Solve } from './types';
+import {
+  backoffDelay,
+  coalesce,
+  decodeLocalDb,
+  decodeQueue,
+  emptyLocalDb,
+  encodeLocalDb,
+  insertChrono,
+  LOCAL_KEY,
+  overlaySessions,
+  overlaySolves,
+  QUEUE_KEY,
+  sortChrono,
+  uuid,
+  type LocalDb,
+  type QueuedOp,
+  type SyncOp,
+} from '../timer/storeUtils';
 
 export interface SolveState {
   /** initial load finished */
   ready: boolean;
+  mode: 'local' | 'cloud';
   sessions: Session[];
   currentSessionId: string | null;
   /** solves of the current session, chronological (oldest first) */
   solves: Solve[];
+  /** number of writes waiting to be synced to the server */
+  pending: number;
+  /** last sync error message, if the server is unreachable */
+  syncError: string | null;
+  /** the current session's solves are being fetched (cloud mode, first visit of a session) */
+  loading: boolean;
 }
 
 export interface AddSolveInput {
@@ -32,32 +67,80 @@ const EMPTY: Solve[] = [];
 
 export const solveStore = createStore<SolveState>({
   ready: false,
+  mode: 'local',
   sessions: [],
   currentSessionId: null,
   solves: EMPTY,
+  pending: 0,
+  syncError: null,
+  loading: false,
 });
 
 export function useSolveState(): SolveState {
   return useStore(solveStore);
 }
 
+export function getCurrentSession(): Session | null {
+  const s = solveStore.get();
+  return s.sessions.find((x) => x.id === s.currentSessionId) ?? null;
+}
+
 // ================================================================ module state
 
 const browser = typeof window !== 'undefined' && typeof document !== 'undefined';
 
-/** the guest database: what the UI shows, persisted in localStorage */
-let model: LocalDb = emptyLocalDb();
+type Scope = { mode: 'local' } | { mode: 'cloud'; userId: string };
+let scope: Scope | null = null;
+/** bumps on every scope change so late async results from a previous scope are ignored */
+let gen = 0;
+
+/** the guest database (always the persisted local data, also while logged in) */
+let localDb: LocalDb = emptyLocalDb();
 let localDirty = false;
 let localTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** what the UI shows: === localDb in local mode, a cache of the server in cloud mode */
+let model: LocalDb = localDb;
+
+let loadError: string | null = null;
+let queueError: string | null = null;
+
+function errorMessage(e: unknown): string {
+  if (e instanceof ApiError) return e.isUnavailable ? 'solve service unreachable' : e.message;
+  return (e as Error)?.message || 'something went wrong';
+}
+
+function userId(): string | null {
+  return scope?.mode === 'cloud' ? scope.userId : null;
+}
 
 function publish(extra: Partial<SolveState> = {}): void {
   solveStore.set((prev) => ({
     ...prev,
+    mode: scope?.mode ?? 'local',
     sessions: model.sessions,
     currentSessionId: model.current,
     solves: (model.current && model.solves.get(model.current)) || EMPTY,
+    pending: pendingCount(),
+    syncError: queueError ?? loadError,
     ...extra,
   }));
+}
+
+/** Resolves once the initial load of the active scope has finished. */
+function whenReady(timeoutMs = 15_000): Promise<void> {
+  if (solveStore.get().ready) return Promise.resolve();
+  return new Promise((resolve) => {
+    const t = setTimeout(done, timeoutMs);
+    const unsub = solveStore.subscribe(() => {
+      if (solveStore.get().ready) done();
+    });
+    function done() {
+      clearTimeout(t);
+      unsub();
+      resolve();
+    }
+  });
 }
 
 // ================================================================ local persistence
@@ -91,11 +174,146 @@ function flushLocal(): void {
   localTimer = null;
   if (!localDirty) return;
   try {
-    if (model.sessions.length === 0) localStorage.removeItem(LOCAL_KEY);
-    else localStorage.setItem(LOCAL_KEY, encodeLocalDb(model));
+    if (localDb.sessions.length === 0) localStorage.removeItem(LOCAL_KEY);
+    else localStorage.setItem(LOCAL_KEY, encodeLocalDb(localDb));
     localDirty = false;
   } catch {
     /* storage full or disabled: the data stays in memory */
+  }
+}
+
+// ================================================================ retry queue
+
+let queue: QueuedOp[] = browser ? decodeQueue(loadJson<unknown>(QUEUE_KEY, [])) : [];
+let inflight: string | null = null;
+let pumping = false;
+let backoffN = 0;
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+function saveQueue(): void {
+  saveJson(QUEUE_KEY, queue);
+}
+
+function pendingCount(): number {
+  const uid = userId();
+  if (!uid) return 0;
+  let n = 0;
+  for (const q of queue) if (q.userId === uid) n++;
+  return n;
+}
+
+/** queued ops of the current user, oldest first */
+function overlayOps(): SyncOp[] {
+  const uid = userId();
+  return queue.filter((q) => q.userId === uid).map((q) => q.op);
+}
+
+function enqueue(op: SyncOp): string {
+  const uid = userId();
+  if (!uid) throw new Error('not logged in');
+  const item: QueuedOp = { opId: uuid(), userId: uid, op, attempts: 0, createdAt: Date.now() };
+  queue = coalesce(queue, item, inflight);
+  saveQueue();
+  if (!retryTimer) void pump();
+  return item.opId;
+}
+
+function isRetryable(e: unknown): boolean {
+  if (!(e instanceof ApiError)) return true; // TypeError / abort: treat as network
+  return e.isUnavailable || e.status >= 500 || e.status === 429 || e.status === 408;
+}
+
+async function send(op: SyncOp): Promise<void> {
+  const ignore404 = (e: unknown) => {
+    if (e instanceof ApiError && e.status === 404) return;
+    throw e;
+  };
+  switch (op.kind) {
+    case 'createSession':
+      await api.sessions.create({ id: op.session.id, name: op.session.name, event: op.session.event });
+      return;
+    case 'renameSession':
+      await api.sessions.rename(op.id, op.name).catch(ignore404);
+      return;
+    case 'deleteSession':
+      await api.sessions.remove(op.id).catch(ignore404);
+      return;
+    case 'createSolve': {
+      const { event: _event, ...body } = op.solve;
+      await api.solves.create(body);
+      return;
+    }
+    case 'updateSolve':
+      await api.solves.update(op.id, op.patch).catch(ignore404);
+      return;
+    case 'deleteSolve':
+      await api.solves.remove(op.id).catch(ignore404);
+      return;
+  }
+}
+
+function scheduleRetry(): void {
+  if (retryTimer) clearTimeout(retryTimer);
+  retryTimer = setTimeout(() => {
+    retryTimer = null;
+    void pump();
+  }, backoffDelay(backoffN++));
+}
+
+async function pump(): Promise<void> {
+  if (pumping || !browser) return;
+  const uid = userId();
+  if (!uid || !getToken()) return;
+  pumping = true;
+  const g = gen;
+  try {
+    for (;;) {
+      if (g !== gen) break;
+      const head = queue.find((q) => q.userId === uid);
+      if (!head) {
+        if (queueError) {
+          queueError = null;
+          publish();
+        }
+        break;
+      }
+      inflight = head.opId;
+      try {
+        await send(head.op);
+        inflight = null;
+        queue = queue.filter((q) => q.opId !== head.opId);
+        saveQueue();
+        backoffN = 0;
+        const hadError = queueError || loadError;
+        queueError = null;
+        publish();
+        if (hadError && loadError) void refreshCloud();
+      } catch (e) {
+        inflight = null;
+        if (g !== gen) break;
+        if (e instanceof ApiError && e.status === 401) {
+          // token expired/revoked: the auth layer logs out; ops stay queued for the next login
+          break;
+        }
+        if (isRetryable(e)) {
+          head.attempts++;
+          saveQueue();
+          queueError = errorMessage(e);
+          publish();
+          scheduleRetry();
+          break;
+        }
+        // permanent rejection (validation, conflict …): drop it and re-sync to revert
+        queue = queue.filter((q) => q.opId !== head.opId);
+        saveQueue();
+        toast.error(`Couldn't save your change: ${errorMessage(e)}`);
+        publish();
+        void refreshCloud();
+      }
+    }
+  } finally {
+    inflight = null;
+    pumping = false;
   }
 }
 
@@ -127,11 +345,12 @@ export function suggestSessionName(event: string): string {
   for (let i = 2; ; i++) if (!taken.has(`${base} ${i}`.toLowerCase())) return `${base} ${i}`;
 }
 
-function loadLocalScope(): void {
-  model = readLocal();
+async function loadLocalScope(): Promise<void> {
+  localDb = readLocal();
+  model = localDb;
   if (!pickCurrent()) createSessionInternal(suggestSessionNameFor(defaultEvent()), defaultEvent());
   model.current = pickCurrent();
-  publish({ ready: true });
+  publish({ ready: true, loading: false });
 }
 
 function suggestSessionNameFor(event: string): string {
@@ -141,15 +360,130 @@ function suggestSessionNameFor(event: string): string {
   for (let i = 2; ; i++) if (!taken.has(`${base} ${i}`.toLowerCase())) return `${base} ${i}`;
 }
 
+let solveReq = 0;
+
+async function loadCloudScope(uid: string, g: number, keepCurrent = false): Promise<void> {
+  let sessions: Session[] | null = null;
+  try {
+    sessions = (await api.sessions.list()).sessions;
+    loadError = null;
+  } catch (e) {
+    if (g !== gen) return;
+    if (e instanceof ApiError && e.status === 401) return; // auth layer switches to local
+    loadError = errorMessage(e);
+  }
+  if (g !== gen) return;
+  const prevCurrent = model.current;
+  const prevSolves = model.solves;
+  const base = sessions ?? model.sessions;
+  model = {
+    sessions: overlaySessions(base, overlayOps()),
+    solves: keepCurrent ? prevSolves : new Map(),
+    current: keepCurrent ? prevCurrent : null,
+    lastByEvent: keepCurrent ? model.lastByEvent : {},
+  };
+  let cur = pickCurrent();
+  if (!cur) cur = createSessionInternal(suggestSessionNameFor(defaultEvent()), defaultEvent()).id;
+  model.current = cur;
+  publish();
+  await loadSessionSolves(cur, g);
+  if (g !== gen) return;
+  publish({ ready: true, loading: false });
+  void pump();
+}
+
+async function loadSessionSolves(sid: string, g: number): Promise<void> {
+  const uid = userId();
+  if (!uid) return;
+  const unsynced = queue.some((q) => q.userId === uid && q.op.kind === 'createSession' && q.op.session.id === sid);
+  if (unsynced) {
+    model.solves.set(sid, overlaySolves(sid, model.solves.get(sid) ?? [], overlayOps()));
+    publish({ loading: false });
+    return;
+  }
+  const req = ++solveReq;
+  if (!model.solves.has(sid)) publish({ loading: true });
+  try {
+    const { solves } = await api.sessions.solves(sid);
+    if (g !== gen) return;
+    const list = overlaySolves(sid, sortChrono(solves), overlayOps());
+    model.solves.set(sid, list);
+    model.sessions = model.sessions.map((s) => (s.id === sid && s.solveCount !== list.length ? { ...s, solveCount: list.length } : s));
+    if (req === solveReq) publish({ loading: false });
+    else publish();
+  } catch (e) {
+    if (g !== gen) return;
+    if (e instanceof ApiError && e.status === 404) {
+      // deleted on another device
+      model.sessions = model.sessions.filter((s) => s.id !== sid);
+      model.solves.delete(sid);
+      if (model.current === sid) {
+        model.current = null;
+        let cur = pickCurrent();
+        if (!cur) cur = createSessionInternal(suggestSessionNameFor(defaultEvent()), defaultEvent()).id;
+        model.current = cur;
+        publish();
+        await loadSessionSolves(cur, g);
+      }
+      return;
+    }
+    if (!(e instanceof ApiError && e.status === 401)) loadError = errorMessage(e);
+    if (!model.solves.has(sid)) model.solves.set(sid, overlaySolves(sid, [], overlayOps()));
+    if (req === solveReq) publish({ loading: false });
+  }
+}
+
+/** Re-reads sessions + current solves from the server, keeping the current session. */
+async function refreshCloud(): Promise<void> {
+  const uid = userId();
+  if (!uid) return;
+  await loadCloudScope(uid, gen, true);
+}
+
+// ================================================================ auth / scope switching
+
+function handleAuth(user: PrivateUser | null): void {
+  const next: Scope = user ? { mode: 'cloud', userId: user.id } : { mode: 'local' };
+  if (scope && scope.mode === next.mode && (next.mode === 'local' || (scope.mode === 'cloud' && scope.userId === next.userId))) return;
+  flushLocal();
+  gen++;
+  scope = next;
+  loadError = null;
+  queueError = null;
+  backoffN = 0;
+  if (retryTimer) clearTimeout(retryTimer);
+  retryTimer = null;
+  if (next.mode === 'local') {
+    void loadLocalScope();
+    return;
+  }
+  model = emptyLocalDb();
+  solveStore.set({ ready: false, mode: 'cloud', sessions: [], currentSessionId: null, solves: EMPTY, pending: pendingCount(), syncError: null, loading: true });
+  void loadCloudScope(next.userId, gen);
+}
+
 if (browser) {
-  loadLocalScope();
+  onAuthChange(handleAuth);
+  const u = getCurrentUser();
+  if (u) handleAuth(u);
+  else if (!getToken()) handleAuth(null);
+  // else: a token exists and the auth check is in flight — AuthProvider will call us
+
   window.addEventListener('pagehide', () => flushLocal());
+  window.addEventListener('online', () => {
+    if (!userId()) return;
+    backoffN = 0;
+    if (retryTimer) clearTimeout(retryTimer);
+    retryTimer = null;
+    void pump();
+    if (loadError) void refreshCloud();
+  });
 }
 
 // ================================================================ mutations
 
 function commit(): void {
-  saveLocalSoon();
+  if (scope?.mode !== 'cloud') saveLocalSoon();
   publish();
 }
 
@@ -178,12 +512,21 @@ function createSessionInternal(name: string, event: string): Session {
   const session: Session = { id: uuid(), name, event, createdAt: now, updatedAt: now, solveCount: 0 };
   model.sessions = [...model.sessions, session];
   model.solves.set(session.id, []);
-  saveLocalSoon();
+  if (scope?.mode === 'cloud') enqueue({ kind: 'createSession', session: { id: session.id, name, event, createdAt: now } });
+  else saveLocalSoon();
   return session;
+}
+
+/** Load (or reload) sessions + current session's solves for the active mode. */
+export async function reloadSolves(): Promise<void> {
+  if (!scope) return whenReady();
+  if (scope.mode === 'local') return loadLocalScope();
+  return refreshCloud();
 }
 
 /** Append a solve to the current session. Resolves with the stored solve. */
 export async function addSolve(input: AddSolveInput): Promise<Solve> {
+  if (!solveStore.get().ready) await whenReady();
   const timeMs = Math.round(input.timeMs);
   if (!Number.isFinite(timeMs) || timeMs < 1 || timeMs > 86_400_000) throw new Error('Time must be between 0.001 s and 24 h');
   const session = sessionById(model.current);
@@ -202,6 +545,24 @@ export async function addSolve(input: AddSolveInput): Promise<Solve> {
   const list = model.solves.get(session.id);
   if (list) model.solves.set(session.id, insertChrono(list, solve));
   patchSession(session.id, { solveCount: (list?.length ?? session.solveCount) + 1, updatedAt: solve.createdAt });
+  if (scope?.mode !== 'cloud') {
+    commit();
+    return solve;
+  }
+  enqueue({
+    kind: 'createSolve',
+    solve: {
+      id: solve.id,
+      sessionId: solve.sessionId,
+      event: solve.event,
+      timeMs,
+      penalty: solve.penalty,
+      scramble: solve.scramble,
+      comment: solve.comment,
+      source: solve.source,
+      createdAt: solve.createdAt,
+    },
+  });
   commit();
   return solve;
 }
@@ -212,6 +573,7 @@ function updateSolveLocal(solveId: string, patch: { penalty?: Penalty; comment?:
   const next = hit.list.slice();
   next[hit.index] = { ...next[hit.index], ...patch };
   model.solves.set(hit.sid, next);
+  if (scope?.mode === 'cloud') enqueue({ kind: 'updateSolve', id: solveId, sessionId: hit.sid, patch });
   commit();
   return true;
 }
@@ -236,10 +598,12 @@ export async function deleteSolve(solveId: string): Promise<void> {
   next.splice(hit.index, 1);
   model.solves.set(hit.sid, next);
   patchSession(hit.sid, { solveCount: next.length });
+  if (scope?.mode === 'cloud') enqueue({ kind: 'deleteSolve', id: solveId, sessionId: hit.sid });
   commit();
 }
 
 export async function createSession(name: string, event: string): Promise<Session> {
+  if (!solveStore.get().ready) await whenReady();
   if (!isEventId(event)) throw new Error(`Unknown event ${event}`);
   const s = createSessionInternal(validName(name), event);
   commit();
@@ -251,6 +615,7 @@ export async function renameSession(sessionId: string, name: string): Promise<vo
   const s = sessionById(sessionId);
   if (!s || s.name === n) return;
   patchSession(sessionId, { name: n, updatedAt: new Date().toISOString() });
+  if (scope?.mode === 'cloud') enqueue({ kind: 'renameSession', id: sessionId, name: n });
   commit();
 }
 
@@ -260,6 +625,7 @@ export async function deleteSession(sessionId: string): Promise<void> {
   model.sessions = model.sessions.filter((x) => x.id !== sessionId);
   model.solves.delete(sessionId);
   for (const [ev, id] of Object.entries(model.lastByEvent)) if (id === sessionId) delete model.lastByEvent[ev];
+  if (scope?.mode === 'cloud') enqueue({ kind: 'deleteSession', id: sessionId });
   if (model.current === sessionId) {
     const sibling = [...model.sessions].reverse().find((x) => x.event === s.event);
     const next = sibling ?? createSessionInternal(suggestSessionNameFor(s.event), s.event);
@@ -276,7 +642,10 @@ export async function switchSession(sessionId: string): Promise<void> {
   model.current = sessionId;
   model.lastByEvent = { ...model.lastByEvent, [s.event]: sessionId };
   if (settingsStore.get().lastEvent !== s.event) updateSettings({ lastEvent: s.event });
-  commit();
+  if (scope?.mode === 'cloud') {
+    publish();
+    await loadSessionSolves(sessionId, gen);
+  } else commit();
 }
 
 function findSessionFor(event: string): Session | undefined {
@@ -287,6 +656,7 @@ function findSessionFor(event: string): Session | undefined {
 
 /** Switch to the first session of `event`, creating one if none exists. */
 export async function switchEvent(event: string): Promise<void> {
+  if (!solveStore.get().ready) await whenReady();
   if (!isEventId(event)) throw new Error(`Unknown event ${event}`);
   const s = findSessionFor(event) ?? createSessionInternal(suggestSessionNameFor(event), event);
   await switchSession(s.id);

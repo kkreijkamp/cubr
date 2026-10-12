@@ -23,6 +23,23 @@
   padding-left: 0.42em;
   padding-right: 0.42em;
 }
+.tp-sync {
+  gap: 0.4em;
+  color: var(--sub-color);
+  padding: 0 0.85em !important;
+  cursor: default;
+  font-size: 0.75rem;
+  transition: color var(--dur);
+}
+.tp-sync.warn {
+  color: var(--error-color);
+}
+.tp-sync svg {
+  flex-shrink: 0;
+}
+.tp-spin {
+  animation: spin 1.2s linear infinite;
+}
 
 /* session dropdown */
 .tp-session {

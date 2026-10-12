@@ -15,7 +15,17 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+/** Listeners notified on login/logout (e.g. the solve store switches between local and cloud). */
+type AuthListener = (user: PrivateUser | null) => void;
+const listeners = new Set<AuthListener>();
+export function onAuthChange(fn: AuthListener): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
 let currentUser: PrivateUser | null = null;
+export function getCurrentUser(): PrivateUser | null {
+  return currentUser;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>(getToken() ? 'loading' : 'guest');
@@ -25,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     currentUser = u;
     setUserState(u);
     setStatus(u ? 'authed' : 'guest');
+    listeners.forEach((l) => l(u));
   }, []);
 
   useEffect(() => {

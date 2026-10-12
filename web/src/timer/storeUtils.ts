@@ -1,6 +1,7 @@
 // Pure helpers behind lib/solves.ts (kept free of browser globals so they can be unit-tested):
-// compact localStorage codec.
+// compact localStorage codec, retry-queue coalescing, optimistic overlays, backoff.
 import type { Penalty } from '@cubetype/cubestats';
+import type { NewSolve } from '../lib/api';
 import type { Session, Solve } from '../lib/types';
 
 // ---------------------------------------------------------------- ids
@@ -177,4 +178,146 @@ export function encodeLocalDb(db: LocalDb): string {
   };
   for (const s of db.sessions) file.solves[s.id] = (db.solves.get(s.id) ?? []).map(encodeSolve);
   return JSON.stringify(file);
+}
+
+// ---------------------------------------------------------------- retry queue
+
+export const QUEUE_KEY = 'cubetype.queue.v1';
+
+export type SyncOp =
+  | { kind: 'createSession'; session: { id: string; name: string; event: string; createdAt: string } }
+  | { kind: 'renameSession'; id: string; name: string }
+  | { kind: 'deleteSession'; id: string }
+  | { kind: 'createSolve'; solve: NewSolve & { event: string; createdAt: string } }
+  | { kind: 'updateSolve'; id: string; sessionId: string; patch: { penalty?: Penalty; comment?: string | null } }
+  | { kind: 'deleteSolve'; id: string; sessionId: string };
+
+export interface QueuedOp {
+  opId: string;
+  userId: string;
+  op: SyncOp;
+  attempts: number;
+  createdAt: number;
+}
+
+const OP_KINDS = new Set(['createSession', 'renameSession', 'deleteSession', 'createSolve', 'updateSolve', 'deleteSolve']);
+
+export function decodeQueue(raw: unknown): QueuedOp[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (q): q is QueuedOp =>
+      !!q && typeof q === 'object' && isStr(q.opId) && isStr(q.userId) && !!q.op && typeof q.op === 'object' && OP_KINDS.has(q.op.kind),
+  );
+}
+
+const solveIdOf = (op: SyncOp): string | null =>
+  op.kind === 'createSolve' ? op.solve.id : op.kind === 'updateSolve' || op.kind === 'deleteSolve' ? op.id : null;
+const sessionIdOf = (op: SyncOp): string | null =>
+  op.kind === 'createSession'
+    ? op.session.id
+    : op.kind === 'renameSession' || op.kind === 'deleteSession'
+      ? op.id
+      : op.kind === 'createSolve'
+        ? op.solve.sessionId
+        : op.sessionId;
+
+/**
+ * Adds `next` to the queue, merging it into ops that have not been sent yet:
+ *  - edits of a not-yet-created solve/session are folded into the create;
+ *  - deleting a not-yet-created solve/session drops every op about it (nothing to send at all).
+ * `inflightOpId` (the op currently being sent) is never modified.
+ */
+export function coalesce(queue: QueuedOp[], next: QueuedOp, inflightOpId: string | null): QueuedOp[] {
+  const editable = (q: QueuedOp) => q.userId === next.userId && q.opId !== inflightOpId;
+  const op = next.op;
+  if (op.kind === 'updateSolve') {
+    const i = queue.findIndex((q) => editable(q) && q.op.kind === 'createSolve' && q.op.solve.id === op.id);
+    if (i >= 0) {
+      const create = queue[i].op as Extract<SyncOp, { kind: 'createSolve' }>;
+      const merged: QueuedOp = { ...queue[i], op: { ...create, solve: { ...create.solve, ...op.patch } } };
+      return queue.map((q, k) => (k === i ? merged : q));
+    }
+    const j = queue.findIndex((q) => editable(q) && q.op.kind === 'updateSolve' && q.op.id === op.id);
+    if (j >= 0) {
+      const prev = queue[j].op as Extract<SyncOp, { kind: 'updateSolve' }>;
+      const merged: QueuedOp = { ...queue[j], op: { ...prev, patch: { ...prev.patch, ...op.patch } } };
+      return queue.map((q, k) => (k === j ? merged : q));
+    }
+  }
+  if (op.kind === 'deleteSolve') {
+    const created = queue.some((q) => editable(q) && q.op.kind === 'createSolve' && q.op.solve.id === op.id);
+    const rest = queue.filter((q) => !(editable(q) && solveIdOf(q.op) === op.id));
+    return created ? rest : [...rest, next];
+  }
+  if (op.kind === 'renameSession') {
+    const i = queue.findIndex((q) => editable(q) && q.op.kind === 'createSession' && q.op.session.id === op.id);
+    if (i >= 0) {
+      const create = queue[i].op as Extract<SyncOp, { kind: 'createSession' }>;
+      const merged: QueuedOp = { ...queue[i], op: { ...create, session: { ...create.session, name: op.name } } };
+      return queue.map((q, k) => (k === i ? merged : q));
+    }
+    const rest = queue.filter((q) => !(editable(q) && q.op.kind === 'renameSession' && q.op.id === op.id));
+    return [...rest, next];
+  }
+  if (op.kind === 'deleteSession') {
+    const created = queue.some((q) => editable(q) && q.op.kind === 'createSession' && q.op.session.id === op.id);
+    const rest = queue.filter((q) => !(editable(q) && sessionIdOf(q.op) === op.id));
+    return created ? rest : [...rest, next];
+  }
+  return [...queue, next];
+}
+
+/** Exponential backoff with ±25 % jitter: 1 s, 2 s, 4 s … capped at 60 s. */
+export function backoffDelay(attempt: number, rand: () => number = Math.random): number {
+  const base = Math.min(60_000, 1000 * 2 ** Math.max(0, Math.min(attempt, 16)));
+  return Math.round(base * (0.75 + rand() * 0.5));
+}
+
+// ---------------------------------------------------------------- optimistic overlays (cloud)
+
+/** Applies queued (unsynced) session ops on top of the server's session list. */
+export function overlaySessions(server: Session[], ops: SyncOp[]): Session[] {
+  let out = server.slice();
+  for (const op of ops) {
+    if (op.kind === 'createSession') {
+      if (!out.some((s) => s.id === op.session.id)) {
+        out.push({ ...op.session, updatedAt: op.session.createdAt, solveCount: 0 });
+      }
+    } else if (op.kind === 'renameSession') {
+      out = out.map((s) => (s.id === op.id ? { ...s, name: op.name } : s));
+    } else if (op.kind === 'deleteSession') {
+      out = out.filter((s) => s.id !== op.id);
+    }
+  }
+  return out;
+}
+
+/** Applies queued solve ops for one session on top of the server's (chronological) solve list. */
+export function overlaySolves(sessionId: string, server: Solve[], ops: SyncOp[]): Solve[] {
+  let out = server;
+  let ids: Set<string> | null = null;
+  for (const op of ops) {
+    if (op.kind === 'createSolve' && op.solve.sessionId === sessionId) {
+      ids ??= new Set(out.map((s) => s.id));
+      if (ids.has(op.solve.id)) continue;
+      ids.add(op.solve.id);
+      const s = op.solve;
+      out = insertChrono(out, {
+        id: s.id,
+        sessionId: s.sessionId,
+        event: s.event,
+        timeMs: s.timeMs,
+        penalty: s.penalty,
+        scramble: s.scramble,
+        comment: s.comment ?? null,
+        source: s.source ?? 'timer',
+        createdAt: s.createdAt,
+      });
+    } else if (op.kind === 'updateSolve' && op.sessionId === sessionId) {
+      out = out.map((s) => (s.id === op.id ? { ...s, ...op.patch } : s));
+    } else if (op.kind === 'deleteSolve' && op.sessionId === sessionId) {
+      out = out.filter((s) => s.id !== op.id);
+    }
+  }
+  return out;
 }

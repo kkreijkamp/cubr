@@ -1,7 +1,10 @@
 // Thin typed client for every cubetype microservice. All calls are same-origin paths that the
 // Ingress (cloud) or gateway (local) routes to the right service — see docs/SPEC.md §3.
 import type {
+  Penalty,
   PrivateUser,
+  Session,
+  Solve,
 } from './types';
 
 export class ApiError extends Error {
@@ -101,6 +104,17 @@ const qs = (params: Record<string, string | number | boolean | null | undefined>
 };
 const enc = encodeURIComponent;
 
+export interface NewSolve {
+  id: string;
+  sessionId: string;
+  timeMs: number;
+  penalty: Penalty;
+  scramble: string;
+  comment?: string | null;
+  source?: string;
+  createdAt?: string;
+}
+
 export const api = {
   auth: {
     register: (body: { username: string; email: string; password: string }) =>
@@ -111,5 +125,17 @@ export const api = {
   },
   scrambles: {
     get: (event: string, count = 1) => get<{ event: string; scrambles: string[]; source: string }>(`/api/scrambles/${enc(event)}${qs({ count })}`),
+  },
+  sessions: {
+    list: (signal?: AbortSignal) => get<{ sessions: Session[] }>('/api/sessions', signal),
+    create: (body: { id?: string; name: string; event: string }) => request<{ session: Session }>('POST', '/api/sessions', body),
+    rename: (id: string, name: string) => request<{ session: Session }>('PATCH', `/api/sessions/${enc(id)}`, { name }),
+    remove: (id: string) => request<void>('DELETE', `/api/sessions/${enc(id)}`),
+    solves: (id: string, signal?: AbortSignal) => get<{ solves: Solve[] }>(`/api/sessions/${enc(id)}/solves`, signal),
+  },
+  solves: {
+    create: (body: NewSolve) => request<{ solve: Solve }>('POST', '/api/solves', body),
+    update: (id: string, body: { penalty?: Penalty; comment?: string | null }) => request<{ solve: Solve }>('PATCH', `/api/solves/${enc(id)}`, body),
+    remove: (id: string) => request<void>('DELETE', `/api/solves/${enc(id)}`),
   },
 };

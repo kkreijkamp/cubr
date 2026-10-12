@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, Eye, Layers, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Check, ChevronDown, Cloud, CloudOff, Eye, HardDrive, Layers, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { EVENTS, getEvent } from '@cubetype/cubestats';
 import type { Session } from '../../lib/types';
 import { formatNumber } from '../../lib/format';
@@ -22,6 +22,9 @@ interface Props {
   onToggleInspection: () => void;
   /** a popover/menu is open (the timer is paused meanwhile) */
   onOverlayChange: (open: boolean) => void;
+  mode: 'local' | 'cloud';
+  pending: number;
+  syncError: string | null;
 }
 
 export function ConfigBar(p: Props) {
@@ -78,6 +81,8 @@ export function ConfigBar(p: Props) {
           <span>inspection</span>
         </button>
       </div>
+
+      <SyncStatus mode={p.mode} pending={p.pending} syncError={p.syncError} />
     </div>
   );
 }
@@ -177,6 +182,36 @@ function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, 
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function SyncStatus({ mode, pending, syncError }: { mode: 'local' | 'cloud'; pending: number; syncError: string | null }) {
+  let icon = <HardDrive size={14} />;
+  let label = 'local';
+  let tip = 'guest mode: solves are saved in this browser';
+  let cls = '';
+  if (mode === 'cloud') {
+    if (pending > 0) {
+      icon = syncError ? <CloudOff size={14} /> : <RefreshCw size={14} className="tp-spin" />;
+      label = `${pending} unsynced`;
+      tip = syncError ? `${syncError} — retrying automatically` : 'syncing…';
+      cls = syncError ? ' warn' : '';
+    } else if (syncError) {
+      icon = <CloudOff size={14} />;
+      label = 'offline';
+      tip = `${syncError} — showing cached solves`;
+      cls = ' warn';
+    } else {
+      icon = <Cloud size={14} />;
+      label = 'synced';
+      tip = 'all solves are saved to your account';
+    }
+  }
+  return (
+    <div className={`config-card tp-sync${cls}`} data-tip={tip} data-tip-pos="down" role="status" aria-label={tip}>
+      {icon}
+      <span>{label}</span>
     </div>
   );
 }
