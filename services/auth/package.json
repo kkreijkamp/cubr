@@ -1,0 +1,16 @@
+{
+  "name": "@cubetype/auth",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts"
+  },
+  "dependencies": {
+    "@cubetype/common": "*",
+    "fastify": "^5.12.7",
+    "zod": "^3.25.76",
+    "bcryptjs": "^3.0.3",
+    "pg": "^8.23.1"
+  }
+}
