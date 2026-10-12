@@ -1,0 +1,50 @@
+import type { Migration } from '@cubetype/common';
+
+// Schema `solve` exactly as in docs/SPEC.md §7.2. `migrate()` creates the schema itself and
+// tracks applied ids in solve.schema_migrations (advisory-locked, safe with many replicas).
+export const migrations: Migration[] = [
+  {
+    id: '001_init',
+    sql: `
+CREATE TABLE solve.sessions (
+  id         uuid PRIMARY KEY,
+  user_id    uuid NOT NULL,
+  name       text NOT NULL,
+  event      text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX sessions_user ON solve.sessions (user_id, created_at);
+
+CREATE TABLE solve.solves (
+  id          uuid PRIMARY KEY,
+  user_id     uuid NOT NULL,
+  session_id  uuid NOT NULL REFERENCES solve.sessions(id) ON DELETE CASCADE,
+  event       text NOT NULL,
+  time_ms     integer NOT NULL CHECK (time_ms > 0),
+  penalty     text NOT NULL DEFAULT 'OK' CHECK (penalty IN ('OK','+2','DNF')),
+  scramble    text NOT NULL,
+  comment     text,
+  source      text NOT NULL DEFAULT 'timer' CHECK (source IN ('timer','manual','import','race','daily','seed')),
+  daily_date  date,
+  daily_index smallint,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  inserted_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX solves_session_time ON solve.solves (session_id, created_at);
+CREATE INDEX solves_user_event_time ON solve.solves (user_id, event, created_at);
+CREATE UNIQUE INDEX solves_daily_unique ON solve.solves (user_id, daily_date, event, daily_index) WHERE daily_date IS NOT NULL;
+
+-- Transactional outbox: events are written in the same transaction as the solve, then
+-- relayed to the Redis stream by a background loop (src/outbox.ts).
+CREATE TABLE solve.outbox (
+  id           bigserial PRIMARY KEY,
+  type         text NOT NULL,
+  payload      jsonb NOT NULL,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  published_at timestamptz
+);
+CREATE INDEX outbox_unpublished ON solve.outbox (id) WHERE published_at IS NULL;
+`,
+  },
+];

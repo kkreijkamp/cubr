@@ -3,6 +3,8 @@
 # ---------------------------------------------------------------------------------------------
 #   docker compose up -d --build                 # build all images and start the whole stack
 #   open http://localhost:8080                   # gateway = same routes as the GKE Ingress
+#   docker compose up -d --scale solve=3         # 3 solve replicas; the gateway round-robins
+#   docker compose logs -f gateway               # access log shows upstream=<container ip>
 #   docker compose down                          # stop (add -v to also delete the volumes)
 #
 # The gateway is the only entry point for the app (http://localhost:8080). Postgres and Redis
@@ -27,6 +29,7 @@ x-service-env: &service-env
   # per replica, so X-Served-By shows which replica answered.
   AUTH_URL: http://auth:8080
   SCRAMBLE_URL: http://scramble:8080
+  SOLVE_URL: http://solve:8080
 
 x-service: &service
   restart: unless-stopped            # come back after crashes / docker restarts
@@ -87,6 +90,11 @@ services:
     <<: *service
     image: cubetype/scramble:dev
     build: { context: ., dockerfile: services/scramble/Dockerfile, args: *build-args }
+
+  solve:
+    <<: *service
+    image: cubetype/solve:dev
+    build: { context: ., dockerfile: services/solve/Dockerfile, args: *build-args }
 
   # ---- gateway: local stand-in for the GKE Ingress ----------------------------------------------
   gateway:

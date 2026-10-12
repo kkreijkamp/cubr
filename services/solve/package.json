@@ -1,0 +1,17 @@
+{
+  "name": "@cubetype/solve",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "node ../../scripts/build-service.mjs ."
+  },
+  "dependencies": {
+    "@cubetype/common": "*",
+    "@cubetype/cubestats": "*",
+    "fastify": "^5.12.7",
+    "zod": "^3.25.76",
+    "pg": "^8.23.1"
+  }
+}
