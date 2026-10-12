@@ -26,6 +26,7 @@ x-service-env: &service-env
   # POD_NAME is not set: services fall back to os.hostname() = the container id, which differs
   # per replica, so X-Served-By shows which replica answered.
   AUTH_URL: http://auth:8080
+  SCRAMBLE_URL: http://scramble:8080
 
 x-service: &service
   restart: unless-stopped            # come back after crashes / docker restarts
@@ -35,7 +36,7 @@ x-service: &service
     interval: 10s
     timeout: 3s
     retries: 3
-    start_period: 60s
+    start_period: 60s                # scramble may need a while on first start
   depends_on:
     postgres: { condition: service_healthy }
     redis: { condition: service_healthy }
@@ -81,6 +82,11 @@ services:
     <<: *service
     image: cubetype/auth:dev
     build: { context: ., dockerfile: services/auth/Dockerfile, args: *build-args }
+
+  scramble:
+    <<: *service
+    image: cubetype/scramble:dev
+    build: { context: ., dockerfile: services/scramble/Dockerfile, args: *build-args }
 
   # ---- gateway: local stand-in for the GKE Ingress ----------------------------------------------
   gateway:

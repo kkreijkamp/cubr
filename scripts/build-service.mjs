@@ -1,8 +1,11 @@
 // Bundles one service (or job) into a single ESM file: <dir>/dist/index.mjs
 // Usage: node scripts/build-service.mjs services/auth
 // Workspace packages (@cubetype/*) and all pure-JS npm deps are inlined, so the runtime
-// Docker image only needs `node` + this one file.
+// Docker image only needs `node` + this one file. Packages listed in the service's
+// package.json "cubetype.external" array (e.g. cubing, which spawns worker threads) are
+// left as imports and must be copied into the image's node_modules.
 import { build } from 'esbuild';
+import fs from 'node:fs';
 import path from 'node:path';
 
 const dir = process.argv[2];
@@ -10,7 +13,8 @@ if (!dir) {
   console.error('usage: node scripts/build-service.mjs <service-dir>');
   process.exit(1);
 }
-const external = ['pg-native'];
+const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+const external = ['pg-native', ...(pkg.cubetype?.external ?? [])];
 
 await build({
   entryPoints: [path.join(dir, 'src/index.ts')],
