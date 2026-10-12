@@ -1,0 +1,167 @@
+/* Settings page — Monkeytype settings layout. */
+.settings-page {
+  display: grid;
+  gap: 3.5rem;
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.st-quicknav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.15rem 0.25rem;
+  background: var(--sub-alt-color);
+  border-radius: var(--roundness);
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
+  position: sticky;
+  top: 0.75rem;
+  z-index: 20;
+}
+.st-quicknav .btn-text {
+  padding: 0.55rem 0.6rem;
+  gap: 0.4em;
+}
+
+.st-section {
+  display: grid;
+  gap: 2rem;
+  scroll-margin-top: 4.5rem;
+}
+.st-section-title {
+  font-size: 2.25rem;
+  color: var(--sub-color);
+  line-height: 1;
+}
+.st-section-body {
+  display: grid;
+  gap: 2.25rem;
+}
+
+.st-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 0.5rem 2.5rem;
+  align-items: center;
+}
+.st-row.wide {
+  grid-template-columns: minmax(0, 1fr);
+}
+.st-row .h3 {
+  margin-bottom: 0.4rem;
+}
+.st-desc {
+  color: var(--text-color);
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+.st-controls {
+  min-width: 0;
+}
+.st-controls > .btn {
+  width: 100%;
+}
+
+.st-size {
+  display: grid;
+  gap: 0.75rem;
+}
+.st-size-preview {
+  text-align: center;
+  color: var(--main-color);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  padding: 0.75rem;
+  border-radius: var(--roundness);
+  box-shadow: inset 0 0 0 2px var(--sub-alt-color);
+  transition: font-size var(--dur);
+  overflow: hidden;
+}
+
+.st-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.st-chips .btn {
+  flex: 1 0 4.25rem;
+}
+
+.st-fonts .btn {
+  font-size: 0.95rem;
+}
+
+/* theme tiles */
+.st-themes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr));
+  gap: 0.6rem;
+}
+.st-theme {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.85rem 0.9rem;
+  border: 0;
+  border-radius: var(--roundness);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-align: left;
+  box-shadow: inset 0 0 0 2px transparent;
+  transition: box-shadow var(--dur);
+}
+.st-theme:hover {
+  box-shadow: 0 0 0 2px var(--text-color);
+}
+.st-theme.active {
+  box-shadow: 0 0 0 2px var(--bg-color), 0 0 0 4px var(--main-color);
+}
+.st-theme-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.st-theme-dots {
+  display: inline-flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+.st-theme-dots i {
+  display: block;
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+}
+
+@media (max-width: 860px) {
+  .st-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.9rem;
+  }
+}
+@media (max-width: 560px) {
+  /* two theme tiles per row on phones */
+  .st-themes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+  .st-theme {
+    padding: 0.75rem 0.65rem;
+  }
+  .st-theme-dots i:not(:first-child) {
+    display: none;
+  }
+  .settings-page {
+    gap: 2.5rem;
+  }
+  .st-section-title {
+    font-size: 1.75rem;
+  }
+  .st-quicknav {
+    position: static;
+  }
+}

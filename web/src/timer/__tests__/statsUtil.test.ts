@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { fmtAvg, fmtSolveLong, fmtSolveShort } from '../../components/timer/statsUtil';
+import { fmtAvg, fmtSolveLong, fmtSolveShort, parseAvgKey, statNs } from '../../components/timer/statsUtil';
+
+describe('stat keys', () => {
+  it('parses mo3/aoN', () => {
+    expect(parseAvgKey('mo3')).toBe(3);
+    expect(parseAvgKey('ao12')).toBe(12);
+    expect(parseAvgKey('ao3')).toBeNull();
+    expect(parseAvgKey('mo5')).toBeNull();
+    expect(parseAvgKey('x')).toBeNull();
+    expect(statNs(['ao100', 'mo3', 'ao5', 'ao5', 'bogus'])).toEqual([3, 5, 100]);
+  });
+});
 
 describe('formatting', () => {
   it('rounds averages but truncates singles', () => {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { EVENTS, effectiveMs, getEvent, rollingAverage, sessionStats, type Penalty, type Precision } from '@cubetype/cubestats';
+import { EVENTS, effectiveMs, getEvent, rollingAverage, sessionStats, type Penalty } from '@cubetype/cubestats';
 import { TimerDisplay } from '../timer/TimerDisplay';
 import { useTimerEngine, type TimerResult, type TimerState } from '../timer/useTimerEngine';
 import { useScrambleQueue } from '../timer/useScrambleQueue';
@@ -10,8 +10,9 @@ import { SolveList } from '../components/timer/SolveList';
 import { SolveModal } from '../components/timer/SolveModal';
 import { QuickActions } from '../components/timer/QuickActions';
 import { ConfirmModal, PromptModal } from '../components/timer/Dialogs';
-import { fmtAvg, fmtSolveShort } from '../components/timer/statsUtil';
+import { fmtAvg, fmtSolveShort, statNs } from '../components/timer/statsUtil';
 import '../components/timer/timer-page.css';
+import { updateSettings, useSettings } from '../lib/settings';
 import {
   addSolve,
   createSession,
@@ -36,34 +37,29 @@ type ModalState =
   | { kind: 'comment'; solveId: string }
   | null;
 
-const HOLD_MS = 300;
-const PRECISION: Precision = 2;
-const TIMER_SIZE = 7;
-/** averages in the stats panel: mo3, ao5, ao12, ao100 */
-const STATS_NS = [3, 5, 12, 100];
-const DEFAULT_EVENT = '333';
-
 function isTyping(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
   return el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName);
 }
 
 export default function TimerPage() {
+  const settings = useSettings();
   const st = useSolveState();
 
   const session = st.sessions.find((s) => s.id === st.currentSessionId) ?? null;
-  const event = session?.event ?? DEFAULT_EVENT;
+  const event = session?.event ?? settings.lastEvent;
   const eventInfo = getEvent(event) ?? EVENTS[0];
   const scr = useScrambleQueue(event);
 
-  const [inspection, setInspection] = useState(false);
   const [overlay, setOverlay] = useState(false);
   const [modal, setModal] = useState<ModalState>(null);
 
   // ---------------------------------------------------------------- derived stats (memoised per solve change)
   const solves = st.solves;
   const last = solves.length ? solves[solves.length - 1] : null;
-  const stats = useMemo(() => sessionStats(solves, STATS_NS), [solves]);
+  const statsKey = settings.statsShown.join(',');
+  const ns = useMemo(() => statNs(settings.statsShown), [statsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const stats = useMemo(() => sessionStats(solves, ns), [solves, ns]);
   const times = useMemo(() => solves.map(effectiveMs), [solves]);
   const ao5 = useMemo(() => rollingAverage(times, 5), [times]);
   const ao12 = useMemo(() => rollingAverage(times, 12), [times]);
@@ -87,9 +83,9 @@ export default function TimerPage() {
   const engine = useTimerEngine({
     enabled: engineEnabled,
     // WCA inspection only applies to events that have it (not blindfolded, not FMC)
-    inspection: inspection && eventInfo.inspection,
-    holdMs: HOLD_MS,
-    alerts: 'beep',
+    inspection: settings.inspection && eventInfo.inspection,
+    holdMs: settings.holdMs,
+    alerts: settings.inspectionAlerts,
     onSolve,
   });
   const { phase } = engine.state;
@@ -108,13 +104,14 @@ export default function TimerPage() {
     if (!l) return;
     void deleteSolve(l.id);
     clearResult();
-    toast.notice(`deleted ${fmtSolveShort(l, PRECISION)}`, { durationMs: 1500 });
-  }, [clearResult]);
+    toast.notice(`deleted ${fmtSolveShort(l, settings.precision)}`, { durationMs: 1500 });
+  }, [clearResult, settings.precision]);
 
   const deleteLast = useCallback(() => {
     if (!lastRef.current) return;
-    setModal({ kind: 'deleteLast' });
-  }, []);
+    if (settings.confirmDelete) setModal({ kind: 'deleteLast' });
+    else doDeleteLast();
+  }, [settings.confirmDelete, doDeleteLast]);
 
   const commentLast = useCallback(() => {
     const l = lastRef.current;
@@ -181,6 +178,8 @@ export default function TimerPage() {
   const openSolve = useCallback((index: number) => setModal({ kind: 'solve', index }), []);
   const onOverlayChange = useCallback((open: boolean) => setOverlay(open), []);
 
+  const cols = 1 + (settings.showSolveList ? 1 : 0);
+
   return (
     <div className="timer-page">
       <ConfigBar
@@ -192,21 +191,21 @@ export default function TimerPage() {
         onNewSession={() => setModal({ kind: 'newSession' })}
         onRenameSession={() => setModal({ kind: 'renameSession' })}
         onDeleteSession={() => setModal({ kind: 'deleteSession' })}
-        inspection={inspection}
-        onToggleInspection={() => setInspection((v) => !v)}
+        inspection={settings.inspection}
+        onToggleInspection={() => updateSettings({ inspection: !settings.inspection })}
         onOverlayChange={onOverlayChange}
       />
 
       <ScrambleBar scramble={scr.current} onNext={scr.next} />
 
       <div className="tp-timer-area">
-        <TimerDisplay state={displayState} precision={PRECISION} sizeRem={TIMER_SIZE} />
+        <TimerDisplay state={displayState} precision={settings.precision} timerUpdate={settings.timerUpdate} sizeRem={settings.timerSize} />
       </div>
 
       <div className="tp-under">
         {solves.length === 0 && st.ready ? (
           <div className="tp-hint">
-            {inspection && eventInfo.inspection ? (
+            {settings.inspection && eventInfo.inspection ? (
               <>
                 press <kbd>space</kbd> to start inspection
               </>
@@ -219,19 +218,21 @@ export default function TimerPage() {
         ) : (
           <div className="tp-avgline">
             <span>
-              ao5<b>{fmtAvg(stats.averages.ao5?.current, PRECISION)}</b>
+              ao5<b>{fmtAvg(stats.averages.ao5?.current, settings.precision)}</b>
             </span>
             <span>
-              ao12<b>{fmtAvg(stats.averages.ao12?.current, PRECISION)}</b>
+              ao12<b>{fmtAvg(stats.averages.ao12?.current, settings.precision)}</b>
             </span>
           </div>
         )}
         <QuickActions last={last} onPenalty={penaltyLast} onComment={commentLast} onDelete={deleteLast} />
       </div>
 
-      <div className="tp-bottom cols-2">
-        <StatsPanel stats={stats} ns={STATS_NS} solves={solves} precision={PRECISION} onOpenSolve={openSolve} />
-        <SolveList solves={solves} ao5={ao5} ao12={ao12} bestIndex={stats.bestIndex} precision={PRECISION} onOpen={openSolve} />
+      <div className={`tp-bottom cols-${cols}`}>
+        <StatsPanel stats={stats} ns={ns} solves={solves} precision={settings.precision} onOpenSolve={openSolve} />
+        {settings.showSolveList && (
+          <SolveList solves={solves} ao5={ao5} ao12={ao12} bestIndex={stats.bestIndex} precision={settings.precision} onOpen={openSolve} />
+        )}
       </div>
 
       {/* ------------------------------------------------------------ modals */}
@@ -240,8 +241,8 @@ export default function TimerPage() {
           solve={solves[modal.index]}
           index={modal.index}
           total={solves.length}
-          precision={PRECISION}
-          confirmDelete
+          precision={settings.precision}
+          confirmDelete={settings.confirmDelete}
           onNavigate={(i) => i >= 0 && i < solves.length && setModal({ kind: 'solve', index: i })}
           onClose={() => setModal(null)}
         />
@@ -289,7 +290,7 @@ export default function TimerPage() {
           title="delete solve"
           message={
             <>
-              Delete your last solve (<span className="main">{fmtSolveShort(last, PRECISION)}</span>)?
+              Delete your last solve (<span className="main">{fmtSolveShort(last, settings.precision)}</span>)?
             </>
           }
           confirmLabel="delete"

@@ -2,6 +2,28 @@
 import { formatSolve, formatTime, type Precision } from '@cubetype/cubestats';
 import type { Solve } from '../../lib/types';
 
+/** "mo3" → 3, "ao12" → 12, anything else → null */
+export function parseAvgKey(key: string): number | null {
+  const m = /^(ao|mo)(\d{1,5})$/.exec(key);
+  if (!m) return null;
+  const n = Number(m[2]);
+  if (m[1] === 'mo' && n !== 3) return null;
+  if (m[1] === 'ao' && n < 5) return null;
+  return n;
+}
+
+export const AVG_CHOICES = ['mo3', 'ao5', 'ao12', 'ao25', 'ao50', 'ao100', 'ao200', 'ao500', 'ao1000'];
+
+/** Sorted, de-duplicated window sizes for the given stat keys. */
+export function statNs(keys: string[]): number[] {
+  const ns = new Set<number>();
+  for (const k of keys) {
+    const n = parseAvgKey(k);
+    if (n) ns.add(n);
+  }
+  return Array.from(ns).sort((a, b) => a - b);
+}
+
 /** Averages are rounded to the display unit (WCA 9f1), singles are truncated (formatTime). */
 export function fmtAvg(v: number | null | undefined, precision: Precision): string {
   if (v === null || v === undefined) return '-';

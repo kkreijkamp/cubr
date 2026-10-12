@@ -1,6 +1,7 @@
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import TimerPage from './pages/TimerPage';
+import SettingsPage from './pages/SettingsPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 const router = createBrowserRouter([
@@ -8,6 +9,7 @@ const router = createBrowserRouter([
     element: <Layout />,
     children: [
       { path: '/', element: <TimerPage /> },
+      { path: '/settings', element: <SettingsPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

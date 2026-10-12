@@ -7,6 +7,7 @@
 //  - Local data: `cubetype.local.v1` (compact tuples, see timer/storeUtils.ts), written debounced
 //    and flushed on pagehide.
 import { getEvent, isEventId, type Penalty } from '@cubetype/cubestats';
+import { settingsStore, updateSettings } from './settings';
 import { createStore, useStore } from './store';
 import type { Session, Solve } from './types';
 import { decodeLocalDb, emptyLocalDb, encodeLocalDb, insertChrono, LOCAL_KEY, uuid, type LocalDb } from '../timer/storeUtils';
@@ -43,8 +44,6 @@ export function useSolveState(): SolveState {
 // ================================================================ module state
 
 const browser = typeof window !== 'undefined' && typeof document !== 'undefined';
-/** event of the first session in a fresh browser */
-const DEFAULT_EVENT = '333';
 
 /** the guest database: what the UI shows, persisted in localStorage */
 let model: LocalDb = emptyLocalDb();
@@ -109,7 +108,15 @@ function sessionById(id: string | null | undefined): Session | undefined {
 function pickCurrent(): string | null {
   const ss = model.sessions;
   if (model.current && ss.some((s) => s.id === model.current)) return model.current;
-  return ss[0]?.id ?? null;
+  const ev = settingsStore.get().lastEvent;
+  const byEv = model.lastByEvent[ev];
+  if (byEv && ss.some((s) => s.id === byEv)) return byEv;
+  return ss.find((s) => s.event === ev)?.id ?? ss[0]?.id ?? null;
+}
+
+function defaultEvent(): string {
+  const ev = settingsStore.get().lastEvent;
+  return isEventId(ev) ? ev : '333';
 }
 
 /** Default name for a new session of `event`: "3x3", then "3x3 2", "3x3 3" … */
@@ -122,7 +129,7 @@ export function suggestSessionName(event: string): string {
 
 function loadLocalScope(): void {
   model = readLocal();
-  if (!pickCurrent()) createSessionInternal(suggestSessionNameFor(DEFAULT_EVENT), DEFAULT_EVENT);
+  if (!pickCurrent()) createSessionInternal(suggestSessionNameFor(defaultEvent()), defaultEvent());
   model.current = pickCurrent();
   publish({ ready: true });
 }
@@ -268,6 +275,7 @@ export async function switchSession(sessionId: string): Promise<void> {
   if (!s) throw new Error('Unknown session');
   model.current = sessionId;
   model.lastByEvent = { ...model.lastByEvent, [s.event]: sessionId };
+  if (settingsStore.get().lastEvent !== s.event) updateSettings({ lastEvent: s.event });
   commit();
 }
 
