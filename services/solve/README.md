@@ -19,7 +19,8 @@ Users only ever see their own rows; foreign ids return 404. A solve always gets 
 ## Choices worth knowing
 - `id` and `scramble`/`penalty` on `POST /api/solves` are optional (server generates the id; defaults `''`/`OK`). `source` may be
   `timer|manual|race|import|seed`.
-- `createdAt` more than 5 min in the future → 400.
+- `createdAt` more than 5 min in the future (a device clock running fast) is clamped to the server time instead of
+  rejecting the solve; unparseable timestamps → 400.
 - Empty bodies sent with `Content-Type: application/json` (for example a DELETE from a fetch wrapper) are accepted.
 
 ## Env / run

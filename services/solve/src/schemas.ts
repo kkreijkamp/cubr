@@ -6,7 +6,7 @@ import { isEventId } from '@cubetype/cubestats';
 // `parse(schema, req.body ?? {})` from common, which turns failures into 400 BAD_REQUEST.
 
 export const MAX_TIME_MS = 86_400_000;
-/** Client clocks drift; anything further in the future than this is rejected. */
+/** Client clocks drift; timestamps further in the future than this are clamped to the server time. */
 export const MAX_FUTURE_SKEW_MS = 5 * 60 * 1000;
 
 export const uuid = z.string().uuid();
@@ -48,10 +48,14 @@ export const patchSolveBody = z
   .object({ penalty: penalty.optional(), comment: comment.nullable().optional() })
   .refine((b) => b.penalty !== undefined || b.comment !== undefined, { message: 'nothing to update (penalty or comment)' });
 
-/** Resolves the solve timestamp: default now, reject timestamps more than 5 min in the future. */
+/**
+ * Resolves the solve timestamp: default now. A device whose clock runs fast must not lose its
+ * solves (the web client drops a solve the server answered with 400), so anything more than
+ * MAX_FUTURE_SKEW_MS ahead is clamped to the server time instead of being rejected.
+ */
 export function resolveCreatedAt(createdAt: string | undefined, now = Date.now()): Date {
   if (createdAt === undefined) return new Date(now);
   const t = Date.parse(createdAt);
-  if (t > now + MAX_FUTURE_SKEW_MS) throw badRequest('createdAt: must not be in the future');
-  return new Date(t);
+  if (Number.isNaN(t)) throw badRequest('createdAt: not a valid timestamp');
+  return new Date(t > now + MAX_FUTURE_SKEW_MS ? now : t);
 }

@@ -69,7 +69,11 @@ describe('resolveCreatedAt', () => {
     expect(resolveCreatedAt('2026-10-14T12:04:00Z', now).toISOString()).toBe('2026-10-14T12:04:00.000Z');
     expect(resolveCreatedAt('2001-01-01T00:00:00Z', now).toISOString()).toBe('2001-01-01T00:00:00.000Z');
   });
-  it('rejects timestamps more than 5 minutes in the future', () => {
-    expect(errorOf(() => resolveCreatedAt('2026-10-14T12:06:00Z', now)).statusCode).toBe(400);
+  it('clamps timestamps more than 5 minutes in the future to now', () => {
+    expect(resolveCreatedAt('2026-10-14T12:06:00Z', now).getTime()).toBe(now);
+    expect(resolveCreatedAt('2030-01-01T00:00:00Z', now).getTime()).toBe(now);
+  });
+  it('rejects unparseable timestamps', () => {
+    expect(errorOf(() => resolveCreatedAt('not a date', now)).statusCode).toBe(400);
   });
 });
