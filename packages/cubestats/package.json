@@ -1,0 +1,10 @@
+{
+  "name": "@cubetype/cubestats",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Speedcubing statistics shared by the cubetype frontend and services: WCA averaging rules, time formatting, event metadata",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}
