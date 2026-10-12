@@ -1,8 +1,13 @@
 import { useEffect } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Settings, Timer } from 'lucide-react';
+import { Keyboard, Palette, Settings, Timer } from 'lucide-react';
 import { CubeLogo } from './CubeLogo';
 import { Toasts } from './Toasts';
+import { CommandPalette, usePaletteHotkeys } from './CommandPalette';
+import { GlobalCommands } from './GlobalCommands';
+import { openPalette } from '../lib/commands';
+import { useSettings } from '../lib/settings';
+import { themeLabel } from '../lib/themes';
 
 const NAV = [
   { to: '/', icon: Timer, label: 'timer', end: true },
@@ -39,14 +44,26 @@ function Header() {
 }
 
 function Footer() {
+  const settings = useSettings();
   return (
     <footer className="footer">
-      <span>v{import.meta.env.VITE_APP_VERSION ?? 'dev'}</span>
+      <div className="footer-links">
+        <button className="btn-text" onClick={() => openPalette()}>
+          <Keyboard size={14} /> <kbd>esc</kbd> command line
+        </button>
+      </div>
+      <div className="footer-right">
+        <button className="btn-text" onClick={() => openPalette('theme')} data-tip="change theme" aria-label="change theme">
+          <Palette size={14} /> {themeLabel(settings.theme)}
+        </button>
+        <span>v{import.meta.env.VITE_APP_VERSION ?? 'dev'}</span>
+      </div>
     </footer>
   );
 }
 
 export function Layout() {
+  usePaletteHotkeys();
   const location = useLocation();
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -59,6 +76,8 @@ export function Layout() {
       </main>
       <Footer />
       <Toasts />
+      <CommandPalette />
+      <GlobalCommands />
     </div>
   );
 }

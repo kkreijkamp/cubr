@@ -1,0 +1,88 @@
+import { useNavigate } from 'react-router-dom';
+import { Palette, Settings, Timer, Type, Zap } from 'lucide-react';
+import { useRegisterCommands, type Command } from '../lib/commands';
+import { FONTS, updateSettings, useSettings, type Settings as S } from '../lib/settings';
+import { applyTheme, getTheme, THEMES, themeLabel } from '../lib/themes';
+
+function ThemeBubbles({ name }: { name: string }) {
+  const t = getTheme(name);
+  return (
+    <span className="bubbles" style={{ background: t.bg }}>
+      <i style={{ background: t.main }} />
+    </span>
+  );
+}
+
+function options<K extends keyof S>(key: K, label: string, values: { value: S[K]; label: string }[], current: S[K]): Command {
+  return {
+    id: `setting-${String(key)}`,
+    label: `${label}…`,
+    icon: <Settings />,
+    keywords: ['setting'],
+    children: () =>
+      values.map((v) => ({
+        id: `setting-${String(key)}-${String(v.value)}`,
+        label: v.label,
+        active: v.value === current,
+        run: () => updateSettings({ [key]: v.value } as Partial<S>),
+      })),
+  };
+}
+
+/** App-wide palette commands: navigation, theme/font with live preview, timer settings. */
+export function GlobalCommands() {
+  const navigate = useNavigate();
+  const settings = useSettings();
+
+  useRegisterCommands(
+    'global',
+    () => {
+      const go = (path: string) => () => navigate(path);
+      const nav: Command[] = [
+        { id: 'go-timer', label: 'Go to timer', icon: <Timer />, run: go('/') },
+        { id: 'go-settings', label: 'Go to settings', icon: <Settings />, run: go('/settings') },
+      ];
+      const theme: Command = {
+        id: 'theme',
+        label: 'Theme…',
+        icon: <Palette />,
+        keywords: ['color', 'colour'],
+        children: () =>
+          THEMES.map((t) => ({
+            id: `theme-${t.name}`,
+            label: themeLabel(t.name),
+            icon: <ThemeBubbles name={t.name} />,
+            active: settings.theme === t.name,
+            preview: () => applyTheme(t.name, false),
+            run: () => updateSettings({ theme: t.name }),
+          })),
+      };
+      const font: Command = {
+        id: 'font',
+        label: 'Font…',
+        icon: <Type />,
+        children: () => FONTS.map((f) => ({ id: `font-${f.name}`, label: f.name, active: settings.font === f.name, run: () => updateSettings({ font: f.name }) })),
+      };
+      const timer: Command[] = [
+        options('inspection', 'Inspection', [{ value: false, label: 'off' }, { value: true, label: 'on (WCA 15s)' }], settings.inspection),
+        options('holdMs', 'Hold to start', [0, 300, 550, 1000].map((v) => ({ value: v, label: `${v} ms` })), settings.holdMs),
+        options(
+          'timerUpdate',
+          'Timer update',
+          [
+            { value: 'realtime', label: 'realtime' },
+            { value: 'tenths', label: 'tenths' },
+            { value: 'seconds', label: 'seconds' },
+            { value: 'hidden', label: 'hidden while solving' },
+          ],
+          settings.timerUpdate,
+        ),
+        options('precision', 'Precision', [{ value: 2, label: '0.01 (centiseconds)' }, { value: 3, label: '0.001 (milliseconds)' }], settings.precision),
+        { ...options('inspectionAlerts', 'Inspection alerts', [{ value: 'off', label: 'off' }, { value: 'beep', label: 'beep' }, { value: 'voice', label: 'voice' }], settings.inspectionAlerts), icon: <Zap /> },
+      ];
+      return [theme, font, ...timer, ...nav];
+    },
+    [settings, navigate],
+  );
+  return null;
+}

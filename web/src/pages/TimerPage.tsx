@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Eye, Layers, List, MessageSquare, Pencil, Plus, RefreshCw, Timer as TimerIcon, Trash2 } from 'lucide-react';
 import { EVENTS, effectiveMs, getEvent, rollingAverage, sessionStats, type Penalty } from '@cubetype/cubestats';
 import { TimerDisplay } from '../timer/TimerDisplay';
 import { useTimerEngine, type TimerResult, type TimerState } from '../timer/useTimerEngine';
@@ -12,6 +13,7 @@ import { QuickActions } from '../components/timer/QuickActions';
 import { ConfirmModal, PromptModal } from '../components/timer/Dialogs';
 import { fmtAvg, fmtSolveShort, statNs } from '../components/timer/statsUtil';
 import '../components/timer/timer-page.css';
+import { paletteStore, useRegisterCommands, type Command } from '../lib/commands';
 import { updateSettings, useSettings } from '../lib/settings';
 import {
   addSolve,
@@ -26,6 +28,7 @@ import {
   switchSession,
   useSolveState,
 } from '../lib/solves';
+import { useStore } from '../lib/store';
 import { toast } from '../lib/toast';
 
 type ModalState =
@@ -45,6 +48,7 @@ function isTyping(el: EventTarget | null): boolean {
 export default function TimerPage() {
   const settings = useSettings();
   const st = useSolveState();
+  const paletteOpen = useStore(paletteStore, (s) => s.open);
 
   const session = st.sessions.find((s) => s.id === st.currentSessionId) ?? null;
   const event = session?.event ?? settings.lastEvent;
@@ -79,7 +83,7 @@ export default function TimerPage() {
     scrRef.current.next();
   }, []);
 
-  const engineEnabled = !overlay && modal === null;
+  const engineEnabled = !overlay && modal === null && !paletteOpen;
   const engine = useTimerEngine({
     enabled: engineEnabled,
     // WCA inspection only applies to events that have it (not blindfolded, not FMC)
@@ -135,7 +139,7 @@ export default function TimerPage() {
   // ---------------------------------------------------------------- keyboard
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || document.querySelector('.modal-backdrop')) return;
+      if (e.defaultPrevented || paletteStore.get().open || document.querySelector('.modal-backdrop')) return;
       const p = phaseRef.current;
       if (p !== 'idle' && p !== 'stopped') return;
       if (isTyping(e.target)) return;
@@ -164,6 +168,71 @@ export default function TimerPage() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [penaltyLast, deleteLast, commentLast, cycleSession]);
+
+  // ---------------------------------------------------------------- palette commands
+  useRegisterCommands(
+    'timer',
+    () => {
+      const eventSessions = st.sessions.filter((s) => s.event === event);
+      const cmds: Command[] = [
+        {
+          id: 'timer-event',
+          label: 'Event…',
+          icon: <TimerIcon />,
+          keywords: ['puzzle', 'cube'],
+          children: () =>
+            EVENTS.map((e) => ({
+              id: `timer-event-${e.id}`,
+              label: `${e.short.toLowerCase()} — ${e.name}`,
+              keywords: [e.id],
+              active: e.id === event,
+              run: () => changeEvent(e.id),
+            })),
+        },
+        {
+          id: 'timer-session',
+          label: 'Session…',
+          icon: <Layers />,
+          children: () =>
+            eventSessions.map((s) => ({
+              id: `timer-session-${s.id}`,
+              label: `${s.name} (${s.solveCount})`,
+              active: s.id === session?.id,
+              run: () => void switchSession(s.id),
+            })),
+        },
+        { id: 'timer-new-session', label: 'New session', icon: <Plus />, run: () => setModal({ kind: 'newSession' }) },
+        { id: 'timer-rename-session', label: 'Rename session', icon: <Pencil />, run: () => setModal({ kind: 'renameSession' }) },
+        { id: 'timer-delete-session', label: 'Delete session', icon: <Trash2 />, run: () => setModal({ kind: 'deleteSession' }) },
+        { id: 'timer-new-scramble', label: 'New scramble', icon: <RefreshCw />, keywords: ['next'], run: () => scrRef.current.next() },
+      ];
+      if (last) {
+        cmds.push(
+          {
+            id: 'timer-penalty',
+            label: 'Penalty last solve…',
+            icon: <TimerIcon />,
+            keywords: ['dnf', '+2', 'ok'],
+            children: () =>
+              (['OK', '+2', 'DNF'] as Penalty[]).map((p) => ({
+                id: `timer-penalty-${p}`,
+                label: p === 'OK' ? 'no penalty' : p,
+                active: last.penalty === p,
+                run: () => penaltyLast(p),
+              })),
+          },
+          { id: 'timer-comment-last', label: 'Comment last solve', icon: <MessageSquare />, run: commentLast },
+          { id: 'timer-delete-last', label: 'Delete last solve', icon: <Trash2 />, run: deleteLast },
+        );
+      }
+      cmds.push(
+        { id: 'timer-toggle-list', label: settings.showSolveList ? 'Hide solve list' : 'Show solve list', icon: <List />, keywords: ['toggle'], run: () => updateSettings({ showSolveList: !settings.showSolveList }) },
+        { id: 'timer-inspection-toggle', label: settings.inspection ? 'Turn inspection off' : 'Turn inspection on', icon: <Eye />, keywords: ['toggle', 'wca'], run: () => updateSettings({ inspection: !settings.inspection }) },
+      );
+      return cmds;
+    },
+    [st.sessions, event, session?.id, last?.id, last?.penalty, settings.showSolveList, settings.inspection, deleteLast],
+  );
 
   // ---------------------------------------------------------------- display
   // idle: show the latest solve of this session (with its current penalty), like csTimer
