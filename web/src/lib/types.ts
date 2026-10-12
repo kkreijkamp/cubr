@@ -3,6 +3,19 @@ import type { Penalty } from '@cubetype/cubestats';
 
 export type { Penalty };
 
+export interface PublicUser {
+  id: string;
+  username: string;
+  displayName: string | null;
+  bio: string | null;
+  country: string | null;
+  wcaId: string | null;
+  createdAt: string;
+}
+export interface PrivateUser extends PublicUser {
+  email: string;
+}
+
 export interface Session {
   id: string;
   name: string;

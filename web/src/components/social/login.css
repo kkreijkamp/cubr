@@ -1,0 +1,105 @@
+/* login / register page */
+.lg-page {
+  display: grid;
+  grid-template-columns: minmax(0, 20rem) auto minmax(0, 20rem);
+  justify-content: center;
+  align-items: start;
+  gap: 3rem;
+  padding-top: 6vh;
+}
+.lg-divider {
+  width: 0.25rem;
+  align-self: stretch;
+  border-radius: 0.25rem;
+  background: var(--sub-alt-color);
+}
+.lg-form {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+.lg-form .h3 {
+  margin: 0 0 0.25rem;
+}
+.lg-form .h3 svg {
+  width: 1.1em;
+  height: 1.1em;
+}
+.lg-form .lg-sub {
+  color: var(--sub-color);
+  font-size: 0.75rem;
+  margin: -0.5rem 0 0.25rem;
+  line-height: 1.5;
+}
+.lg-field {
+  display: grid;
+  gap: 0.3rem;
+}
+.lg-input {
+  position: relative;
+}
+.lg-input input {
+  width: 100%;
+  padding-right: 2.4em;
+}
+.lg-input .lg-indicator {
+  position: absolute;
+  right: 0.7em;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  width: 1em;
+  height: 1em;
+  pointer-events: none;
+}
+.lg-input .lg-indicator.ok {
+  color: var(--main-color);
+}
+.lg-input .lg-indicator.bad {
+  color: var(--error-color);
+}
+.lg-input input[aria-invalid='true'] {
+  box-shadow: inset 0 0 0 1px var(--error-color);
+}
+.lg-field-error {
+  color: var(--error-color);
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+.lg-form-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+  color: var(--error-color);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--roundness);
+  background: color-mix(in srgb, var(--error-color) 12%, transparent);
+}
+.lg-form-error svg {
+  flex-shrink: 0;
+  margin-top: 0.1em;
+}
+.lg-form .btn {
+  margin-top: 0.25rem;
+}
+
+@media (max-width: 760px) {
+  .lg-page {
+    grid-template-columns: minmax(0, 24rem);
+    gap: 2rem;
+    padding-top: 1rem;
+  }
+  .lg-divider {
+    width: auto;
+    height: 0.25rem;
+  }
+  /* login first on phones (the common case), then register */
+  .lg-page .lg-login {
+    order: -2;
+  }
+  .lg-page .lg-divider {
+    order: -1;
+  }
+}

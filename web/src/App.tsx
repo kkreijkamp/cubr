@@ -1,7 +1,10 @@
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { Layout } from './components/Layout';
+import { AuthProvider } from './lib/auth';
 import TimerPage from './pages/TimerPage';
+import AccountPage from './pages/AccountPage';
 import SettingsPage from './pages/SettingsPage';
+import LoginPage from './pages/LoginPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 const router = createBrowserRouter([
@@ -9,7 +12,9 @@ const router = createBrowserRouter([
     element: <Layout />,
     children: [
       { path: '/', element: <TimerPage /> },
+      { path: '/account', element: <AccountPage /> },
       { path: '/settings', element: <SettingsPage /> },
+      { path: '/login', element: <LoginPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },
@@ -19,5 +24,9 @@ const router = createBrowserRouter([
 });
 
 export function App() {
-  return <RouterProvider router={router} future={{ v7_startTransition: true }} />;
+  return (
+    <AuthProvider>
+      <RouterProvider router={router} future={{ v7_startTransition: true }} />
+    </AuthProvider>
+  );
 }

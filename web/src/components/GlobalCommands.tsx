@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
-import { Palette, Settings, Timer, Type, Zap } from 'lucide-react';
+import { LogIn, LogOut, Palette, Settings, Timer, Type, User, Zap } from 'lucide-react';
 import { useRegisterCommands, type Command } from '../lib/commands';
+import { useAuth } from '../lib/auth';
 import { FONTS, updateSettings, useSettings, type Settings as S } from '../lib/settings';
 import { applyTheme, getTheme, THEMES, themeLabel } from '../lib/themes';
 
@@ -29,10 +30,11 @@ function options<K extends keyof S>(key: K, label: string, values: { value: S[K]
   };
 }
 
-/** App-wide palette commands: navigation, theme/font with live preview, timer settings. */
+/** App-wide palette commands: navigation, theme/font with live preview, timer settings, auth. */
 export function GlobalCommands() {
   const navigate = useNavigate();
   const settings = useSettings();
+  const { user, logout } = useAuth();
 
   useRegisterCommands(
     'global',
@@ -80,9 +82,15 @@ export function GlobalCommands() {
         options('precision', 'Precision', [{ value: 2, label: '0.01 (centiseconds)' }, { value: 3, label: '0.001 (milliseconds)' }], settings.precision),
         { ...options('inspectionAlerts', 'Inspection alerts', [{ value: 'off', label: 'off' }, { value: 'beep', label: 'beep' }, { value: 'voice', label: 'voice' }], settings.inspectionAlerts), icon: <Zap /> },
       ];
-      return [theme, font, ...timer, ...nav];
+      const auth: Command[] = user
+        ? [
+            { id: 'go-account', label: 'Go to account', icon: <User />, run: go('/account') },
+            { id: 'logout', label: 'Log out', icon: <LogOut />, run: () => void logout() },
+          ]
+        : [{ id: 'login', label: 'Log in / register', icon: <LogIn />, run: go('/login') }];
+      return [theme, font, ...timer, ...nav, ...auth];
     },
-    [settings, navigate],
+    [settings, user, navigate, logout],
   );
   return null;
 }

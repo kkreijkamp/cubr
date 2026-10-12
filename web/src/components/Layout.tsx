@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Keyboard, Palette, Settings, Timer } from 'lucide-react';
+import { Keyboard, Palette, Settings, Timer, User } from 'lucide-react';
 import { CubeLogo } from './CubeLogo';
 import { Toasts } from './Toasts';
 import { CommandPalette, usePaletteHotkeys } from './CommandPalette';
 import { GlobalCommands } from './GlobalCommands';
+import { useAuth } from '../lib/auth';
 import { openPalette } from '../lib/commands';
 import { useSettings } from '../lib/settings';
 import { themeLabel } from '../lib/themes';
@@ -15,6 +16,7 @@ const NAV = [
 ];
 
 function Header() {
+  const { user, status } = useAuth();
   return (
     <header className="header">
       <Link to="/" className="logo" aria-label="cubetype home">
@@ -38,6 +40,17 @@ function Header() {
             <Icon size={20} />
           </NavLink>
         ))}
+        <div className="spacer" />
+        {status === 'authed' && user ? (
+          <NavLink to="/account" className={({ isActive }) => `btn-text nav-user${isActive ? ' active' : ''}`} data-tip="account" data-tip-pos="down">
+            <User size={20} />
+            <span className="hide-mobile">{user.username}</span>
+          </NavLink>
+        ) : (
+          <NavLink to="/login" className={({ isActive }) => `btn-text${isActive ? ' active' : ''}`} data-tip="sign in" data-tip-pos="down" aria-label="sign in">
+            <User size={20} />
+          </NavLink>
+        )}
       </nav>
     </header>
   );

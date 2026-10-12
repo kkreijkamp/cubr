@@ -175,6 +175,12 @@ h4 {
 .nav .btn-text.active {
   color: var(--text-color);
 }
+.nav-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
 @media (max-width: 720px) {
   .logo .logo-text {
     font-size: 1.4rem;
@@ -184,6 +190,9 @@ h4 {
   }
   .nav .btn-text {
     padding: 0.35rem;
+  }
+  .nav .hide-mobile {
+    display: none;
   }
   .nav {
     gap: 0;
@@ -837,6 +846,26 @@ table.table .secondary {
   display: block;
 }
 
+/* loader bar */
+.loader-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  background: var(--main-color);
+  animation: loader 1.6s infinite;
+  pointer-events: none;
+  z-index: 20000;
+}
+
+.spinner {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--sub-color);
+  animation: spin 0.9s linear infinite;
+}
+
 /* ---------------------------------------------------------------- animations */
 @keyframes fadeIn {
   from {
@@ -866,6 +895,22 @@ table.table .secondary {
     transform: none;
   }
 }
+@keyframes loader {
+  0% {
+    transform: translateX(-100%) scaleX(0);
+  }
+  50% {
+    transform: translateX(0) scaleX(1);
+  }
+  100% {
+    transform: translateX(100%) scaleX(0);
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 @keyframes shake {
   0% {
     transform: translate(2px, 0);
@@ -887,5 +932,11 @@ table.table .secondary {
   *::after {
     animation: none !important;
     transition: none !important;
+  }
+  .loader-bar {
+    animation: loader 1.6s infinite !important;
+  }
+  .spinner {
+    animation: spin 0.9s linear infinite !important;
   }
 }
