@@ -1,11 +1,14 @@
-// The speedcubing timer state machine (keyboard), modelled on csTimer.
+// The speedcubing timer state machine (keyboard), modelled on csTimer with WCA rules.
 //
 //   idle ──press──▶ holding ──(holdMs)──▶ ready ──release──▶ running ──any key──▶ stopped ──release──▶ idle
 //                      └──release early──▶ idle
+//   with inspection: idle ──press+release──▶ inspecting ──press──▶ holding ▶ ready ▶ running …
+//   inspection penalty when the solve starts: ≥ 15 s → +2, ≥ 17 s → DNF (WCA A4d1/A4d2)
+//   Esc: cancels holding/ready/inspection; while running it stops the solve as a DNF.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Penalty } from '@cubetype/cubestats';
 
-export type TimerPhase = 'idle' | 'holding' | 'ready' | 'running' | 'stopped';
+export type TimerPhase = 'idle' | 'holding' | 'ready' | 'inspecting' | 'running' | 'stopped';
 
 export interface TimerResult {
   timeMs: number;
@@ -14,8 +17,12 @@ export interface TimerResult {
 
 export interface TimerState {
   phase: TimerPhase;
+  /** true while holding/ready happen during an inspection countdown */
+  inInspection: boolean;
   /** performance.now() timestamp the solve started */
   startedAt: number | null;
+  /** performance.now() timestamp inspection started */
+  inspectionStartedAt: number | null;
   /** last completed solve */
   result: TimerResult | null;
 }
@@ -23,17 +30,58 @@ export interface TimerState {
 export interface TimerEngineOptions {
   /** disable when a modal is open, the page is inactive, … */
   enabled: boolean;
+  inspection: boolean;
   holdMs: number;
+  alerts: 'off' | 'beep' | 'voice';
   onSolve: (r: TimerResult) => void;
 }
 
+export const INSPECTION_MS = 15_000;
+const PLUS2_AT = 15_000;
+const DNF_AT = 17_000;
 const MODIFIERS = new Set(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Tab']);
 /** stop events this soon after the start are ignored (accidental double press), like csTimer */
 const MIN_RUN_MS = 150;
 
+export function inspectionPenalty(elapsedMs: number): Penalty {
+  if (elapsedMs >= DNF_AT) return 'DNF';
+  if (elapsedMs >= PLUS2_AT) return '+2';
+  return 'OK';
+}
+
+// ---- inspection alerts (8 s / 12 s) ------------------------------------------------------------
+let audioCtx: AudioContext | null = null;
+function beep(freq: number) {
+  try {
+    audioCtx ??= new AudioContext();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.25);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.25);
+  } catch {
+    /* audio not available */
+  }
+}
+function alertAt(seconds: 8 | 12, mode: TimerEngineOptions['alerts']) {
+  if (mode === 'beep') beep(seconds === 8 ? 660 : 880);
+  else if (mode === 'voice' && 'speechSynthesis' in window) {
+    const u = new SpeechSynthesisUtterance(seconds === 8 ? 'eight seconds' : 'twelve seconds');
+    u.rate = 1.3;
+    window.speechSynthesis.speak(u);
+  }
+}
+
 function isTypingTarget(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
   return el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName);
+}
+
+function blockedByOverlay(): boolean {
+  return Boolean(document.querySelector('.modal-backdrop'));
 }
 
 const now = (e?: { timeStamp: number }) => (e && e.timeStamp > 0 ? e.timeStamp : performance.now());
@@ -49,11 +97,14 @@ export function useTimerEngine(opts: TimerEngineOptions) {
 
   const [state, setState] = useState<TimerState>({
     phase: 'idle',
+    inInspection: false,
     startedAt: null,
+    inspectionStartedAt: null,
     result: null,
   });
   const st = useRef(state);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const alertTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const keysDown = useRef(new Set<string>());
 
   const publish = useCallback((patch: Partial<TimerState>) => {
@@ -65,6 +116,21 @@ export function useTimerEngine(opts: TimerEngineOptions) {
     if (holdTimer.current) clearTimeout(holdTimer.current);
     holdTimer.current = null;
   };
+  const clearAlerts = () => {
+    alertTimers.current.forEach(clearTimeout);
+    alertTimers.current = [];
+  };
+
+  const startInspection = useCallback(
+    (t: number) => {
+      publish({ phase: 'inspecting', inInspection: true, inspectionStartedAt: t, startedAt: null });
+      const mode = optsRef.current.alerts;
+      if (mode !== 'off') {
+        alertTimers.current = [setTimeout(() => alertAt(8, mode), 8000), setTimeout(() => alertAt(12, mode), 12000)];
+      }
+    },
+    [publish],
+  );
 
   /** press = space keydown */
   const press = useCallback(
@@ -72,12 +138,18 @@ export function useTimerEngine(opts: TimerEngineOptions) {
       const s = st.current;
       if (s.phase === 'running') return; // handled by stop()
       if (s.phase === 'stopped') return;
-      if (s.phase === 'idle') {
+      if (s.phase === 'idle' && optsRef.current.inspection) {
+        // first press with inspection on: releasing starts the countdown (no hold needed)
+        publish({ phase: 'holding', inInspection: false });
+        return;
+      }
+      if (s.phase === 'idle' || s.phase === 'inspecting') {
+        const inInspection = s.phase === 'inspecting';
         const hold = optsRef.current.holdMs;
         if (hold <= 0) {
-          publish({ phase: 'ready' });
+          publish({ phase: 'ready', inInspection });
         } else {
-          publish({ phase: 'holding' });
+          publish({ phase: 'holding', inInspection });
           clearHold();
           holdTimer.current = setTimeout(() => {
             if (st.current.phase === 'holding') publish({ phase: 'ready' });
@@ -94,30 +166,39 @@ export function useTimerEngine(opts: TimerEngineOptions) {
       const s = st.current;
       clearHold();
       if (s.phase === 'stopped') {
-        if (keysDown.current.size === 0) publish({ phase: 'idle' });
+        if (keysDown.current.size === 0) publish({ phase: 'idle', inInspection: false });
         return;
       }
       if (s.phase === 'holding') {
-        publish({ phase: 'idle' });
+        if (!s.inInspection && optsRef.current.inspection && s.inspectionStartedAt === null) {
+          startInspection(t);
+        } else {
+          publish({ phase: s.inInspection ? 'inspecting' : 'idle' });
+        }
         return;
       }
       if (s.phase === 'ready') {
-        // solve starts now
+        // solve starts now — the 8/12 s inspection calls must not go off during the solve
+        clearAlerts();
         document.activeElement instanceof HTMLElement && document.activeElement.blur();
         publish({ phase: 'running', startedAt: t });
       }
     },
-    [publish],
+    [publish, startInspection],
   );
 
   const stop = useCallback(
-    (t: number) => {
+    (t: number, forceDnf: boolean) => {
       const s = st.current;
       if (s.phase !== 'running' || s.startedAt === null) return;
-      if (t - s.startedAt < MIN_RUN_MS) return;
+      if (!forceDnf && t - s.startedAt < MIN_RUN_MS) return;
+      clearAlerts();
       const timeMs = Math.max(1, Math.round(t - s.startedAt));
-      const result: TimerResult = { timeMs, penalty: 'OK' };
-      publish({ phase: 'stopped', result });
+      let penalty: Penalty = 'OK';
+      if (s.inspectionStartedAt !== null) penalty = inspectionPenalty(s.startedAt - s.inspectionStartedAt);
+      if (forceDnf) penalty = 'DNF';
+      const result = { timeMs, penalty };
+      publish({ phase: 'stopped', result, inInspection: false, inspectionStartedAt: null });
       optsRef.current.onSolve(result);
     },
     [publish],
@@ -125,10 +206,11 @@ export function useTimerEngine(opts: TimerEngineOptions) {
 
   const cancel = useCallback(() => {
     clearHold();
+    clearAlerts();
     const s = st.current;
     if (s.phase === 'running') return;
     if (s.phase !== 'idle') {
-      publish({ phase: 'idle', startedAt: null });
+      publish({ phase: 'idle', inInspection: false, inspectionStartedAt: null, startedAt: null });
     }
   }, [publish]);
 
@@ -138,13 +220,20 @@ export function useTimerEngine(opts: TimerEngineOptions) {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!gateOpen()) return;
-      if (isTypingTarget(e.target)) return;
+      if (isTypingTarget(e.target) || blockedByOverlay()) return;
       const s = st.current;
       if (s.phase === 'running') {
         if (MODIFIERS.has(e.key) && e.key !== 'Tab') return;
         e.preventDefault();
         keysDown.current.add(e.code);
-        stop(now(e));
+        stop(now(e), e.key === 'Escape');
+        return;
+      }
+      if (e.key === 'Escape') {
+        if (s.phase !== 'idle' && s.phase !== 'stopped') {
+          e.preventDefault(); // consume so the command palette doesn't open
+          cancel();
+        }
         return;
       }
       if (e.code !== 'Space') return;
@@ -170,7 +259,7 @@ export function useTimerEngine(opts: TimerEngineOptions) {
       keysDown.current.clear();
       if (st.current.phase === 'holding' || st.current.phase === 'ready') {
         clearHold();
-        publish({ phase: 'idle' });
+        publish({ phase: st.current.inInspection ? 'inspecting' : 'idle' });
       }
       if (st.current.phase === 'stopped') publish({ phase: 'idle' });
     };
@@ -182,15 +271,19 @@ export function useTimerEngine(opts: TimerEngineOptions) {
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
     };
-  }, [press, release, stop, publish]);
+  }, [press, release, stop, cancel, publish]);
 
   // cleanup timers on unmount; cancel if disabled mid-way
   useEffect(() => () => {
     clearHold();
+    clearAlerts();
   }, []);
   useEffect(() => {
     if (!opts.enabled && st.current.phase !== 'running') cancel();
   }, [opts.enabled, cancel]);
 
-  return { state, cancel };
+  /** forget the last result (e.g. after deleting it) */
+  const clearResult = useCallback(() => publish({ result: null }), [publish]);
+
+  return { state, cancel, clearResult };
 }

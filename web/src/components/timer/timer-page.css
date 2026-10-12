@@ -104,6 +104,25 @@
 .tp-hint kbd {
   font-size: 0.75rem;
 }
+.tp-quick {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.95rem;
+}
+.tp-quick .btn-text {
+  padding: 0.45rem 0.7rem;
+}
+.tp-quick.hidden {
+  visibility: hidden;
+}
+.tp-quick-sep {
+  width: 0.2em;
+  height: 1.2em;
+  border-radius: 0.2em;
+  background: var(--sub-alt-color);
+  margin: 0 0.4rem;
+}
 
 /* ------------------------------------------------------------ bottom panels */
 .tp-bottom {
@@ -198,6 +217,21 @@
 .tp-stats tbody tr > :last-child {
   border-radius: 0 var(--roundness) var(--roundness) 0;
 }
+.tp-cell-btn {
+  background: none;
+  border: 0;
+  padding: 0.2rem 0.3rem;
+  margin: 0 -0.3rem;
+  border-radius: calc(var(--roundness) / 2);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: background var(--dur), color var(--dur);
+}
+.tp-cell-btn:hover {
+  background: var(--text-color);
+  color: var(--bg-color);
+}
 .tp-stat-summary {
   display: flex;
   flex-wrap: wrap;
@@ -248,6 +282,7 @@
   padding: 0 0.75rem;
   border-radius: var(--roundness);
   color: var(--text-color);
+  cursor: pointer;
   transition: background var(--dur), color var(--dur);
 }
 .tp-solve-row > span:not(.idx):not(.time) {
@@ -264,6 +299,72 @@
 }
 .tp-solve-row .time.dnf {
   color: var(--error-color);
+}
+.tp-solve-row:hover {
+  background: var(--text-color);
+}
+.tp-solve-row:focus {
+  outline: none;
+}
+.tp-solve-row:hover > span,
+.tp-solve-row:hover .time {
+  color: var(--bg-color) !important;
+}
+.tp-comment-mark {
+  margin-left: 0.35em;
+  vertical-align: -1px;
+  opacity: 0.7;
+}
+
+/* ------------------------------------------------------------ modals */
+.tp-modal-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+}
+.tp-modal-nav {
+  display: inline-flex;
+  margin-left: 0.25rem;
+}
+.tp-modal-nav .btn-text {
+  padding: 0.25rem;
+}
+.tp-solve-detail {
+  display: grid;
+  gap: 0.25rem;
+}
+.tp-solve-time {
+  font-size: 3.5rem;
+  line-height: 1.05;
+  color: var(--main-color);
+  font-variant-numeric: tabular-nums;
+}
+.tp-solve-time.dnf {
+  color: var(--error-color);
+}
+.tp-solve-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  color: var(--sub-color);
+  font-size: 0.8rem;
+}
+.tp-detail-block {
+  display: grid;
+  gap: 0.35rem;
+}
+.tp-detail-scramble {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  background: var(--sub-alt-color);
+  border-radius: var(--roundness);
+  padding: 0.65rem 0.85rem;
+}
+.tp-detail-actions {
+  justify-content: space-between;
 }
 
 /* ------------------------------------------------------------ responsive */
@@ -282,5 +383,8 @@
   }
   .tp-solve-scroll {
     max-height: 50vh;
+  }
+  .tp-solve-time {
+    font-size: 2.75rem;
   }
 }

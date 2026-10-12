@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { effectiveMs, rollingAverage, sessionStats, type Precision } from '@cubetype/cubestats';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { EVENTS, effectiveMs, getEvent, rollingAverage, sessionStats, type Penalty, type Precision } from '@cubetype/cubestats';
 import { TimerDisplay } from '../timer/TimerDisplay';
 import { useTimerEngine, type TimerResult, type TimerState } from '../timer/useTimerEngine';
 import { useScrambleQueue } from '../timer/useScrambleQueue';
@@ -7,9 +7,19 @@ import { ConfigBar } from '../components/timer/ConfigBar';
 import { ScrambleBar } from '../components/timer/ScrambleBar';
 import { StatsPanel } from '../components/timer/StatsPanel';
 import { SolveList } from '../components/timer/SolveList';
-import { fmtAvg } from '../components/timer/statsUtil';
+import { SolveModal } from '../components/timer/SolveModal';
+import { QuickActions } from '../components/timer/QuickActions';
+import { ConfirmModal, PromptModal } from '../components/timer/Dialogs';
+import { fmtAvg, fmtSolveShort } from '../components/timer/statsUtil';
 import '../components/timer/timer-page.css';
-import { addSolve, switchEvent, useSolveState } from '../lib/solves';
+import { addSolve, deleteSolve, setComment, setPenalty, switchEvent, useSolveState } from '../lib/solves';
+import { toast } from '../lib/toast';
+
+type ModalState =
+  | { kind: 'solve'; index: number }
+  | { kind: 'deleteLast' }
+  | { kind: 'comment'; solveId: string }
+  | null;
 
 const HOLD_MS = 300;
 const PRECISION: Precision = 2;
@@ -28,7 +38,11 @@ export default function TimerPage() {
 
   const session = st.sessions.find((s) => s.id === st.currentSessionId) ?? null;
   const event = session?.event ?? DEFAULT_EVENT;
+  const eventInfo = getEvent(event) ?? EVENTS[0];
   const scr = useScrambleQueue(event);
+
+  const [inspection, setInspection] = useState(false);
+  const [modal, setModal] = useState<ModalState>(null);
 
   // ---------------------------------------------------------------- derived stats (memoised per solve change)
   const solves = st.solves;
@@ -41,52 +55,106 @@ export default function TimerPage() {
   // ---------------------------------------------------------------- refs for stable callbacks
   const scrRef = useRef(scr);
   scrRef.current = scr;
+  const lastRef = useRef(last);
+  lastRef.current = last;
 
   // ---------------------------------------------------------------- recording solves
   const onSolve = useCallback((r: TimerResult) => {
     const scramble = scrRef.current.current?.text ?? '';
-    void addSolve({ timeMs: r.timeMs, penalty: r.penalty, scramble });
+    addSolve({ timeMs: r.timeMs, penalty: r.penalty, scramble }).catch((e: Error) => {
+      toast.error(e.message || "couldn't save the solve");
+    });
     scrRef.current.next();
   }, []);
 
-  const engine = useTimerEngine({ enabled: true, holdMs: HOLD_MS, onSolve });
+  const engineEnabled = modal === null;
+  const engine = useTimerEngine({
+    enabled: engineEnabled,
+    // WCA inspection only applies to events that have it (not blindfolded, not FMC)
+    inspection: inspection && eventInfo.inspection,
+    holdMs: HOLD_MS,
+    alerts: 'beep',
+    onSolve,
+  });
   const { phase } = engine.state;
+  const { clearResult } = engine;
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
 
+  // ---------------------------------------------------------------- actions on the latest solve
+  const penaltyLast = useCallback((p: Penalty) => {
+    const l = lastRef.current;
+    if (l) void setPenalty(l.id, p);
+  }, []);
+
+  const doDeleteLast = useCallback(() => {
+    const l = lastRef.current;
+    if (!l) return;
+    void deleteSolve(l.id);
+    clearResult();
+    toast.notice(`deleted ${fmtSolveShort(l, PRECISION)}`, { durationMs: 1500 });
+  }, [clearResult]);
+
+  const deleteLast = useCallback(() => {
+    if (!lastRef.current) return;
+    setModal({ kind: 'deleteLast' });
+  }, []);
+
+  const commentLast = useCallback(() => {
+    const l = lastRef.current;
+    if (l) setModal({ kind: 'comment', solveId: l.id });
+  }, []);
+
   const changeEvent = useCallback((ev: string) => {
-    void switchEvent(ev);
+    void switchEvent(ev).catch((e: Error) => toast.error(e.message));
   }, []);
 
   // ---------------------------------------------------------------- keyboard
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented) return;
+      if (e.defaultPrevented || document.querySelector('.modal-backdrop')) return;
       const p = phaseRef.current;
       if (p !== 'idle' && p !== 'stopped') return;
       if (isTyping(e.target)) return;
       if (e.key === 'Tab' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
         scrRef.current.next();
+        return;
+      }
+      if (!e.altKey || e.ctrlKey || e.metaKey) return;
+      const actions: Record<string, () => void> = {
+        Digit1: () => penaltyLast('OK'),
+        Digit2: () => penaltyLast('+2'),
+        Digit3: () => penaltyLast('DNF'),
+        Backspace: deleteLast,
+        KeyZ: deleteLast,
+        KeyC: commentLast,
+      };
+      const fn = actions[e.code];
+      if (fn) {
+        e.preventDefault();
+        fn();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [penaltyLast, deleteLast, commentLast]);
 
   // ---------------------------------------------------------------- display
-  // idle: show the latest solve of this session, like csTimer
+  // idle: show the latest solve of this session (with its current penalty), like csTimer
   const displayState: TimerState = useMemo(() => {
     const s = engine.state;
-    if (s.phase === 'idle' || s.phase === 'holding') {
+    if (s.phase === 'idle' || (s.phase === 'holding' && !s.inInspection)) {
       return { ...s, result: last ? { timeMs: last.timeMs, penalty: last.penalty } : null };
     }
     return s;
   }, [engine.state, last]);
 
+  const openSolve = useCallback((index: number) => setModal({ kind: 'solve', index }), []);
+
   return (
     <div className="timer-page">
-      <ConfigBar event={event} onEvent={changeEvent} />
+      <ConfigBar event={event} onEvent={changeEvent} inspection={inspection} onToggleInspection={() => setInspection((v) => !v)} />
 
       <ScrambleBar scramble={scr.current} onNext={scr.next} />
 
@@ -97,7 +165,15 @@ export default function TimerPage() {
       <div className="tp-under">
         {solves.length === 0 && st.ready ? (
           <div className="tp-hint">
-            hold <kbd>space</kbd> until the time turns green, release to start
+            {inspection && eventInfo.inspection ? (
+              <>
+                press <kbd>space</kbd> to start inspection
+              </>
+            ) : (
+              <>
+                hold <kbd>space</kbd> until the time turns green, release to start
+              </>
+            )}
           </div>
         ) : (
           <div className="tp-avgline">
@@ -109,12 +185,50 @@ export default function TimerPage() {
             </span>
           </div>
         )}
+        <QuickActions last={last} onPenalty={penaltyLast} onComment={commentLast} onDelete={deleteLast} />
       </div>
 
       <div className="tp-bottom cols-2">
-        <StatsPanel stats={stats} ns={STATS_NS} solves={solves} precision={PRECISION} />
-        <SolveList solves={solves} ao5={ao5} ao12={ao12} bestIndex={stats.bestIndex} precision={PRECISION} />
+        <StatsPanel stats={stats} ns={STATS_NS} solves={solves} precision={PRECISION} onOpenSolve={openSolve} />
+        <SolveList solves={solves} ao5={ao5} ao12={ao12} bestIndex={stats.bestIndex} precision={PRECISION} onOpen={openSolve} />
       </div>
+
+      {/* ------------------------------------------------------------ modals */}
+      {modal?.kind === 'solve' && solves[modal.index] && (
+        <SolveModal
+          solve={solves[modal.index]}
+          index={modal.index}
+          total={solves.length}
+          precision={PRECISION}
+          confirmDelete
+          onNavigate={(i) => i >= 0 && i < solves.length && setModal({ kind: 'solve', index: i })}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal?.kind === 'deleteLast' && last && (
+        <ConfirmModal
+          title="delete solve"
+          message={
+            <>
+              Delete your last solve (<span className="main">{fmtSolveShort(last, PRECISION)}</span>)?
+            </>
+          }
+          confirmLabel="delete"
+          onConfirm={doDeleteLast}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal?.kind === 'comment' && (
+        <PromptModal
+          title="comment"
+          label={`solve ${solves.findIndex((s) => s.id === modal.solveId) + 1}`}
+          initial={solves.find((s) => s.id === modal.solveId)?.comment ?? ''}
+          placeholder="pll skip, lockup on f2l, …"
+          maxLength={500}
+          onSubmit={(c) => setComment(modal.solveId, c || null)}
+          onClose={() => setModal(null)}
+        />
+      )}
     </div>
   );
 }

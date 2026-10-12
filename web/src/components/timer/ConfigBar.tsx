@@ -1,3 +1,4 @@
+import { Eye } from 'lucide-react';
 import { EVENTS, getEvent } from '@cubetype/cubestats';
 
 /** Buttons on the timer page never take focus on click, so Space can't re-trigger them. */
@@ -8,6 +9,8 @@ const shortLabel = (id: string) => (getEvent(id)?.short ?? id).toLowerCase();
 interface Props {
   event: string;
   onEvent: (event: string) => void;
+  inspection: boolean;
+  onToggleInspection: () => void;
 }
 
 export function ConfigBar(p: Props) {
@@ -26,6 +29,20 @@ export function ConfigBar(p: Props) {
             {shortLabel(e.id)}
           </button>
         ))}
+      </div>
+
+      <div className="config-card tp-toggles">
+        <button
+          className={`btn-text${p.inspection ? ' active' : ''}`}
+          onClick={p.onToggleInspection}
+          aria-pressed={p.inspection}
+          data-tip={p.inspection ? 'WCA inspection on' : 'WCA inspection off'}
+          data-tip-pos="down"
+          {...noFocus}
+        >
+          <Eye size={14} />
+          <span>inspection</span>
+        </button>
       </div>
     </div>
   );

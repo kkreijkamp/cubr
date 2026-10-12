@@ -688,6 +688,90 @@ table.table .secondary {
   }
 }
 
+/* ---------------------------------------------------------------- toasts */
+.toasts {
+  position: fixed;
+  right: 1rem;
+  top: 1rem;
+  width: min(350px, calc(100vw - 2rem));
+  z-index: 10000;
+  display: grid;
+  gap: 0.75rem;
+}
+.toast {
+  padding: 0.9rem 1rem;
+  border: 2px solid;
+  border-radius: calc(var(--roundness) * 2);
+  color: #fff;
+  font-size: 0.875rem;
+  backdrop-filter: blur(15px);
+  cursor: pointer;
+  animation: toastIn 0.15s ease-out;
+  transition: background var(--dur);
+}
+.toast .title {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  opacity: 0.6;
+  padding-bottom: 0.35rem;
+  font-size: 0.75rem;
+}
+.toast.notice {
+  background: rgba(0, 77, 148, 0.9);
+  border-color: rgba(0, 130, 251, 0.985);
+}
+.toast.success {
+  background: rgba(0, 148, 0, 0.9);
+  border-color: rgba(100, 206, 100, 0.71);
+}
+.toast.error {
+  background: rgba(138, 18, 12, 0.9);
+  border-color: rgba(241, 51, 34, 0.71);
+}
+.toast:hover {
+  filter: brightness(1.1);
+}
+
+/* ---------------------------------------------------------------- modal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 6rem 1rem 2rem;
+  z-index: 1000;
+  overflow-y: auto;
+  animation: fadeIn 0.125s ease-out;
+}
+.modal-backdrop.modal-centered {
+  align-items: center;
+  padding-top: 2rem;
+}
+.modal {
+  background: var(--bg-color);
+  border-radius: calc(var(--roundness) * 2);
+  box-shadow: 0 0 0 4px var(--sub-alt-color);
+  width: 100%;
+  max-width: 34rem;
+  padding: 1.5rem;
+  display: grid;
+  gap: 1rem;
+  animation: modalIn 0.125s ease-out;
+}
+.modal.wide {
+  max-width: 52rem;
+}
+.modal .modal-title {
+  font-size: 1.4rem;
+  color: var(--sub-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
 /* ---------------------------------------------------------------- animations */
 @keyframes fadeIn {
   from {
@@ -695,6 +779,26 @@ table.table .secondary {
   }
   to {
     opacity: 1;
+  }
+}
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    margin-top: 1rem;
+  }
+  to {
+    opacity: 1;
+    margin-top: 0;
+  }
+}
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 @keyframes shake {

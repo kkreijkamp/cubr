@@ -1,0 +1,20 @@
+/* shared dialog bits (confirm / prompt / upload offer) */
+.dialog-message {
+  text-align: left; /* Modal's "center" backdrop class also matches the global .center utility */
+  color: var(--text-color);
+  line-height: 1.5;
+  font-size: 0.9rem;
+}
+.dialog-message .sub {
+  font-size: 0.85rem;
+}
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.modal .field {
+  text-align: left;
+}

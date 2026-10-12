@@ -138,6 +138,16 @@ function commit(): void {
   publish();
 }
 
+function locate(id: string): { sid: string; index: number; list: Solve[] } | null {
+  const order = model.current ? [model.current, ...Array.from(model.solves.keys()).filter((k) => k !== model.current)] : Array.from(model.solves.keys());
+  for (const sid of order) {
+    const list = model.solves.get(sid);
+    if (!list) continue;
+    for (let i = list.length - 1; i >= 0; i--) if (list[i].id === id) return { sid, index: i, list };
+  }
+  return null;
+}
+
 function patchSession(id: string, patch: Partial<Session>): void {
   model.sessions = model.sessions.map((s) => (s.id === id ? { ...s, ...patch } : s));
 }
@@ -173,6 +183,39 @@ export async function addSolve(input: AddSolveInput): Promise<Solve> {
   patchSession(session.id, { solveCount: (list?.length ?? session.solveCount) + 1, updatedAt: solve.createdAt });
   commit();
   return solve;
+}
+
+function updateSolveLocal(solveId: string, patch: { penalty?: Penalty; comment?: string | null }): boolean {
+  const hit = locate(solveId);
+  if (!hit) return false;
+  const next = hit.list.slice();
+  next[hit.index] = { ...next[hit.index], ...patch };
+  model.solves.set(hit.sid, next);
+  commit();
+  return true;
+}
+
+export async function setPenalty(solveId: string, penalty: Penalty): Promise<void> {
+  const hit = locate(solveId);
+  if (!hit || hit.list[hit.index].penalty === penalty) return;
+  updateSolveLocal(solveId, { penalty });
+}
+
+export async function setComment(solveId: string, comment: string | null): Promise<void> {
+  const c = comment && comment.trim() ? comment.trim().slice(0, 500) : null;
+  const hit = locate(solveId);
+  if (!hit || (hit.list[hit.index].comment ?? null) === c) return;
+  updateSolveLocal(solveId, { comment: c });
+}
+
+export async function deleteSolve(solveId: string): Promise<void> {
+  const hit = locate(solveId);
+  if (!hit) return;
+  const next = hit.list.slice();
+  next.splice(hit.index, 1);
+  model.solves.set(hit.sid, next);
+  patchSession(hit.sid, { solveCount: next.length });
+  commit();
 }
 
 export async function switchSession(sessionId: string): Promise<void> {

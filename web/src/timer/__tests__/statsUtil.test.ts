@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fmtAvg, fmtSolveShort } from '../../components/timer/statsUtil';
+import { fmtAvg, fmtSolveLong, fmtSolveShort } from '../../components/timer/statsUtil';
 
 describe('formatting', () => {
   it('rounds averages but truncates singles', () => {
@@ -10,5 +10,7 @@ describe('formatting', () => {
     expect(fmtSolveShort({ timeMs: 12349, penalty: 'OK' }, 2)).toBe('12.34');
     expect(fmtSolveShort({ timeMs: 12349, penalty: '+2' }, 2)).toBe('14.34+');
     expect(fmtSolveShort({ timeMs: 12349, penalty: 'DNF' }, 2)).toBe('DNF');
+    expect(fmtSolveLong({ timeMs: 12349, penalty: 'DNF' }, 2)).toBe('DNF(12.34)');
+    expect(fmtSolveLong({ timeMs: 1, penalty: 'DNF' }, 2)).toBe('DNF');
   });
 });

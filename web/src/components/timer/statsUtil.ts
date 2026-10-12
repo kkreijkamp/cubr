@@ -15,3 +15,9 @@ export function fmtSolveShort(s: Pick<Solve, 'timeMs' | 'penalty'>, precision: P
   if (s.penalty === 'DNF') return 'DNF';
   return formatSolve(s.timeMs, s.penalty, precision);
 }
+
+/** Long form: "DNF(12.34)" (plain "DNF" for entries without a real time). */
+export function fmtSolveLong(s: Pick<Solve, 'timeMs' | 'penalty'>, precision: Precision): string {
+  if (s.penalty === 'DNF' && s.timeMs <= 1) return 'DNF';
+  return formatSolve(s.timeMs, s.penalty, precision);
+}

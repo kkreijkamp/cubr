@@ -10,15 +10,23 @@ interface Props {
   ns: number[];
   solves: Solve[];
   precision: Precision;
+  onOpenSolve: (index: number) => void;
 }
 
-function Cell({ value, best }: { value: string; best?: boolean }) {
+function Cell({ value, onClick, best, label }: { value: string; onClick?: () => void; best?: boolean; label?: string }) {
   if (value === '-') return <td className="na">-</td>;
-  return <td className={best ? 'best' : undefined}>{value}</td>;
+  if (!onClick) return <td className={best ? 'best' : undefined}>{value}</td>;
+  return (
+    <td className={best ? 'best' : undefined}>
+      <button className="tp-cell-btn" onClick={onClick} aria-label={label} onMouseDown={(e) => e.preventDefault()}>
+        {value}
+      </button>
+    </td>
+  );
 }
 
 /** current / best table for single + the configured averages, plus count / mean / σ. */
-export const StatsPanel = memo(function StatsPanel({ stats, ns, solves, precision }: Props) {
+export const StatsPanel = memo(function StatsPanel({ stats, ns, solves, precision, onOpenSolve }: Props) {
   const last = solves.length ? solves[solves.length - 1] : null;
   const sigma = stats.sd === null ? '-' : (stats.sd / 1000).toFixed(2);
   return (
@@ -37,8 +45,17 @@ export const StatsPanel = memo(function StatsPanel({ stats, ns, solves, precisio
         <tbody>
           <tr>
             <th scope="row">time</th>
-            <Cell value={last ? fmtSolveShort(last, precision) : '-'} />
-            <Cell best value={formatTime(stats.best, precision)} />
+            <Cell
+              value={last ? fmtSolveShort(last, precision) : '-'}
+              onClick={last ? () => onOpenSolve(solves.length - 1) : undefined}
+              label="open latest solve"
+            />
+            <Cell
+              best
+              value={formatTime(stats.best, precision)}
+              onClick={stats.bestIndex !== null ? () => onOpenSolve(stats.bestIndex!) : undefined}
+              label="open best single"
+            />
           </tr>
           {ns.map((n) => {
             const key = avgKey(n);

@@ -13,11 +13,22 @@
 .timer-display.running {
   color: var(--main-color);
 }
+.timer-display.inspecting {
+  color: var(--main-color);
+}
 .timer-display.holding {
   color: var(--timer-holding);
 }
 .timer-display.ready {
   color: var(--timer-ready);
+}
+.timer-display.dnf {
+  color: var(--error-color);
+}
+.timer-display .penalty {
+  font-size: 0.4em;
+  color: var(--sub-color);
+  margin-left: 0.1em;
 }
 @media (max-width: 720px) {
   .timer-display {

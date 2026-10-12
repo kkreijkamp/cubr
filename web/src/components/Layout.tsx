@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Timer } from 'lucide-react';
 import { CubeLogo } from './CubeLogo';
+import { Toasts } from './Toasts';
 
 const NAV = [
   { to: '/', icon: Timer, label: 'timer', end: true },
@@ -56,6 +57,7 @@ export function Layout() {
         <Outlet />
       </main>
       <Footer />
+      <Toasts />
     </div>
   );
 }
