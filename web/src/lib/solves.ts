@@ -9,11 +9,12 @@
 //
 // Implementation notes
 //  - Local data: `cubetype.local.v1` (compact tuples, see timer/storeUtils.ts), written debounced
-//    and flushed on pagehide.
+//    and flushed on pagehide. Corrupt data is backed up to `cubetype.local.v1.corrupt`, never lost.
 //  - Cloud writes go through a persistent FIFO queue (`cubetype.queue.v1`) processed one op at a
 //    time; unsent edits are coalesced into their create. Network/5xx/429 → exponential backoff
 //    (1 s … 60 s, retried immediately on `online`). Server reads are overlaid with queued ops so
-//    optimistic changes survive reloads.
+//    optimistic changes survive reloads. The current session is cached (`cubetype.cloudcache.v1`)
+//    so a logged-in user can keep timing while solve-service is down.
 import { getEvent, isEventId, type Penalty } from '@cubetype/cubestats';
 import { api, ApiError, getToken } from './api';
 import { getCurrentUser, onAuthChange } from './auth';
@@ -28,6 +29,7 @@ import {
   decodeQueue,
   emptyLocalDb,
   encodeLocalDb,
+  encodeSolve,
   insertChrono,
   LOCAL_KEY,
   overlaySessions,
@@ -37,6 +39,7 @@ import {
   uuid,
   type LocalDb,
   type QueuedOp,
+  type SolveTuple,
   type SyncOp,
 } from '../timer/storeUtils';
 
@@ -88,6 +91,8 @@ export function getCurrentSession(): Session | null {
 // ================================================================ module state
 
 const browser = typeof window !== 'undefined' && typeof document !== 'undefined';
+const CLOUD_CACHE_KEY = 'cubetype.cloudcache.v1';
+const LAST_SESSION_KEY = 'cubetype.lastSession.v1';
 
 type Scope = { mode: 'local' } | { mode: 'cloud'; userId: string };
 let scope: Scope | null = null;
@@ -98,6 +103,8 @@ let gen = 0;
 let localDb: LocalDb = emptyLocalDb();
 let localDirty = false;
 let localTimer: ReturnType<typeof setTimeout> | null = null;
+let storageError: string | null = null;
+let quotaWarned = false;
 
 /** what the UI shows: === localDb in local mode, a cache of the server in cloud mode */
 let model: LocalDb = localDb;
@@ -122,7 +129,7 @@ function publish(extra: Partial<SolveState> = {}): void {
     currentSessionId: model.current,
     solves: (model.current && model.solves.get(model.current)) || EMPTY,
     pending: pendingCount(),
-    syncError: queueError ?? loadError,
+    syncError: queueError ?? loadError ?? storageError,
     ...extra,
   }));
 }
@@ -145,7 +152,7 @@ function whenReady(timeoutMs = 15_000): Promise<void> {
 
 // ================================================================ local persistence
 
-function readLocal(): LocalDb {
+function readLocal(quiet = false): LocalDb {
   let raw: string | null = null;
   try {
     raw = localStorage.getItem(LOCAL_KEY);
@@ -159,7 +166,18 @@ function readLocal(): LocalDb {
   } catch {
     /* handled below */
   }
-  return decodeLocalDb(parsed, isEventId).db;
+  const { db, corrupt } = decodeLocalDb(parsed, isEventId);
+  if (corrupt && !quiet) {
+    try {
+      localStorage.setItem(`${LOCAL_KEY}.corrupt`, raw);
+    } catch {
+      /* no space for a backup */
+    }
+    toast.notice('Your saved guest solves could not be read, so the timer started fresh. A backup copy was kept in this browser.', {
+      durationMs: 8000,
+    });
+  }
+  return db;
 }
 
 function saveLocalSoon(): void {
@@ -168,23 +186,98 @@ function saveLocalSoon(): void {
   localTimer = setTimeout(flushLocal, 250);
 }
 
-/** Writes the guest db now. */
-function flushLocal(): void {
+/** Writes the guest db now. Returns false when the browser refused (quota). */
+function flushLocal(): boolean {
   if (localTimer) clearTimeout(localTimer);
   localTimer = null;
-  if (!localDirty) return;
+  if (!localDirty) return true;
   try {
     if (localDb.sessions.length === 0) localStorage.removeItem(LOCAL_KEY);
     else localStorage.setItem(LOCAL_KEY, encodeLocalDb(localDb));
     localDirty = false;
+    if (storageError) {
+      storageError = null;
+      publish();
+    }
+    return true;
   } catch {
-    /* storage full or disabled: the data stays in memory */
+    storageError = 'browser storage is full — sign in to sync your solves to the cloud';
+    if (!quotaWarned) toast.error('Browser storage is full: new solves may not be saved. Sign in to sync them to the cloud.');
+    quotaWarned = true;
+    publish();
+    return false;
   }
+}
+
+// ================================================================ cloud cache & last session
+
+interface CloudCache {
+  userId: string;
+  sessions: Session[];
+  sessionId: string | null;
+  solves: SolveTuple[];
+}
+let cacheTimer: ReturnType<typeof setTimeout> | null = null;
+
+function readCloudCache(uid: string): { sessions: Session[]; sessionId: string | null; solves: Solve[] } | null {
+  const c = loadJson<CloudCache | null>(CLOUD_CACHE_KEY, null);
+  if (!c || c.userId !== uid || !Array.isArray(c.sessions)) return null;
+  const sessions = c.sessions.filter((s) => s && typeof s.id === 'string' && isEventId(s.event));
+  const session = sessions.find((s) => s.id === c.sessionId);
+  let solves: Solve[] = [];
+  if (session && Array.isArray(c.solves)) {
+    // reuse the local codec for the cached solves
+    const { db } = decodeLocalDb(
+      { v: 1, sessions: [{ id: session.id, name: session.name, event: session.event, createdAt: session.createdAt, updatedAt: session.updatedAt }], solves: { [session.id]: c.solves } },
+      isEventId,
+    );
+    solves = db.solves.get(session.id) ?? [];
+  }
+  return { sessions, sessionId: session?.id ?? null, solves };
+}
+
+function flushCloudCache(): void {
+  if (cacheTimer) clearTimeout(cacheTimer);
+  cacheTimer = null;
+  const uid = userId();
+  if (!uid || !solveStore.get().ready) return;
+  const cur = model.current;
+  const list = (cur && model.solves.get(cur)) || [];
+  const cache: CloudCache = {
+    userId: uid,
+    sessions: model.sessions,
+    sessionId: list.length <= 20_000 ? cur : null,
+    solves: list.length <= 20_000 ? list.map(encodeSolve) : [],
+  };
+  saveJson(CLOUD_CACHE_KEY, cache);
+}
+
+function cloudCacheSoon(): void {
+  if (cacheTimer) return;
+  cacheTimer = setTimeout(flushCloudCache, 1500);
+}
+
+function readLastSession(uid: string): { current: string | null; lastByEvent: Record<string, string> } {
+  const all = loadJson<Record<string, { current?: string; lastByEvent?: Record<string, string> }>>(LAST_SESSION_KEY, {});
+  const mine = all && typeof all === 'object' ? all[uid] : undefined;
+  return {
+    current: typeof mine?.current === 'string' ? mine.current : null,
+    lastByEvent: mine?.lastByEvent && typeof mine.lastByEvent === 'object' ? { ...mine.lastByEvent } : {},
+  };
+}
+
+function writeLastSession(): void {
+  const uid = userId();
+  if (!uid) return;
+  const all = loadJson<Record<string, unknown>>(LAST_SESSION_KEY, {});
+  saveJson(LAST_SESSION_KEY, { ...(all && typeof all === 'object' ? all : {}), [uid]: { current: model.current, lastByEvent: model.lastByEvent } });
 }
 
 // ================================================================ retry queue
 
 let queue: QueuedOp[] = browser ? decodeQueue(loadJson<unknown>(QUEUE_KEY, [])) : [];
+/** ops completed in the last minute — re-applied on reads to cover read-after-write races */
+let recent: { op: SyncOp; at: number }[] = [];
 let inflight: string | null = null;
 let pumping = false;
 let backoffN = 0;
@@ -202,10 +295,12 @@ function pendingCount(): number {
   return n;
 }
 
-/** queued ops of the current user, oldest first */
+/** queued + recently completed ops of the current user, oldest first */
 function overlayOps(): SyncOp[] {
   const uid = userId();
-  return queue.filter((q) => q.userId === uid).map((q) => q.op);
+  const cutoff = Date.now() - 60_000;
+  recent = recent.filter((r) => r.at > cutoff);
+  return [...recent.map((r) => r.op), ...queue.filter((q) => q.userId === uid).map((q) => q.op)];
 }
 
 function enqueue(op: SyncOp): string {
@@ -283,6 +378,8 @@ async function pump(): Promise<void> {
         inflight = null;
         queue = queue.filter((q) => q.opId !== head.opId);
         saveQueue();
+        recent.push({ op: head.op, at: Date.now() });
+        if (recent.length > 200) recent = recent.slice(-200);
         backoffN = 0;
         const hadError = queueError || loadError;
         queueError = null;
@@ -360,6 +457,8 @@ function suggestSessionNameFor(event: string): string {
   for (let i = 2; ; i++) if (!taken.has(`${base} ${i}`.toLowerCase())) return `${base} ${i}`;
 }
 
+let loadAttempts = 0;
+let loadRetryTimer: ReturnType<typeof setTimeout> | null = null;
 let solveReq = 0;
 
 async function loadCloudScope(uid: string, g: number, keepCurrent = false): Promise<void> {
@@ -367,21 +466,32 @@ async function loadCloudScope(uid: string, g: number, keepCurrent = false): Prom
   try {
     sessions = (await api.sessions.list()).sessions;
     loadError = null;
+    loadAttempts = 0;
   } catch (e) {
     if (g !== gen) return;
     if (e instanceof ApiError && e.status === 401) return; // auth layer switches to local
     loadError = errorMessage(e);
+    if (loadRetryTimer) clearTimeout(loadRetryTimer);
+    loadRetryTimer = setTimeout(() => {
+      loadRetryTimer = null;
+      if (g === gen && loadError) void refreshCloud();
+    }, backoffDelay(loadAttempts++ + 1));
   }
   if (g !== gen) return;
+  const last = readLastSession(uid);
   const prevCurrent = model.current;
   const prevSolves = model.solves;
-  const base = sessions ?? model.sessions;
+  const cache = sessions ? null : readCloudCache(uid);
+  const base = sessions ?? cache?.sessions ?? model.sessions;
   model = {
     sessions: overlaySessions(base, overlayOps()),
     solves: keepCurrent ? prevSolves : new Map(),
-    current: keepCurrent ? prevCurrent : null,
-    lastByEvent: keepCurrent ? model.lastByEvent : {},
+    current: keepCurrent ? prevCurrent : last.current,
+    lastByEvent: keepCurrent ? model.lastByEvent : last.lastByEvent,
   };
+  if (cache?.sessionId && !model.solves.has(cache.sessionId)) {
+    model.solves.set(cache.sessionId, overlaySolves(cache.sessionId, cache.solves, overlayOps()));
+  }
   let cur = pickCurrent();
   if (!cur) cur = createSessionInternal(suggestSessionNameFor(defaultEvent()), defaultEvent()).id;
   model.current = cur;
@@ -411,6 +521,7 @@ async function loadSessionSolves(sid: string, g: number): Promise<void> {
     model.sessions = model.sessions.map((s) => (s.id === sid && s.solveCount !== list.length ? { ...s, solveCount: list.length } : s));
     if (req === solveReq) publish({ loading: false });
     else publish();
+    cloudCacheSoon();
   } catch (e) {
     if (g !== gen) return;
     if (e instanceof ApiError && e.status === 404) {
@@ -446,13 +557,17 @@ function handleAuth(user: PrivateUser | null): void {
   const next: Scope = user ? { mode: 'cloud', userId: user.id } : { mode: 'local' };
   if (scope && scope.mode === next.mode && (next.mode === 'local' || (scope.mode === 'cloud' && scope.userId === next.userId))) return;
   flushLocal();
+  flushCloudCache();
   gen++;
   scope = next;
   loadError = null;
   queueError = null;
   backoffN = 0;
+  loadAttempts = 0;
   if (retryTimer) clearTimeout(retryTimer);
+  if (loadRetryTimer) clearTimeout(loadRetryTimer);
   retryTimer = null;
+  loadRetryTimer = null;
   if (next.mode === 'local') {
     void loadLocalScope();
     return;
@@ -469,7 +584,16 @@ if (browser) {
   else if (!getToken()) handleAuth(null);
   // else: a token exists and the auth check is in flight — AuthProvider will call us
 
-  window.addEventListener('pagehide', () => flushLocal());
+  window.addEventListener('pagehide', () => {
+    flushLocal();
+    flushCloudCache();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      flushLocal();
+      flushCloudCache();
+    } else if (userId() && pendingCount() > 0 && !retryTimer) void pump();
+  });
   window.addEventListener('online', () => {
     if (!userId()) return;
     backoffN = 0;
@@ -478,12 +602,26 @@ if (browser) {
     void pump();
     if (loadError) void refreshCloud();
   });
+  // another tab changed the guest data
+  window.addEventListener('storage', (e) => {
+    if (e.key !== LOCAL_KEY || scope?.mode !== 'local' || localDirty) return;
+    const current = model.current;
+    localDb = readLocal(true);
+    model = localDb;
+    model.current = current && sessionById(current) ? current : pickCurrent();
+    if (!model.current) {
+      createSessionInternal(suggestSessionNameFor(defaultEvent()), defaultEvent());
+      model.current = pickCurrent();
+    }
+    publish();
+  });
 }
 
 // ================================================================ mutations
 
 function commit(): void {
-  if (scope?.mode !== 'cloud') saveLocalSoon();
+  if (scope?.mode === 'cloud') cloudCacheSoon();
+  else saveLocalSoon();
   publish();
 }
 
@@ -643,6 +781,7 @@ export async function switchSession(sessionId: string): Promise<void> {
   model.lastByEvent = { ...model.lastByEvent, [s.event]: sessionId };
   if (settingsStore.get().lastEvent !== s.event) updateSettings({ lastEvent: s.event });
   if (scope?.mode === 'cloud') {
+    writeLastSession();
     publish();
     await loadSessionSolves(sessionId, gen);
   } else commit();

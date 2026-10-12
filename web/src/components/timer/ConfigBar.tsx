@@ -207,6 +207,9 @@ function SyncStatus({ mode, pending, syncError }: { mode: 'local' | 'cloud'; pen
       label = 'synced';
       tip = 'all solves are saved to your account';
     }
+  } else if (syncError) {
+    cls = ' warn';
+    tip = syncError;
   }
   return (
     <div className={`config-card tp-sync${cls}`} data-tip={tip} data-tip-pos="down" role="status" aria-label={tip}>
