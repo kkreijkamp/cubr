@@ -112,6 +112,14 @@ function pickCurrent(): string | null {
   return ss[0]?.id ?? null;
 }
 
+/** Default name for a new session of `event`: "3x3", then "3x3 2", "3x3 3" … */
+export function suggestSessionName(event: string): string {
+  const base = getEvent(event)?.short ?? event;
+  const taken = new Set(solveStore.get().sessions.map((s) => s.name.toLowerCase()));
+  if (!taken.has(base.toLowerCase())) return base;
+  for (let i = 2; ; i++) if (!taken.has(`${base} ${i}`.toLowerCase())) return `${base} ${i}`;
+}
+
 function loadLocalScope(): void {
   model = readLocal();
   if (!pickCurrent()) createSessionInternal(suggestSessionNameFor(DEFAULT_EVENT), DEFAULT_EVENT);
@@ -150,6 +158,12 @@ function locate(id: string): { sid: string; index: number; list: Solve[] } | nul
 
 function patchSession(id: string, patch: Partial<Session>): void {
   model.sessions = model.sessions.map((s) => (s.id === id ? { ...s, ...patch } : s));
+}
+
+function validName(name: string): string {
+  const n = name.trim();
+  if (n.length < 1 || n.length > 40) throw new Error('Session names must be 1–40 characters');
+  return n;
 }
 
 function createSessionInternal(name: string, event: string): Session {
@@ -215,6 +229,37 @@ export async function deleteSolve(solveId: string): Promise<void> {
   next.splice(hit.index, 1);
   model.solves.set(hit.sid, next);
   patchSession(hit.sid, { solveCount: next.length });
+  commit();
+}
+
+export async function createSession(name: string, event: string): Promise<Session> {
+  if (!isEventId(event)) throw new Error(`Unknown event ${event}`);
+  const s = createSessionInternal(validName(name), event);
+  commit();
+  return s;
+}
+
+export async function renameSession(sessionId: string, name: string): Promise<void> {
+  const n = validName(name);
+  const s = sessionById(sessionId);
+  if (!s || s.name === n) return;
+  patchSession(sessionId, { name: n, updatedAt: new Date().toISOString() });
+  commit();
+}
+
+export async function deleteSession(sessionId: string): Promise<void> {
+  const s = sessionById(sessionId);
+  if (!s) return;
+  model.sessions = model.sessions.filter((x) => x.id !== sessionId);
+  model.solves.delete(sessionId);
+  for (const [ev, id] of Object.entries(model.lastByEvent)) if (id === sessionId) delete model.lastByEvent[ev];
+  if (model.current === sessionId) {
+    const sibling = [...model.sessions].reverse().find((x) => x.event === s.event);
+    const next = sibling ?? createSessionInternal(suggestSessionNameFor(s.event), s.event);
+    commit();
+    await switchSession(next.id);
+    return;
+  }
   commit();
 }
 

@@ -24,6 +24,102 @@
   padding-right: 0.42em;
 }
 
+/* session dropdown */
+.tp-session {
+  position: relative;
+  display: inline-flex;
+}
+.tp-session-btn {
+  max-width: 16rem;
+}
+.tp-session-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 11rem;
+}
+.tp-session-btn .tp-chevron {
+  transition: transform var(--dur);
+}
+.tp-session-btn.open {
+  color: var(--text-color);
+}
+.tp-session-btn.open .tp-chevron {
+  transform: rotate(180deg);
+}
+.tp-menu {
+  position: absolute;
+  top: calc(100% + 0.6rem);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  min-width: 15rem;
+  max-width: min(22rem, calc(100vw - 2rem));
+  background: var(--bg-color);
+  border-radius: var(--roundness);
+  box-shadow: 0 0 0 2px var(--sub-alt-color);
+  padding: 0.4rem;
+  font-size: 0.8rem;
+  animation: fadeIn 0.1s ease-out;
+}
+.tp-menu-title {
+  color: var(--sub-color);
+  font-size: 0.7rem;
+  padding: 0.35rem 0.6rem 0.45rem;
+}
+.tp-menu-list {
+  max-height: 16rem;
+  overflow-y: auto;
+}
+.tp-menu-item {
+  display: grid;
+  grid-template-columns: 1rem 1fr auto;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 0;
+  border-radius: calc(var(--roundness) * 0.75);
+  background: transparent;
+  color: var(--text-color);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur), color var(--dur);
+}
+.tp-menu-item:hover {
+  background: var(--sub-alt-color);
+}
+.tp-menu-item.active {
+  color: var(--main-color);
+}
+.tp-menu-item.danger:hover {
+  color: var(--error-color);
+}
+.tp-menu-item:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+.tp-menu-check {
+  display: inline-flex;
+  color: inherit;
+}
+.tp-menu-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tp-menu-count {
+  color: var(--sub-color);
+  font-variant-numeric: tabular-nums;
+}
+.tp-menu-sep {
+  height: 2px;
+  background: var(--sub-alt-color);
+  margin: 0.35rem 0.25rem;
+  border-radius: 2px;
+}
+
 /* ------------------------------------------------------------ scramble */
 .tp-scramble-wrap {
   display: grid;

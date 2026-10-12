@@ -12,11 +12,26 @@ import { QuickActions } from '../components/timer/QuickActions';
 import { ConfirmModal, PromptModal } from '../components/timer/Dialogs';
 import { fmtAvg, fmtSolveShort } from '../components/timer/statsUtil';
 import '../components/timer/timer-page.css';
-import { addSolve, deleteSolve, setComment, setPenalty, switchEvent, useSolveState } from '../lib/solves';
+import {
+  addSolve,
+  createSession,
+  deleteSession,
+  deleteSolve,
+  renameSession,
+  setComment,
+  setPenalty,
+  suggestSessionName,
+  switchEvent,
+  switchSession,
+  useSolveState,
+} from '../lib/solves';
 import { toast } from '../lib/toast';
 
 type ModalState =
   | { kind: 'solve'; index: number }
+  | { kind: 'newSession' }
+  | { kind: 'renameSession' }
+  | { kind: 'deleteSession' }
   | { kind: 'deleteLast' }
   | { kind: 'comment'; solveId: string }
   | null;
@@ -42,6 +57,7 @@ export default function TimerPage() {
   const scr = useScrambleQueue(event);
 
   const [inspection, setInspection] = useState(false);
+  const [overlay, setOverlay] = useState(false);
   const [modal, setModal] = useState<ModalState>(null);
 
   // ---------------------------------------------------------------- derived stats (memoised per solve change)
@@ -67,7 +83,7 @@ export default function TimerPage() {
     scrRef.current.next();
   }, []);
 
-  const engineEnabled = modal === null;
+  const engineEnabled = !overlay && modal === null;
   const engine = useTimerEngine({
     enabled: engineEnabled,
     // WCA inspection only applies to events that have it (not blindfolded, not FMC)
@@ -105,6 +121,16 @@ export default function TimerPage() {
     if (l) setModal({ kind: 'comment', solveId: l.id });
   }, []);
 
+  const cycleSession = useCallback(
+    (dir: 1 | -1) => {
+      const list = st.sessions.filter((s) => s.event === event);
+      if (list.length < 2 || !session) return;
+      const i = list.findIndex((s) => s.id === session.id);
+      void switchSession(list[(i + dir + list.length) % list.length].id);
+    },
+    [st.sessions, event, session],
+  );
+
   const changeEvent = useCallback((ev: string) => {
     void switchEvent(ev).catch((e: Error) => toast.error(e.message));
   }, []);
@@ -129,6 +155,8 @@ export default function TimerPage() {
         Backspace: deleteLast,
         KeyZ: deleteLast,
         KeyC: commentLast,
+        ArrowUp: () => cycleSession(-1),
+        ArrowDown: () => cycleSession(1),
       };
       const fn = actions[e.code];
       if (fn) {
@@ -138,7 +166,7 @@ export default function TimerPage() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [penaltyLast, deleteLast, commentLast]);
+  }, [penaltyLast, deleteLast, commentLast, cycleSession]);
 
   // ---------------------------------------------------------------- display
   // idle: show the latest solve of this session (with its current penalty), like csTimer
@@ -151,10 +179,23 @@ export default function TimerPage() {
   }, [engine.state, last]);
 
   const openSolve = useCallback((index: number) => setModal({ kind: 'solve', index }), []);
+  const onOverlayChange = useCallback((open: boolean) => setOverlay(open), []);
 
   return (
     <div className="timer-page">
-      <ConfigBar event={event} onEvent={changeEvent} inspection={inspection} onToggleInspection={() => setInspection((v) => !v)} />
+      <ConfigBar
+        event={event}
+        sessions={st.sessions}
+        currentSessionId={st.currentSessionId}
+        onEvent={changeEvent}
+        onSession={(id) => void switchSession(id)}
+        onNewSession={() => setModal({ kind: 'newSession' })}
+        onRenameSession={() => setModal({ kind: 'renameSession' })}
+        onDeleteSession={() => setModal({ kind: 'deleteSession' })}
+        inspection={inspection}
+        onToggleInspection={() => setInspection((v) => !v)}
+        onOverlayChange={onOverlayChange}
+      />
 
       <ScrambleBar scramble={scr.current} onNext={scr.next} />
 
@@ -202,6 +243,44 @@ export default function TimerPage() {
           precision={PRECISION}
           confirmDelete
           onNavigate={(i) => i >= 0 && i < solves.length && setModal({ kind: 'solve', index: i })}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal?.kind === 'newSession' && (
+        <PromptModal
+          title="new session"
+          label={`name · ${eventInfo.short.toLowerCase()}`}
+          initial={suggestSessionName(event)}
+          confirmLabel="create"
+          onSubmit={async (name) => {
+            const s = await createSession(name, event);
+            await switchSession(s.id);
+          }}
+          validate={(v) => (v.trim().length < 1 ? 'give it a name' : null)}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal?.kind === 'renameSession' && session && (
+        <PromptModal
+          title="rename session"
+          label="name"
+          initial={session.name}
+          onSubmit={(name) => renameSession(session.id, name)}
+          validate={(v) => (v.trim().length < 1 ? 'give it a name' : null)}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal?.kind === 'deleteSession' && session && (
+        <ConfirmModal
+          title="delete session"
+          message={
+            <>
+              Delete <span className="main">{session.name}</span>
+              {session.solveCount > 0 ? ` and its ${session.solveCount} solve${session.solveCount === 1 ? '' : 's'}` : ''}? This can't be undone.
+            </>
+          }
+          confirmLabel="delete session"
+          onConfirm={() => deleteSession(session.id)}
           onClose={() => setModal(null)}
         />
       )}
