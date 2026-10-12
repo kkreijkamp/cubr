@@ -17,6 +17,6 @@ Accounts, JWT login and per-user settings (SPEC §7.1, §9.1). Owns Postgres sch
 
 Env: `PORT`, `DATABASE_URL`, `JWT_SECRET`, `POD_NAME`, `NODE_NAME`, `APP_VERSION`, `LOG_LEVEL`.
 
-Dev (any local PostgreSQL 17 with a `cubetype` database):
-`DATABASE_URL=postgres://cubetype:cubetype@localhost:5432/cubetype npm run dev -w services/auth`
-Tests: `npx vitest run services/auth`.
+Dev against the compose database: `docker compose up -d postgres`, then
+`PORT=8081 DATABASE_URL=postgres://cubetype:cubetype@localhost:55433/cubetype npm run dev -w services/auth`
+Tests: `npx vitest run services/auth`. Image: `docker build -f services/auth/Dockerfile -t cubetype/auth:dev .`

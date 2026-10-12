@@ -1,0 +1,96 @@
+# =============================================================================================
+# cubetype -- full local stack (docker compose v2)
+# ---------------------------------------------------------------------------------------------
+#   docker compose up -d --build                 # build all images and start the whole stack
+#   open http://localhost:8080                   # gateway = same routes as the GKE Ingress
+#   docker compose down                          # stop (add -v to also delete the volumes)
+#
+# The gateway is the only entry point for the app (http://localhost:8080). Postgres and Redis
+# are also published, on 127.0.0.1 only and on non-default ports so a locally installed
+# Postgres/Redis cannot clash: 55433 (psql postgres://cubetype:cubetype@localhost:55433/cubetype)
+# and 56380 (redis-cli -p 56380). The same ports let you run one service on the host:
+#   DATABASE_URL=postgres://cubetype:cubetype@localhost:55433/cubetype \
+#   REDIS_URL=redis://localhost:56380 npm run dev -w services/auth
+# Environment variables follow docs/SPEC.md §4.
+# =============================================================================================
+
+name: cubetype                       # compose project name -> containers cubetype-<svc>-<n>
+
+# ---- shared snippets (YAML anchors) -------------------------------------------------------------
+x-service-env: &service-env
+  DATABASE_URL: postgres://cubetype:cubetype@postgres:5432/cubetype
+  REDIS_URL: redis://redis:6379
+  JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}   # override with JWT_SECRET=... docker compose up
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  NODE_NAME: docker-compose                          # K8s sets this from spec.nodeName
+  # POD_NAME is not set: services fall back to os.hostname() = the container id, which differs
+  # per replica, so X-Served-By shows which replica answered.
+  AUTH_URL: http://auth:8080
+
+x-service: &service
+  restart: unless-stopped            # come back after crashes / docker restarts
+  environment: *service-env
+  healthcheck:                       # readiness = /readyz (deps reachable, migrations applied)
+    test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/readyz"]
+    interval: 10s
+    timeout: 3s
+    retries: 3
+    start_period: 60s
+  depends_on:
+    postgres: { condition: service_healthy }
+    redis: { condition: service_healthy }
+
+x-build-args: &build-args
+  APP_VERSION: ${APP_VERSION:-dev}   # baked into the image -> X-Service: <svc>@<version>
+
+services:
+  # ---- data stores -----------------------------------------------------------------------------
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cubetype
+      POSTGRES_PASSWORD: cubetype
+      POSTGRES_DB: cubetype
+    volumes:
+      - pgdata:/var/lib/postgresql/data   # survives `docker compose down` (use -v to wipe)
+    ports:
+      - "127.0.0.1:55433:5432"            # psql / services on the host: localhost:55433
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cubetype -d cubetype"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]   # AOF persistence: data survives restarts
+    volumes:
+      - redisdata:/data
+    ports:
+      - "127.0.0.1:56380:6379"            # redis-cli / services on the host: localhost:56380
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # ---- microservices (build context = repo root, see docs/BUILDING.md) ------------------------
+  auth:
+    <<: *service
+    image: cubetype/auth:dev
+    build: { context: ., dockerfile: services/auth/Dockerfile, args: *build-args }
+
+  # ---- gateway: local stand-in for the GKE Ingress ----------------------------------------------
+  gateway:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    volumes:
+      - ./deploy/gateway/nginx.conf:/etc/nginx/nginx.conf:ro   # routing rules (see file header)
+    ports:
+      - "8080:8080"                   # THE entry point: http://localhost:8080
+
+volumes:
+  pgdata:
+  redisdata:
