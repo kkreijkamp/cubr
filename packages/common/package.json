@@ -1,0 +1,14 @@
+{
+  "name": "@cubetype/common",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared server plumbing for cubetype microservices (config, Fastify bootstrap)",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "fastify": "^5.12.7",
+    "zod": "^3.25.76"
+  }
+}

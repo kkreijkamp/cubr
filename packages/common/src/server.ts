@@ -1,0 +1,178 @@
+import Fastify, { type FastifyInstance, type FastifyError } from 'fastify';
+import { ZodError } from 'zod';
+import type { BaseConfig } from './config.js';
+import { HttpError } from './errors.js';
+
+export type DependencyCheck = () => Promise<unknown>;
+
+export interface ServerOptions {
+  /** Public route prefixes for this service, e.g. ['/api/solves', '/api/sessions'].
+   *  `<prefix>/_info` is registered for each one. */
+  infoPrefixes: string[];
+  /** Named dependency checks that gate /readyz and appear in _info (e.g. { postgres: () => pool.query('select 1') }). */
+  checks?: Record<string, DependencyCheck>;
+  /** Dependencies shown in _info but NOT gating readiness (the service degrades gracefully without them). */
+  softChecks?: Record<string, DependencyCheck>;
+  /** Max request body in bytes (default 1 MiB). */
+  bodyLimit?: number;
+  /** Extra fields merged into the _info payload. */
+  info?: () => Record<string, unknown> | Promise<Record<string, unknown>>;
+}
+
+export interface Server {
+  app: FastifyInstance;
+  /** True once SIGTERM has been received (readiness then reports 503). */
+  isShuttingDown(): boolean;
+  markShuttingDown(): void;
+}
+
+const CHECK_TIMEOUT_MS = 2000; // probes must answer fast even when a dependency hangs
+
+async function runCheck(fn: DependencyCheck): Promise<'ok' | 'down'> {
+  try {
+    await Promise.race([
+      fn(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), CHECK_TIMEOUT_MS)),
+    ]);
+    return 'ok';
+  } catch {
+    return 'down';
+  }
+}
+
+/**
+ * Creates a Fastify instance with the cross-cutting behaviour every cubetype service shares:
+ * JSON error envelope, X-Served-By / X-Service headers, /healthz, /readyz and <prefix>/_info.
+ */
+export function createServer(config: BaseConfig, opts: ServerOptions): Server {
+  const app = Fastify({
+    logger: {
+      level: config.logLevel,
+      base: { svc: config.serviceName, pod: config.podName },
+    },
+    bodyLimit: opts.bodyLimit ?? 1024 * 1024,
+    trustProxy: true, // behind the gateway / Ingress: req.ip comes from X-Forwarded-For
+  });
+
+  const startedAt = new Date();
+  let shuttingDown = false;
+  const checks = opts.checks ?? {};
+
+  app.addHook('onSend', async (_req, reply, payload) => {
+    reply.header('X-Served-By', config.podName);
+    reply.header('X-Service', `${config.serviceName}@${config.version}`);
+    return payload;
+  });
+
+  app.setErrorHandler((err: FastifyError | HttpError | ZodError | Error, req, reply) => {
+    if (err instanceof HttpError) {
+      return reply.status(err.statusCode).send({ error: { code: err.code, message: err.message } });
+    }
+    if (err instanceof ZodError) {
+      const issue = err.issues[0];
+      return reply.status(400).send({
+        error: { code: 'BAD_REQUEST', message: `${issue.path.join('.')}: ${issue.message}` },
+      });
+    }
+    const fe = err as FastifyError;
+    if (fe.statusCode === 413 || fe.code === 'FST_ERR_CTP_BODY_TOO_LARGE') {
+      return reply.status(413).send({ error: { code: 'PAYLOAD_TOO_LARGE', message: 'Request body too large' } });
+    }
+    if (fe.validation || (fe.statusCode && fe.statusCode >= 400 && fe.statusCode < 500)) {
+      return reply.status(fe.statusCode ?? 400).send({ error: { code: 'BAD_REQUEST', message: fe.message } });
+    }
+    req.log.error({ err }, 'unhandled error');
+    return reply.status(500).send({ error: { code: 'INTERNAL', message: 'Internal server error' } });
+  });
+
+  app.setNotFoundHandler((req, reply) => {
+    reply.status(404).send({ error: { code: 'NOT_FOUND', message: `Route ${req.method} ${req.url} not found` } });
+  });
+
+  // Liveness: the process is up. Never checks dependencies (a DB outage must not restart pods).
+  app.get('/healthz', { logLevel: 'warn' }, async () => ({ status: 'ok' }));
+
+  // Readiness: dependencies reachable and not shutting down. K8s / the load balancer only
+  // routes traffic to ready pods.
+  app.get('/readyz', { logLevel: 'warn' }, async (_req, reply) => {
+    if (shuttingDown) return reply.status(503).send({ status: 'shutting-down' });
+    const entries = await Promise.all(
+      Object.entries(checks).map(async ([name, fn]) => [name, await runCheck(fn)] as const),
+    );
+    const deps = Object.fromEntries(entries);
+    const ok = entries.every(([, s]) => s === 'ok');
+    return reply.status(ok ? 200 : 503).send({ status: ok ? 'ready' : 'not-ready', deps });
+  });
+
+  const allChecks = { ...checks, ...(opts.softChecks ?? {}) };
+  const infoHandler = async () => {
+    const entries = await Promise.all(
+      Object.entries(allChecks).map(async ([name, fn]) => [name, await runCheck(fn)] as const),
+    );
+    return {
+      service: config.serviceName,
+      version: config.version,
+      pod: config.podName,
+      node: config.nodeName,
+      startedAt: startedAt.toISOString(),
+      uptimeSec: Math.round((Date.now() - startedAt.getTime()) / 1000),
+      deps: Object.fromEntries(entries),
+      ...(opts.info ? await opts.info() : {}),
+    };
+  };
+  for (const prefix of opts.infoPrefixes) {
+    app.get(`${prefix}/_info`, { logLevel: 'warn' }, infoHandler);
+  }
+
+  return {
+    app,
+    isShuttingDown: () => shuttingDown,
+    markShuttingDown: () => {
+      shuttingDown = true;
+    },
+  };
+}
+
+/**
+ * Starts listening and wires graceful shutdown: on SIGTERM/SIGINT readiness flips to 503,
+ * in-flight requests finish, then the `onClose` hooks (pools, consumers) run.
+ */
+export async function start(
+  server: Server,
+  config: BaseConfig,
+  onClose: Array<() => Promise<unknown> | unknown> = [],
+): Promise<void> {
+  const { app } = server;
+  let closing = false;
+  const shutdown = async (signal: string) => {
+    if (closing) return;
+    closing = true;
+    server.markShuttingDown();
+    app.log.info({ signal }, 'shutting down');
+    const force = setTimeout(() => {
+      app.log.error('forced exit after shutdown timeout');
+      process.exit(1);
+    }, 20_000);
+    force.unref();
+    try {
+      await app.close();
+      for (const fn of onClose) {
+        try {
+          await fn();
+        } catch (err) {
+          app.log.warn({ err }, 'error during shutdown hook');
+        }
+      }
+    } finally {
+      process.exit(0);
+    }
+  };
+  process.once('SIGTERM', () => void shutdown('SIGTERM'));
+  process.once('SIGINT', () => void shutdown('SIGINT'));
+
+  await app.listen({ host: '0.0.0.0', port: config.port });
+  app.log.info(
+    { version: config.version, node: config.nodeName },
+    `${config.serviceName} listening on :${config.port}`,
+  );
+}
