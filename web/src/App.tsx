@@ -1,12 +1,13 @@
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { Layout } from './components/Layout';
+import TimerPage from './pages/TimerPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 const router = createBrowserRouter([
   {
     element: <Layout />,
     children: [
-      { path: '/', element: <h1>cubetype</h1> },
+      { path: '/', element: <TimerPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

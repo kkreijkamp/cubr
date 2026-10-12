@@ -1,0 +1,49 @@
+/* Timer page — Monkeytype layout language on top of global.css tokens. */
+
+.timer-page {
+  display: grid;
+  gap: 0;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* ------------------------------------------------------------ timer */
+.tp-timer-area {
+  display: grid;
+  place-items: center;
+  min-height: clamp(9rem, 24vh, 15rem);
+  padding: 1.25rem 0 0.75rem;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.tp-timer-area .timer-display {
+  transition: color 0.08s;
+}
+.tp-under {
+  display: grid;
+  justify-items: center;
+  gap: 0.4rem;
+  min-height: 5.25rem;
+  align-content: start;
+}
+.tp-avgline {
+  display: flex;
+  gap: 1.5rem;
+  color: var(--sub-color);
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+.tp-avgline b {
+  font-weight: 400;
+  color: var(--text-color);
+  margin-left: 0.5em;
+}
+.tp-hint {
+  color: var(--sub-color);
+  font-size: 0.9rem;
+  animation: fadeIn 0.3s ease-out;
+}
+.tp-hint kbd {
+  font-size: 0.75rem;
+}

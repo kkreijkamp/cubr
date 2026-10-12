@@ -230,6 +230,12 @@ h4 {
   font-size: 0.75rem;
   padding: 0.25rem;
 }
+.keytips {
+  text-align: center;
+  color: var(--sub-color);
+  font-size: 0.75rem;
+  line-height: 2;
+}
 
 kbd {
   color: var(--bg-color);

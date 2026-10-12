@@ -1,0 +1,26 @@
+/* Big timer display. Colour encodes state like csTimer, mapped onto theme tokens. */
+.timer-display {
+  font-size: var(--timer-size, 7rem);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-color);
+  text-align: center;
+  user-select: none;
+  letter-spacing: -0.02em;
+  transition: color 0.08s;
+  white-space: nowrap;
+}
+.timer-display.running {
+  color: var(--main-color);
+}
+.timer-display.holding {
+  color: var(--timer-holding);
+}
+.timer-display.ready {
+  color: var(--timer-ready);
+}
+@media (max-width: 720px) {
+  .timer-display {
+    font-size: min(var(--timer-size, 7rem), 22vw);
+  }
+}
