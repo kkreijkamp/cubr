@@ -1,0 +1,222 @@
+/* Daily challenge. Theme tokens only. */
+
+.daily-countdown {
+  display: grid;
+  justify-items: end;
+  gap: 0.1rem;
+}
+.daily-countdown .label {
+  color: var(--sub-color);
+  font-size: 0.75rem;
+}
+.daily-countdown .value {
+  color: var(--main-color);
+  font-size: 1.6rem;
+  line-height: 1.1;
+}
+
+.daily-config {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: space-between;
+}
+
+.daily-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22rem;
+  gap: 2rem;
+  align-items: start;
+}
+@media (max-width: 1000px) {
+  .daily-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.daily-main {
+  display: grid;
+  gap: 1.1rem;
+  align-content: start;
+  min-width: 0;
+}
+.daily-side {
+  min-width: 0;
+}
+.daily-past {
+  text-align: center;
+}
+
+/* 5-attempt progress strip */
+.daily-strip {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+.daily-strip li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--roundness);
+  background: var(--sub-alt-color);
+  font-variant-numeric: tabular-nums;
+  min-width: 0;
+  transition: box-shadow var(--dur), background var(--dur);
+}
+.daily-strip .n {
+  color: var(--sub-color);
+  font-size: 0.75rem;
+}
+.daily-strip .t {
+  color: var(--sub-color);
+  font-size: 1.05rem;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.daily-strip li.filled .t {
+  color: var(--text-color);
+}
+.daily-strip .t.dnf {
+  color: var(--error-color) !important;
+}
+.daily-strip li.current {
+  box-shadow: inset 0 0 0 2px var(--main-color);
+}
+.daily-strip li.current .t,
+.daily-strip li.current .n {
+  color: var(--main-color);
+}
+.daily-strip li.failed {
+  box-shadow: inset 0 0 0 2px var(--error-color);
+}
+.daily-strip .s {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  color: var(--error-color);
+  min-width: 0.75rem;
+}
+.daily-strip .s .btn-text {
+  padding: 0;
+  color: var(--error-color);
+}
+@media (max-width: 640px) {
+  .daily-strip {
+    gap: 0.3rem;
+  }
+  .daily-strip li {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    gap: 0.15rem;
+    padding: 0.45rem 0.25rem;
+  }
+  .daily-strip .t {
+    font-size: 0.85rem;
+    max-width: 100%;
+  }
+  .daily-strip .s:empty {
+    display: none;
+  }
+}
+
+.daily-scramble-label {
+  text-align: center;
+  color: var(--sub-color);
+  font-size: 0.8rem;
+  margin-bottom: -0.6rem;
+}
+
+/* result after 5 attempts */
+.daily-result {
+  display: grid;
+  justify-items: center;
+  gap: 1.25rem;
+  padding: 1.5rem 0 0.5rem;
+  text-align: center;
+}
+.daily-result .stat.lg .value {
+  font-size: 5rem;
+}
+.daily-result-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem 3rem;
+}
+.daily-result-stats .small-value {
+  font-size: 1.2rem;
+  line-height: 1.6;
+}
+
+.daily-scrambles summary {
+  cursor: pointer;
+}
+.daily-scrambles ol {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* leaderboard */
+.daily-board {
+  display: grid;
+  gap: 0.5rem;
+}
+.daily-board .live-section-title {
+  margin-bottom: 0.25rem;
+}
+.daily-table td,
+.daily-table th {
+  padding-left: 0.6rem;
+  padding-right: 0.6rem;
+}
+.daily-table td {
+  padding-top: 0.55rem;
+  padding-bottom: 0.55rem;
+}
+.daily-table .name {
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.daily-table .name a {
+  color: var(--text-color);
+}
+.daily-table .name a:hover {
+  color: var(--main-color);
+}
+.daily-table .flag {
+  margin-right: 0.4rem;
+}
+.daily-table .crown {
+  color: var(--main-color);
+  vertical-align: -0.15em;
+}
+.daily-table tr.gap td {
+  background: transparent !important;
+  color: var(--sub-color);
+  text-align: center;
+  padding: 0.1rem;
+}
+.daily-more {
+  justify-self: center;
+}
+@media (max-width: 720px) {
+  .daily-countdown {
+    justify-items: start;
+  }
+  .daily-result .stat.lg .value {
+    font-size: 3.75rem;
+  }
+}

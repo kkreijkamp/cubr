@@ -7,6 +7,7 @@ import { isEventId } from '@cubetype/cubestats';
 //   lb:<event>:<kind>:all            zset  all-time board (score = ms, member = userId)
 //   lb:<event>:<kind>:w:<YYYY-Www>   zset  weekly board   (TTL 15 d)
 //   lb:<event>:<kind>:d:<YYYY-MM-DD> zset  daily board    (TTL 3 d)
+//   lb:dc:<YYYY-MM-DD>:<event>       zset  daily-challenge ao5 board
 //   <board>:at                       hash  userId → achievedAt (ISO) for the score on <board>
 //   <board>:ts                       hash  userId → occurredAt (epoch ms) of the last applied
 //                                          pb.updated (all-time boards only; drops stale events)
@@ -39,6 +40,7 @@ export const hasBoards = (event: string): boolean => isEventId(event) && event !
 export const allTimeKey = (event: string, kind: Kind) => `lb:${event}:${kind}:all`;
 export const dailyKey = (event: string, kind: Kind, day: string) => `lb:${event}:${kind}:d:${day}`;
 export const weeklyKey = (event: string, kind: Kind, week: string) => `lb:${event}:${kind}:w:${week}`;
+export const challengeKey = (date: string, event: string) => `lb:dc:${date}:${event}`;
 export const atKey = (board: string) => `${board}:at`;
 export const tsKey = (board: string) => `${board}:ts`;
 
@@ -57,6 +59,14 @@ export function currentPeriodKey(period: Period, now: Date = new Date()): string
   if (period === 'weekly') return utcWeek(now);
   if (period === 'daily') return utcDay(now);
   return 'all';
+}
+
+/** True for a real calendar date written as YYYY-MM-DD. */
+export function isValidDay(s: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return false;
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  return d.toISOString().slice(0, 10) === s;
 }
 
 /** 1-based page → inclusive ZRANGE indexes. */

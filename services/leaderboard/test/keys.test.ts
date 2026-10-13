@@ -4,10 +4,12 @@ import {
   allTimeKey,
   atKey,
   boardKey,
+  challengeKey,
   currentPeriodKey,
   dailyKey,
   hasBoards,
   isKind,
+  isValidDay,
   pageRange,
   rankAt,
   tsKey,
@@ -19,6 +21,7 @@ describe('key builders', () => {
     expect(allTimeKey('333', 'single')).toBe('lb:333:single:all');
     expect(dailyKey('333oh', 'ao5', '2026-10-14')).toBe('lb:333oh:ao5:d:2026-10-14');
     expect(weeklyKey('pyram', 'single', '2026-W42')).toBe('lb:pyram:single:w:2026-W42');
+    expect(challengeKey('2026-10-14', '222')).toBe('lb:dc:2026-10-14:222');
     expect(atKey('lb:333:single:all')).toBe('lb:333:single:all:at');
     expect(tsKey('lb:333:single:all')).toBe('lb:333:single:all:ts');
   });
@@ -49,6 +52,13 @@ describe('period keys (UTC)', () => {
   it('handles ISO week-year boundaries', () => {
     expect(currentPeriodKey('weekly', new Date('2027-01-01T12:00:00Z'))).toBe('2026-W53');
     expect(currentPeriodKey('weekly', new Date('2024-12-30T12:00:00Z'))).toBe('2025-W01');
+  });
+  it('validates day keys', () => {
+    expect(isValidDay('2026-10-14')).toBe(true);
+    expect(isValidDay('2024-02-29')).toBe(true);
+    expect(isValidDay('2026-02-29')).toBe(false);
+    expect(isValidDay('2026-13-01')).toBe(false);
+    expect(isValidDay('2026-1-01')).toBe(false);
   });
 });
 

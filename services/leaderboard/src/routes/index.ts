@@ -1,9 +1,18 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { badRequest, parse, type Redis, type makeAuth } from '@cubetype/common';
-import { isEventId } from '@cubetype/cubestats';
+import { DAILY_EVENTS, isEventId } from '@cubetype/cubestats';
 import { readBoard, readUserRanks } from '../board.js';
-import { PERIODS, PERIOD_KINDS, boardKey, currentPeriodKey, isKind } from '../keys.js';
+import {
+  PERIODS,
+  PERIOD_KINDS,
+  boardKey,
+  challengeKey,
+  currentPeriodKey,
+  isKind,
+  isValidDay,
+  utcDay,
+} from '../keys.js';
 
 export interface Deps {
   redis: Redis;
@@ -20,9 +29,27 @@ const boardQuery = z.object({
   ...paging,
 });
 
+const challengeQuery = z.object({
+  date: z.string().max(10).optional(),
+  event: z.string().max(10).default('333'),
+  ...paging,
+});
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function registerRoutes(app: FastifyInstance, { redis, auth }: Deps): Promise<void> {
+  // GET /api/leaderboards/daily-challenge?date=YYYY-MM-DD&event=333 (date defaults to today, UTC)
+  app.get('/api/leaderboards/daily-challenge', { preHandler: auth.optionalAuth }, async (req) => {
+    const q = parse(challengeQuery, req.query);
+    if (!(DAILY_EVENTS as string[]).includes(q.event)) {
+      throw badRequest(`event: no daily challenge for '${q.event}' (one of ${DAILY_EVENTS.join(', ')})`);
+    }
+    const date = q.date ?? utcDay(new Date());
+    if (!isValidDay(date)) throw badRequest('date: expected YYYY-MM-DD');
+    const board = await readBoard(redis, challengeKey(date, q.event), q.page, q.size, req.user?.id);
+    return { event: q.event, kind: 'ao5', period: 'challenge', periodKey: date, total: board.total, page: q.page, size: q.size, entries: board.entries, me: board.me };
+  });
+
   // GET /api/leaderboards/users/:userId/ranks → positions on every all-time board
   app.get<{ Params: { userId: string } }>('/api/leaderboards/users/:userId/ranks', async (req) => {
     const { userId } = req.params;

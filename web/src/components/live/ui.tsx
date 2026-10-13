@@ -1,0 +1,99 @@
+// Small presentational pieces shared by the live pages.
+import { useState, type ReactNode } from 'react';
+import { Check, Copy } from 'lucide-react';
+import { getEvent } from '@cubetype/cubestats';
+import { copyText } from './hooks';
+import './live.css';
+
+/** Monkeytype config-card of text buttons; the active one is main-coloured. */
+export function Segmented<T extends string | number>({
+  options,
+  value,
+  onChange,
+  label,
+  className,
+}: {
+  options: { value: T; label: ReactNode; tip?: string; disabled?: boolean }[];
+  value: T;
+  onChange: (v: T) => void;
+  label?: string;
+  className?: string;
+}) {
+  return (
+    <div className={`config-card live-seg ${className ?? ''}`} role="tablist" aria-label={label}>
+      {options.map((o) => (
+        <button
+          key={String(o.value)}
+          role="tab"
+          aria-selected={o.value === value}
+          className={`btn-text${o.value === value ? ' active' : ''}`}
+          onClick={(e) => {
+            onChange(o.value);
+            (e.currentTarget as HTMLButtonElement).blur();
+          }}
+          disabled={o.disabled}
+          data-tip={o.tip}
+          data-tip-pos={o.tip ? 'down' : undefined}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Event chips using the short WCA names ("3x3", "Pyra", …). */
+export function EventPicker({ events, value, onChange, label = 'event' }: { events: string[]; value: string; onChange: (e: string) => void; label?: string }) {
+  return (
+    <Segmented
+      label={label}
+      value={value}
+      onChange={onChange}
+      options={events.map((id) => ({ value: id, label: getEvent(id)?.short ?? id, tip: getEvent(id)?.name }))}
+    />
+  );
+}
+
+/** Scramble text sized to its length, with a copy button. */
+export function ScrambleText({ scramble, event, muted, actions }: { scramble: string | null; event: string; muted?: boolean; actions?: ReactNode }) {
+  const [copied, setCopied] = useState(false);
+  const len = scramble?.length ?? 0;
+  const size = len <= 40 ? 1.6 : len <= 70 ? 1.35 : len <= 130 ? 1.1 : len <= 260 ? 0.95 : 0.8;
+  return (
+    <div className={`live-scramble${muted ? ' muted' : ''}${event === 'minx' ? ' minx' : ''}`}>
+      <div className="text" style={{ fontSize: `${size}rem` }}>
+        {scramble ?? ' '}
+      </div>
+      {scramble && (
+        <div className="actions">
+          {actions}
+          <button
+            className="btn-text"
+            aria-label="copy scramble"
+            data-tip={copied ? 'copied!' : 'copy scramble'}
+            onClick={async (e) => {
+              (e.currentTarget as HTMLButtonElement).blur();
+              if (await copyText(scramble)) {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1200);
+              }
+            }}
+          >
+            {copied ? <Check size={16} /> : <Copy size={16} />}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Banner for a service that is temporarily unavailable. */
+export function Notice({ icon, children, tone = 'sub', action }: { icon?: ReactNode; children: ReactNode; tone?: 'sub' | 'error' | 'main'; action?: ReactNode }) {
+  return (
+    <div className={`live-notice ${tone}`} role="status">
+      {icon}
+      <div className="body">{children}</div>
+      {action}
+    </div>
+  );
+}

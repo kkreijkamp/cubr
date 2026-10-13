@@ -1,4 +1,4 @@
-import { currentAverage, effectiveMs, toApiValue, type SolveLike } from '@cubetype/cubestats';
+import { averageOfN, currentAverage, effectiveMs, toApiValue, type SolveLike } from '@cubetype/cubestats';
 
 /** API-encoded averages: ms, -1 = DNF, null = not enough solves. */
 export interface Rolling {
@@ -18,6 +18,15 @@ export function rollingFromSolves(solves: SolveLike[]): Rolling {
   return {
     ao5: toApiValue(currentAverage(times, 5)),
     ao12: toApiValue(currentAverage(times, 12)),
+  };
+}
+
+/** Daily challenge ao5: exactly 5 attempts ordered by index → ao5 + per-attempt effective times. */
+export function dailyResult(solves: SolveLike[]): { ao5: number | null; times: number[] } {
+  const times = solves.map(effectiveMs);
+  return {
+    ao5: times.length === 5 ? toApiValue(averageOfN(times, 5)) : null,
+    times: times.map((t) => toApiValue(t) as number),
   };
 }
 

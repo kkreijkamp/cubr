@@ -1,7 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CalendarRange, ChevronLeft, ChevronRight, Crown, Globe, Hash, Sigma, Sun, Timer, User, UserX } from 'lucide-react';
-import { EVENTS } from '@cubetype/cubestats';
+import {
+  CalendarCheck,
+  CalendarDays,
+  CalendarRange,
+  ChevronLeft,
+  ChevronRight,
+  Crown,
+  Globe,
+  Hash,
+  Sigma,
+  Sun,
+  Timer,
+  User,
+  UserX,
+} from 'lucide-react';
+import { DAILY_EVENTS, EVENTS } from '@cubetype/cubestats';
 import { Modal } from '../components/Modal';
 import { ErrorState, Loading, Spinner } from '../components/Spinner';
 import { countryName } from '../components/social/countries';
@@ -17,11 +31,12 @@ import '../components/social/leaderboards.css';
 
 const PAGE_SIZE = 50;
 
-type Period = 'all' | 'weekly' | 'daily';
+type Period = 'all' | 'weekly' | 'daily' | 'challenge';
 const PERIODS: { id: Period; label: string; icon: typeof Globe }[] = [
   { id: 'all', label: 'all-time', icon: Globe },
   { id: 'weekly', label: 'weekly', icon: CalendarRange },
   { id: 'daily', label: 'daily', icon: Sun },
+  { id: 'challenge', label: 'daily challenge', icon: CalendarCheck },
 ];
 const KINDS: { id: LbKind; icon: typeof Timer }[] = [
   { id: 'single', icon: Timer },
@@ -36,9 +51,18 @@ interface Selection {
   kind: LbKind;
   event: string;
   page: number;
+  /** daily-challenge date (UTC "YYYY-MM-DD"), only for period = challenge */
+  date: string;
+}
+
+/** The last 7 UTC days, newest first (daily-challenge boards). */
+function lastSevenDays(): string[] {
+  const today = utcDateKey();
+  return Array.from({ length: 7 }, (_, i) => addDaysKey(today, -i));
 }
 
 function kindsFor(period: Period): LbKind[] {
+  if (period === 'challenge') return ['ao5'];
   if (period === 'all') return ['single', 'ao5', 'ao12'];
   return ['single', 'ao5'];
 }
@@ -47,17 +71,23 @@ function normalize(raw: Partial<Record<keyof Selection, string | number | null>>
   const period = (PERIODS.some((p) => p.id === raw.period) ? raw.period : 'all') as Period;
   const allowedKinds = kindsFor(period);
   const kind = (allowedKinds.includes(raw.kind as LbKind) ? raw.kind : allowedKinds[0]) as LbKind;
-  const event = typeof raw.event === 'string' && BOARD_EVENTS.some((e) => e.id === raw.event) ? raw.event : '333';
+  let event = typeof raw.event === 'string' && BOARD_EVENTS.some((e) => e.id === raw.event) ? raw.event : '333';
+  if (period === 'challenge' && !DAILY_EVENTS.includes(event)) event = '333';
   const page = Math.max(1, Math.floor(Number(raw.page) || 1));
-  return { period, kind, event, page };
+  const days = lastSevenDays();
+  const date = typeof raw.date === 'string' && days.includes(raw.date) ? raw.date : days[0];
+  return { period, kind, event, page, date };
 }
 
 function toParams(s: Selection): Record<string, string> {
-  return { event: s.event, kind: s.kind, period: s.period, page: String(s.page) };
+  const p: Record<string, string> = { event: s.event, kind: s.kind, period: s.period, page: String(s.page) };
+  if (s.period === 'challenge') p.date = s.date;
+  return p;
 }
 
 function boardTitle(s: Selection): string {
   const ev = eventLabel(s.event);
+  if (s.period === 'challenge') return `${ev} daily challenge leaderboard`;
   const period = PERIODS.find((p) => p.id === s.period)!.label;
   return `${period} ${ev} ${s.kind} leaderboard`;
 }
@@ -97,7 +127,15 @@ function useNow(intervalMs: number): number {
   return now;
 }
 
+function shortDay(key: string, index: number): string {
+  if (index === 0) return 'today';
+  if (index === 1) return 'yesterday';
+  // "Mon 12 Oct 2026" → "mon 12 oct"
+  return formatDayKey(key).split(' ').slice(0, 3).join(' ').toLowerCase();
+}
+
 function fetchBoard(s: Selection, signal: AbortSignal): Promise<Leaderboard> {
+  if (s.period === 'challenge') return api.leaderboards.dailyChallenge(s.event, s.date, signal, { page: s.page, size: PAGE_SIZE });
   return api.leaderboards.get(s.event, s.kind, { period: s.period, page: s.page, size: PAGE_SIZE }, signal);
 }
 
@@ -130,12 +168,31 @@ function Subtitle({ sel, periodKey }: { sel: Selection; periodKey: string | unde
       </div>
     );
   }
-  const day = periodKey && /^\d{4}-\d{2}-\d{2}$/.test(periodKey) ? periodKey : utcDateKey();
+  if (sel.period === 'daily') {
+    const day = periodKey && /^\d{4}-\d{2}-\d{2}$/.test(periodKey) ? periodKey : utcDateKey();
+    return (
+      <div className="lb-subtitle">
+        <span data-tip={tz}>{formatDayKey(day).toLowerCase()}</span>
+        <span className="lb-pipe" aria-hidden="true" />
+        <span>resets in {formatDuration(msUntilReset('daily'))}</span>
+      </div>
+    );
+  }
+  const isToday = sel.date === utcDateKey();
   return (
     <div className="lb-subtitle">
-      <span data-tip={tz}>{formatDayKey(day).toLowerCase()}</span>
+      <span data-tip={tz}>{formatDayKey(sel.date).toLowerCase()}</span>
       <span className="lb-pipe" aria-hidden="true" />
-      <span>resets in {formatDuration(msUntilReset('daily'))}</span>
+      <span>ao5 of the same 5 scrambles for everyone</span>
+      {isToday && (
+        <>
+          <span className="lb-pipe" aria-hidden="true" />
+          <Link to="/daily">
+            play today&apos;s challenge <ChevronRight />
+          </Link>
+          <span>next in {formatDuration(msUntilReset('daily'))}</span>
+        </>
+      )}
     </div>
   );
 }
@@ -157,14 +214,19 @@ function MeCard({ board, sel, precision, onJump }: { board: Leaderboard | undefi
   const me = board.me;
   if (!me) {
     const how =
-      sel.period === 'all'
-        ? `set a ${eventLabel(sel.event)} ${sel.kind} on the timer to get ranked.`
-        : `solve some ${eventLabel(sel.event)} ${sel.period === 'daily' ? 'today' : 'this week'} to get ranked.`;
+      sel.period === 'challenge'
+        ? sel.date === utcDateKey()
+          ? 'finish all 5 scrambles of today’s challenge to get ranked.'
+          : 'you did not finish this day’s challenge.'
+        : sel.period === 'all'
+          ? `set a ${eventLabel(sel.event)} ${sel.kind} on the timer to get ranked.`
+          : `solve some ${eventLabel(sel.event)} ${sel.period === 'daily' ? 'today' : 'this week'} to get ranked.`;
     return (
       <div className="lb-me lb-me-empty">
         <UserX size={20} />
         <span>
-          you are not on this leaderboard yet. {how} <Link to="/">open the timer</Link>
+          you are not on this leaderboard yet. {how}{' '}
+          {sel.period === 'challenge' ? (sel.date === utcDateKey() ? <Link to="/daily">go to the challenge</Link> : null) : <Link to="/">open the timer</Link>}
         </span>
         <span />
       </div>
@@ -239,6 +301,7 @@ export default function LeaderboardsPage() {
         kind: params.get('kind'),
         event: params.get('event'),
         page: params.get('page'),
+        date: params.get('date'),
       }),
     [params],
   );
@@ -247,7 +310,7 @@ export default function LeaderboardsPage() {
 
   const update = useCallback(
     (patch: Partial<Selection>) => {
-      const selectionChanged = ['period', 'kind', 'event'].some((k) => k in patch);
+      const selectionChanged = ['period', 'kind', 'event', 'date'].some((k) => k in patch);
       const next = normalize({ ...sel, page: selectionChanged ? 1 : sel.page, ...patch });
       setParams(toParams(next), { replace: true });
     },
@@ -260,7 +323,7 @@ export default function LeaderboardsPage() {
     if (canonical !== params.toString()) setParams(toParams(sel), { replace: true });
   }, [sel, params, setParams]);
 
-  const board = useAsync((signal) => fetchBoard(sel, signal), [sel.event, sel.kind, sel.period, sel.page, user?.id]);
+  const board = useAsync((signal) => fetchBoard(sel, signal), [sel.event, sel.kind, sel.period, sel.page, sel.date, user?.id]);
   const data = board.data;
   const total = data?.total ?? 0;
   const pages = Math.max(1, Math.ceil(total / (data?.size || PAGE_SIZE)));
@@ -326,7 +389,7 @@ export default function LeaderboardsPage() {
           label: 'Leaderboard event…',
           icon: <Crown />,
           children: () =>
-            BOARD_EVENTS.map((e) => ({
+            BOARD_EVENTS.filter((e) => sel.period !== 'challenge' || DAILY_EVENTS.includes(e.id)).map((e) => ({
               id: `lb-event-${e.id}`,
               label: eventLabel(e.id),
               keywords: [e.name],
@@ -350,6 +413,8 @@ export default function LeaderboardsPage() {
     [sel, pages, myPage, update, goPage, jumpToMe],
   );
 
+  const days = lastSevenDays();
+  const visibleEvents = sel.period === 'challenge' ? BOARD_EVENTS.filter((e) => DAILY_EVENTS.includes(e.id)) : BOARD_EVENTS;
   const from = total === 0 ? 0 : (sel.page - 1) * PAGE_SIZE + 1;
   const to = Math.min(total, sel.page * PAGE_SIZE);
 
@@ -363,15 +428,25 @@ export default function LeaderboardsPage() {
             </button>
           ))}
         </div>
-        <div className="lb-group lb-kinds" role="group" aria-label="result type">
-          {KINDS.filter((k) => kindsFor(sel.period).includes(k.id)).map(({ id, icon: Icon }) => (
-            <button key={id} className={`btn${sel.kind === id ? ' active' : ''}`} aria-pressed={sel.kind === id} onClick={() => update({ kind: id })}>
-              <Icon /> {id}
-            </button>
-          ))}
-        </div>
+        {sel.period === 'challenge' ? (
+          <div className="lb-group lb-dates" role="group" aria-label="challenge date">
+            {days.map((d, i) => (
+              <button key={d} className={`btn${sel.date === d ? ' active' : ''}`} aria-pressed={sel.date === d} onClick={() => update({ date: d })}>
+                {i < 2 && <CalendarDays />} {shortDay(d, i)}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="lb-group lb-kinds" role="group" aria-label="result type">
+            {KINDS.filter((k) => kindsFor(sel.period).includes(k.id)).map(({ id, icon: Icon }) => (
+              <button key={id} className={`btn${sel.kind === id ? ' active' : ''}`} aria-pressed={sel.kind === id} onClick={() => update({ kind: id })}>
+                <Icon /> {id}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="lb-group lb-events" role="group" aria-label="event">
-          {BOARD_EVENTS.map((e) => (
+          {visibleEvents.map((e) => (
             <button
               key={e.id}
               className={`btn${sel.event === e.id ? ' active' : ''}`}
@@ -401,7 +476,19 @@ export default function LeaderboardsPage() {
           <div className="lb-empty">
             <div className="shrug">no entries yet ¯\_(ツ)_/¯</div>
             <div className="small">
-              be the first to set a {eventLabel(sel.event)} {sel.kind} — <Link to="/">open the timer</Link>
+              {sel.period === 'challenge' ? (
+                sel.date === utcDateKey() ? (
+                  <>
+                    be the first: <Link to="/daily">play today&apos;s challenge</Link>
+                  </>
+                ) : (
+                  'nobody finished the challenge on this day'
+                )
+              ) : (
+                <>
+                  be the first to set a {eventLabel(sel.event)} {sel.kind} — <Link to="/">open the timer</Link>
+                </>
+              )}
             </div>
           </div>
         ) : (

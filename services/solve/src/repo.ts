@@ -66,6 +66,7 @@ export function solveEventPayload(user: AuthUser, row: SolveRow, tz: string, rol
     tz,
     source: row.source,
     rolling,
+    ...(row.daily_date ? { dailyDate: row.daily_date, dailyIndex: row.daily_index } : {}),
   };
 }
 

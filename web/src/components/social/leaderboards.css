@@ -272,7 +272,8 @@ table.lb-table tr.me.flash td {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-content: start;
   }
-  .lb-group.lb-events {
+  .lb-group.lb-events,
+  .lb-group.lb-dates {
     grid-column: 1 / -1;
     grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr));
   }
@@ -292,7 +293,8 @@ table.lb-table tr.me.flash td {
     grid-auto-flow: column;
     grid-auto-columns: minmax(0, 1fr);
   }
-  .lb-group.lb-events {
+  .lb-group.lb-events,
+  .lb-group.lb-dates {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
   .lb-group .btn {

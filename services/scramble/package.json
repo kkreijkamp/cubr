@@ -12,7 +12,9 @@
     "@cubetype/cubestats": "*",
     "fastify": "^5.12.7",
     "zod": "^3.25.76",
-    "cubing": "^0.65.1"
+    "cubing": "^0.65.1",
+    "ioredis": "^5.11.1",
+    "pg": "^8.23.1"
   },
   "cubetype": {
     "external": ["cubing"]

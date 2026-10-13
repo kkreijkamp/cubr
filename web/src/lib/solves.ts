@@ -64,6 +64,11 @@ export interface AddSolveInput {
   penalty: Penalty;
   scramble: string;
   comment?: string | null;
+  source?: 'timer' | 'daily';
+  /** daily-challenge attempt (cloud mode only) */
+  daily?: { date: string; index: number };
+  /** override target session (defaults to the current session) */
+  sessionId?: string;
 }
 
 const EMPTY: Solve[] = [];
@@ -282,6 +287,7 @@ let inflight: string | null = null;
 let pumping = false;
 let backoffN = 0;
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
+const waiters = new Map<string, { resolve: () => void; reject: (e: Error) => void }>();
 
 function saveQueue(): void {
   saveJson(QUEUE_KEY, queue);
@@ -303,12 +309,22 @@ function overlayOps(): SyncOp[] {
   return [...recent.map((r) => r.op), ...queue.filter((q) => q.userId === uid).map((q) => q.op)];
 }
 
+function settle(opId: string, err?: Error): void {
+  const w = waiters.get(opId);
+  if (!w) return;
+  waiters.delete(opId);
+  if (err) w.reject(err);
+  else w.resolve();
+}
+
 function enqueue(op: SyncOp): string {
   const uid = userId();
   if (!uid) throw new Error('not logged in');
   const item: QueuedOp = { opId: uuid(), userId: uid, op, attempts: 0, createdAt: Date.now() };
   queue = coalesce(queue, item, inflight);
   saveQueue();
+  // waiters of ops that were folded away (e.g. a solve deleted before it was sent) are done
+  for (const id of Array.from(waiters.keys())) if (id !== inflight && !queue.some((q) => q.opId === id)) settle(id);
   if (!retryTimer) void pump();
   return item.opId;
 }
@@ -383,6 +399,7 @@ async function pump(): Promise<void> {
         backoffN = 0;
         const hadError = queueError || loadError;
         queueError = null;
+        settle(head.opId);
         publish();
         if (hadError && loadError) void refreshCloud();
       } catch (e) {
@@ -390,12 +407,14 @@ async function pump(): Promise<void> {
         if (g !== gen) break;
         if (e instanceof ApiError && e.status === 401) {
           // token expired/revoked: the auth layer logs out; ops stay queued for the next login
+          settle(head.opId);
           break;
         }
         if (isRetryable(e)) {
           head.attempts++;
           saveQueue();
           queueError = errorMessage(e);
+          settle(head.opId); // accepted locally, will sync later
           publish();
           scheduleRetry();
           break;
@@ -403,6 +422,7 @@ async function pump(): Promise<void> {
         // permanent rejection (validation, conflict …): drop it and re-sync to revert
         queue = queue.filter((q) => q.opId !== head.opId);
         saveQueue();
+        settle(head.opId, e as Error);
         toast.error(`Couldn't save your change: ${errorMessage(e)}`);
         publish();
         void refreshCloud();
@@ -662,13 +682,16 @@ export async function reloadSolves(): Promise<void> {
   return refreshCloud();
 }
 
-/** Append a solve to the current session. Resolves with the stored solve. */
+/** Append a solve to the current (or given) session. Resolves with the stored solve. */
 export async function addSolve(input: AddSolveInput): Promise<Solve> {
   if (!solveStore.get().ready) await whenReady();
   const timeMs = Math.round(input.timeMs);
   if (!Number.isFinite(timeMs) || timeMs < 1 || timeMs > 86_400_000) throw new Error('Time must be between 0.001 s and 24 h');
-  const session = sessionById(model.current);
-  if (!session) throw new Error('Unknown session');
+  let session = sessionById(input.sessionId ?? model.current);
+  if (!session) {
+    if (input.sessionId) throw new Error('Unknown session');
+    session = await ensureSession(defaultEvent());
+  }
   const solve: Solve = {
     id: uuid(),
     sessionId: session.id,
@@ -677,8 +700,10 @@ export async function addSolve(input: AddSolveInput): Promise<Solve> {
     penalty: input.penalty,
     scramble: (input.scramble ?? '').slice(0, 2000),
     comment: input.comment ? input.comment.slice(0, 500) : null,
-    source: 'timer',
+    source: input.source ?? 'timer',
     createdAt: new Date().toISOString(),
+    dailyDate: input.daily?.date ?? null,
+    dailyIndex: input.daily?.index ?? null,
   };
   const list = model.solves.get(session.id);
   if (list) model.solves.set(session.id, insertChrono(list, solve));
@@ -687,7 +712,7 @@ export async function addSolve(input: AddSolveInput): Promise<Solve> {
     commit();
     return solve;
   }
-  enqueue({
+  const opId = enqueue({
     kind: 'createSolve',
     solve: {
       id: solve.id,
@@ -699,9 +724,17 @@ export async function addSolve(input: AddSolveInput): Promise<Solve> {
       comment: solve.comment,
       source: solve.source,
       createdAt: solve.createdAt,
+      ...(input.daily ? { daily: input.daily } : {}),
     },
   });
   commit();
+  if (input.daily) {
+    // daily attempts report server rejections (e.g. 409 already submitted) to the caller
+    await new Promise<void>((resolve, reject) => {
+      if (!queue.some((q) => q.opId === opId)) return resolve();
+      waiters.set(opId, { resolve, reject });
+    });
+  }
   return solve;
 }
 
@@ -799,4 +832,15 @@ export async function switchEvent(event: string): Promise<void> {
   if (!isEventId(event)) throw new Error(`Unknown event ${event}`);
   const s = findSessionFor(event) ?? createSessionInternal(suggestSessionNameFor(event), event);
   await switchSession(s.id);
+}
+
+/** Returns a session for `event` without switching to it (creates one if needed). */
+export async function ensureSession(event: string): Promise<Session> {
+  if (!solveStore.get().ready) await whenReady();
+  if (!isEventId(event)) throw new Error(`Unknown event ${event}`);
+  const found = findSessionFor(event);
+  if (found) return found;
+  const s = createSessionInternal(suggestSessionNameFor(event), event);
+  commit();
+  return s;
 }

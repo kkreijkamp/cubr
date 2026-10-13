@@ -31,4 +31,8 @@ export function tzFrom(req: FastifyRequest): string {
 export function pgCode(err: unknown): string | undefined {
   return (err as { code?: string } | null)?.code;
 }
+export function pgConstraint(err: unknown): string | undefined {
+  return (err as { constraint?: string } | null)?.constraint;
+}
+export const UNIQUE_VIOLATION = '23505';
 export const FK_VIOLATION = '23503';

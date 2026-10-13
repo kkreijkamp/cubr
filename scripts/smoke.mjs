@@ -77,6 +77,8 @@ check('me', me.status === 200 && me.data?.user?.username === username);
 console.log('\nscrambles:');
 const sc = await req('GET', '/api/scrambles/333?count=3');
 check('3x3 scrambles', sc.status === 200 && sc.data?.scrambles?.length === 3, `source=${sc.data?.source} (${sc.ms} ms)`);
+const daily = await req('GET', '/api/scrambles/daily');
+check('daily challenge scrambles', daily.status === 200 && Array.isArray(daily.data?.events?.['333']), daily.data?.date);
 
 console.log('\nsolves → event bus → stats & leaderboard:');
 const sessions = await req('GET', '/api/sessions');

@@ -120,6 +120,7 @@ export interface NewSolve {
   comment?: string | null;
   source?: string;
   createdAt?: string;
+  daily?: { date: string; index: number };
 }
 
 export const api = {
@@ -136,7 +137,9 @@ export const api = {
     users: (ids: string[]) => get<{ users: PublicUser[] }>(`/api/users${qs({ ids: ids.join(',') })}`),
   },
   scrambles: {
+    events: () => get<{ events: { id: string; name: string; puzzle: string }[] }>('/api/scrambles/events'),
     get: (event: string, count = 1) => get<{ event: string; scrambles: string[]; source: string }>(`/api/scrambles/${enc(event)}${qs({ count })}`),
+    daily: (date?: string) => get<{ date: string; events: Record<string, string[]> }>(`/api/scrambles/daily${qs({ date })}`),
   },
   sessions: {
     list: (signal?: AbortSignal) => get<{ sessions: Session[] }>('/api/sessions', signal),
@@ -149,6 +152,8 @@ export const api = {
     create: (body: NewSolve) => request<{ solve: Solve; rolling: { ao5: number | null; ao12: number | null } }>('POST', '/api/solves', body),
     update: (id: string, body: { penalty?: Penalty; comment?: string | null }) => request<{ solve: Solve }>('PATCH', `/api/solves/${enc(id)}`, body),
     remove: (id: string) => request<void>('DELETE', `/api/solves/${enc(id)}`),
+    daily: (date?: string) =>
+      get<{ date: string; events: Record<string, { solves: Solve[]; ao5: number | null }> }>(`/api/solves/daily${qs({ date })}`),
   },
   stats: {
     summary: (userId: string, signal?: AbortSignal) => get<StatsSummary>(`/api/stats/users/${enc(userId)}/summary`, signal),
@@ -162,6 +167,8 @@ export const api = {
   leaderboards: {
     get: (event: string, kind: LbKind, opts: { period?: 'all' | 'weekly' | 'daily'; page?: number; size?: number; key?: string } = {}, signal?: AbortSignal) =>
       get<Leaderboard>(`/api/leaderboards/${enc(event)}/${kind}${qs({ period: opts.period ?? 'all', page: opts.page, size: opts.size, key: opts.key })}`, signal),
+    dailyChallenge: (event: string, date?: string, signal?: AbortSignal, opts: { page?: number; size?: number } = {}) =>
+      get<Leaderboard>(`/api/leaderboards/daily-challenge${qs({ event, date, page: opts.page, size: opts.size })}`, signal),
     userRanks: (userId: string, signal?: AbortSignal) => get<{ ranks: UserRank[] }>(`/api/leaderboards/users/${enc(userId)}/ranks`, signal),
   },
 };

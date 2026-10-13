@@ -5,9 +5,11 @@ import {
   WEEKLY_TTL_SEC,
   allTimeKey,
   atKey,
+  challengeKey,
   dailyKey,
   hasBoards,
   isKind,
+  isValidDay,
   tsKey,
   utcDay,
   utcWeek,
@@ -21,7 +23,7 @@ import {
 // All writes are idempotent (exact set / keep-best), so at-least-once redelivery is harmless.
 // ---------------------------------------------------------------------------------------------
 
-export const CONSUMED_TYPES = ['pb.updated', 'solve.created', 'user.registered', 'user.updated'];
+export const CONSUMED_TYPES = ['pb.updated', 'solve.created', 'daily.completed', 'user.registered', 'user.updated'];
 
 /** A keep-best write (ZADD LT) to a period board. */
 export interface BestWrite {
@@ -102,6 +104,16 @@ export function planSolveCreated(d: Data, nowMs = Date.now()): BestWrite[] {
   return out;
 }
 
+/** daily.completed → daily-challenge ao5 board (DNF ao5 = -1 is skipped). Kept without TTL (history). */
+export function planDailyCompleted(d: Data, nowMs = Date.now()): BestWrite | null {
+  const event = String(d.event ?? '');
+  const date = String(d.date ?? '');
+  const valueMs = positiveMs(d.ao5);
+  if (!hasBoards(event) || !isValidDay(date) || valueMs === null) return null;
+  const achievedAt = new Date(parseTime(d.occurredAt) ?? nowMs).toISOString();
+  return { board: challengeKey(date, event), event, kind: 'ao5', valueMs, achievedAt, ttlSec: 0 };
+}
+
 type UserInfo = { userId: string; username: string; country?: string | null };
 
 /** Display info carried by an event: username always; country only for user.* events. */
@@ -145,6 +157,11 @@ export function makeHandler({ redis }: IngestDeps) {
       case 'solve.created':
         for (const w of planSolveCreated(d)) await writeBest(evt, w);
         return;
+      case 'daily.completed': {
+        const w = planDailyCompleted(d);
+        if (w) await writeBest(evt, w);
+        return;
+      }
       default:
         return; // user.* — display info handled above
     }

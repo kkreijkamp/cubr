@@ -41,3 +41,6 @@ export function getEvent(id: string): EventInfo | undefined {
 export function isEventId(id: string): boolean {
   return BY_ID.has(id);
 }
+
+/** Events that have a daily challenge (5 scrambles per day, ranked by ao5). */
+export const DAILY_EVENTS = ['333', '222', '444', 'pyram', 'skewb'];
