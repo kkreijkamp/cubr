@@ -70,17 +70,18 @@ const timeZone = (() => {
   }
 })();
 
-export async function request<T>(method: string, path: string, body?: unknown, opts: { signal?: AbortSignal } = {}): Promise<T> {
+export async function request<T>(method: string, path: string, body?: unknown, opts: { signal?: AbortSignal; timeoutMs?: number } = {}): Promise<T> {
   const headers: Record<string, string> = { 'X-Timezone': timeZone };
   if (body !== undefined) headers['content-type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;
   let res: Response;
+  const signal = opts.signal ?? (opts.timeoutMs ? AbortSignal.timeout(opts.timeoutMs) : undefined);
   try {
     res = await fetch(path, {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
-      signal: opts.signal,
+      signal,
       cache: 'no-store',
     });
   } catch (err) {
@@ -130,6 +131,14 @@ export interface NewSolve {
   daily?: { date: string; index: number };
 }
 
+export interface ImportPayload {
+  sessions: {
+    name: string;
+    event: string;
+    solves: { timeMs: number; penalty: Penalty; scramble: string; comment?: string | null; createdAt: string }[];
+  }[];
+}
+
 export const api = {
   auth: {
     register: (body: { username: string; email: string; password: string }) =>
@@ -154,11 +163,14 @@ export const api = {
     rename: (id: string, name: string) => request<{ session: Session }>('PATCH', `/api/sessions/${enc(id)}`, { name }),
     remove: (id: string) => request<void>('DELETE', `/api/sessions/${enc(id)}`),
     solves: (id: string, signal?: AbortSignal) => get<{ solves: Solve[] }>(`/api/sessions/${enc(id)}/solves`, signal),
+    import: (payload: ImportPayload) =>
+      request<{ imported: { sessions: number; solves: number } }>('POST', '/api/sessions/import', payload, { timeoutMs: 120_000 }),
   },
   solves: {
     create: (body: NewSolve) => request<{ solve: Solve; rolling: { ao5: number | null; ao12: number | null } }>('POST', '/api/solves', body),
     update: (id: string, body: { penalty?: Penalty; comment?: string | null }) => request<{ solve: Solve }>('PATCH', `/api/solves/${enc(id)}`, body),
     remove: (id: string) => request<void>('DELETE', `/api/solves/${enc(id)}`),
+    export: () => get<{ exportedAt: string; sessions: (Session & { solves: Solve[] })[] }>('/api/solves/export'),
     daily: (date?: string) =>
       get<{ date: string; events: Record<string, { solves: Solve[]; ao5: number | null }> }>(`/api/solves/daily${qs({ date })}`),
   },

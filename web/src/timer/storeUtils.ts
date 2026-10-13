@@ -1,7 +1,7 @@
 // Pure helpers behind lib/solves.ts (kept free of browser globals so they can be unit-tested):
-// compact localStorage codec, retry-queue coalescing, optimistic overlays, backoff.
+// compact localStorage codec, retry-queue coalescing, optimistic overlays, import chunking, backoff.
 import type { Penalty } from '@cubetype/cubestats';
-import type { NewSolve } from '../lib/api';
+import type { ImportPayload, NewSolve } from '../lib/api';
 import type { Session, Solve } from '../lib/types';
 
 // ---------------------------------------------------------------- ids
@@ -321,5 +321,43 @@ export function overlaySolves(sessionId: string, server: Solve[], ops: SyncOp[])
       out = out.filter((s) => s.id !== op.id);
     }
   }
+  return out;
+}
+
+// ---------------------------------------------------------------- import chunking
+
+type ImportSession = ImportPayload['sessions'][number];
+
+/**
+ * Packs sessions into request bodies of at most `max` solves. A session is never split across
+ * requests (the import endpoint creates one server session per entry) unless it alone exceeds the
+ * server's hard limit, in which case it is split into "name (2)", "name (3)" … parts.
+ */
+export function planImportChunks(sessions: ImportSession[], max = 20_000, hardMax = 100_000): ImportPayload[] {
+  const parts: ImportSession[] = [];
+  for (const s of sessions) {
+    if (s.solves.length === 0) continue;
+    if (s.solves.length <= hardMax) {
+      parts.push(s);
+      continue;
+    }
+    for (let i = 0, n = 1; i < s.solves.length; i += hardMax, n++) {
+      const suffix = n === 1 ? '' : ` (${n})`;
+      parts.push({ ...s, name: `${s.name.slice(0, 40 - suffix.length)}${suffix}`, solves: s.solves.slice(i, i + hardMax) });
+    }
+  }
+  const out: ImportPayload[] = [];
+  let cur: ImportSession[] = [];
+  let count = 0;
+  for (const p of parts) {
+    if (cur.length && count + p.solves.length > max) {
+      out.push({ sessions: cur });
+      cur = [];
+      count = 0;
+    }
+    cur.push(p);
+    count += p.solves.length;
+  }
+  if (cur.length) out.push({ sessions: cur });
   return out;
 }

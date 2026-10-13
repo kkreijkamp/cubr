@@ -51,7 +51,7 @@ let cached: Promise<CountryOption[]> | null = null;
 
 /** Countries for the select, sorted by name. Never rejects. */
 export function loadCountries(): Promise<CountryOption[]> {
-  cached ??= request<{ countries: { id: string; iso2: string | null; name: string }[] }>('GET', '/api/wca/countries', undefined, { signal: AbortSignal.timeout(5000) })
+  cached ??= request<{ countries: { id: string; iso2: string | null; name: string }[] }>('GET', '/api/wca/countries', undefined, { timeoutMs: 5000 })
     .then((r) => {
       const list = (r.countries ?? [])
         .filter((c) => c.iso2 && /^[A-Za-z]{2}$/.test(c.iso2))

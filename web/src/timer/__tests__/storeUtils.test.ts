@@ -8,6 +8,7 @@ import {
   insertChrono,
   overlaySessions,
   overlaySolves,
+  planImportChunks,
   sortChrono,
   uuid,
   type QueuedOp,
@@ -193,5 +194,29 @@ describe('optimistic overlays', () => {
       ['b', 'DNF'],
     ]);
     expect(overlaySolves('s1', out, ops)).toEqual(out);
+  });
+});
+
+describe('import chunking', () => {
+  const sess = (name: string, n: number) => ({
+    name,
+    event: '333',
+    solves: Array.from({ length: n }, (_, i) => ({ timeMs: 1000 + i, penalty: 'OK' as const, scramble: '', createdAt: 'x' })),
+  });
+
+  it('packs whole sessions into requests of at most max solves', () => {
+    const chunks = planImportChunks([sess('a', 8), sess('b', 5), sess('c', 0), sess('d', 3), sess('e', 9)], 10);
+    expect(chunks.map((c) => c.sessions.map((s) => s.name))).toEqual([['a'], ['b', 'd'], ['e']]);
+    for (const c of chunks) expect(c.sessions.reduce((a, s) => a + s.solves.length, 0)).toBeLessThanOrEqual(10);
+  });
+
+  it('never splits a session unless it exceeds the hard limit', () => {
+    const big = planImportChunks([sess('big', 25)], 10, 100);
+    expect(big).toHaveLength(1);
+    expect(big[0].sessions[0].solves).toHaveLength(25);
+    const huge = planImportChunks([sess('huge session name that is quite long!!', 25)], 10, 10);
+    expect(huge.map((c) => c.sessions[0].name)).toEqual(['huge session name that is quite long!!', 'huge session name that is quite long (2)', 'huge session name that is quite long (3)']);
+    expect(huge.flatMap((c) => c.sessions[0].solves)).toHaveLength(25);
+    for (const c of huge) expect(c.sessions[0].name.length).toBeLessThanOrEqual(40);
   });
 });

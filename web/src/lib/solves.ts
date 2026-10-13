@@ -15,8 +15,8 @@
 //    (1 s … 60 s, retried immediately on `online`). Server reads are overlaid with queued ops so
 //    optimistic changes survive reloads. The current session is cached (`cubetype.cloudcache.v1`)
 //    so a logged-in user can keep timing while solve-service is down.
-import { getEvent, isEventId, type Penalty } from '@cubetype/cubestats';
-import { api, ApiError, getToken } from './api';
+import { getEvent, isEventId, type ImportedSession, type Penalty } from '@cubetype/cubestats';
+import { api, ApiError, getToken, type ImportPayload } from './api';
 import { getCurrentUser, onAuthChange } from './auth';
 import { settingsStore, updateSettings } from './settings';
 import { createStore, loadJson, saveJson, useStore } from './store';
@@ -34,6 +34,7 @@ import {
   LOCAL_KEY,
   overlaySessions,
   overlaySolves,
+  planImportChunks,
   QUEUE_KEY,
   sortChrono,
   uuid,
@@ -98,6 +99,7 @@ export function getCurrentSession(): Session | null {
 const browser = typeof window !== 'undefined' && typeof document !== 'undefined';
 const CLOUD_CACHE_KEY = 'cubetype.cloudcache.v1';
 const LAST_SESSION_KEY = 'cubetype.lastSession.v1';
+const OFFER_DISMISSED_KEY = 'cubetype.uploadOffer.dismissed';
 
 type Scope = { mode: 'local' } | { mode: 'cloud'; userId: string };
 let scope: Scope | null = null;
@@ -206,8 +208,8 @@ function flushLocal(): boolean {
     }
     return true;
   } catch {
-    storageError = 'browser storage is full — sign in to sync your solves to the cloud';
-    if (!quotaWarned) toast.error('Browser storage is full: new solves may not be saved. Sign in to sync them to the cloud.');
+    storageError = 'browser storage is full — export your solves or sign in to sync them';
+    if (!quotaWarned) toast.error('Browser storage is full: new solves may not be saved. Export your data or sign in to sync to the cloud.');
     quotaWarned = true;
     publish();
     return false;
@@ -434,6 +436,25 @@ async function pump(): Promise<void> {
   }
 }
 
+/**
+ * Tries to sync everything that is queued right now. Resolves when the queue is empty, when the
+ * server is unreachable (the queue keeps retrying in the background) or after `timeoutMs`.
+ */
+export async function flushQueue(timeoutMs = 8000): Promise<void> {
+  if (!userId()) return;
+  if (retryTimer) {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  }
+  backoffN = 0;
+  void pump();
+  const until = Date.now() + timeoutMs;
+  while (Date.now() < until && pendingCount() > 0 && (pumping || !retryTimer)) {
+    await new Promise((r) => setTimeout(r, 150));
+    if (!pumping && !retryTimer && pendingCount() > 0) void pump();
+  }
+}
+
 // ================================================================ loading
 
 function sessionById(id: string | null | undefined): Session | undefined {
@@ -573,6 +594,43 @@ async function refreshCloud(): Promise<void> {
 
 // ================================================================ auth / scope switching
 
+export interface UploadOffer {
+  userId: string;
+  sessions: number;
+  solves: number;
+}
+/** Set after login when this browser still has guest solves that could be uploaded. */
+export const uploadOfferStore = createStore<UploadOffer | null>(null);
+export function useUploadOffer(): UploadOffer | null {
+  return useStore(uploadOfferStore);
+}
+
+function countLocal(db: LocalDb): { sessions: number; solves: number } {
+  let sessions = 0;
+  let solves = 0;
+  for (const s of db.sessions) {
+    const n = db.solves.get(s.id)?.length ?? 0;
+    if (n > 0) {
+      sessions++;
+      solves += n;
+    }
+  }
+  return { sessions, solves };
+}
+
+function maybeOfferUpload(uid: string): void {
+  if (userId() !== uid) return;
+  let dismissed: string | null = null;
+  try {
+    dismissed = sessionStorage.getItem(OFFER_DISMISSED_KEY);
+  } catch {
+    /* ignore */
+  }
+  if (dismissed === uid) return;
+  const c = countLocal(readLocal(true));
+  if (c.solves > 0) uploadOfferStore.set({ userId: uid, ...c });
+}
+
 function handleAuth(user: PrivateUser | null): void {
   const next: Scope = user ? { mode: 'cloud', userId: user.id } : { mode: 'local' };
   if (scope && scope.mode === next.mode && (next.mode === 'local' || (scope.mode === 'cloud' && scope.userId === next.userId))) return;
@@ -588,13 +646,17 @@ function handleAuth(user: PrivateUser | null): void {
   if (loadRetryTimer) clearTimeout(loadRetryTimer);
   retryTimer = null;
   loadRetryTimer = null;
+  uploadOfferStore.set(null);
   if (next.mode === 'local') {
     void loadLocalScope();
     return;
   }
   model = emptyLocalDb();
   solveStore.set({ ready: false, mode: 'cloud', sessions: [], currentSessionId: null, solves: EMPTY, pending: pendingCount(), syncError: null, loading: true });
-  void loadCloudScope(next.userId, gen);
+  const g = gen;
+  void loadCloudScope(next.userId, g).then(() => {
+    if (g === gen) maybeOfferUpload(next.userId);
+  });
 }
 
 if (browser) {
@@ -843,4 +905,163 @@ export async function ensureSession(event: string): Promise<Session> {
   const s = createSessionInternal(suggestSessionNameFor(event), event);
   commit();
   return s;
+}
+
+/** Import parsed csTimer sessions (cloud: POST /api/sessions/import; local: localStorage). */
+export async function importSessions(sessions: ImportedSession[]): Promise<{ sessions: number; solves: number }> {
+  if (!solveStore.get().ready) await whenReady();
+  const valid = sessions.filter((s) => isEventId(s.event) && s.solves.length > 0);
+  if (scope?.mode === 'cloud') {
+    const payload: ImportPayload['sessions'] = valid.map((s) => ({
+      name: (s.name.trim() || 'import').slice(0, 40),
+      event: s.event,
+      solves: s.solves.map((x) => ({ timeMs: x.timeMs, penalty: x.penalty, scramble: x.scramble, comment: x.comment, createdAt: x.createdAt })),
+    }));
+    const total = { sessions: 0, solves: 0 };
+    for (const chunk of planImportChunks(payload)) {
+      const r = await api.sessions.import(chunk);
+      total.sessions += r.imported.sessions;
+      total.solves += r.imported.solves;
+    }
+    await refreshCloud();
+    return total;
+  }
+  const added: Session[] = [];
+  let solves = 0;
+  for (const s of valid) {
+    const now = new Date().toISOString();
+    const session: Session = { id: uuid(), name: (s.name.trim() || 'import').slice(0, 40), event: s.event, createdAt: now, updatedAt: now, solveCount: s.solves.length };
+    const list = sortChrono(
+      s.solves.map((x) => ({
+        id: uuid(),
+        sessionId: session.id,
+        event: s.event,
+        timeMs: x.timeMs,
+        penalty: x.penalty,
+        scramble: x.scramble,
+        comment: x.comment,
+        source: 'import',
+        createdAt: x.createdAt,
+      })),
+    );
+    added.push(session);
+    localDb.sessions = [...localDb.sessions, session];
+    localDb.solves.set(session.id, list);
+    solves += list.length;
+  }
+  localDirty = true;
+  if (!flushLocal()) {
+    const ids = new Set(added.map((s) => s.id));
+    localDb.sessions = localDb.sessions.filter((s) => !ids.has(s.id));
+    ids.forEach((id) => localDb.solves.delete(id));
+    localDirty = true;
+    flushLocal();
+    throw new Error('Not enough browser storage for this import. Sign in to import it into your cloud account instead.');
+  }
+  if (scope?.mode === 'local') publish();
+  return { sessions: added.length, solves };
+}
+
+/** All sessions with all solves (for JSON export). */
+export async function exportAll(): Promise<{ exportedAt: string; sessions: (Session & { solves: Solve[] })[] }> {
+  if (!solveStore.get().ready) await whenReady();
+  if (scope?.mode === 'cloud') {
+    await flushQueue();
+    return api.solves.export();
+  }
+  flushLocal();
+  return {
+    exportedAt: new Date().toISOString(),
+    sessions: localDb.sessions.map((s) => ({ ...s, solves: localDb.solves.get(s.id) ?? [] })),
+  };
+}
+
+// ================================================================ guest data helpers (extra exports)
+
+/** Uploads this browser's guest solves to the logged-in account, then removes the local copy. */
+export async function uploadLocalSolves(): Promise<{ sessions: number; solves: number }> {
+  const uid = userId();
+  if (!uid) throw new Error('Sign in first');
+  flushLocal();
+  const db = readLocal(true);
+  const entries = db.sessions
+    .map((s) => ({ s, list: db.solves.get(s.id) ?? [] }))
+    .filter((x) => x.list.length > 0)
+    .map(({ s, list }) => ({
+      localId: s.id,
+      payload: {
+        name: s.name,
+        event: s.event,
+        solves: list.map((x) => ({ timeMs: x.timeMs, penalty: x.penalty, scramble: x.scramble, comment: x.comment, createdAt: x.createdAt })),
+      },
+    }));
+  const owner = new Map<ImportPayload['sessions'][number], string>(entries.map((e) => [e.payload, e.localId]));
+  const total = { sessions: 0, solves: 0 };
+  const done = new Set<string>();
+  try {
+    for (const chunk of planImportChunks(entries.map((e) => e.payload))) {
+      const r = await api.sessions.import(chunk);
+      total.sessions += r.imported.sessions;
+      total.solves += r.imported.solves;
+      chunk.sessions.forEach((p) => {
+        const id = owner.get(p);
+        if (id) done.add(id);
+      });
+    }
+  } catch (e) {
+    // keep only what was not uploaded yet, so a retry never duplicates solves
+    if (done.size) removeLocalSessions(done);
+    throw e;
+  }
+  removeLocalSessions(new Set(db.sessions.map((s) => s.id)));
+  uploadOfferStore.set(null);
+  if (userId() === uid) await refreshCloud();
+  return total;
+}
+
+function removeLocalSessions(ids: Set<string>): void {
+  localDb = readLocal(true);
+  localDb.sessions = localDb.sessions.filter((s) => !ids.has(s.id));
+  ids.forEach((id) => localDb.solves.delete(id));
+  localDirty = true;
+  flushLocal();
+}
+
+export function dismissUploadOffer(): void {
+  const offer = uploadOfferStore.get();
+  if (offer) {
+    try {
+      sessionStorage.setItem(OFFER_DISMISSED_KEY, offer.userId);
+    } catch {
+      /* ignore */
+    }
+  }
+  uploadOfferStore.set(null);
+}
+
+/** Counts of the guest data stored in this browser. */
+export function localDataSummary(): { sessions: number; solves: number } {
+  if (scope?.mode === 'local') return countLocal(localDb);
+  return countLocal(readLocal(true));
+}
+
+/** Deletes every guest session/solve stored in this browser (does not touch cloud data). */
+export function clearLocalData(): void {
+  try {
+    localStorage.removeItem(LOCAL_KEY);
+    localStorage.removeItem(`${LOCAL_KEY}.corrupt`);
+  } catch {
+    /* ignore */
+  }
+  if (localTimer) clearTimeout(localTimer);
+  localTimer = null;
+  localDirty = false;
+  localDb = emptyLocalDb();
+  storageError = null;
+  if (scope?.mode === 'local') {
+    model = localDb;
+    createSessionInternal(suggestSessionNameFor(defaultEvent()), defaultEvent());
+    model.current = pickCurrent();
+    publish();
+  }
 }

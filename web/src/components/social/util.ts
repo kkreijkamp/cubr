@@ -48,6 +48,18 @@ export function friendlyError(err: unknown, what: string): string {
   return (err as Error)?.message || 'something went wrong';
 }
 
+/** Triggers a browser download of `content`. */
+export function downloadFile(filename: string, content: BlobPart, type = 'application/json'): void {
+  const url = URL.createObjectURL(new Blob([content], { type }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 /** "Mon 03 Mar 2026" for a "YYYY-MM-DD" calendar key (no timezone shifting). */
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

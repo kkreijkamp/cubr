@@ -686,6 +686,42 @@ table.wc-table tr.clickable:focus-visible td {
   background: var(--error-color);
 }
 
+/* import preview */
+.im-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2rem;
+}
+.im-list {
+  max-height: min(50vh, 22rem);
+  overflow-y: auto;
+  border-radius: var(--roundness);
+}
+table.im-table td,
+table.im-table th {
+  padding: 0.55rem 0.75rem;
+}
+table.im-table td.left {
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+table.im-table tr.off td {
+  opacity: 0.4;
+}
+table.im-table label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6em;
+  cursor: pointer;
+}
+.im-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 /* edit profile modal */
 .ep-form {
   display: grid;
@@ -842,7 +878,8 @@ table.wc-table tr.clickable:focus-visible td {
   .ac-row .ac-actions {
     justify-content: flex-start;
   }
-  table.wc-table .hide-sm {
+  table.wc-table .hide-sm,
+  .hide-mobile-cell {
     display: none;
   }
   .ep-two {

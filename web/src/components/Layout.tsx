@@ -5,6 +5,7 @@ import { CubeLogo } from './CubeLogo';
 import { Toasts } from './Toasts';
 import { CommandPalette, usePaletteHotkeys } from './CommandPalette';
 import { GlobalCommands } from './GlobalCommands';
+import { LocalUploadOffer } from './timer/LocalUploadOffer';
 import { useAuth } from '../lib/auth';
 import { openPalette } from '../lib/commands';
 import { useSettings } from '../lib/settings';
@@ -95,6 +96,7 @@ export function Layout() {
       <Toasts />
       <CommandPalette />
       <GlobalCommands />
+      <LocalUploadOffer />
     </div>
   );
 }

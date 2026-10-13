@@ -1,9 +1,33 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Bell, Eye, Gauge, Hand, Hash, List, Maximize2, Palette, RotateCcw, Sigma, Timer, Trash2, TriangleAlert, Type } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  ArrowUpRight,
+  Bell,
+  Database,
+  Download,
+  Eye,
+  Gauge,
+  Hand,
+  Hash,
+  List,
+  Maximize2,
+  Palette,
+  RotateCcw,
+  Sigma,
+  Timer,
+  Trash2,
+  TriangleAlert,
+  Type,
+  Upload,
+} from 'lucide-react';
+import { CsTimerFormatError, EVENTS, parseCsTimerExport, type ImportedSession } from '@cubetype/cubestats';
 import { ConfirmModal } from '../components/timer/Dialogs';
 import { AVG_CHOICES, parseAvgKey } from '../components/timer/statsUtil';
 import '../components/timer/settings-page.css';
+import { useAuth } from '../lib/auth';
+import { formatNumber } from '../lib/format';
 import { applyVisualSettings, DEFAULT_SETTINGS, FONTS, updateSettings, useSettings, type Settings } from '../lib/settings';
+import { clearLocalData, exportAll, importSessions, localDataSummary, useSolveState } from '../lib/solves';
 import { applyTheme, THEMES, themeLabel } from '../lib/themes';
 import { toast } from '../lib/toast';
 
@@ -13,6 +37,7 @@ const SECTIONS = [
   { id: 'display', label: 'display', icon: Maximize2 },
   { id: 'stats', label: 'stats', icon: Sigma },
   { id: 'theme', label: 'theme', icon: Palette },
+  { id: 'data', label: 'data', icon: Database },
   { id: 'danger', label: 'danger zone', icon: TriangleAlert },
 ] as const;
 
@@ -61,10 +86,26 @@ function set<K extends keyof Settings>(key: K) {
   return (v: Settings[K]) => updateSettings({ [key]: v } as Partial<Settings>);
 }
 
+function download(name: string, text: string) {
+  const blob = new Blob([text], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export default function SettingsPage() {
   const s = useSettings();
-  const [confirm, setConfirm] = useState<'reset' | null>(null);
+  const { status } = useAuth();
+  const solveState = useSolveState();
+  const [confirm, setConfirm] = useState<'clear' | 'reset' | null>(null);
+  const [local, setLocal] = useState(() => localDataSummary());
 
+  useEffect(() => setLocal(localDataSummary()), [solveState.sessions, solveState.solves]);
   // never leave a hover preview applied when navigating away
   useEffect(() => () => applyVisualSettings(), []);
 
@@ -198,7 +239,33 @@ export default function SettingsPage() {
         <ThemeGrid current={s.theme} />
       </Section>
 
+      <Section id="data" title="data">
+        <DataTools loggedIn={status === 'authed'} />
+      </Section>
+
       <Section id="danger" title="danger zone">
+        <SettingRow
+          icon={<Trash2 size={16} />}
+          title="clear guest data"
+          description={
+            <>
+              Delete every session and solve stored in this browser while signed out
+              {local.solves > 0 ? (
+                <>
+                  {' '}
+                  (<span className="main">{formatNumber(local.solves)} solves</span> in {local.sessions} session{local.sessions === 1 ? '' : 's'})
+                </>
+              ) : (
+                ' (there are none right now)'
+              )}
+              . Solves in your account are not affected. <span className="error">You can't undo this.</span>
+            </>
+          }
+        >
+          <button className="btn danger" onClick={() => setConfirm('clear')} disabled={local.solves === 0 && local.sessions <= 1}>
+            clear guest data
+          </button>
+        </SettingRow>
         <SettingRow icon={<RotateCcw size={16} />} title="reset settings" description="Put every setting on this page back to its default (your solves are kept).">
           <button className="btn danger" onClick={() => setConfirm('reset')}>
             reset settings
@@ -206,6 +273,23 @@ export default function SettingsPage() {
         </SettingRow>
       </Section>
 
+      {confirm === 'clear' && (
+        <ConfirmModal
+          title="clear guest data"
+          message={
+            <>
+              Permanently delete {formatNumber(local.solves)} solves stored in this browser? <span className="error">This can't be undone.</span>
+            </>
+          }
+          confirmLabel="delete everything"
+          onConfirm={() => {
+            clearLocalData();
+            setLocal(localDataSummary());
+            toast.success('guest data cleared');
+          }}
+          onClose={() => setConfirm(null)}
+        />
+      )}
       {confirm === 'reset' && (
         <ConfirmModal
           title="reset settings"
@@ -272,5 +356,120 @@ function ThemeGrid({ current }: { current: string }) {
         </button>
       ))}
     </div>
+  );
+}
+
+function DataTools({ loggedIn }: { loggedIn: boolean }) {
+  const [parsed, setParsed] = useState<{ file: string; sessions: ImportedSession[] } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<'import' | 'export' | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const summary = useMemo(() => {
+    if (!parsed) return null;
+    const solves = parsed.sessions.reduce((a, x) => a + x.solves.length, 0);
+    const events = Array.from(new Set(parsed.sessions.map((x) => x.event))).map((e) => EVENTS.find((ev) => ev.id === e)?.short.toLowerCase() ?? e);
+    return { solves, events };
+  }, [parsed]);
+
+  const onFile = async (f: File | undefined) => {
+    setError(null);
+    setParsed(null);
+    if (!f) return;
+    try {
+      const text = await f.text();
+      const sessions = parseCsTimerExport(text);
+      if (!sessions.length) throw new CsTimerFormatError('That export has no solves in it.');
+      setParsed({ file: f.name, sessions });
+    } catch (e) {
+      setError(e instanceof CsTimerFormatError ? e.message : 'Could not read that file.');
+    } finally {
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  const doImport = async () => {
+    if (!parsed) return;
+    setBusy('import');
+    setError(null);
+    try {
+      const r = await importSessions(parsed.sessions);
+      toast.success(`imported ${formatNumber(r.solves)} solves in ${r.sessions} session${r.sessions === 1 ? '' : 's'}`);
+      setParsed(null);
+    } catch (e) {
+      setError((e as Error).message || 'import failed');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const doExport = async () => {
+    setBusy('export');
+    try {
+      const data = await exportAll();
+      download(`cubetype-export-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data));
+      const n = data.sessions.reduce((a, x) => a + x.solves.length, 0);
+      toast.success(`exported ${formatNumber(n)} solves`);
+    } catch (e) {
+      toast.error((e as Error).message || 'export failed');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <>
+      <SettingRow
+        icon={<Upload size={16} />}
+        title="import from csTimer"
+        description={
+          <>
+            In csTimer open <span className="text">export → export to file</span>, then pick that .txt file here. Each csTimer session becomes a cubetype
+            session {loggedIn ? 'in your account' : 'in this browser'}.
+          </>
+        }
+      >
+        <div className="st-import">
+          <input ref={fileRef} type="file" accept=".txt,.json,text/plain,application/json" hidden onChange={(e) => void onFile(e.target.files?.[0])} />
+          {!parsed ? (
+            <button className="btn" onClick={() => fileRef.current?.click()} disabled={busy !== null}>
+              <Upload size={16} /> choose file
+            </button>
+          ) : (
+            <div className="st-import-preview">
+              <div className="small">
+                <span className="text">{parsed.file}</span>
+                <br />
+                <span className="main">{formatNumber(summary?.solves ?? 0)} solves</span> · {parsed.sessions.length} session{parsed.sessions.length === 1 ? '' : 's'} ·{' '}
+                {summary?.events.join(', ')}
+              </div>
+              <div className="row">
+                <button className="btn" onClick={() => setParsed(null)} disabled={busy !== null}>
+                  cancel
+                </button>
+                <button className="btn primary" onClick={doImport} disabled={busy !== null}>
+                  {busy === 'import' ? 'importing…' : 'import'}
+                </button>
+              </div>
+            </div>
+          )}
+          {error && <div className="error small">{error}</div>}
+        </div>
+      </SettingRow>
+      <SettingRow icon={<Download size={16} />} title="export" description="Download every session and solve as JSON — your data is yours.">
+        <button className="btn" onClick={doExport} disabled={busy !== null}>
+          <Download size={16} /> {busy === 'export' ? 'exporting…' : 'export json'}
+        </button>
+      </SettingRow>
+      <SettingRow
+        icon={<Database size={16} />}
+        title="account"
+        description={loggedIn ? 'Profile, PB history, activity and more data tools live on your account page.' : 'Sign in to sync your solves across devices, get on the leaderboards and race others.'}
+      >
+        <Link className="btn" to={loggedIn ? '/account' : '/login'}>
+          {loggedIn ? 'open account' : 'sign in'} <ArrowUpRight size={16} />
+        </Link>
+      </SettingRow>
+    </>
   );
 }
