@@ -118,15 +118,21 @@ export function planDailyCompleted(d: Data, nowMs = Date.now()): BestWrite | nul
   return { board: challengeKey(date, event), event, kind: 'ao5', valueMs, achievedAt, ttlSec: 0 };
 }
 
-type UserInfo = { userId: string; username: string; country?: string | null };
+/** Only same-origin avatar paths from the auth service are stored (no arbitrary image URLs). */
+const AVATAR_PATH_RE = /^\/api\/users\/[0-9a-f-]{36}\/avatar\?v=[0-9a-f]{6,64}$/;
 
-/** Display info carried by an event: username always; country only for user.* events. */
+type UserInfo = { userId: string; username: string; country?: string | null; avatarUrl?: string | null };
+
+/** Display info carried by an event: username always; country and avatarUrl only for user.* events. */
 export function planUserInfo(type: string, d: Data): UserInfo | null {
   if (typeof d.userId !== 'string' || !d.userId) return null;
   if (typeof d.username !== 'string' || !d.username) return null;
   const info: UserInfo = { userId: d.userId, username: d.username };
   if (type.startsWith('user.') && 'country' in d) {
     info.country = typeof d.country === 'string' && d.country ? d.country : null;
+  }
+  if (type.startsWith('user.') && 'avatarUrl' in d) {
+    info.avatarUrl = typeof d.avatarUrl === 'string' && AVATAR_PATH_RE.test(d.avatarUrl) ? d.avatarUrl : null;
   }
   return info;
 }
@@ -183,7 +189,8 @@ export function makeHandler({ redis, floors, log }: IngestDeps) {
     const info = planUserInfo(evt.type, d);
     if (info) {
       const hasCountry = info.country !== undefined;
-      await redis.lbUser(USERS_KEY, info.userId, info.username, hasCountry ? '1' : '0', info.country ?? '');
+      const hasAvatar = info.avatarUrl !== undefined;
+      await redis.lbUser(USERS_KEY, info.userId, info.username, hasCountry ? '1' : '0', info.country ?? '', hasAvatar ? '1' : '0', info.avatarUrl ?? '');
     }
 
     switch (evt.type) {

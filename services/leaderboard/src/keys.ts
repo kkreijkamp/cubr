@@ -11,7 +11,7 @@ import { isEventId } from '@cubetype/cubestats';
 //   <board>:at                       hash  userId → achievedAt (ISO) for the score on <board>
 //   <board>:ts                       hash  userId → occurredAt (epoch ms) of the last applied
 //                                          pb.updated (all-time boards only; drops stale events)
-//   lb:users                         hash  userId → JSON {username, country}
+//   lb:users                         hash  userId → JSON {username, country, avatarUrl}
 //   lb:flagged                       list  rejected (anti-cheat) entries, newest first, capped
 // ---------------------------------------------------------------------------------------------
 
@@ -70,6 +70,19 @@ export function isValidDay(s: string): boolean {
   if (!m) return false;
   const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
   return d.toISOString().slice(0, 10) === s;
+}
+
+/** Number of ISO weeks (52 or 53) in an ISO week-numbering year: Dec 28 is always in the last week. */
+export function isoWeeksInYear(year: number): number {
+  return Number(utcWeek(new Date(Date.UTC(year, 11, 28))).slice(-2));
+}
+
+/** True for an existing ISO week written as YYYY-Www. */
+export function isValidWeek(s: string): boolean {
+  const m = /^(\d{4})-W(\d{2})$/.exec(s);
+  if (!m) return false;
+  const w = Number(m[2]);
+  return w >= 1 && w <= isoWeeksInYear(Number(m[1]));
 }
 
 /** 1-based page → inclusive ZRANGE indexes. */

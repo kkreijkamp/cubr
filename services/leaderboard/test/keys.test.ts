@@ -10,6 +10,8 @@ import {
   hasBoards,
   isKind,
   isValidDay,
+  isValidWeek,
+  isoWeeksInYear,
   pageRange,
   rankAt,
   tsKey,
@@ -59,6 +61,15 @@ describe('period keys (UTC)', () => {
     expect(isValidDay('2026-02-29')).toBe(false);
     expect(isValidDay('2026-13-01')).toBe(false);
     expect(isValidDay('2026-1-01')).toBe(false);
+  });
+  it('validates week keys incl. 53-week years', () => {
+    expect(isoWeeksInYear(2026)).toBe(53);
+    expect(isoWeeksInYear(2025)).toBe(52);
+    expect(isValidWeek('2026-W53')).toBe(true);
+    expect(isValidWeek('2025-W53')).toBe(false);
+    expect(isValidWeek('2026-W00')).toBe(false);
+    expect(isValidWeek('2026-W5')).toBe(false);
+    expect(isValidWeek('2026-10-14')).toBe(false);
   });
 });
 

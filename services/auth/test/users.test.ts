@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  avatarUrl,
+  baseContentType,
   buildUserUpdate,
+  sniffImageType,
   conflictMessage,
   jsonBytes,
   loginSchema,
@@ -103,6 +106,7 @@ describe('row mapping', () => {
       country: 'AU',
       wcaId: null,
       createdAt: '2026-01-02T03:04:05.000Z',
+      avatarUrl: null,
     });
     expect(u).not.toHaveProperty('email');
     expect(u).not.toHaveProperty('password_hash');
@@ -126,7 +130,30 @@ describe('row mapping', () => {
       country: 'AU',
       wcaId: null,
       createdAt: '2026-01-02T03:04:05.000Z',
+      avatarUrl: null,
     });
+  });
+  it('exposes a versioned avatar URL only when a picture exists', () => {
+    expect(toPublicUser({ ...row, avatar_version: 'abc123def456' }).avatarUrl).toBe(`/api/users/${row.id}/avatar?v=abc123def456`);
+    expect(avatarUrl(row.id, null)).toBeNull();
+  });
+});
+
+describe('profile picture helpers', () => {
+  it('sniffs PNG, JPEG and WebP magic bytes', () => {
+    expect(sniffImageType(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0]))).toBe('image/png');
+    expect(sniffImageType(Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0]))).toBe('image/jpeg');
+    expect(sniffImageType(Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WEBPVP8 ')]))).toBe('image/webp');
+  });
+  it('rejects anything else (svg, gif, html, empty)', () => {
+    expect(sniffImageType(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>'))).toBeNull();
+    expect(sniffImageType(Buffer.from('GIF89a......'))).toBeNull();
+    expect(sniffImageType(Buffer.from('<html>'))).toBeNull();
+    expect(sniffImageType(Buffer.alloc(0))).toBeNull();
+  });
+  it('normalises content-type headers', () => {
+    expect(baseContentType('image/WebP; charset=binary')).toBe('image/webp');
+    expect(baseContentType(undefined)).toBe('');
   });
 });
 

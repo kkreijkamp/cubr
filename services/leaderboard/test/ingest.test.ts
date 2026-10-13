@@ -137,10 +137,21 @@ describe('planUserInfo', () => {
 
 describe('read helpers', () => {
   it('parseUserInfo tolerates missing / bad JSON', () => {
-    expect(parseUserInfo('{"username":"x","country":"AU"}')).toEqual({ username: 'x', country: 'AU' });
-    expect(parseUserInfo('{"username":"x"}')).toEqual({ username: 'x', country: null });
-    expect(parseUserInfo(null)).toEqual({ username: 'unknown', country: null });
-    expect(parseUserInfo('{bad')).toEqual({ username: 'unknown', country: null });
+    expect(parseUserInfo('{"username":"x","country":"AU"}')).toEqual({ username: 'x', country: 'AU', avatarUrl: null });
+    expect(parseUserInfo('{"username":"x"}')).toEqual({ username: 'x', country: null, avatarUrl: null });
+    expect(parseUserInfo(null)).toEqual({ username: 'unknown', country: null, avatarUrl: null });
+    expect(parseUserInfo('{bad')).toEqual({ username: 'unknown', country: null, avatarUrl: null });
+  });
+  it('parseUserInfo only passes through same-origin avatar paths', () => {
+    expect(parseUserInfo(`{"username":"x","avatarUrl":"/api/users/${U}/avatar?v=abc123"}`).avatarUrl).toBe(`/api/users/${U}/avatar?v=abc123`);
+    expect(parseUserInfo('{"username":"x","avatarUrl":"https://evil.example/x.png"}').avatarUrl).toBeNull();
+  });
+  it('planUserInfo carries avatarUrl from user.* events and rejects foreign URLs', () => {
+    const ok = planUserInfo('user.updated', { userId: U, username: 'x', avatarUrl: `/api/users/${U}/avatar?v=abc123def456` });
+    expect(ok?.avatarUrl).toBe(`/api/users/${U}/avatar?v=abc123def456`);
+    expect(planUserInfo('user.updated', { userId: U, username: 'x', avatarUrl: 'javascript:alert(1)' })?.avatarUrl).toBeNull();
+    expect(planUserInfo('user.updated', { userId: U, username: 'x', avatarUrl: null })?.avatarUrl).toBeNull();
+    expect(planUserInfo('solve.created', { userId: U, username: 'x', avatarUrl: 'x' })).not.toHaveProperty('avatarUrl');
   });
   it('splitWithScores pairs members and scores', () => {
     expect(splitWithScores(['a', '100', 'b', '200'])).toEqual({ ids: ['a', 'b'], scores: [100, 200] });

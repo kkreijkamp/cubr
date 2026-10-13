@@ -61,6 +61,11 @@ if ARGV[3] == '1' then
   if ARGV[4] ~= '' then c = ARGV[4] end
   if obj.country ~= c then obj.country = c; changed = true end
 end
+if ARGV[5] == '1' then
+  local a = cjson.null
+  if ARGV[6] ~= '' then a = ARGV[6] end
+  if obj.avatarUrl ~= a then obj.avatarUrl = a; changed = true end
+end
 if changed then
   redis.call('HSET', KEYS[1], ARGV[1], cjson.encode(obj))
   return 1
@@ -71,7 +76,15 @@ declare module 'ioredis' {
   interface RedisCommander<Context> {
     lbBest(board: string, at: string, score: number, userId: string, achievedAt: string, ttlSec: number): Result<number, Context>;
     lbSetPb(board: string, at: string, ts: string, userId: string, score: number | '', achievedAt: string, occurredAtMs: number): Result<number, Context>;
-    lbUser(users: string, userId: string, username: string, hasCountry: '0' | '1', country: string): Result<number, Context>;
+    lbUser(
+      users: string,
+      userId: string,
+      username: string,
+      hasCountry: '0' | '1',
+      country: string,
+      hasAvatar: '0' | '1',
+      avatarUrl: string,
+    ): Result<number, Context>;
   }
 }
 

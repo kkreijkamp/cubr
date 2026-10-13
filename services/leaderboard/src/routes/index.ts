@@ -11,6 +11,7 @@ import {
   currentPeriodKey,
   isKind,
   isValidDay,
+  isValidWeek,
   utcDay,
 } from '../keys.js';
 
@@ -26,6 +27,8 @@ const paging = {
 
 const boardQuery = z.object({
   period: z.enum(PERIODS).default('all'),
+  /** optional past board: YYYY-MM-DD (daily) or YYYY-Www (weekly); ignored for period=all */
+  key: z.string().max(10).optional(),
   ...paging,
 });
 
@@ -57,7 +60,7 @@ export async function registerRoutes(app: FastifyInstance, { redis, auth }: Deps
     return { ranks: await readUserRanks(redis, userId.toLowerCase()) };
   });
 
-  // GET /api/leaderboards/:event/:kind?period=all|weekly|daily&page=1&size=50
+  // GET /api/leaderboards/:event/:kind?period=all|weekly|daily&page=1&size=50[&key=…]
   app.get<{ Params: { event: string; kind: string } }>(
     '/api/leaderboards/:event/:kind',
     { preHandler: auth.optionalAuth },
@@ -70,7 +73,13 @@ export async function registerRoutes(app: FastifyInstance, { redis, auth }: Deps
         throw badRequest(`kind: ${q.period} boards exist for ${PERIOD_KINDS[q.period].join(', ')} only`);
       }
 
-      const periodKey = currentPeriodKey(q.period);
+      let periodKey = currentPeriodKey(q.period);
+      if (q.key !== undefined && q.period !== 'all') {
+        const ok = q.period === 'daily' ? isValidDay(q.key) : isValidWeek(q.key);
+        if (!ok) throw badRequest(`key: expected ${q.period === 'daily' ? 'YYYY-MM-DD' : 'YYYY-Www'}`);
+        periodKey = q.key;
+      }
+
       const board = await readBoard(redis, boardKey(event, kind, q.period, periodKey), q.page, q.size, req.user?.id);
       return { event, kind, period: q.period, periodKey, total: board.total, page: q.page, size: q.size, entries: board.entries, me: board.me };
     },

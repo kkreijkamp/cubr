@@ -9,6 +9,7 @@ export interface BoardEntry {
   userId: string;
   username: string;
   country: string | null;
+  avatarUrl: string | null;
   valueMs: number;
   achievedAt: string | null;
 }
@@ -20,19 +21,20 @@ export interface BoardPage {
 }
 
 /** Parses a lb:users value; unknown users show as 'unknown' so clients can always render a name. */
-export function parseUserInfo(raw: string | null | undefined): { username: string; country: string | null } {
+export function parseUserInfo(raw: string | null | undefined): { username: string; country: string | null; avatarUrl: string | null } {
   if (raw) {
     try {
-      const v = JSON.parse(raw) as { username?: unknown; country?: unknown };
+      const v = JSON.parse(raw) as { username?: unknown; country?: unknown; avatarUrl?: unknown };
       return {
         username: typeof v.username === 'string' && v.username ? v.username : 'unknown',
         country: typeof v.country === 'string' && v.country ? v.country : null,
+        avatarUrl: typeof v.avatarUrl === 'string' && v.avatarUrl.startsWith('/api/users/') ? v.avatarUrl : null,
       };
     } catch {
       /* fall through */
     }
   }
-  return { username: 'unknown', country: null };
+  return { username: 'unknown', country: null, avatarUrl: null };
 }
 
 /** Splits a ZRANGE … WITHSCORES reply [member, score, member, score, …]. */

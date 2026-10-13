@@ -26,4 +26,19 @@ export const migrations: Migration[] = [
       );
     `,
   },
+  {
+    id: '002_avatars',
+    sql: `
+      -- profile pictures: small pre-resized images (≈ 20–40 KB) stored next to the account;
+      -- users.avatar_version (a content hash) makes every picture URL unique → cacheable forever
+      ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS avatar_version text;
+      CREATE TABLE IF NOT EXISTS auth.avatars (
+        user_id      uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+        content_type text NOT NULL CHECK (content_type IN ('image/webp', 'image/jpeg', 'image/png')),
+        bytes        bytea NOT NULL,
+        version      text NOT NULL,
+        updated_at   timestamptz NOT NULL DEFAULT now()
+      );
+    `,
+  },
 ];

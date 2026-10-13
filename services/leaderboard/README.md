@@ -6,7 +6,7 @@ Readiness gates on Redis. Fastify on :8080.
 
 | Route | Notes |
 |---|---|
-| `GET /api/leaderboards/:event/:kind?period=all\|weekly\|daily&page=1&size=50` | kind ∈ single, ao5, ao12 (weekly/daily: single, ao5). `me` filled when a valid token is sent |
+| `GET /api/leaderboards/:event/:kind?period=all\|weekly\|daily&page=1&size=50[&key=]` | kind ∈ single, ao5, ao12 (weekly/daily: single, ao5). `key` views a past board (`YYYY-MM-DD` / `YYYY-Www`). `me` filled when a valid token is sent |
 | `GET /api/leaderboards/daily-challenge?date=&event=333` | kind `ao5`, period `challenge`; date defaults to today (UTC); event ∈ daily-challenge events |
 | `GET /api/leaderboards/users/:userId/ranks` | every all-time board the user is on: `{event, kind, period:'all', rank, total, valueMs}` |
 | `GET /api/leaderboards/_info` | info + consumer stats, anti-cheat floor source |

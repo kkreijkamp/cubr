@@ -63,6 +63,8 @@ export interface UserRow {
   wca_id: string | null;
   created_at: Date | string;
   last_login_at?: Date | string | null;
+  /** short content hash of the current profile picture (null = none); part of the avatar URL */
+  avatar_version?: string | null;
 }
 
 export interface PublicUser {
@@ -73,6 +75,8 @@ export interface PublicUser {
   country: string | null;
   wcaId: string | null;
   createdAt: string;
+  /** same-origin, immutable (versioned) URL of the profile picture, or null */
+  avatarUrl: string | null;
 }
 export interface PrivateUser extends PublicUser {
   email: string;
@@ -90,7 +94,13 @@ export function toPublicUser(row: UserRow): PublicUser {
     country: row.country ? row.country.trim() || null : null,
     wcaId: row.wca_id ?? null,
     createdAt: iso(row.created_at),
+    avatarUrl: avatarUrl(row.id, row.avatar_version),
   };
+}
+
+/** Versioned avatar URL: a new picture gets a new URL, so the old one can be cached forever. */
+export function avatarUrl(userId: string, version: string | null | undefined): string | null {
+  return version ? `/api/users/${userId}/avatar?v=${version}` : null;
 }
 
 export function toPrivateUser(row: UserRow): PrivateUser {
@@ -98,7 +108,7 @@ export function toPrivateUser(row: UserRow): PrivateUser {
 }
 
 /** Columns selected everywhere a user is returned (never includes password_hash). */
-export const USER_COLUMNS = 'id, username, email, display_name, bio, country, wca_id, created_at, last_login_at';
+export const USER_COLUMNS = 'id, username, email, display_name, bio, country, wca_id, created_at, last_login_at, avatar_version';
 
 /** Maps validated PATCH /me fields to SQL columns. Only fixed identifiers, values stay parameterised. */
 export function buildUserUpdate(patch: PatchMe): { sets: string[]; values: unknown[] } {
@@ -156,5 +166,28 @@ export function userEventData(user: PublicUser) {
     country: user.country,
     wcaId: user.wcaId,
     createdAt: user.createdAt,
+    avatarUrl: user.avatarUrl,
   };
+}
+
+// ---- profile pictures --------------------------------------------------------------------------
+// The browser crops and resizes to a small square image before uploading; the server never decodes
+// images (no native image libraries) — it only checks the declared type against the file's magic
+// bytes and enforces a size cap, then serves the bytes back with a fixed, safe Content-Type.
+
+export const AVATAR_MAX_BYTES = 300 * 1024;
+export const AVATAR_TYPES = ['image/webp', 'image/jpeg', 'image/png'] as const;
+export type AvatarType = (typeof AVATAR_TYPES)[number];
+
+/** Detects PNG / JPEG / WebP from the first bytes of a file (null = anything else). */
+export function sniffImageType(buf: Buffer): AvatarType | null {
+  if (buf.length >= 8 && buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
+  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg';
+  if (buf.length >= 12 && buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') return 'image/webp';
+  return null;
+}
+
+/** 'image/webp; charset=x' → 'image/webp' */
+export function baseContentType(header: string | undefined): string {
+  return (header ?? '').split(';')[0].trim().toLowerCase();
 }

@@ -1,7 +1,7 @@
 # auth service
 
-Accounts, JWT login/logout, profile and per-user settings (SPEC §7.1, §9.1). Owns Postgres schema
-`auth` (`users`, `user_settings`), migrated at startup. Fastify on :8080.
+Accounts, JWT login/logout, profiles with pictures and per-user settings (SPEC §7.1, §9.1). Owns Postgres
+schema `auth` (`users`, `user_settings`, `avatars`), migrated at startup. Fastify on :8080.
 
 | Route | Auth | Notes |
 |---|---|---|
@@ -11,6 +11,9 @@ Accounts, JWT login/logout, profile and per-user settings (SPEC §7.1, §9.1). O
 | `GET /api/auth/me` | req | `{user: PrivateUser, settings}` |
 | `PATCH /api/auth/me` | req | `{displayName?, bio?, country?, wcaId?}`; `null` or `""` clears; country/wcaId are uppercased |
 | `PUT /api/auth/me/settings` | req | `{settings: object}`; > 16 KB JSON → 413 `PAYLOAD_TOO_LARGE` |
+| `PUT /api/auth/me/avatar` | req | raw image body (`image/webp`, `image/jpeg` or `image/png`, ≤ 300 KB, magic bytes must match the Content-Type) → `{user}`; 10/hour/user; publishes `user.updated` |
+| `DELETE /api/auth/me/avatar` | req | removes the picture → `{user}`; publishes `user.updated` |
+| `GET /api/users/:idOrUsername/avatar` | – | the image; `?v=<version>` matching the current picture → `Cache-Control: immutable` (1 year), else 5 min; ETag/304; `nosniff` + sandbox CSP |
 | `GET /api/users/:username` | – | `{user: PublicUser}` (case-insensitive), 404 |
 | `GET /api/users?ids=a,b` | – | ≤ 100 ids (400 above), invalid uuids ignored, order preserved |
 | `GET /api/auth/_info`, `/api/users/_info` | – | info |
@@ -19,7 +22,12 @@ Accounts, JWT login/logout, profile and per-user settings (SPEC §7.1, §9.1). O
   so response time doesn't reveal whether an account exists.
 - Tokens: HS256 JWTs from `@cubetype/common` (`sub` = user id, `username`, `jti`), valid for 30 days.
   Every service verifies them with `makeAuth`, which also rejects revoked `jti`s.
-- Events published: `user.registered`, `user.updated` (SPEC §8 fields, eventId `auth-<uuid>`).
+- Profile pictures: the browser crops/resizes to a 256×256 WebP/JPEG (≈ 20–40 KB) before uploading, so the server
+  never decodes images (no native image libraries in the bundle): it checks the declared type against the file's
+  magic bytes, caps the size and stores the bytes in `auth.avatars` (bytea, migration `002_avatars`).
+  `users.avatar_version` (first 12 hex chars of the SHA-256) is part of `avatarUrl`, so every new picture gets a new
+  URL that browsers and caches can keep forever.
+- Events published: `user.registered`, `user.updated` (SPEC §8 fields incl. `avatarUrl`, eventId `auth-<uuid>`).
 - Readiness gates on Postgres + migrations. Redis is soft: when it is down, register/login/profile
   still work (rate limits fail open after 500 ms, revocation checks fail open, event publishing is
   skipped with a warning after 1.5 s); only logout returns 503 because the revocation could not be stored.

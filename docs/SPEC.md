@@ -143,6 +143,16 @@ CREATE TABLE auth.user_settings (
   settings   jsonb NOT NULL DEFAULT '{}',
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+-- profile pictures (migration 002): browser-resized ≤ 300 KB images; users.avatar_version is a
+-- content hash that makes each picture URL unique (immutable, cacheable forever)
+ALTER TABLE auth.users ADD COLUMN avatar_version text;
+CREATE TABLE auth.avatars (
+  user_id      uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  content_type text NOT NULL CHECK (content_type IN ('image/webp','image/jpeg','image/png')),
+  bytes        bytea NOT NULL,
+  version      text NOT NULL,
+  updated_at   timestamptz NOT NULL DEFAULT now()
+);
 ```
 
 ### 7.2 `solve` schema (solve-service)
@@ -243,7 +253,7 @@ trigram/lower index on person name for search.
 | `lb:<event>:<kind>:all` | zset (score=ms, member=userId) | leaderboard | all-time boards |
 | `lb:<event>:<kind>:w:<isoWeek>` / `:d:<YYYY-MM-DD>` | zset, TTL 15d/3d | leaderboard | weekly/daily boards |
 | `lb:dc:<YYYY-MM-DD>:<event>` | zset | leaderboard | daily-challenge ao5 board |
-| `lb:users` | hash userId → JSON {username,country} | leaderboard | display info |
+| `lb:users` | hash userId → JSON {username,country,avatarUrl} | leaderboard | display info |
 | `lb:flagged` | list | leaderboard | results rejected by the anti-cheat check |
 | `lb:meta:built` | string | leaderboard | marks boards as rebuilt after Redis loss |
 | `race:room:<id>` etc. | hash/json | race | room state (shared across replicas) |
@@ -261,7 +271,7 @@ Use `publishEvent()` / `consumeEvents()` from common.
 
 | type | publisher | data fields (besides eventId, occurredAt) |
 |---|---|---|
-| `user.registered` | auth | `userId, username, displayName, country, wcaId, createdAt` |
+| `user.registered` | auth | `userId, username, displayName, country, wcaId, createdAt, avatarUrl` |
 | `user.updated` | auth | same as above |
 | `solve.created` | solve | `userId, username, event, sessionId, solveId, timeMs, penalty, effectiveMs (int or null=DNF), createdAt, tz, source, rolling: {ao5, ao12}` (rolling = session's current ao5/ao12 *including* this solve; ms, -1 DNF, null n/a); daily-challenge solves also carry `dailyDate, dailyIndex` |
 | `solve.updated` | solve | same fields as created (new values) |
@@ -277,7 +287,7 @@ The shapes below are the contract between the services and the web client: every
 always present. Responses may carry additional fields; clients ignore fields they don't know.
 
 ```ts
-type PublicUser = { id: string; username: string; displayName: string|null; bio: string|null; country: string|null; wcaId: string|null; createdAt: string };
+type PublicUser = { id: string; username: string; displayName: string|null; bio: string|null; country: string|null; wcaId: string|null; createdAt: string; avatarUrl: string|null /* '/api/users/<id>/avatar?v=<version>' */ };
 type PrivateUser = PublicUser & { email: string };
 type Session = { id: string; name: string; event: string; createdAt: string; updatedAt: string; solveCount: number };
 type Solve = { id: string; sessionId: string; event: string; timeMs: number; penalty: 'OK'|'+2'|'DNF'; scramble: string; comment: string|null; source: string; createdAt: string; dailyDate?: string|null; dailyIndex?: number|null };
@@ -293,6 +303,9 @@ type PB = { valueMs: number; solveId: string|null; achievedAt: string };
 | GET `/api/auth/me` | req | – | `{user: PrivateUser, settings: object}` |
 | PATCH `/api/auth/me` | req | `{displayName?, bio?, country?, wcaId?}` (null clears) | `{user: PrivateUser}` |
 | PUT `/api/auth/me/settings` | req | `{settings: object}` (≤ 16 KB JSON) | `{settings}` |
+| PUT `/api/auth/me/avatar` | req | raw image body, `Content-Type: image/webp\|image/jpeg\|image/png`, ≤ 300 KB (magic bytes must match) | `{user: PrivateUser}`; 400, 413, 429 (10/h) (+ `user.updated`) |
+| DELETE `/api/auth/me/avatar` | req | – | `{user: PrivateUser}` (+ `user.updated`) |
+| GET `/api/users/:idOrUsername/avatar` | – | `?v=` version | image bytes (immutable cache when `v` matches, ETag/304); 404 |
 | GET `/api/users/:username` | – | – | `{user: PublicUser}`; 404 |
 | GET `/api/users?ids=a,b,c` | – | ≤ 100 ids | `{users: PublicUser[]}` |
 | GET `/api/auth/_info` | – | – | info |
@@ -349,14 +362,14 @@ rows for the event. Emit `pb.updated` whenever a PB row changes (improves, worse
 ### 9.5 leaderboard (`/api/leaderboards`)
 | Method & path | Response |
 |---|---|
-| GET `/api/leaderboards/:event/:kind?period=all|weekly|daily&page=1&size=50` | `{event, kind, period, periodKey, total, page, size, entries: [{rank, userId, username, country, valueMs, achievedAt}], me: {rank, valueMs}|null}` — kind ∈ single, ao5, ao12 (weekly/daily: single, ao5). `me` filled when a valid token is sent. |
+| GET `/api/leaderboards/:event/:kind?period=all|weekly|daily&page=1&size=50&key=` | `{event, kind, period, periodKey, total, page, size, entries: [{rank, userId, username, country, avatarUrl, valueMs, achievedAt}], me: {rank, valueMs}|null}` — kind ∈ single, ao5, ao12 (weekly/daily: single, ao5). `key` (optional) selects a past daily/weekly board (`YYYY-MM-DD` / `YYYY-Www`). `me` filled when a valid token is sent. |
 | GET `/api/leaderboards/daily-challenge?date=&event=333` | same shape, kind `"ao5"`, period `"challenge"` |
 | GET `/api/leaderboards/users/:userId/ranks` | `{ranks: [{event, kind, period:"all", rank, total, valueMs}]}` |
 | GET `/api/leaderboards/_info` | info |
 
 Sources: all-time boards from `pb.updated` (ZADD exact value; ZREM when valueMs is null or -1).
 Weekly/daily boards from `solve.created` (single = effectiveMs, ao5 = rolling.ao5, `ZADD LT`, skip DNF).
-Daily-challenge board from `daily.completed`. Display info from `user.*` events and usernames in payloads.
+Daily-challenge board from `daily.completed`. Display info (username, country, avatar URL) from `user.*` events and usernames in payloads.
 Anti-cheat: ignore values below the WCA world record for that event/kind (fetch `GET wca /internal/records`, cache 1 h, fallback hard-coded floors e.g. 333 single 3000 ms) — store rejected entries in `lb:flagged`.
 Rebuild: a background loop checks for `lb:meta:built`; when it is missing (Redis lost its data), one
 replica acquires `SET lb:rebuild-lock NX EX 120`, rebuilds the all-time boards from
