@@ -13,6 +13,12 @@ import type {
   Solve,
   StatsSummary,
   UserRank,
+  WcaDistribution,
+  WcaMeta,
+  WcaPerson,
+  WcaPersonSummary,
+  WcaRank,
+  WcaRecord,
 } from './types';
 
 export class ApiError extends Error {
@@ -176,5 +182,17 @@ export const api = {
     rooms: (signal?: AbortSignal) => get<{ rooms: RaceRoomSummary[] }>('/api/race/rooms', signal),
     createRoom: (body: { name: string; event: string; isPrivate?: boolean }) =>
       request<{ room: { id: string; name: string; event: string } }>('POST', '/api/race/rooms', body),
+  },
+  wca: {
+    meta: (signal?: AbortSignal) => get<WcaMeta>('/api/wca/meta', signal),
+    records: (signal?: AbortSignal) => get<{ records: WcaRecord[] }>('/api/wca/records', signal),
+    rank: (p: { event: string; kind: 'single' | 'average'; value: number; country?: string | null }, signal?: AbortSignal) =>
+      get<WcaRank>(`/api/wca/rank${qs(p)}`, signal),
+    distribution: (event: string, kind: 'single' | 'average', buckets = 50, signal?: AbortSignal) =>
+      get<WcaDistribution>(`/api/wca/distribution${qs({ event, kind, buckets })}`, signal),
+    persons: (q: string, limit = 20, signal?: AbortSignal) => get<{ persons: WcaPersonSummary[] }>(`/api/wca/persons${qs({ q, limit })}`, signal),
+    person: (wcaId: string, signal?: AbortSignal) => get<WcaPerson>(`/api/wca/persons/${enc(wcaId)}`, signal),
+    countries: (signal?: AbortSignal) =>
+      get<{ countries: { id: string; iso2: string | null; name: string; continentId: string }[] }>('/api/wca/countries', signal),
   },
 };

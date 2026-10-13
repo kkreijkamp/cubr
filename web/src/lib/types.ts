@@ -139,3 +139,64 @@ export interface RoomState {
   standings: { playerId: string; name: string; wins: number; solves: number; meanMs: number | null; ao5: number | null }[];
   createdAt: string;
 }
+
+export interface WcaMeta {
+  exportDate: string;
+  exportVersion: string;
+  counts: Record<string, number>;
+}
+export interface WcaRecordValue {
+  value: number;
+  personId: string;
+  personName: string;
+  countryId: string;
+  countryIso2: string | null;
+}
+export interface WcaRecord {
+  event: string;
+  eventName: string;
+  unit: 'time' | 'moves';
+  single: (WcaRecordValue & { holders?: WcaRecordValue[] }) | null;
+  average: (WcaRecordValue & { holders?: WcaRecordValue[] }) | null;
+}
+export interface WcaRank {
+  event: string;
+  kind: 'single' | 'average';
+  value: number;
+  world: { rank: number; total: number; percentile: number };
+  unit?: 'time' | 'moves';
+  country: { rank: number; total: number; percentile: number; countryId: string; countryIso2: string | null; countryName?: string } | null;
+  neighbours: { personId: string; name: string; countryId: string; countryIso2: string | null; value: number; worldRank: number }[];
+}
+export interface WcaDistribution {
+  event: string;
+  kind: string;
+  unit?: 'time' | 'moves';
+  total: number;
+  p99?: number;
+  min?: number;
+  below?: number;
+  above?: number;
+  p10: number;
+  p25: number;
+  p50: number;
+  p75: number;
+  p90: number;
+  buckets: { from: number; to: number; count: number }[];
+}
+export interface WcaPersonSummary {
+  wcaId: string;
+  name: string;
+  countryId: string;
+  countryIso2: string | null;
+}
+export interface WcaRankValue {
+  value: number;
+  worldRank: number;
+  continentRank: number;
+  countryRank: number;
+}
+export interface WcaPerson {
+  person: { wcaId: string; name: string; countryId: string; countryIso2: string | null; gender: string | null };
+  pbs: { event: string; single: WcaRankValue | null; average: WcaRankValue | null }[];
+}
