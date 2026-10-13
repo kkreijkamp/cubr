@@ -8,6 +8,8 @@ import { isEventId } from '@cubetype/cubestats';
 //   lb:<event>:<kind>:w:<YYYY-Www>   zset  weekly board   (TTL 15 d)
 //   lb:<event>:<kind>:d:<YYYY-MM-DD> zset  daily board    (TTL 3 d)
 //   <board>:at                       hash  userId → achievedAt (ISO) for the score on <board>
+//   <board>:ts                       hash  userId → occurredAt (epoch ms) of the last applied
+//                                          pb.updated (all-time boards only; drops stale events)
 //   lb:users                         hash  userId → JSON {username, country}
 // ---------------------------------------------------------------------------------------------
 
@@ -38,6 +40,7 @@ export const allTimeKey = (event: string, kind: Kind) => `lb:${event}:${kind}:al
 export const dailyKey = (event: string, kind: Kind, day: string) => `lb:${event}:${kind}:d:${day}`;
 export const weeklyKey = (event: string, kind: Kind, week: string) => `lb:${event}:${kind}:w:${week}`;
 export const atKey = (board: string) => `${board}:at`;
+export const tsKey = (board: string) => `${board}:ts`;
 
 export function boardKey(event: string, kind: Kind, period: Period, periodKey: string): string {
   if (period === 'weekly') return weeklyKey(event, kind, periodKey);

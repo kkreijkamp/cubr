@@ -11,8 +11,10 @@ Readiness gates on Redis. Fastify on :8080.
 | `GET /api/leaderboards/_info` | info + consumer stats |
 
 **Events consumed** (group `leaderboard`, consumer = pod name): `pb.updated` → all-time boards (exact
-ZADD, ZREM when null/-1); `solve.created` → daily + weekly boards for the single and rolling ao5
-(`ZADD LT`, DNF skipped); `user.*` and every payload with a `username` → `lb:users`.
+ZADD, ZREM when null/-1; stale events are dropped via a per-user occurredAt guard in `<board>:ts`);
+`solve.created` → daily + weekly boards for the single and rolling ao5 (`ZADD LT`, DNF skipped);
+`user.*` and every payload with a `username` → `lb:users`.
+Score + achievedAt (`<board>:at` hash) are written atomically by small Lua scripts (`src/scripts.ts`).
 
 Decisions / simplifications:
 - Daily/weekly boards are global, so buckets are UTC days / ISO weeks of the solve's `createdAt`

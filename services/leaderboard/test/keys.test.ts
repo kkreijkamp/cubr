@@ -10,6 +10,7 @@ import {
   isKind,
   pageRange,
   rankAt,
+  tsKey,
   weeklyKey,
 } from '../src/keys.js';
 
@@ -19,6 +20,7 @@ describe('key builders', () => {
     expect(dailyKey('333oh', 'ao5', '2026-10-14')).toBe('lb:333oh:ao5:d:2026-10-14');
     expect(weeklyKey('pyram', 'single', '2026-W42')).toBe('lb:pyram:single:w:2026-W42');
     expect(atKey('lb:333:single:all')).toBe('lb:333:single:all:at');
+    expect(tsKey('lb:333:single:all')).toBe('lb:333:single:all:ts');
   });
   it('boardKey picks the period', () => {
     expect(boardKey('333', 'ao12', 'all', 'all')).toBe('lb:333:ao12:all');

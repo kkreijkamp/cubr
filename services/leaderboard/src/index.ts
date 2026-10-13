@@ -9,6 +9,7 @@ import {
 } from '@cubetype/common';
 import { CONSUMED_TYPES, makeHandler } from './ingest.js';
 import { registerRoutes } from './routes/index.js';
+import { defineScripts } from './scripts.js';
 
 const config = loadConfig('leaderboard');
 
@@ -24,6 +25,7 @@ const server = createServer(config, {
 });
 const { app } = server;
 const redis = createRedis(config.redisUrl, app.log);
+defineScripts(redis);
 const auth = makeAuth(config.jwtSecret, redis);
 
 await registerRoutes(app, { redis, auth });

@@ -14,6 +14,7 @@ describe('planPbUpdated', () => {
       kind: 'single',
       valueMs: 9876,
       achievedAt: '2026-10-13T10:00:00.000Z',
+      occurredAtMs: Date.parse('2026-10-14T11:00:00Z'),
     });
   });
   it('removes on null / -1', () => {

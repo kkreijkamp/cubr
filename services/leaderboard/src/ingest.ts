@@ -8,6 +8,7 @@ import {
   dailyKey,
   hasBoards,
   isKind,
+  tsKey,
   utcDay,
   utcWeek,
   weeklyKey,
@@ -39,6 +40,7 @@ export interface PbWrite {
   kind: Kind;
   valueMs: number | null;
   achievedAt: string;
+  occurredAtMs: number;
 }
 
 type Data = Record<string, unknown>;
@@ -63,8 +65,9 @@ export function planPbUpdated(d: Data, nowMs = Date.now()): PbWrite | null {
     valueMs = positiveMs(d.valueMs);
     if (valueMs === null) return null; // garbage value: ignore rather than delete
   }
-  const achievedAt = new Date(parseTime(d.achievedAt) ?? parseTime(d.occurredAt) ?? nowMs).toISOString();
-  return { board: allTimeKey(event, kind), event, kind, valueMs, achievedAt };
+  const occurredAtMs = parseTime(d.occurredAt) ?? nowMs;
+  const achievedAt = new Date(parseTime(d.achievedAt) ?? occurredAtMs).toISOString();
+  return { board: allTimeKey(event, kind), event, kind, valueMs, achievedAt, occurredAtMs };
 }
 
 /**
@@ -117,28 +120,8 @@ export interface IngestDeps {
 }
 
 export function makeHandler({ redis }: IngestDeps) {
-  /** Merges display info into lb:users; the country is only replaced when the event carried one. */
-  async function saveUserInfo(info: UserInfo) {
-    const raw = await redis.hget(USERS_KEY, info.userId);
-    let cur: Record<string, unknown> = {};
-    if (raw) {
-      try {
-        cur = JSON.parse(raw) as Record<string, unknown>;
-      } catch {
-        /* corrupt entry: overwrite it */
-      }
-    }
-    const next = { ...cur, username: info.username, ...(info.country !== undefined ? { country: info.country } : {}) };
-    const json = JSON.stringify(next);
-    if (json !== raw) await redis.hset(USERS_KEY, info.userId, json);
-  }
-
-  /** Keep-best write: ZADD LT only ever lowers a score; achievedAt follows the score. */
   async function writeBest(evt: EventEnvelope, w: BestWrite) {
-    const userId = evt.data.userId as string;
-    const changed = await redis.zadd(w.board, 'LT', 'CH', w.valueMs, userId);
-    if (changed === 1) await redis.hset(atKey(w.board), userId, w.achievedAt);
-    await redis.multi().expire(w.board, w.ttlSec).expire(atKey(w.board), w.ttlSec).exec();
+    await redis.lbBest(w.board, atKey(w.board), w.valueMs, evt.data.userId as string, w.achievedAt, w.ttlSec);
   }
 
   return async function handle(evt: EventEnvelope): Promise<void> {
@@ -147,14 +130,16 @@ export function makeHandler({ redis }: IngestDeps) {
     if (typeof userId !== 'string' || !userId) return;
 
     const info = planUserInfo(evt.type, d);
-    if (info) await saveUserInfo(info);
+    if (info) {
+      const hasCountry = info.country !== undefined;
+      await redis.lbUser(USERS_KEY, info.userId, info.username, hasCountry ? '1' : '0', info.country ?? '');
+    }
 
     switch (evt.type) {
       case 'pb.updated': {
         const w = planPbUpdated(d);
         if (!w) return;
-        if (w.valueMs === null) await redis.multi().zrem(w.board, userId).hdel(atKey(w.board), userId).exec();
-        else await redis.multi().zadd(w.board, w.valueMs, userId).hset(atKey(w.board), userId, w.achievedAt).exec();
+        await redis.lbSetPb(w.board, atKey(w.board), tsKey(w.board), userId, w.valueMs ?? '', w.achievedAt, w.occurredAtMs);
         return;
       }
       case 'solve.created':
