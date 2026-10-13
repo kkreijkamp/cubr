@@ -55,11 +55,11 @@ export function PbCards({ summary, own, precision }: { summary: AsyncState<Stats
         <WidgetEmpty icon={<Trophy size={16} />}>
           {own ? (
             <>
-              no solves yet — <Link to="/" className="link-main">open the timer</Link> and press space. your personal bests and activity will
+              no solves yet — <Link to="/" className="link-main">open the timer</Link> and press space. your personal bests and charts will
               show up here.
             </>
           ) : (
-            'no solves yet — personal bests will appear after the first solve.'
+            'no solves yet — personal bests and charts will appear after the first solve.'
           )}
         </WidgetEmpty>
       </section>

@@ -1,25 +1,31 @@
+import { lazy, Suspense } from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { Layout } from './components/Layout';
+import { Loading } from './components/Spinner';
 import { AuthProvider } from './lib/auth';
 import TimerPage from './pages/TimerPage';
-import LeaderboardsPage from './pages/LeaderboardsPage';
-import ProfilePage from './pages/ProfilePage';
-import AccountPage from './pages/AccountPage';
-import SettingsPage from './pages/SettingsPage';
-import LoginPage from './pages/LoginPage';
-import NotFoundPage from './pages/NotFoundPage';
+
+// Everything except the timer is code-split so the first paint is just the timer.
+const LeaderboardsPage = lazy(() => import('./pages/LeaderboardsPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const AccountPage = lazy(() => import('./pages/AccountPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+
+const s = (el: JSX.Element) => <Suspense fallback={<Loading />}>{el}</Suspense>;
 
 const router = createBrowserRouter([
   {
     element: <Layout />,
     children: [
       { path: '/', element: <TimerPage /> },
-      { path: '/leaderboards', element: <LeaderboardsPage /> },
-      { path: '/profile/:username', element: <ProfilePage /> },
-      { path: '/account', element: <AccountPage /> },
-      { path: '/settings', element: <SettingsPage /> },
-      { path: '/login', element: <LoginPage /> },
-      { path: '*', element: <NotFoundPage /> },
+      { path: '/leaderboards', element: s(<LeaderboardsPage />) },
+      { path: '/profile/:username', element: s(<ProfilePage />) },
+      { path: '/account', element: s(<AccountPage />) },
+      { path: '/settings', element: s(<SettingsPage />) },
+      { path: '/login', element: s(<LoginPage />) },
+      { path: '*', element: s(<NotFoundPage />) },
     ],
   },
 ], {

@@ -4,12 +4,14 @@ import type {
   ActivityDay,
   Leaderboard,
   LbKind,
+  PbKind,
   Penalty,
   PrivateUser,
   PublicUser,
   Session,
   Solve,
   StatsSummary,
+  UserRank,
 } from './types';
 
 export class ApiError extends Error {
@@ -152,9 +154,14 @@ export const api = {
     summary: (userId: string, signal?: AbortSignal) => get<StatsSummary>(`/api/stats/users/${enc(userId)}/summary`, signal),
     activity: (userId: string, from?: string, to?: string, signal?: AbortSignal) =>
       get<{ days: ActivityDay[] }>(`/api/stats/users/${enc(userId)}/activity${qs({ from, to })}`, signal),
+    pbHistory: (userId: string, event: string, signal?: AbortSignal) =>
+      get<{ history: { kind: PbKind; valueMs: number; achievedAt: string }[] }>(`/api/stats/users/${enc(userId)}/pb-history${qs({ event })}`, signal),
+    hourly: (userId: string, event: string, signal?: AbortSignal) =>
+      get<{ hours: { hour: number; solves: number; meanMs: number | null }[] }>(`/api/stats/users/${enc(userId)}/hourly${qs({ event })}`, signal),
   },
   leaderboards: {
     get: (event: string, kind: LbKind, opts: { period?: 'all' | 'weekly' | 'daily'; page?: number; size?: number; key?: string } = {}, signal?: AbortSignal) =>
       get<Leaderboard>(`/api/leaderboards/${enc(event)}/${kind}${qs({ period: opts.period ?? 'all', page: opts.page, size: opts.size, key: opts.key })}`, signal),
+    userRanks: (userId: string, signal?: AbortSignal) => get<{ ranks: UserRank[] }>(`/api/leaderboards/users/${enc(userId)}/ranks`, signal),
   },
 };

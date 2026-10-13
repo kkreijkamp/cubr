@@ -69,4 +69,10 @@ export function applyTheme(name: string, persist = true): void {
       /* ignore */
     }
   }
+  window.dispatchEvent(new CustomEvent('cubetype:theme'));
+}
+
+/** Reads the current value of a theme CSS variable (for canvas/chart colours). */
+export function cssVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }

@@ -96,3 +96,11 @@ export interface Leaderboard {
   entries: LeaderboardEntry[];
   me: { rank: number; valueMs: number } | null;
 }
+export interface UserRank {
+  event: string;
+  kind: string;
+  period: 'all';
+  rank: number;
+  total: number;
+  valueMs: number;
+}
