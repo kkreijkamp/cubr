@@ -1,7 +1,7 @@
 import { badRequest, conflict, forbidden } from '@cubetype/common';
 import { computeStandings } from './standings.js';
 import type {
-  Identity, Penalty, PlayerStatus, RoomState, ScrambleSource, StoredRoom,
+  Identity, Penalty, PlayerStatus, Presence, RoomState, ScrambleSource, StoredRoom,
 } from './types.js';
 
 /**
@@ -103,7 +103,7 @@ export function submitResult(room: StoredRoom, playerId: string, round: number, 
 }
 
 /**
- * Invariants applied after every mutation, given who is connected right now:
+ * Invariants applied after every mutation, given who is connected right now (on any pod):
  * - host transfer: if the host is gone or disconnected, the oldest connected player takes over
  *   (with nobody connected the old host is kept so they can come back);
  * - round completion: once every connected player has a result, status becomes "finished".
@@ -122,8 +122,8 @@ export function normalize(room: StoredRoom, connected: Set<string>): void {
   }
 }
 
-/** Renders the SPEC RoomState (connected flags come from the connection registry). */
-export function toRoomState(room: StoredRoom, connected: Set<string>): RoomState {
+/** Renders the SPEC RoomState (connected flags and pods come from the presence registry). */
+export function toRoomState(room: StoredRoom, presence: Presence): RoomState {
   return {
     id: room.id,
     name: room.name,
@@ -131,7 +131,10 @@ export function toRoomState(room: StoredRoom, connected: Set<string>): RoomState
     hostId: room.hostId,
     status: room.status,
     round: room.round,
-    players: room.players.map((p) => ({ id: p.id, name: p.name, userId: p.userId, status: p.status, connected: connected.has(p.id) })),
+    players: room.players.map((p) => {
+      const pods = presence.get(p.id) ?? [];
+      return { id: p.id, name: p.name, userId: p.userId, status: p.status, connected: pods.length > 0, pods };
+    }),
     results: room.results,
     standings: computeStandings(room.players, room.results),
     createdAt: room.createdAt,

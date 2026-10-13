@@ -33,7 +33,7 @@ export interface StoredPlayer {
 /**
  * What is persisted in Redis under `race:room:<id>`. Note there is no `connected` flag here:
  * connectivity is derived from the connection registry (`race:room:<id>:conns`) every time
- * the state is rendered, so it is always up to date.
+ * the state is rendered, so it is always correct across pods.
  */
 export interface StoredRoom {
   v: 1;
@@ -68,9 +68,11 @@ export interface PublicPlayer {
   userId: string | null;
   status: PlayerStatus;
   connected: boolean;
+  /** the race pods currently holding this player's socket(s), so the UI can show the scaling */
+  pods: string[];
 }
 
-/** SPEC §9.6 RoomState, plus isPrivate, rev and round.scrambleSource. */
+/** SPEC §9.6 RoomState, plus isPrivate, rev, round.scrambleSource and players[].pods. */
 export interface RoomState {
   id: string;
   name: string;
@@ -92,6 +94,9 @@ export interface Identity {
   userId: string | null;
   guest: boolean;
 }
+
+/** playerId → pods that hold a live socket for that player in this room. */
+export type Presence = Map<string, string[]>;
 
 export interface ChatMessage {
   playerId: string;

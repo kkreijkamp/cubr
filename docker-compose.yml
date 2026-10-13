@@ -115,7 +115,7 @@ services:
     <<: *service
     image: cubetype/race:dev
     build: { context: ., dockerfile: services/race/Dockerfile, args: *build-args }
-    depends_on:                       # Redis-only service (room state lives in Redis)
+    depends_on:                       # Redis-only service (room state + Socket.IO adapter)
       redis: { condition: service_healthy }
 
   # ---- frontend ----------------------------------------------------------------------------------

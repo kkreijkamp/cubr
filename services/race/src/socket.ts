@@ -1,5 +1,6 @@
 import type { Server as HttpServer } from 'node:http';
 import { Server, type DefaultEventsMap, type Socket } from 'socket.io';
+import { createAdapter } from '@socket.io/redis-adapter';
 import { z, ZodError } from 'zod';
 import type { FastifyBaseLogger } from 'fastify';
 import { HttpError, badRequest, forbidden, notFound, rateLimit, rateLimited, type Redis } from '@cubetype/common';
@@ -34,9 +35,10 @@ const FLOOD_MAX_EVENTS = 60;
 /**
  * Socket.IO attached to Fastify's own HTTP server: engine.io answers `/socket.io/*` (websocket
  * upgrades only) and hands every other request to Fastify, so REST and websockets share port
- * 8080.
+ * 8080. The Redis adapter turns `io.to(room).emit()` into a Redis PUBLISH that every race pod
+ * receives and forwards to its local members of that room.
  */
-export function createSocketServer(httpServer: HttpServer): RaceServer {
+export function createSocketServer(httpServer: HttpServer, pub: Redis, sub: Redis): RaceServer {
   const io: RaceServer = new Server(httpServer, {
     path: '/socket.io',
     transports: ['websocket'], // no long-polling → no sticky sessions needed behind the LB
@@ -44,6 +46,7 @@ export function createSocketServer(httpServer: HttpServer): RaceServer {
     serveClient: false, // the SPA bundles socket.io-client (keeps our esbuild bundle self-contained)
     maxHttpBufferSize: 16 * 1024, // all our messages are tiny
   });
+  io.adapter(createAdapter(pub, sub, { key: 'race:sio' }));
   return io;
 }
 
@@ -74,11 +77,14 @@ export interface SocketDeps {
   scrambles: ScrambleFetcher;
   redis: Redis;
   jwtSecret: string;
+  pod: string;
   log: FastifyBaseLogger;
 }
 
-export function registerSocketHandlers(deps: SocketDeps): void {
-  const { io, store, scrambles, redis, log } = deps;
+export function registerSocketHandlers(deps: SocketDeps) {
+  const { io, store, scrambles, redis, pod, log } = deps;
+  /** in-flight disconnect cleanups, awaited during graceful shutdown */
+  const pendingCleanups = new Set<Promise<unknown>>();
 
   /** Runs `task` after the socket's previous events finished (keeps per-socket ordering). */
   function serial<T>(socket: RaceSocket, task: () => Promise<T>): Promise<T> {
@@ -148,7 +154,10 @@ export function registerSocketHandlers(deps: SocketDeps): void {
         { conn: { playerId, delta: -1 } },
       );
     } catch (err) {
-      if (!(err instanceof HttpError && err.code === 'NOT_FOUND')) throw err; // room expired: nothing to clean up
+      // The socket is gone either way: keep the local registry truthful; the periodic
+      // reconcile fixes Redis once it is reachable again.
+      store.trackLocal(roomId, playerId, -1);
+      if (!(err instanceof HttpError && err.code === 'NOT_FOUND')) throw err;
     }
   }
 
@@ -169,7 +178,7 @@ export function registerSocketHandlers(deps: SocketDeps): void {
     const me = socket.data.identity;
 
     on(socket, 'room:join', schemas.join, async ({ roomId }) => {
-      const extra = { playerId: me.playerId, name: me.name };
+      const extra = { playerId: me.playerId, name: me.name, servedBy: pod };
       if (socket.data.roomId === roomId) {
         const state = await store.getState(roomId); // idempotent re-join from the same socket
         if (!state) throw notFound('Room not found (it may have expired)');
@@ -238,9 +247,26 @@ export function registerSocketHandlers(deps: SocketDeps): void {
     });
 
     socket.on('disconnect', () => {
-      serial(socket, () => leaveCurrent(socket, false)).catch((err) =>
+      const p = serial(socket, () => leaveCurrent(socket, false)).catch((err) =>
         log.warn({ err: (err as Error).message, playerId: me.playerId }, 'disconnect cleanup failed'),
       );
+      pendingCleanups.add(p);
+      void p.finally(() => pendingCleanups.delete(p));
     });
   });
+
+  return {
+    /**
+     * Graceful shutdown: drop every websocket on this pod at the transport level (clients see
+     * "transport close" and auto-reconnect — through the load balancer, to another pod), then
+     * wait for the resulting registry cleanups so other players see the move promptly.
+     */
+    async drain(timeoutMs = 5000): Promise<void> {
+      io.engine.close();
+      const deadline = Date.now() + timeoutMs;
+      while (pendingCleanups.size && Date.now() < deadline) {
+        await Promise.race([Promise.allSettled([...pendingCleanups]), new Promise((r) => setTimeout(r, 100))]);
+      }
+    },
+  };
 }

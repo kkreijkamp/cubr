@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { HttpError } from '@cubetype/common';
 import { MAX_PLAYERS, addPlayer, newRoom, normalize, removePlayer, setStatus, startRound, submitResult, toRoomState } from '../src/room.js';
-import { connectedFrom } from '../src/store.js';
+import { presenceFrom } from '../src/store.js';
 import type { Identity, StoredRoom } from '../src/types.js';
 
 const guest = (id: string, name = id): Identity => ({ playerId: id, name, userId: null, guest: true });
@@ -131,20 +131,26 @@ describe('room rules', () => {
   });
 });
 
-describe('connections → RoomState', () => {
-  it('a player is connected while at least one socket is open', () => {
-    const connected = connectedFrom({ 'guest-aaaaaa': '2', 'guest-bbbbbb': '0' });
-    expect([...connected]).toEqual(['guest-aaaaaa']);
+describe('presence → RoomState', () => {
+  it('counts only sockets on live pods and lists the pods per player', () => {
+    const presence = presenceFrom(
+      { 'race-a|guest-aaaaaa': '1', 'race-b|guest-aaaaaa': '2', 'race-b|guest-bbbbbb': '1', 'race-dead|guest-cccccc': '1', 'race-a|guest-dddddd': '0' },
+      new Set(['race-a', 'race-b']),
+    );
+    expect(presence.get('guest-aaaaaa')).toEqual(['race-a', 'race-b']);
+    expect(presence.get('guest-bbbbbb')).toEqual(['race-b']);
+    expect(presence.has('guest-cccccc')).toBe(false);
+    expect(presence.has('guest-dddddd')).toBe(false);
 
     const r = room();
     addPlayer(r, guest('guest-aaaaaa', 'A'), 1);
-    addPlayer(r, guest('guest-bbbbbb', 'B'), 2);
-    normalize(r, connected);
-    const state = toRoomState(r, connected);
+    addPlayer(r, guest('guest-cccccc', 'C'), 2);
+    normalize(r, new Set(presence.keys()));
+    const state = toRoomState(r, presence);
     expect(state.hostId).toBe('guest-aaaaaa');
     expect(state.players).toEqual([
-      { id: 'guest-aaaaaa', name: 'A', userId: null, status: 'idle', connected: true },
-      { id: 'guest-bbbbbb', name: 'B', userId: null, status: 'idle', connected: false },
+      { id: 'guest-aaaaaa', name: 'A', userId: null, status: 'idle', connected: true, pods: ['race-a', 'race-b'] },
+      { id: 'guest-cccccc', name: 'C', userId: null, status: 'idle', connected: false, pods: [] },
     ]);
     expect(state.standings).toHaveLength(2);
     expect(state).toMatchObject({ id: 'abcd1234', name: 'Test', event: '333', status: 'lobby', round: null, results: {} });
