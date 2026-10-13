@@ -55,7 +55,7 @@ async function eventually(name, fn, timeoutMs = 15_000) {
 console.log(`cubetype smoke test → ${BASE}\n`);
 
 console.log('health / info (every service answers through the entry point):');
-for (const p of ['/api/auth/_info', '/api/scrambles/_info', '/api/solves/_info', '/api/stats/_info', '/api/leaderboards/_info', '/api/race/_info']) {
+for (const p of ['/api/auth/_info', '/api/scrambles/_info', '/api/solves/_info', '/api/stats/_info', '/api/leaderboards/_info', '/api/race/_info', '/api/wca/_info']) {
   const r = await req('GET', p);
   check(p, r.status === 200, `${r.data?.service ?? '?'}@${r.data?.version ?? '?'} on ${r.data?.pod ?? '?'} (${r.ms} ms)`);
 }
@@ -106,6 +106,17 @@ await eventually('daily leaderboard updated', async () => {
   const lb = await req('GET', '/api/leaderboards/333/single?period=daily');
   return { ok: lb.data?.me?.valueMs > 0, detail: `rank=${lb.data?.me?.rank}` };
 });
+
+console.log('\nwca dataset:');
+const meta = await req('GET', '/api/wca/meta');
+if (meta.status === 503) {
+  // a fresh stack has no WCA data until the import job ran (docker compose --profile jobs run --rm wca-import)
+  console.log(`  – skipped: ${meta.data?.error?.message ?? 'WCA data not loaded'} (run the wca-import job first)`);
+} else {
+  check('wca meta', meta.status === 200, meta.status === 200 ? `export ${meta.data.exportDate}, persons=${meta.data.counts?.persons}` : `status ${meta.status}`);
+  const rank = await req('GET', '/api/wca/rank?event=333&kind=single&value=9876&country=AU');
+  check('where would I rank?', rank.status === 200, rank.status === 200 ? `world #${rank.data.world.rank} of ${rank.data.world.total} (${rank.data.world.percentile}%) · ${rank.ms} ms` : `status ${rank.status} ${rank.data?.error?.message ?? ''}`);
+}
 
 console.log('\nrace:');
 const room = await req('POST', '/api/race/rooms', { name: 'smoke room', event: '333' });
