@@ -74,3 +74,25 @@ export interface ActivityDay {
   solves: number;
   totalMs: number;
 }
+
+export type LbKind = 'single' | 'ao5' | 'ao12';
+export type LbPeriod = 'all' | 'weekly' | 'daily';
+export interface LeaderboardEntry {
+  rank: number;
+  userId: string;
+  username: string;
+  country: string | null;
+  valueMs: number;
+  achievedAt: string | null;
+}
+export interface Leaderboard {
+  event: string;
+  kind: string;
+  period: LbPeriod;
+  periodKey: string;
+  total: number;
+  page: number;
+  size: number;
+  entries: LeaderboardEntry[];
+  me: { rank: number; valueMs: number } | null;
+}

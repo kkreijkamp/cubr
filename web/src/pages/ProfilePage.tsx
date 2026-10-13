@@ -30,6 +30,9 @@ export default function ProfilePage() {
           </div>
           <div className="sub">maybe they changed their name, or it was never solved ¯\_(ツ)_/¯</div>
           <div className="row" style={{ justifyContent: 'center' }}>
+            <Link to="/leaderboards" className="btn">
+              browse leaderboards
+            </Link>
             <Link to="/" className="btn">
               back to the timer
             </Link>

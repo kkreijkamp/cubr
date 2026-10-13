@@ -1,0 +1,329 @@
+/* leaderboards page — Monkeytype layout: sidebar of button groups + title / rank card / table */
+.lb {
+  display: grid;
+  grid-template-columns: 15rem minmax(0, 1fr);
+  gap: 2rem;
+  align-items: start;
+}
+.lb-side {
+  display: grid;
+  gap: 1rem;
+  position: sticky;
+  top: 1rem;
+}
+.lb-group {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  border-radius: var(--roundness);
+  background: var(--sub-alt-color);
+  font-size: 0.85rem;
+}
+.lb-group .btn {
+  justify-content: flex-start;
+  width: 100%;
+  padding: 0.55em 0.75em;
+}
+.lb-group .btn svg {
+  width: 1em;
+  height: 1em;
+}
+.lb-group-label {
+  color: var(--sub-color);
+  font-size: 0.7rem;
+  padding: 0.35rem 0.75em 0.15rem;
+}
+.lb-group.lb-events {
+  grid-template-columns: 1fr 1fr;
+}
+.lb-group.lb-events .lb-group-label {
+  grid-column: 1 / -1;
+}
+
+.lb-main {
+  display: grid;
+  gap: 1.25rem;
+  min-width: 0;
+}
+.lb-head {
+  display: grid;
+  gap: 0.5rem;
+}
+.lb-title {
+  font-size: clamp(1.5rem, 1.1rem + 1.4vw, 2.25rem);
+  line-height: 1.15;
+  color: var(--text-color);
+}
+.lb-subtitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+  color: var(--sub-color);
+  font-size: 0.8rem;
+}
+.lb-subtitle .lb-pipe {
+  width: 0.25em;
+  height: 1.5em;
+  border-radius: 0.25em;
+  background: var(--sub-alt-color);
+}
+.lb-subtitle a {
+  color: var(--main-color);
+}
+.lb-subtitle a:hover {
+  color: var(--text-color);
+}
+.lb-subtitle svg {
+  width: 1em;
+  height: 1em;
+}
+
+/* "your rank" card */
+.lb-me {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.5rem 1.5rem;
+  min-height: 4.5rem;
+  padding: 0.75rem 1rem 0.75rem 1.25rem;
+  border-radius: var(--roundness);
+  background: var(--sub-alt-color);
+}
+.lb-me .lb-me-rank {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  min-width: 3.5rem;
+  color: var(--text-color);
+  font-size: 1.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.lb-me .lb-me-rank svg {
+  color: var(--main-color);
+}
+.lb-me .lb-me-who {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.lb-me .lb-me-who .name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  color: var(--text-color);
+}
+.lb-me .lb-me-who .sub {
+  font-size: 0.75rem;
+}
+.lb-me .lb-me-value {
+  color: var(--main-color);
+  font-size: 1.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.lb-me.lb-me-empty {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  color: var(--sub-color);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.lb-me.lb-me-empty > svg {
+  color: var(--sub-color);
+}
+.lb-me.lb-me-empty a {
+  color: var(--main-color);
+}
+.lb-me.lb-me-empty a:hover {
+  color: var(--text-color);
+}
+
+/* toolbar: count on the left, pagination on the right */
+.lb-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  font-size: 0.8rem;
+}
+.lb-toolbar .lb-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--sub-color);
+}
+.lb-pager {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+.lb-pager .btn {
+  padding: 0.55em 0.85em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* table */
+table.lb-table {
+  transition: opacity var(--dur);
+}
+table.lb-table.stale {
+  opacity: 0.5;
+}
+table.lb-table th.rank,
+table.lb-table td.rank {
+  text-align: center;
+  width: 4.5rem;
+}
+table.lb-table th.rank svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  vertical-align: -0.15em;
+}
+table.lb-table td.rank svg {
+  color: var(--main-color);
+  vertical-align: -0.2em;
+}
+table.lb-table th.name,
+table.lb-table td.name {
+  text-align: left;
+  width: 100%;
+  max-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+table.lb-table td.name a {
+  color: var(--text-color);
+}
+table.lb-table td.name a:hover {
+  color: var(--main-color);
+}
+table.lb-table tr.me td.name a:hover {
+  color: var(--text-color);
+}
+table.lb-table td.name .flag {
+  margin-left: 0.5em;
+  font-size: 0.95em;
+}
+table.lb-table td.name .you {
+  margin-left: 0.6em;
+}
+table.lb-table td.value {
+  font-size: 1.05em;
+}
+table.lb-table td.date {
+  line-height: 1.35;
+}
+table.lb-table td.date .secondary {
+  display: block;
+}
+table.lb-table tr.me.flash td {
+  animation: lbFlash 1.6s ease-out;
+}
+@keyframes lbFlash {
+  0%,
+  30% {
+    background: color-mix(in srgb, var(--main-color) 30%, var(--sub-alt-color));
+  }
+}
+
+.lb-empty {
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+  padding: 3rem 1rem;
+  border-radius: var(--roundness);
+  box-shadow: inset 0 0 0 2px var(--sub-alt-color);
+  color: var(--sub-color);
+  text-align: center;
+}
+.lb-empty .shrug {
+  font-size: 1.5rem;
+  color: var(--text-color);
+}
+.lb-empty a {
+  color: var(--main-color);
+}
+.lb-empty a:hover {
+  color: var(--text-color);
+}
+
+.lb-goto {
+  display: flex;
+  gap: 0.5rem;
+}
+.lb-goto input {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 1000px) {
+  .lb {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+  }
+  .lb-side {
+    position: static;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+  .lb-group {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+  }
+  .lb-group.lb-events {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr));
+  }
+  .lb-group-label {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 600px) {
+  .lb-side {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lb-group {
+    font-size: 0.8rem;
+  }
+  .lb-group.lb-kinds {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+  }
+  .lb-group.lb-events {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .lb-group .btn {
+    justify-content: center;
+    padding: 0.55em 0.4em;
+  }
+  .lb-me {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.25rem 1rem;
+    padding: 0.75rem 1rem;
+  }
+  .lb-me .lb-me-jump {
+    display: none;
+  }
+  .lb-me .lb-me-rank,
+  .lb-me .lb-me-value {
+    font-size: 1.4rem;
+  }
+  table.lb-table th.date,
+  table.lb-table td.date {
+    display: none;
+  }
+  table.lb-table th.rank,
+  table.lb-table td.rank {
+    width: 3rem;
+  }
+  .lb-toolbar .lb-count {
+    display: none;
+  }
+  .lb-pager {
+    width: 100%;
+    justify-content: space-between;
+  }
+}

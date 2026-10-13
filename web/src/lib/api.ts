@@ -2,6 +2,8 @@
 // Ingress (cloud) or gateway (local) routes to the right service — see docs/SPEC.md §3.
 import type {
   ActivityDay,
+  Leaderboard,
+  LbKind,
   Penalty,
   PrivateUser,
   PublicUser,
@@ -150,5 +152,9 @@ export const api = {
     summary: (userId: string, signal?: AbortSignal) => get<StatsSummary>(`/api/stats/users/${enc(userId)}/summary`, signal),
     activity: (userId: string, from?: string, to?: string, signal?: AbortSignal) =>
       get<{ days: ActivityDay[] }>(`/api/stats/users/${enc(userId)}/activity${qs({ from, to })}`, signal),
+  },
+  leaderboards: {
+    get: (event: string, kind: LbKind, opts: { period?: 'all' | 'weekly' | 'daily'; page?: number; size?: number; key?: string } = {}, signal?: AbortSignal) =>
+      get<Leaderboard>(`/api/leaderboards/${enc(event)}/${kind}${qs({ period: opts.period ?? 'all', page: opts.page, size: opts.size, key: opts.key })}`, signal),
   },
 };

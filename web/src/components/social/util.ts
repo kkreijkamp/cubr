@@ -1,4 +1,4 @@
-// Small helpers shared by the social pages (login, profile/account).
+// Small helpers shared by the social pages (login, profile/account, leaderboards).
 import { getEvent } from '@cubetype/cubestats';
 import { ApiError } from '../../lib/api';
 import type { PbKind } from '../../lib/types';

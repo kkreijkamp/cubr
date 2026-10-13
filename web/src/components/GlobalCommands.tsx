@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { LogIn, LogOut, Palette, Settings, Timer, Type, User, Zap } from 'lucide-react';
+import { Crown, LogIn, LogOut, Palette, Settings, Timer, Type, User, Zap } from 'lucide-react';
 import { useRegisterCommands, type Command } from '../lib/commands';
 import { useAuth } from '../lib/auth';
 import { FONTS, updateSettings, useSettings, type Settings as S } from '../lib/settings';
@@ -42,6 +42,7 @@ export function GlobalCommands() {
       const go = (path: string) => () => navigate(path);
       const nav: Command[] = [
         { id: 'go-timer', label: 'Go to timer', icon: <Timer />, run: go('/') },
+        { id: 'go-lb', label: 'Go to leaderboards', icon: <Crown />, run: go('/leaderboards') },
         { id: 'go-settings', label: 'Go to settings', icon: <Settings />, run: go('/settings') },
       ];
       const theme: Command = {
