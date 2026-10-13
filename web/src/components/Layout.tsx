@@ -86,6 +86,7 @@ export function Layout() {
   const location = useLocation();
   useEffect(() => {
     window.scrollTo(0, 0);
+    document.body.classList.remove('focus');
   }, [location.pathname]);
   return (
     <div className="app">

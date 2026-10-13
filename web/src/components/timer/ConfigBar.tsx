@@ -42,7 +42,7 @@ export function ConfigBar(p: Props) {
   }, [menuOpen, pickerOpen, onOverlayChange]);
 
   return (
-    <div className="config-bar tp-config">
+    <div className="config-bar tp-config fade-on-focus">
       {/* desktop: every event inline */}
       <div className="config-card tp-events-full" role="group" aria-label="event">
         {EVENTS.map((e) => (
@@ -84,7 +84,7 @@ export function ConfigBar(p: Props) {
           className={`btn-text${p.inspection ? ' active' : ''}`}
           onClick={p.onToggleInspection}
           aria-pressed={p.inspection}
-          data-tip={p.inspection ? 'WCA inspection on' : 'WCA inspection off'}
+          data-tip={p.inspection ? 'WCA inspection on (alt+i)' : 'WCA inspection off (alt+i)'}
           data-tip-pos="down"
           {...noFocus}
         >

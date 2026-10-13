@@ -87,7 +87,7 @@ export function ScrambleBar({ scramble, onNext, onPrev, hasPrev, onCustom, editi
   }
 
   return (
-    <div className="tp-scramble-wrap">
+    <div className="tp-scramble-wrap fade-on-focus">
       {scramble ? (
         <div className="tp-scramble" style={{ ['--scramble-size' as string]: sizeFor(scramble.text) }} key={scramble.text}>
           {scramble.text}

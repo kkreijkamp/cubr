@@ -263,6 +263,12 @@
   color: var(--text-color);
   margin-left: 0.5em;
 }
+.tp-avgline .pb-badge {
+  color: var(--main-color);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+}
 .tp-hint {
   color: var(--sub-color);
   font-size: 0.9rem;
@@ -601,6 +607,33 @@
   margin-top: 1.5rem;
 }
 
+/* ------------------------------------------------------------ footer bits */
+.tp-keytips {
+  margin-top: 2.5rem;
+}
+.tp-keytips kbd {
+  margin: 0 0.15em;
+}
+.tp-guest {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  color: var(--sub-color);
+  font-size: 0.75rem;
+  text-align: center;
+}
+.tp-guest a {
+  color: var(--main-color);
+}
+.tp-guest a:hover {
+  color: var(--text-color);
+}
+.tp-guest .btn-text {
+  padding: 0.2rem;
+}
+
 /* ------------------------------------------------------------ modals */
 .tp-modal-title {
   display: inline-flex;
@@ -763,6 +796,9 @@
   }
   .tp-preview-box {
     min-height: 11rem;
+  }
+  .tp-keytips {
+    display: none;
   }
   .tp-solve-time {
     font-size: 2.75rem;

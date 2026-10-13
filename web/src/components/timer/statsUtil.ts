@@ -1,5 +1,5 @@
 // Small pure helpers for the timer page's stats panel, average detail modal and charts.
-import { effectiveMs, formatSolve, formatTime, trimFor, type Precision } from '@cubetype/cubestats';
+import { effectiveMs, formatSolve, formatTime, trimFor, type Precision, type SessionStats } from '@cubetype/cubestats';
 import type { Solve } from '../../lib/types';
 
 /** "mo3" → 3, "ao12" → 12, anything else → null */
@@ -88,6 +88,28 @@ export function averageReport(label: string, w: AverageWindow, precision: Precis
     lines.push(`${i + 1}. ${w.trimmed.has(i) ? `(${t})` : t}   ${s.scramble.replace(/\n/g, ' ')}`);
   });
   return lines.join('\n');
+}
+
+export type PbKind = 'single' | 'ao5' | 'ao12' | 'ao100';
+
+/**
+ * New session bests set by the latest solve. Requires an existing (finite) previous best so the
+ * first few solves of a session don't spam "new pb".
+ */
+export function detectPbs(prev: SessionStats, next: SessionStats): { kind: PbKind; value: number }[] {
+  const out: { kind: PbKind; value: number }[] = [];
+  const lastIndex = next.count - 1;
+  if (next.bestIndex === lastIndex && next.best !== null && prev.best !== null && prev.count >= 5 && next.best < prev.best) {
+    out.push({ kind: 'single', value: next.best });
+  }
+  for (const kind of ['ao5', 'ao12', 'ao100'] as const) {
+    const a = next.averages[kind];
+    const b = prev.averages[kind];
+    if (!a || !b || a.best === null || b.best === null) continue;
+    if (!Number.isFinite(b.best)) continue;
+    if (a.bestIndex === lastIndex && a.best < b.best) out.push({ kind, value: a.best });
+  }
+  return out;
 }
 
 /** Evenly thins a series to at most `max` points (keeps first & last). */

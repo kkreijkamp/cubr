@@ -29,6 +29,7 @@ export function usePaletteHotkeys(): void {
         return;
       }
       if (e.key === 'Escape' && !paletteStore.get().open && !isTypingTarget(e.target) && !document.querySelector('.modal-backdrop')) {
+        if (document.body.classList.contains('focus')) return;
         e.preventDefault();
         openPalette();
       }

@@ -11,6 +11,8 @@ interface Props {
   timerUpdate: TimerUpdate;
   /** font size in rem */
   sizeRem?: number;
+  /** highlight the result as a new PB */
+  pb?: boolean;
   className?: string;
 }
 
@@ -39,7 +41,7 @@ function runningText(elapsed: number, mode: TimerUpdate, precision: Precision): 
  * The big timer number. While running/inspecting it updates its own text node every animation
  * frame (no React re-render per frame).
  */
-export function TimerDisplay({ state, precision, timerUpdate, sizeRem = 7, className }: Props) {
+export function TimerDisplay({ state, precision, timerUpdate, sizeRem = 7, pb, className }: Props) {
   const textRef = useRef<HTMLSpanElement>(null);
   const { phase, inInspection, startedAt, inspectionStartedAt, result } = state;
   const showInspection = phase === 'inspecting' || (inInspection && (phase === 'holding' || phase === 'ready'));
@@ -81,6 +83,7 @@ export function TimerDisplay({ state, precision, timerUpdate, sizeRem = 7, class
   } else {
     text = zero;
   }
+  if (pb && (phase === 'idle' || phase === 'stopped')) cls += ' pb';
 
   return (
     <div className={`timer-display ${cls} ${className ?? ''}`} style={{ ['--timer-size' as string]: `${sizeRem}rem` }} aria-live="off">

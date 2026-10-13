@@ -1,7 +1,9 @@
 import { lazy, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   ChartLine,
   Copy,
+  Crown,
   Eye,
   Keyboard,
   Layers,
@@ -12,8 +14,9 @@ import {
   RefreshCw,
   Timer as TimerIcon,
   Trash2,
+  X,
 } from 'lucide-react';
-import { EVENTS, effectiveMs, getEvent, rollingAverage, sessionStats, type Penalty } from '@cubetype/cubestats';
+import { EVENTS, effectiveMs, formatTime, getEvent, rollingAverage, sessionStats, type Penalty } from '@cubetype/cubestats';
 import { TimerDisplay } from '../timer/TimerDisplay';
 import { useTimerEngine, type TimerResult, type TimerState } from '../timer/useTimerEngine';
 import { useScrambleQueue } from '../timer/useScrambleQueue';
@@ -27,10 +30,11 @@ import { AverageModal } from '../components/timer/AverageModal';
 import { QuickActions } from '../components/timer/QuickActions';
 import { ManualEntry } from '../components/timer/ManualEntry';
 import { ConfirmModal, PromptModal } from '../components/timer/Dialogs';
-import { copyText, isTouchDevice } from '../components/timer/feedback';
-import { averageWindow, fmtAvg, fmtSolveShort, statNs } from '../components/timer/statsUtil';
+import { copyText, isTouchDevice, playPbSound } from '../components/timer/feedback';
+import { averageWindow, detectPbs, fmtAvg, fmtSolveShort, statNs } from '../components/timer/statsUtil';
 import { noFocus } from '../components/timer/ConfigBar';
 import '../components/timer/timer-page.css';
+import { useAuth } from '../lib/auth';
 import { paletteStore, useRegisterCommands, type Command } from '../lib/commands';
 import { updateSettings, useSettings } from '../lib/settings';
 import {
@@ -64,6 +68,9 @@ const TrendChart = lazy(() => import('../components/timer/Charts').then((m) => (
 const HistogramChart = lazy(() => import('../components/timer/Charts').then((m) => ({ default: m.HistogramChart })));
 const chartFallback = <div className="tp-chart-fallback" />;
 
+const GUEST_HINT_KEY = 'cubetype.guestHintDismissed';
+const PB_KINDS_NS = [5, 12, 100];
+
 function isTyping(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
   return el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName);
@@ -72,6 +79,7 @@ function isTyping(el: EventTarget | null): boolean {
 export default function TimerPage() {
   const settings = useSettings();
   const st = useSolveState();
+  const { status: authStatus } = useAuth();
   const paletteOpen = useStore(paletteStore, (s) => s.open);
 
   const session = st.sessions.find((s) => s.id === st.currentSessionId) ?? null;
@@ -83,6 +91,15 @@ export default function TimerPage() {
   const [editingScramble, setEditingScramble] = useState(false);
   const [overlay, setOverlay] = useState(false);
   const [modal, setModal] = useState<ModalState>(null);
+  const [pbSolveId, setPbSolveId] = useState<string | null>(null);
+  const [pbKey, setPbKey] = useState(0);
+  const [guestHintHidden, setGuestHintHidden] = useState(() => {
+    try {
+      return localStorage.getItem(GUEST_HINT_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
   const touch = useMemo(isTouchDevice, []);
 
   // ---------------------------------------------------------------- derived stats (memoised per solve change)
@@ -93,7 +110,8 @@ export default function TimerPage() {
   const solves = useDeferredValue(liveSolves);
   const statsKey = settings.statsShown.join(',');
   const ns = useMemo(() => statNs(settings.statsShown), [statsKey]); // eslint-disable-line react-hooks/exhaustive-deps
-  const stats = useMemo(() => sessionStats(solves, ns), [solves, ns]);
+  const nsAll = useMemo(() => Array.from(new Set([...ns, ...PB_KINDS_NS])).sort((a, b) => a - b), [ns]);
+  const stats = useMemo(() => sessionStats(solves, nsAll), [solves, nsAll]);
   const times = useMemo(() => solves.map(effectiveMs), [solves]);
   const ao5 = useMemo(() => rollingAverage(times, 5), [times]);
   const ao12 = useMemo(() => rollingAverage(times, 12), [times]);
@@ -103,12 +121,15 @@ export default function TimerPage() {
   scrRef.current = scr;
   const lastRef = useRef(last);
   lastRef.current = last;
+  const pendingPb = useRef(false);
   const lastStopAt = useRef(0);
 
   // ---------------------------------------------------------------- recording solves
   const record = useCallback((r: { timeMs: number; penalty: Penalty }, source: 'timer' | 'manual') => {
     const scramble = scrRef.current.current?.text ?? '';
+    pendingPb.current = true;
     addSolve({ timeMs: r.timeMs, penalty: r.penalty, scramble, source }).catch((e: Error) => {
+      pendingPb.current = false;
       toast.error(e.message || "couldn't save the solve");
     });
     scrRef.current.next();
@@ -131,10 +152,35 @@ export default function TimerPage() {
     alerts: settings.inspectionAlerts,
     onSolve,
   });
-  const { phase } = engine.state;
+  const { phase, inInspection } = engine.state;
   const { clearResult, cancel: cancelEngine } = engine;
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
+
+  // PB detection: compare the stats before and after a solve recorded on this page
+  const prevStats = useRef<{ sid: string | null; stats: typeof stats } | null>(null);
+  useEffect(() => {
+    const prev = prevStats.current;
+    prevStats.current = { sid: st.currentSessionId, stats };
+    if (!pendingPb.current) return;
+    if (!prev || prev.sid !== st.currentSessionId || stats.count !== prev.stats.count + 1) return;
+    pendingPb.current = false;
+    const pbs = detectPbs(prev.stats, stats);
+    const newest = solves[solves.length - 1];
+    if (!pbs.length || !newest) return;
+    const text = pbs.map((p) => `${p.kind} ${p.kind === 'single' ? formatTime(p.value, settings.precision) : fmtAvg(p.value, settings.precision)}`).join(' · ');
+    toast.pb(`new pb! ${text}`);
+    setPbSolveId(newest.id);
+    setPbKey((k) => k + 1);
+    if (settings.pbSound) playPbSound();
+  }, [stats]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // focus mode: fade everything but the timer while inspecting / solving
+  useEffect(() => {
+    const active = settings.focusMode && (phase === 'running' || phase === 'inspecting' || (inInspection && (phase === 'holding' || phase === 'ready')));
+    document.body.classList.toggle('focus', active);
+  }, [phase, inInspection, settings.focusMode]);
+  useEffect(() => () => document.body.classList.remove('focus'), []);
 
   // leaving manual mode / opening things: never keep a stale engine result around
   useEffect(() => {
@@ -188,6 +234,13 @@ export default function TimerPage() {
 
   // ---------------------------------------------------------------- keyboard
   useEffect(() => {
+    // Space must never activate a focused button on this page: drop focus before it lands
+    const guardSpace = (e: KeyboardEvent) => {
+      if (e.code !== 'Space') return;
+      const a = document.activeElement as HTMLElement | null;
+      if (!a || a === document.body || isTyping(a) || a.closest('.modal-backdrop')) return;
+      if (a.tagName === 'BUTTON' || a.tagName === 'A' || a.getAttribute('role') === 'button') a.blur();
+    };
     // a touch that stopped the timer must not also "click" whatever appears under the finger
     const guardClick = (e: MouseEvent) => {
       if (performance.now() - lastStopAt.current < 450) {
@@ -195,8 +248,14 @@ export default function TimerPage() {
         e.stopPropagation();
       }
     };
+    window.addEventListener('keydown', guardSpace, true);
+    window.addEventListener('keyup', guardSpace, true);
     window.addEventListener('click', guardClick, true);
-    return () => window.removeEventListener('click', guardClick, true);
+    return () => {
+      window.removeEventListener('keydown', guardSpace, true);
+      window.removeEventListener('keyup', guardSpace, true);
+      window.removeEventListener('click', guardClick, true);
+    };
   }, []);
 
   useEffect(() => {
@@ -223,6 +282,7 @@ export default function TimerPage() {
         ArrowRight: () => scrRef.current.next(),
         ArrowUp: () => cycleSession(-1),
         ArrowDown: () => cycleSession(1),
+        KeyI: () => updateSettings({ inspection: !settings.inspection }),
         KeyM: () => setManual((m) => !m),
       };
       const fn = actions[e.code];
@@ -233,7 +293,7 @@ export default function TimerPage() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [penaltyLast, deleteLast, commentLast, cycleSession]);
+  }, [penaltyLast, deleteLast, commentLast, cycleSession, settings.inspection]);
 
   // ---------------------------------------------------------------- palette commands
   useRegisterCommands(
@@ -333,6 +393,10 @@ export default function TimerPage() {
   const showPreview = settings.scramblePreview !== 'off';
   const previewScramble = useDeferredValue(scr.current?.text ?? null);
   const cols = 1 + (showPreview ? 1 : 0) + (settings.showSolveList ? 1 : 0);
+  const pb = !!last && last.id === pbSolveId;
+  const pbKinds = pb ? 'new pb' : null;
+  const guest = st.mode === 'local' && authStatus === 'guest' && !guestHintHidden;
+  const isIdle = phase === 'idle' || phase === 'stopped';
 
   return (
     <div className="timer-page">
@@ -369,11 +433,13 @@ export default function TimerPage() {
         {manual ? (
           <ManualEntry onSubmit={(r) => record(r, 'manual')} disabled={modal !== null || paletteOpen} />
         ) : (
-          <TimerDisplay state={displayState} precision={settings.precision} timerUpdate={settings.timerUpdate} sizeRem={settings.timerSize} />
+          <div key={pbKey}>
+            <TimerDisplay state={displayState} precision={settings.precision} timerUpdate={settings.timerUpdate} sizeRem={settings.timerSize} pb={pb && isIdle} />
+          </div>
         )}
       </div>
 
-      <div className="tp-under">
+      <div className="tp-under fade-on-focus">
         {solves.length === 0 && !manual && st.ready ? (
           <div className="tp-hint">
             {touch ? (
@@ -390,6 +456,11 @@ export default function TimerPage() {
           </div>
         ) : (
           <div className="tp-avgline">
+            {pbKinds && (
+              <span className="pb-badge">
+                <Crown size={14} /> {pbKinds}
+              </span>
+            )}
             <span>
               ao5<b>{fmtAvg(stats.averages.ao5?.current, settings.precision)}</b>
             </span>
@@ -401,7 +472,7 @@ export default function TimerPage() {
         <QuickActions last={last} onPenalty={penaltyLast} onComment={commentLast} onDelete={deleteLast} />
       </div>
 
-      <div className={`tp-bottom cols-${cols}`}>
+      <div className={`tp-bottom fade-on-focus cols-${cols}`}>
         <StatsPanel stats={stats} ns={ns} solves={solves} precision={settings.precision} onOpenAverage={openAverage} onOpenSolve={openSolve} />
         {showPreview && (
           <section className="tp-panel tp-preview" aria-label="scramble preview">
@@ -422,7 +493,7 @@ export default function TimerPage() {
 
       {settings.showCharts ? (
         solves.length >= 2 ? (
-          <div className="tp-charts">
+          <div className="tp-charts fade-on-focus">
             <Suspense fallback={chartFallback}>
               <TrendChart times={times} ao5={ao5} ao12={ao12} precision={settings.precision} onOpenSolve={openSolve} />
             </Suspense>
@@ -432,9 +503,36 @@ export default function TimerPage() {
           </div>
         ) : null
       ) : (
-        <div className="tp-charts-toggle">
+        <div className="tp-charts-toggle fade-on-focus">
           <button className="btn-text small" onClick={() => updateSettings({ showCharts: true })} {...noFocus}>
             <ChartLine size={14} /> show charts
+          </button>
+        </div>
+      )}
+
+      <div className="keytips tp-keytips fade-on-focus">
+        <kbd>space</kbd> start / stop · <kbd>tab</kbd> new scramble · <kbd>alt</kbd>+<kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd> ok / +2 / dnf ·{' '}
+        <kbd>alt</kbd>+<kbd>⌫</kbd> delete last · <kbd>esc</kbd> command line
+      </div>
+      {guest && (
+        <div className="tp-guest fade-on-focus">
+          <span>
+            <Link to="/login">sign in</Link> to save solves to the cloud, appear on leaderboards and race
+          </span>
+          <button
+            className="btn-text"
+            aria-label="dismiss"
+            onClick={() => {
+              setGuestHintHidden(true);
+              try {
+                localStorage.setItem(GUEST_HINT_KEY, '1');
+              } catch {
+                /* ignore */
+              }
+            }}
+            {...noFocus}
+          >
+            <X size={12} />
           </button>
         </div>
       )}

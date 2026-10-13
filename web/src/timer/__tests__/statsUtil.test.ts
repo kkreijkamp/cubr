@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { parseTimeInput } from '@cubetype/cubestats';
+import { parseTimeInput, sessionStats } from '@cubetype/cubestats';
 import {
   averageReport,
   averageWindow,
+  detectPbs,
   fmtAvg,
   fmtSolveLong,
   fmtSolveShort,
@@ -70,6 +71,23 @@ describe('average windows', () => {
   });
   it('mo3 trims nothing', () => {
     expect(averageWindow(mk([1000, 2000, 3000]), 2, 3, 2000).trimmed.size).toBe(0);
+  });
+});
+
+describe('pb detection', () => {
+  it('reports a new single and ao5 only against an existing best', () => {
+    const before = mk([12000, 13000, 13000, 12500, 12800, 12100]);
+    const after = [...before, ...mk([9000]).map((s) => ({ ...s, id: 'new' }))];
+    const pbs = detectPbs(sessionStats(before, [5, 12, 100]), sessionStats(after, [5, 12, 100]));
+    expect(pbs.map((p) => p.kind)).toEqual(['single', 'ao5']);
+    // a first solve or too few solves never counts
+    expect(detectPbs(sessionStats(mk([]), [5]), sessionStats(mk([5000]), [5]))).toEqual([]);
+    expect(detectPbs(sessionStats(mk([9000, 8000]), [5]), sessionStats(mk([9000, 8000, 7000]), [5]))).toEqual([]);
+  });
+  it('ignores improvements that are not caused by the latest solve', () => {
+    const before = mk([12000, 11000, 13000, 12500, 11800, 12100]);
+    const after = mk([12000, 11000, 13000, 12500, 11800, 12100, 15000]);
+    expect(detectPbs(sessionStats(before, [5]), sessionStats(after, [5]))).toEqual([]);
   });
 });
 

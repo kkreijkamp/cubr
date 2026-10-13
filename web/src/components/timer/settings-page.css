@@ -63,6 +63,12 @@
 .st-controls > .btn {
   width: 100%;
 }
+.st-inline {
+  display: inline-flex;
+  padding: 0.1rem 0.3rem;
+  font-size: 0.8rem;
+  vertical-align: baseline;
+}
 
 .st-size {
   display: grid;
@@ -158,10 +164,46 @@
   justify-content: flex-end;
 }
 
+/* shortcuts */
+.st-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.25rem 2rem;
+}
+.st-shortcut {
+  display: grid;
+  grid-template-columns: minmax(9.5rem, auto) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: baseline;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--roundness);
+  font-size: 0.8rem;
+}
+.st-shortcut:nth-child(4n + 1),
+.st-shortcut:nth-child(4n + 2) {
+  background: var(--sub-alt-color);
+}
+.st-shortcut .keys {
+  color: var(--sub-color);
+  white-space: nowrap;
+}
+.st-shortcut .what {
+  color: var(--text-color);
+}
+
 @media (max-width: 860px) {
   .st-row {
     grid-template-columns: minmax(0, 1fr);
     gap: 0.9rem;
+  }
+  .st-shortcuts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .st-shortcut:nth-child(n) {
+    background: transparent;
+  }
+  .st-shortcut:nth-child(odd) {
+    background: var(--sub-alt-color);
   }
 }
 @media (max-width: 560px) {
@@ -184,5 +226,9 @@
   }
   .st-quicknav {
     position: static;
+  }
+  .st-shortcut {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.25rem;
   }
 }

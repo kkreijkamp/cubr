@@ -30,6 +30,10 @@
   color: var(--sub-color);
   margin-left: 0.1em;
 }
+.timer-display.pb {
+  color: var(--main-color);
+  animation: pbPop 0.5s ease-out;
+}
 @media (max-width: 720px) {
   .timer-display {
     font-size: min(var(--timer-size, 7rem), 22vw);

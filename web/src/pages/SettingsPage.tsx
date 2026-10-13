@@ -10,9 +10,11 @@ import {
   Gauge,
   Hand,
   Hash,
+  Keyboard,
   List,
   Maximize2,
   Palette,
+  Play,
   RotateCcw,
   Sigma,
   Timer,
@@ -20,9 +22,11 @@ import {
   TriangleAlert,
   Type,
   Upload,
+  Volume2,
 } from 'lucide-react';
 import { CsTimerFormatError, EVENTS, parseCsTimerExport, type ImportedSession } from '@cubetype/cubestats';
 import { ConfirmModal } from '../components/timer/Dialogs';
+import { playPbSound } from '../components/timer/feedback';
 import { AVG_CHOICES, parseAvgKey } from '../components/timer/statsUtil';
 import '../components/timer/settings-page.css';
 import { useAuth } from '../lib/auth';
@@ -39,6 +43,7 @@ const SECTIONS = [
   { id: 'stats', label: 'stats', icon: Sigma },
   { id: 'theme', label: 'theme', icon: Palette },
   { id: 'data', label: 'data', icon: Database },
+  { id: 'shortcuts', label: 'shortcuts', icon: Keyboard },
   { id: 'danger', label: 'danger zone', icon: TriangleAlert },
 ] as const;
 
@@ -86,6 +91,66 @@ const onOff = [
 function set<K extends keyof Settings>(key: K) {
   return (v: Settings[K]) => updateSettings({ [key]: v } as Partial<Settings>);
 }
+
+const SHORTCUTS: [ReactNode, string][] = [
+  [<kbd key="s">space</kbd>, 'hold to get ready, release to start, any key stops'],
+  [<kbd key="e">esc</kbd>, 'cancel inspection · stop as DNF while running · command line when idle'],
+  [
+    <>
+      <kbd>ctrl</kbd>+<kbd>k</kbd>
+    </>,
+    'command line (anywhere)',
+  ],
+  [<kbd key="t">tab</kbd>, 'next scramble'],
+  [
+    <>
+      <kbd>alt</kbd>+<kbd>←</kbd> / <kbd>→</kbd>
+    </>,
+    'previous / next scramble',
+  ],
+  [
+    <>
+      <kbd>alt</kbd>+<kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>
+    </>,
+    'latest solve: no penalty / +2 / DNF',
+  ],
+  [
+    <>
+      <kbd>alt</kbd>+<kbd>⌫</kbd> or <kbd>alt</kbd>+<kbd>z</kbd>
+    </>,
+    'delete the latest solve',
+  ],
+  [
+    <>
+      <kbd>alt</kbd>+<kbd>c</kbd>
+    </>,
+    'comment on the latest solve',
+  ],
+  [
+    <>
+      <kbd>alt</kbd>+<kbd>↑</kbd> / <kbd>↓</kbd>
+    </>,
+    'previous / next session of this event',
+  ],
+  [
+    <>
+      <kbd>alt</kbd>+<kbd>i</kbd>
+    </>,
+    'toggle WCA inspection',
+  ],
+  [
+    <>
+      <kbd>alt</kbd>+<kbd>m</kbd>
+    </>,
+    'toggle manual time entry',
+  ],
+  [
+    <>
+      <kbd>←</kbd> / <kbd>→</kbd>
+    </>,
+    'browse solves in the solve window',
+  ],
+];
 
 function download(name: string, text: string) {
   const blob = new Blob([text], { type: 'application/json' });
@@ -162,6 +227,9 @@ export default function SettingsPage() {
               12.34
             </div>
           </div>
+        </SettingRow>
+        <SettingRow icon={<Eye size={16} />} title="focus mode" description="Fade out everything except the timer while you inspect and solve.">
+          <Options value={s.focusMode} options={onOff} onChange={set('focusMode')} />
         </SettingRow>
       </Section>
 
@@ -248,6 +316,20 @@ export default function SettingsPage() {
         <SettingRow icon={<Trash2 size={16} />} title="confirm delete" description="Ask before deleting a solve with alt+backspace or from the solve window.">
           <Options value={s.confirmDelete} options={onOff} onChange={set('confirmDelete')} />
         </SettingRow>
+        <SettingRow
+          icon={<Volume2 size={16} />}
+          title="pb sound"
+          description={
+            <>
+              Play a short chime when you set a new personal best.{' '}
+              <button className="btn-text st-inline" onClick={playPbSound}>
+                <Play size={12} /> preview
+              </button>
+            </>
+          }
+        >
+          <Options value={s.pbSound} options={onOff} onChange={set('pbSound')} />
+        </SettingRow>
       </Section>
 
       <Section id="theme" title="theme">
@@ -256,6 +338,17 @@ export default function SettingsPage() {
 
       <Section id="data" title="data">
         <DataTools loggedIn={status === 'authed'} />
+      </Section>
+
+      <Section id="shortcuts" title="keyboard shortcuts">
+        <div className="st-shortcuts">
+          {SHORTCUTS.map(([keys, label], i) => (
+            <div key={i} className="st-shortcut">
+              <span className="keys">{keys}</span>
+              <span className="what">{label}</span>
+            </div>
+          ))}
+        </div>
       </Section>
 
       <Section id="danger" title="danger zone">

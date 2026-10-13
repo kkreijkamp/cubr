@@ -218,6 +218,27 @@ h4 {
   }
 }
 
+/* focus mode: while the timer runs everything but the timer fades out */
+body.focus .header .nav,
+body.focus .footer,
+body.focus .fade-on-focus {
+  opacity: 0;
+  pointer-events: none;
+}
+body.focus .logo .logo-icon,
+body.focus .logo .logo-text {
+  color: var(--sub-color);
+}
+body.focus,
+body.focus * {
+  cursor: none !important;
+}
+.footer,
+.fade-on-focus,
+.header .nav {
+  transition: opacity 0.25s;
+}
+
 /* footer */
 .footer {
   display: flex;
@@ -690,6 +711,9 @@ table.table .secondary {
 [data-tip][data-tip-pos='left']:hover::after {
   transform: translateY(50%);
 }
+body.focus [data-tip]::after {
+  display: none;
+}
 /* touch screens have no hover: skip tooltips entirely (they also widen the page off-screen) */
 @media (hover: none) {
   [data-tip]::after {
@@ -738,8 +762,16 @@ table.table .secondary {
   background: rgba(138, 18, 12, 0.9);
   border-color: rgba(241, 51, 34, 0.71);
 }
+.toast.pb {
+  background: color-mix(in srgb, var(--main-color) 88%, transparent);
+  border-color: var(--main-color);
+  color: var(--bg-color);
+}
 .toast:hover {
   filter: brightness(1.1);
+}
+body.focus .toast:not(.important) {
+  display: none;
 }
 
 /* ---------------------------------------------------------------- modal */
@@ -951,6 +983,25 @@ table.table .secondary {
   }
   100% {
     transform: translate(2px, 0);
+  }
+}
+@keyframes ringFlash {
+  0% {
+    box-shadow: 0 0 0 0.25em var(--main-color);
+  }
+  100% {
+    box-shadow: 0 0 0 0.25em transparent;
+  }
+}
+@keyframes pbPop {
+  0% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
   }
 }
 .shake {

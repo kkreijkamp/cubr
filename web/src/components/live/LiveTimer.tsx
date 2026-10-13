@@ -1,6 +1,6 @@
 // Timer wiring shared by the daily challenge and race pages: the shared engine + display, gated by
-// the page (a race round must be running, a daily attempt must be left).
-import { useRef, type ReactNode } from 'react';
+// the page (a race round must be running, a daily attempt must be left), focus mode while solving.
+import { useEffect, useRef, type ReactNode } from 'react';
 import { useTimerEngine, type TimerPhase, type TimerResult } from '../../timer/useTimerEngine';
 import { TimerDisplay } from '../../timer/TimerDisplay';
 import { useSettings } from '../../lib/settings';
@@ -34,6 +34,14 @@ export function useLiveTimer(o: LiveTimerOptions): LiveTimerEngine {
   });
   phaseRef.current = engine.state.phase;
 
+  const { phase } = engine.state;
+  const focus = settings.focusMode && (phase === 'running' || phase === 'inspecting');
+  useEffect(() => {
+    if (!focus) return;
+    document.body.classList.add('focus');
+    return () => document.body.classList.remove('focus');
+  }, [focus]);
+
   return engine;
 }
 
@@ -43,16 +51,17 @@ interface TimerAreaProps {
   scale?: number;
   /** dims the display when no solve can start */
   idleDim?: boolean;
+  pb?: boolean;
   children?: ReactNode;
 }
 
 /** Big timer + touch surface (tap / hold on phones). */
-export function TimerArea({ engine, scale = 1, idleDim, children }: TimerAreaProps) {
+export function TimerArea({ engine, scale = 1, idleDim, pb, children }: TimerAreaProps) {
   const settings = useSettings();
   const size = Math.max(3, settings.timerSize * scale);
   return (
     <div className={`live-timer${idleDim && engine.state.phase === 'idle' ? ' dim' : ''}`} {...engine.touchHandlers}>
-      <TimerDisplay state={engine.state} precision={settings.precision} timerUpdate={settings.timerUpdate} sizeRem={size} />
+      <TimerDisplay state={engine.state} precision={settings.precision} timerUpdate={settings.timerUpdate} sizeRem={size} pb={pb} />
       {children}
     </div>
   );

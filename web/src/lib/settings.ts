@@ -21,11 +21,15 @@ export interface Settings {
   /** timer font size in rem */
   timerSize: number;
   scramblePreview: PreviewMode;
+  /** fade the UI while solving */
+  focusMode: boolean;
   /** which averages appear in the timer stats panel */
   statsShown: string[];
   confirmDelete: boolean;
   showSolveList: boolean;
   showCharts: boolean;
+  /** play a sound when you set a PB */
+  pbSound: boolean;
   /** last used event (timer page) */
   lastEvent: string;
 }
@@ -40,10 +44,12 @@ export const DEFAULT_SETTINGS: Settings = {
   precision: 2,
   timerSize: 7,
   scramblePreview: '2D',
+  focusMode: true,
   statsShown: ['mo3', 'ao5', 'ao12', 'ao100'],
   confirmDelete: true,
   showSolveList: true,
   showCharts: true,
+  pbSound: true,
   lastEvent: '333',
 };
 

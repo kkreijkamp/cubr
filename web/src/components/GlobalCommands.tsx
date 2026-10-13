@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { CalendarDays, Crown, Globe, LogIn, LogOut, Palette, Settings, Swords, Timer, Type, User, Zap } from 'lucide-react';
+import { CalendarDays, Crown, Eye, Globe, LogIn, LogOut, Palette, Settings, Swords, Timer, Type, User, Zap } from 'lucide-react';
 import { useRegisterCommands, type Command } from '../lib/commands';
 import { useAuth } from '../lib/auth';
 import { FONTS, updateSettings, useSettings, type Settings as S } from '../lib/settings';
@@ -85,6 +85,7 @@ export function GlobalCommands() {
         ),
         options('precision', 'Precision', [{ value: 2, label: '0.01 (centiseconds)' }, { value: 3, label: '0.001 (milliseconds)' }], settings.precision),
         options('scramblePreview', 'Scramble preview', [{ value: 'off', label: 'off' }, { value: '2D', label: '2D' }, { value: '3D', label: '3D' }], settings.scramblePreview),
+        { ...options('focusMode', 'Focus mode', [{ value: true, label: 'on' }, { value: false, label: 'off' }], settings.focusMode), icon: <Eye /> },
         { ...options('inspectionAlerts', 'Inspection alerts', [{ value: 'off', label: 'off' }, { value: 'beep', label: 'beep' }, { value: 'voice', label: 'voice' }], settings.inspectionAlerts), icon: <Zap /> },
       ];
       const auth: Command[] = user

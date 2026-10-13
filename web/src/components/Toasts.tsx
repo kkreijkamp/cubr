@@ -1,7 +1,7 @@
-import { AlertCircle, CheckCircle2, Info } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Crown, Info } from 'lucide-react';
 import { dismissToast, useToasts } from '../lib/toast';
 
-const ICONS = { notice: Info, success: CheckCircle2, error: AlertCircle };
+const ICONS = { notice: Info, success: CheckCircle2, error: AlertCircle, pb: Crown };
 
 export function Toasts() {
   const toasts = useToasts();
@@ -10,7 +10,7 @@ export function Toasts() {
       {toasts.map((t) => {
         const Icon = ICONS[t.type];
         return (
-          <div key={t.id} className={`toast ${t.type}`} onClick={() => dismissToast(t.id)}>
+          <div key={t.id} className={`toast ${t.type}${t.important ? ' important' : ''}`} onClick={() => dismissToast(t.id)}>
             <div className="title">
               <Icon size={14} /> {t.title}
             </div>
