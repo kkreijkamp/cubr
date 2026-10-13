@@ -312,6 +312,8 @@ export function overlaySolves(sessionId: string, server: Solve[], ops: SyncOp[])
         comment: s.comment ?? null,
         source: s.source ?? 'timer',
         createdAt: s.createdAt,
+        dailyDate: s.daily?.date ?? null,
+        dailyIndex: s.daily?.index ?? null,
       });
     } else if (op.kind === 'updateSolve' && op.sessionId === sessionId) {
       out = out.map((s) => (s.id === op.id ? { ...s, ...op.patch } : s));

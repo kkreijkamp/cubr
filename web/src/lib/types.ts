@@ -37,6 +37,8 @@ export interface Solve {
   comment: string | null;
   source: SolveSource | string;
   createdAt: string;
+  dailyDate?: string | null;
+  dailyIndex?: number | null;
 }
 
 /** averages/PB values: ms, -1 = DNF, null = n/a */

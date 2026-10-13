@@ -1,0 +1,134 @@
+/* Shared styles for the live pages. Theme tokens only. */
+
+/* grid columns must be allowed to shrink below their content's min-width, otherwise wide tables
+   (inside .table-wrap) or nowrap pickers widen the whole page on phones */
+.live-page,
+.live-page .stack {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.live-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  flex-wrap: wrap;
+}
+.live-head .titles {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+.live-head .subtitle {
+  color: var(--sub-color);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+.live-head .tools {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* segmented config card */
+.live-seg {
+  font-size: 0.85rem;
+  max-width: 100%;
+}
+.live-seg .btn-text {
+  padding: 0.55rem 0.55em;
+}
+
+/* scramble */
+.live-scramble {
+  display: grid;
+  justify-items: center;
+  gap: 0.25rem;
+  text-align: center;
+  min-width: 0;
+}
+.live-scramble .text {
+  color: var(--text-color);
+  line-height: 1.45;
+  max-width: 46ch;
+  word-spacing: 0.15em;
+  overflow-wrap: anywhere;
+  transition: color var(--dur), opacity 0.25s;
+}
+.live-scramble.minx .text {
+  white-space: pre-line;
+  max-width: none;
+}
+.live-scramble.muted .text {
+  color: var(--sub-color);
+}
+.live-scramble .actions {
+  display: flex;
+  gap: 0.25rem;
+}
+.live-scramble .actions .btn-text {
+  padding: 0.35rem;
+}
+
+/* timer surface */
+.live-timer {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 0.75rem;
+  min-height: 9rem;
+  padding: 1rem 0;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: opacity 0.25s;
+}
+.live-timer.dim .timer-display {
+  color: var(--sub-color);
+}
+
+/* notices / banners */
+.live-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 1rem;
+  border-radius: var(--roundness);
+  background: var(--sub-alt-color);
+  color: var(--sub-color);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+.live-notice svg {
+  flex-shrink: 0;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+.live-notice .body {
+  flex: 1;
+  min-width: 0;
+}
+.live-notice.error {
+  color: var(--error-color);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--error-color) 55%, transparent);
+}
+.live-notice.main {
+  color: var(--main-color);
+}
+.live-notice .btn {
+  font-size: 0.8rem;
+}
+
+/* little "kbd + label" hints */
+.live-keytips {
+  color: var(--sub-color);
+  font-size: 0.75rem;
+  line-height: 2;
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .live-seg {
+    font-size: 0.78rem;
+  }
+}
