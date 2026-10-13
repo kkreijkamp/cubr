@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planPbUpdated, planSolveCreated, planUserInfo } from '../src/ingest.js';
+import { planDailyCompleted, planPbUpdated, planSolveCreated, planUserInfo } from '../src/ingest.js';
 import { parseUserInfo, splitWithScores } from '../src/board.js';
 
 const U = '00000000-0000-4000-8000-000000000001';
@@ -57,6 +57,22 @@ describe('planSolveCreated', () => {
   });
   it('skips 333fm', () => {
     expect(planSolveCreated({ ...base, event: '333fm', effectiveMs: 60000 }, NOW)).toEqual([]);
+  });
+});
+
+describe('planDailyCompleted', () => {
+  it('writes the challenge board, skips DNF', () => {
+    const d = { userId: U, username: 'a', date: '2026-10-14', event: '222', ao5: 3456, occurredAt: '2026-10-14T09:00:00Z' };
+    expect(planDailyCompleted(d, NOW)).toEqual({
+      board: 'lb:dc:2026-10-14:222',
+      event: '222',
+      kind: 'ao5',
+      valueMs: 3456,
+      achievedAt: '2026-10-14T09:00:00.000Z',
+      ttlSec: 0,
+    });
+    expect(planDailyCompleted({ ...d, ao5: -1 }, NOW)).toBeNull();
+    expect(planDailyCompleted({ ...d, date: '14/10/2026' }, NOW)).toBeNull();
   });
 });
 

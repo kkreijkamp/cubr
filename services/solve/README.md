@@ -1,7 +1,8 @@
 # solve service
 
-The core write path of cubetype: sessions and solves CRUD and the **transactional outbox** that feeds the
-Redis event bus. Owns the Postgres schema `solve` (SPEC §7.2), migrated at startup. Port 8080.
+The core write path of cubetype: sessions and solves CRUD, daily-challenge attempts, and the
+**transactional outbox** that feeds the Redis event bus. Owns the Postgres schema `solve` (SPEC §7.2),
+migrated at startup. Port 8080.
 
 ## Routes (all `/api/*` require `Authorization: Bearer <jwt>`)
 | Route | Notes |
@@ -12,6 +13,7 @@ Redis event bus. Owns the Postgres schema `solve` (SPEC §7.2), migrated at star
 | `GET /api/sessions/:id/solves` | `{solves}` ascending by `createdAt` |
 | `POST /api/solves` | idempotent on `id` (`ON CONFLICT DO NOTHING`): retry → 200, no second event; id of another user → 409. Returns `{solve, rolling:{ao5,ao12}}` |
 | `PATCH /api/solves/:id` `{penalty?, comment?}` / `DELETE /api/solves/:id` | emit `solve.updated` / `solve.deleted`; a changed solve is returned with the session's `rolling` |
+| `GET /api/solves/daily?date=` | the user's daily attempts per event + ao5 |
 | `GET /api/solves/_info`, `/api/sessions/_info` | info incl. `outbox: {backlog, published, lastPublishedAt, lastError, healthy}` |
 | `GET /internal/users/:userId/solves?event=` | **no auth, not routed by the gateway**: `{solves:[{id, sessionId, timeMs, penalty, createdAt}]}` ordered by session, time (stats recompute) |
 
@@ -21,7 +23,7 @@ Users only ever see their own rows; foreign ids return 404. A solve always gets 
 
 ## Events produced (stream `cubetype:events`, `eventId = solve-<outboxId>`)
 `solve.created` (with `rolling` = session's current ao5/ao12 incl. this solve), `solve.updated`, `solve.deleted`,
-`session.deleted`. Each is inserted into `solve.outbox` **in the same
+`session.deleted`, `daily.completed`. Each is inserted into `solve.outbox` **in the same
 transaction** as the data change. A relay loop in every replica claims up to 500 unpublished rows every 250 ms
 (`FOR UPDATE SKIP LOCKED`, so replicas never double-claim), XADDs each batch in id order, and marks the rows published.
 Published rows older than 1 day are deleted every 10 min.
@@ -31,15 +33,21 @@ accepted (rows wait in `solve.outbox`; the relay pings Redis first, backs off up
 Redis returns, which shows up as `outbox.backlog` in `_info`). Readiness gates on Postgres + migrations only. Delivery is
 at-least-once: consumers dedupe on `eventId`.
 
+## Daily challenge
+`POST /api/solves` with `daily: {date, index 0..4}` → `source: 'daily'`. Session event must be a daily event
+(`333 222 444 pyram skewb`); date must be UTC yesterday/today/tomorrow (i.e. "today" somewhere on Earth). A repeated index
+→ 409 `daily attempt already recorded` (partial unique index). When all 5 indexes exist, `daily.completed` (ao5 + times) is
+queued in the same transaction (advisory lock per user/date/event prevents a race).
+
 ## Choices worth knowing
 - `id` and `scramble`/`penalty` on `POST /api/solves` are optional (server generates the id; defaults `''`/`OK`). `source` may be
-  `timer|manual|race|import|seed`.
+  `timer|manual|race|daily|import|seed`.
 - `createdAt` more than 5 min in the future (a device clock running fast) is clamped to the server time instead of
   rejecting the solve; unparseable timestamps → 400.
 - `rolling` is computed inside the transaction while the session row is locked (`FOR NO KEY UPDATE`), so concurrent
   solves in one session each see all earlier ones. ao5/ao12 use the WCA trimming rules from `@cubetype/cubestats`
   (ms, `-1` = DNF, `null` = not enough solves).
-- No-op PATCHes (same values) emit nothing.
+- No-op PATCHes (same values) emit nothing. Editing or deleting a daily attempt does not re-emit `daily.completed`.
 - Empty bodies sent with `Content-Type: application/json` (for example a DELETE from a fetch wrapper) are accepted.
 
 ## Env / run

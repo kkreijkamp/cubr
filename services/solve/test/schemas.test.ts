@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { HttpError, parse } from '@cubetype/common';
-import { createSessionBody, createSolveBody, patchSolveBody, resolveCreatedAt } from '../src/schemas.js';
+import {
+  assertDailyAllowed, createSessionBody, createSolveBody, patchSolveBody, resolveCreatedAt, utcDay,
+} from '../src/schemas.js';
 
 const SID = '33333333-3333-4333-8333-333333333333';
 const ID = '11111111-1111-4111-8111-111111111111';
@@ -34,6 +36,9 @@ describe('createSolveBody', () => {
     ['bad source', { source: 'cheat' }, 'source'],
     ['bad id', { id: 'nope' }, 'id'],
     ['bad createdAt', { createdAt: 'yesterday' }, 'createdAt'],
+    ['daily index 5', { daily: { date: '2026-10-14', index: 5 } }, 'daily.index'],
+    ['daily bad date', { daily: { date: '2026-02-30', index: 0 } }, 'daily.date'],
+    ['daily source without daily', { source: 'daily' }, 'daily'],
   ])('rejects %s', (_name, patch, path) => {
     const err = errorOf(() => parse(createSolveBody, { ...valid, ...patch }));
     expect(err).toBeInstanceOf(HttpError);
@@ -75,5 +80,18 @@ describe('resolveCreatedAt', () => {
   });
   it('rejects unparseable timestamps', () => {
     expect(errorOf(() => resolveCreatedAt('not a date', now)).statusCode).toBe(400);
+  });
+});
+
+describe('assertDailyAllowed', () => {
+  const now = Date.parse('2026-10-14T23:30:00Z');
+  it('allows UTC yesterday, today and tomorrow for daily events', () => {
+    expect(utcDay(now)).toBe('2026-10-14');
+    for (const d of ['2026-10-13', '2026-10-14', '2026-10-15']) expect(() => assertDailyAllowed(d, '333', now)).not.toThrow();
+  });
+  it('rejects other days and non-daily events', () => {
+    expect(errorOf(() => assertDailyAllowed('2026-10-12', '333', now)).statusCode).toBe(400);
+    expect(errorOf(() => assertDailyAllowed('2026-10-16', '333', now)).statusCode).toBe(400);
+    expect(errorOf(() => assertDailyAllowed('2026-10-14', '777', now)).message).toMatch(/no daily challenge/);
   });
 });

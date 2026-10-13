@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Penalty } from '@cubetype/cubestats';
-import { effectiveOrNull, rollingFromSolves } from '../src/rolling.js';
+import { dailyResult, effectiveOrNull, rollingFromSolves } from '../src/rolling.js';
 
 const ok = (ms: number) => ({ timeMs: ms, penalty: 'OK' as Penalty });
 const dnf = (ms = 10_000) => ({ timeMs: ms, penalty: 'DNF' as Penalty });
@@ -35,6 +35,18 @@ describe('rollingFromSolves', () => {
     expect(r.ao5).toBe(10_900);
     // last 12 = 10000..11100 → drop 10000 & 11100 → mean(10100..11000) = 10550
     expect(r.ao12).toBe(10_550);
+  });
+});
+
+describe('dailyResult', () => {
+  it('computes the ao5 and API-encoded times (DNF → -1)', () => {
+    const r = dailyResult([ok(10_000), plus2(9_000), dnf(), ok(12_000), ok(8_000)]);
+    expect(r.times).toEqual([10_000, 11_000, -1, 12_000, 8_000]);
+    expect(r.ao5).toBe(11_000); // drop 8000 & DNF → mean(10000, 11000, 12000)
+  });
+
+  it('is null until all 5 attempts exist', () => {
+    expect(dailyResult([ok(1000), ok(2000)]).ao5).toBeNull();
   });
 });
 

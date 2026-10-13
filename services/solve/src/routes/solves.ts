@@ -1,17 +1,36 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import { conflict, notFound, parse, withTx } from '@cubetype/common';
-import { currentUser, FK_VIOLATION, pgCode, tzFrom, type RouteContext } from '../context.js';
+import { conflict, notFound, parse, withTx, type AuthUser, type PoolClient } from '@cubetype/common';
+import type { Penalty } from '@cubetype/cubestats';
+import { currentUser, FK_VIOLATION, pgCode, pgConstraint, tzFrom, UNIQUE_VIOLATION, type RouteContext } from '../context.js';
 import { SOLVE_COLUMNS, toSolve, type Solve, type SolveRow } from '../mapping.js';
 import { enqueue } from '../outbox.js';
 import { sessionRolling, solveDeletedPayload, solveEventPayload } from '../repo.js';
-import type { Rolling } from '../rolling.js';
-import { createSolveBody, idParams, patchSolveBody, resolveCreatedAt } from '../schemas.js';
+import { dailyResult, type Rolling } from '../rolling.js';
+import { assertDailyAllowed, createSolveBody, dailyQuery, idParams, patchSolveBody, resolveCreatedAt, utcDay } from '../schemas.js';
 
 /** Translates constraint violations raised inside a solve transaction into API errors. */
 function mapPgError(err: unknown): never {
+  if (pgCode(err) === UNIQUE_VIOLATION && pgConstraint(err) === 'solves_daily_unique') {
+    throw conflict('daily attempt already recorded');
+  }
   if (pgCode(err) === FK_VIOLATION) throw notFound('session not found'); // deleted concurrently
   throw err;
+}
+
+/**
+ * After a daily attempt is inserted: if the user now has all 5 attempts for (date, event),
+ * queue `daily.completed` with the ao5 (same transaction, so it is emitted exactly once).
+ */
+async function completeDailyIfDone(client: PoolClient, user: AuthUser, date: string, event: string, tz: string): Promise<void> {
+  const { rows } = await client.query<{ time_ms: number; penalty: Penalty }>(
+    `SELECT time_ms, penalty FROM solve.solves
+      WHERE user_id = $1 AND daily_date = $2 AND event = $3 ORDER BY daily_index`,
+    [user.id, date, event],
+  );
+  if (rows.length < 5) return;
+  const { ao5, times } = dailyResult(rows.map((r) => ({ timeMs: r.time_ms, penalty: r.penalty })));
+  await enqueue(client, 'daily.completed', { userId: user.id, username: user.username, date, event, ao5, times, tz });
 }
 
 export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteContext): void {
@@ -27,7 +46,8 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
     const tz = tzFrom(req);
     const createdAt = resolveCreatedAt(body.createdAt);
     const id = body.id ?? randomUUID();
-    const source = body.source ?? 'timer';
+    const daily = body.daily;
+    const source = daily ? 'daily' : (body.source ?? 'timer');
 
     const result = await withTx(pool, async (client) => {
       // Row lock on the session serialises concurrent writes to one session, so every
@@ -39,13 +59,20 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
       if (!session.rows[0]) throw notFound('session not found');
       const event = session.rows[0].event; // a solve always belongs to its session's event
 
+      if (daily) {
+        assertDailyAllowed(daily.date, event);
+        // Serialise attempts of one (user, date, event) so the "all 5 done" check can't race.
+        await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`solve:daily:${user.id}:${daily.date}:${event}`]);
+      }
+
       const ins = await client.query<SolveRow>(
         `INSERT INTO solve.solves
-           (id, user_id, session_id, event, time_ms, penalty, scramble, comment, source, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+           (id, user_id, session_id, event, time_ms, penalty, scramble, comment, source, daily_date, daily_index, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
          ON CONFLICT (id) DO NOTHING
          RETURNING ${SOLVE_COLUMNS}`,
-        [id, user.id, body.sessionId, event, body.timeMs, body.penalty, body.scramble, body.comment ?? null, source, createdAt],
+        [id, user.id, body.sessionId, event, body.timeMs, body.penalty, body.scramble, body.comment ?? null, source,
+          daily?.date ?? null, daily?.index ?? null, createdAt],
       );
 
       if (!ins.rows[0]) {
@@ -59,6 +86,7 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
       const row = ins.rows[0];
       const rolling = await sessionRolling(client, row.session_id);
       await enqueue(client, 'solve.created', solveEventPayload(user, row, tz, rolling));
+      if (daily) await completeDailyIfDone(client, user, daily.date, event, tz);
       return { created: true, row, rolling };
     }).catch(mapPgError);
 
@@ -107,5 +135,28 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
       await enqueue(client, 'solve.deleted', solveDeletedPayload(user, rows[0], tz));
     });
     return reply.code(204).send();
+  });
+
+  // The user's daily-challenge attempts for one UTC day, grouped by event.
+  app.get('/api/solves/daily', authed, async (req) => {
+    const user = currentUser(req);
+    const q = parse(dailyQuery, req.query ?? {});
+    const date = q.date ?? utcDay(Date.now());
+    const { rows } = await pool.query<SolveRow>(
+      `SELECT ${SOLVE_COLUMNS} FROM solve.solves WHERE user_id = $1 AND daily_date = $2 ORDER BY event, daily_index`,
+      [user.id, date],
+    );
+    const events: Record<string, { solves: Solve[]; ao5: number | null }> = {};
+    const byEvent = new Map<string, SolveRow[]>();
+    for (const r of rows) {
+      const list = byEvent.get(r.event) ?? [];
+      list.push(r);
+      byEvent.set(r.event, list);
+    }
+    for (const [event, list] of byEvent) {
+      const { ao5 } = dailyResult(list.map((r) => ({ timeMs: r.time_ms, penalty: r.penalty })));
+      events[event] = { solves: list.map(toSolve), ao5 };
+    }
+    return { date, events };
   });
 }
