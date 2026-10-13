@@ -25,9 +25,11 @@ import {
   registerSchema,
   settingsSchema,
   toPrivateUser,
+  toPublicUser,
+  userEventData,
   type UserRow,
 } from '../users.js';
-import { allow, withTimeout } from '../safe.js';
+import { allow, publishSafely, withTimeout } from '../safe.js';
 
 const BCRYPT_COST = 10;
 
@@ -71,6 +73,7 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
 
     const user = toPrivateUser(row);
     const { token } = await signToken(config.jwtSecret, user);
+    await publishSafely(redis, req.log, 'user.registered', userEventData(toPublicUser(row)));
     return reply.status(201).send({ token, user });
   });
 
@@ -147,6 +150,7 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
       values,
     );
     if (!rows[0]) throw unauthorized('Account no longer exists');
+    await publishSafely(redis, req.log, 'user.updated', userEventData(toPublicUser(rows[0])));
     return { user: toPrivateUser(rows[0]) };
   });
 

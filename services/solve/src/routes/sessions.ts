@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import { conflict, notFound, parse } from '@cubetype/common';
-import { currentUser, type RouteContext } from '../context.js';
+import { conflict, notFound, parse, withTx } from '@cubetype/common';
+import { currentUser, tzFrom, type RouteContext } from '../context.js';
 import { SOLVE_COLUMNS, toSession, toSolve, type SessionRow, type SolveRow } from '../mapping.js';
+import { enqueue } from '../outbox.js';
 import { ensureDefaultSession, getSession, listSessions } from '../repo.js';
 import { createSessionBody, idParams, patchSessionBody } from '../schemas.js';
 
@@ -50,12 +51,21 @@ export function registerSessionRoutes(app: FastifyInstance, { pool, auth }: Rout
     return { session: toSession(rows[0]) };
   });
 
-  // Cascades to the session's solves.
+  // Cascades to the session's solves; consumers recompute the user's stats for the event.
   app.delete('/api/sessions/:id', authed, async (req, reply) => {
     const user = currentUser(req);
     const { id } = parse(idParams, req.params);
-    const { rowCount } = await pool.query('DELETE FROM solve.sessions WHERE id = $1 AND user_id = $2', [id, user.id]);
-    if (!rowCount) throw notFound('session not found');
+    const tz = tzFrom(req);
+    await withTx(pool, async (client) => {
+      const { rows } = await client.query<{ id: string; event: string }>(
+        'DELETE FROM solve.sessions WHERE id = $1 AND user_id = $2 RETURNING id, event',
+        [id, user.id],
+      );
+      if (!rows[0]) throw notFound('session not found');
+      await enqueue(client, 'session.deleted', {
+        userId: user.id, username: user.username, sessionId: rows[0].id, event: rows[0].event, tz,
+      });
+    });
     return reply.code(204).send();
   });
 

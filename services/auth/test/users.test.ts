@@ -10,6 +10,7 @@ import {
   settingsSchema,
   toPrivateUser,
   toPublicUser,
+  userEventData,
   type UserRow,
 } from '../src/users.js';
 
@@ -116,6 +117,16 @@ describe('row mapping', () => {
     const u = toPublicUser({ ...row, country: '  ', created_at: '2026-01-02T03:04:05Z' });
     expect(u.country).toBeNull();
     expect(u.createdAt).toBe('2026-01-02T03:04:05.000Z');
+  });
+  it('builds user event payloads per SPEC §8', () => {
+    expect(userEventData(toPublicUser(row))).toEqual({
+      userId: row.id,
+      username: 'Felix_Z',
+      displayName: 'Felix',
+      country: 'AU',
+      wcaId: null,
+      createdAt: '2026-01-02T03:04:05.000Z',
+    });
   });
 });
 

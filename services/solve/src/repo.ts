@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { withTx, type Pool, type PoolClient } from '@cubetype/common';
-import type { SessionRow } from './mapping.js';
+import { withTx, type AuthUser, type Pool, type PoolClient } from '@cubetype/common';
+import { effectiveMs } from '@cubetype/cubestats';
+import { iso, type SessionRow, type SolveRow } from './mapping.js';
 
 // SQL shared by several routes. Every query is scoped by user_id: a user can never see or
 // touch another user's rows (foreign ids simply look like "not found").
@@ -37,4 +38,38 @@ export async function ensureDefaultSession(pool: Pool, userId: string): Promise<
       randomUUID(), userId, DEFAULT_SESSION.name, DEFAULT_SESSION.event,
     ]);
   });
+}
+
+/** `solve.created` / `solve.updated` payload (SPEC §8). */
+export function solveEventPayload(user: AuthUser, row: SolveRow, tz: string): Record<string, unknown> {
+  const effective = effectiveMs({ timeMs: row.time_ms, penalty: row.penalty });
+  return {
+    userId: user.id,
+    username: user.username,
+    event: row.event,
+    sessionId: row.session_id,
+    solveId: row.id,
+    timeMs: row.time_ms,
+    penalty: row.penalty,
+    effectiveMs: Number.isFinite(effective) ? effective : null, // null = DNF
+    createdAt: iso(row.created_at),
+    tz,
+    source: row.source,
+  };
+}
+
+/** `solve.deleted` payload (SPEC §8). */
+export function solveDeletedPayload(user: AuthUser, row: SolveRow, tz: string): Record<string, unknown> {
+  return {
+    userId: user.id,
+    username: user.username,
+    event: row.event,
+    sessionId: row.session_id,
+    solveId: row.id,
+    timeMs: row.time_ms,
+    penalty: row.penalty,
+    createdAt: iso(row.created_at),
+    tz,
+    source: row.source,
+  };
 }
