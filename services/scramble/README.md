@@ -1,13 +1,15 @@
 # scramble-service
 
 Official WCA **random-state** scrambles generated server-side with [cubing.js](https://js.cubing.net)
-(`randomScrambleForEvent`) and a Redis pool of pre-generated scrambles shared by all replicas.
+(`randomScrambleForEvent`), a Redis pool of pre-generated scrambles shared by all replicas, and the
+daily challenge (5 persisted scrambles per event per day).
 
 | Route | Response |
 |---|---|
 | `GET /api/scrambles/events` | `{events: [{id, name, short, puzzle}]}` (from `@cubetype/cubestats` EVENTS) |
 | `GET /api/scrambles/:event?count=1..25&fresh=0\|1` | `{event, scrambles, source: "pool"\|"generated"}` — 404 unknown event (e.g. `333mbf`), 400 bad count, 503 on timeout/overload |
-| `GET /api/scrambles/_info` | standard info + `warmup`, `generator` (queue depth, generated, timings), `pool` (LLEN per event), `refill`, `memory` |
+| `GET /api/scrambles/daily?date=YYYY-MM-DD` | `{date, events: {333, 222, 444, pyram, skewb: string[5]}}` — default today (UTC), only the last 30 days; 503 while Postgres is unreachable |
+| `GET /api/scrambles/_info` | standard info + `warmup`, `generator` (queue depth, generated, timings), `pool` (LLEN per event), `refill`, `daily`, `memory` |
 
 Megaminx scrambles contain `\n` line breaks (render with `white-space: pre-line`).
 
@@ -16,7 +18,7 @@ A random-state scramble is not a list of random moves: cubing.js picks a uniform
 *state* and runs a solver search (Kociemba-style two-phase for 3x3x3, big pruning tables for 4x4x4)
 to find a short sequence reaching it. Each request is pure CPU — no I/O to wait on — so CPU
 utilisation tracks request rate almost linearly. The service is stateless (shared state lives in
-Redis), so more replicas simply mean more scrambles per second; `?fresh=1` always generates,
+Redis/Postgres), so more replicas simply mean more scrambles per second; `?fresh=1` always generates,
 bypassing the pool, which makes it the endpoint to load-test.
 
 Measured per instance (1 search thread, Apple M-series, `fresh=1` sequential): 333 ≈ 6–12 ms
@@ -41,8 +43,14 @@ so it only uses idle CPU. Serving does `LPOP key count`; any shortfall is genera
 (`source: "generated"`). Redis is optional: commands time out after 250 ms, a 3 s circuit breaker
 skips Redis after a failure, and requests simply generate directly.
 
+## Daily challenge (schema `scramble`)
+`daily_challenges(day, event, scrambles text[])`. The first request for a day generates missing
+events, `INSERT … ON CONFLICT (day, event) DO NOTHING`, then re-selects — concurrent replicas
+therefore agree on one set. Responses are cached in memory for 60 s (a stale copy is served during
+a DB outage). Migrations run in the background with retry; Postgres is a soft dependency.
+
 ## Readiness
-`/readyz` gates only on the warm-up. `redis` is a soft check (shown in `_info`).
+`/readyz` gates only on the warm-up. `redis` and `postgres` are soft checks (shown in `_info`).
 
 ## Environment
 Shared vars (SPEC §4).
@@ -53,6 +61,7 @@ spawns its search worker from its own files. The Dockerfile installs `cubing@0.6
 lockfile) into `/app/node_modules` next to `/app/dist/index.mjs`, removing the browser/CLI-only
 deps (three.js, @optique, types) that `cubing/scramble` never loads.
 
-Dev: `docker compose up -d redis`, then `PORT=8082 REDIS_URL=redis://localhost:56380 npm run dev -w services/scramble` ·
+Dev: `docker compose up -d postgres redis`, then
+`PORT=8082 DATABASE_URL=postgres://cubetype:cubetype@localhost:55433/cubetype REDIS_URL=redis://localhost:56380 npm run dev -w services/scramble` ·
 Tests: `npx vitest run services/scramble` (cubing.test.ts runs real searches) ·
 Image: `docker build -f services/scramble/Dockerfile -t cubetype/scramble:dev .`

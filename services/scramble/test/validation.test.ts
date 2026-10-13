@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HttpError, parse } from '@cubetype/common';
-import { scrambleQuerySchema } from '../src/validation.js';
+import { resolveDailyDate, scrambleQuerySchema } from '../src/validation.js';
 
 const query = (q: Record<string, string>) => parse(scrambleQuerySchema, q);
 
@@ -38,5 +38,40 @@ describe('scramble query (count / fresh)', () => {
     expect(query({ fresh: '0' }).fresh).toBe(false);
     expect(query({ fresh: 'false' }).fresh).toBe(false);
     expect400(() => query({ fresh: 'yes' }), /^fresh: /);
+  });
+});
+
+describe('resolveDailyDate', () => {
+  const now = new Date('2026-10-14T23:59:59Z');
+
+  it('defaults to today (UTC)', () => {
+    expect(resolveDailyDate(undefined, now)).toBe('2026-10-14');
+    expect(resolveDailyDate('', now)).toBe('2026-10-14');
+    // 23:30 in UTC-10 is already tomorrow in UTC
+    expect(resolveDailyDate(undefined, new Date('2026-10-15T00:30:00Z'))).toBe('2026-10-15');
+  });
+
+  it('accepts today back to 30 days ago', () => {
+    expect(resolveDailyDate('2026-10-14', now)).toBe('2026-10-14');
+    expect(resolveDailyDate('2026-10-01', now)).toBe('2026-10-01');
+    expect(resolveDailyDate('2026-09-14', now)).toBe('2026-09-14');
+  });
+
+  it('rejects dates older than 30 days or in the future', () => {
+    expect400(() => resolveDailyDate('2026-09-13', now), /last 30 days/);
+    expect400(() => resolveDailyDate('2026-10-15', now), /future/);
+  });
+
+  it('rejects malformed and impossible dates', () => {
+    for (const d of ['2026-1-01', '14-10-2026', 'today', '2026-10-14T00:00:00Z', '20261014']) {
+      expect400(() => resolveDailyDate(d, now), /YYYY-MM-DD/);
+    }
+    expect400(() => resolveDailyDate('2026-02-30', now), /valid calendar date/);
+    expect400(() => resolveDailyDate('2026-13-01', now), /valid calendar date/);
+  });
+
+  it('handles leap days', () => {
+    expect(resolveDailyDate('2028-02-29', new Date('2028-03-10T12:00:00Z'))).toBe('2028-02-29');
+    expect400(() => resolveDailyDate('2027-02-29', new Date('2027-03-10T12:00:00Z')), /valid calendar date/);
   });
 });
