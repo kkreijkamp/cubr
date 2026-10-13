@@ -55,7 +55,7 @@ async function eventually(name, fn, timeoutMs = 15_000) {
 console.log(`cubetype smoke test → ${BASE}\n`);
 
 console.log('health / info (every service answers through the entry point):');
-for (const p of ['/api/auth/_info', '/api/scrambles/_info', '/api/solves/_info', '/api/stats/_info']) {
+for (const p of ['/api/auth/_info', '/api/scrambles/_info', '/api/solves/_info', '/api/stats/_info', '/api/leaderboards/_info']) {
   const r = await req('GET', p);
   check(p, r.status === 200, `${r.data?.service ?? '?'}@${r.data?.version ?? '?'} on ${r.data?.pod ?? '?'} (${r.ms} ms)`);
 }
@@ -78,7 +78,7 @@ console.log('\nscrambles:');
 const sc = await req('GET', '/api/scrambles/333?count=3');
 check('3x3 scrambles', sc.status === 200 && sc.data?.scrambles?.length === 3, `source=${sc.data?.source} (${sc.ms} ms)`);
 
-console.log('\nsolves → event bus → stats:');
+console.log('\nsolves → event bus → stats & leaderboard:');
 const sessions = await req('GET', '/api/sessions');
 const session = sessions.data?.sessions?.[0];
 check('default session created', Boolean(session), session?.name);
@@ -95,6 +95,14 @@ await eventually('stats read model updated (single PB)', async () => {
   const s = await req('GET', `/api/stats/users/${userId}/summary`);
   const ev = s.data?.events?.find((e) => e.event === '333');
   return { ok: ev?.pbs?.single?.valueMs === 9876 && ev?.solves === 6, detail: `single=${ev?.pbs?.single?.valueMs} solves=${ev?.solves}` };
+});
+await eventually('leaderboard updated (all-time single)', async () => {
+  const lb = await req('GET', '/api/leaderboards/333/single?period=all');
+  return { ok: lb.data?.me?.valueMs === 9876, detail: `rank=${lb.data?.me?.rank} of ${lb.data?.total}` };
+});
+await eventually('daily leaderboard updated', async () => {
+  const lb = await req('GET', '/api/leaderboards/333/single?period=daily');
+  return { ok: lb.data?.me?.valueMs > 0, detail: `rank=${lb.data?.me?.rank}` };
 });
 
 console.log('\ncleanup:');
