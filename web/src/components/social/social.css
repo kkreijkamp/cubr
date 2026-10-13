@@ -686,6 +686,68 @@ table.wc-table tr.clickable:focus-visible td {
   background: var(--error-color);
 }
 
+/* edit profile modal */
+.ep-form {
+  display: grid;
+  gap: 1rem;
+}
+.ep-form .field input,
+.ep-form .field textarea,
+.ep-form .field select {
+  width: 100%;
+}
+.ep-form .field textarea {
+  min-height: 5.5rem;
+  line-height: 1.45;
+}
+.ep-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+}
+.ep-label .count {
+  color: var(--sub-color);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+.ep-label .count.over {
+  color: var(--error-color);
+}
+.ep-hint {
+  color: var(--sub-color);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+.ep-hint a {
+  color: var(--main-color);
+}
+.ep-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--roundness);
+  background: color-mix(in srgb, var(--error-color) 12%, transparent);
+  color: var(--error-color);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+.ep-error svg {
+  flex-shrink: 0;
+  margin-top: 0.1em;
+}
+.ep-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+.ep-two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
 /* ---------------------------------------------------------------- responsive */
 @media (max-width: 1100px) {
   .pv-header {
@@ -782,5 +844,8 @@ table.wc-table tr.clickable:focus-visible td {
   }
   table.wc-table .hide-sm {
     display: none;
+  }
+  .ep-two {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

@@ -84,6 +84,24 @@
 .lg-form .btn {
   margin-top: 0.25rem;
 }
+.lg-perks {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.75rem 2rem;
+  color: var(--sub-color);
+  font-size: 0.75rem;
+  margin-top: 1rem;
+}
+.lg-perks span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+}
+.lg-perks svg {
+  color: var(--main-color);
+}
 
 @media (max-width: 760px) {
   .lg-page {
@@ -101,5 +119,10 @@
   }
   .lg-page .lg-divider {
     order: -1;
+  }
+  .lg-perks {
+    justify-content: flex-start;
+    flex-direction: column;
+    margin-top: 0;
   }
 }

@@ -16,7 +16,8 @@ interface Props {
   user: PublicUser;
   /** the signed-in user's own profile (account page) */
   own: boolean;
-  /** extra sections appended at the bottom (account page) */
+  onEdit?: () => void;
+  /** extra sections appended at the bottom (account: data tools) */
   children?: ReactNode;
 }
 
@@ -24,7 +25,7 @@ interface Props {
  * Shared profile layout for /account and /profile/:username. Every widget fetches its own data
  * (useAsync) with its own loading/error state, so a down microservice only blanks its widget.
  */
-export function ProfileView({ user, own, children }: Props) {
+export function ProfileView({ user, own, onEdit, children }: Props) {
   const { precision } = useSettings();
   const summary = useAsync((signal) => api.stats.summary(user.id, signal), [user.id]);
 
@@ -40,7 +41,7 @@ export function ProfileView({ user, own, children }: Props) {
 
   return (
     <div className="pv">
-      <ProfileHeader user={user} summary={summary} own={own} />
+      <ProfileHeader user={user} summary={summary} own={own} onEdit={onEdit} />
       <RanksCard userId={user.id} own={own} precision={precision} />
       <PbCards summary={summary} own={own} precision={precision} />
       <ActivityHeatmap userId={user.id} joinedAt={user.createdAt} />
@@ -50,7 +51,7 @@ export function ProfileView({ user, own, children }: Props) {
             <PbHistoryChart key={`pb-${user.id}-${defaultEvent}`} userId={user.id} events={events} defaultEvent={defaultEvent} precision={precision} />
             <HourlyChart key={`hr-${user.id}-${defaultEvent}`} userId={user.id} events={events} defaultEvent={defaultEvent} precision={precision} />
           </div>
-          <WcaComparison summary={summary} wcaId={user.wcaId} country={user.country} own={own} precision={precision} />
+          <WcaComparison summary={summary} wcaId={user.wcaId} country={user.country} own={own} onEdit={onEdit} precision={precision} />
         </>
       )}
       {children}

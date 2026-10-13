@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ExternalLink, Link2 } from 'lucide-react';
+import { ExternalLink, Link2, Pencil } from 'lucide-react';
 import { formatDuration } from '@cubetype/cubestats';
 import { countryName } from './countries';
 import { WidgetError } from './Widget';
@@ -14,6 +14,7 @@ interface Props {
   user: PublicUser;
   summary: AsyncState<StatsSummary>;
   own: boolean;
+  onEdit?: () => void;
 }
 
 async function copyProfileLink(username: string) {
@@ -26,7 +27,7 @@ async function copyProfileLink(username: string) {
   }
 }
 
-export function ProfileHeader({ user, summary, own }: Props) {
+export function ProfileHeader({ user, summary, own, onEdit }: Props) {
   const name = user.displayName?.trim() || user.username;
   const totals = summary.data?.totals;
   const flag = flagEmoji(user.country);
@@ -101,7 +102,18 @@ export function ProfileHeader({ user, summary, own }: Props) {
         {!hasDetails && (
           <div className="pv-detail wide">
             <span className="label">bio</span>
-            <span className="value muted">no bio yet.</span>
+            {own ? (
+              <span className="value muted">
+                tell people about yourself — add a bio, your country and your wca id.{' '}
+                {onEdit && (
+                  <button className="btn-text small" style={{ padding: 0, color: 'var(--main-color)' }} onClick={onEdit}>
+                    edit profile
+                  </button>
+                )}
+              </span>
+            ) : (
+              <span className="value muted">no bio yet.</span>
+            )}
           </div>
         )}
       </div>
@@ -130,6 +142,11 @@ export function ProfileHeader({ user, summary, own }: Props) {
       )}
 
       <div className="pv-strip">
+        {own && onEdit && (
+          <button className="btn-text" onClick={onEdit} data-tip="edit profile" data-tip-pos="left" aria-label="edit profile">
+            <Pencil />
+          </button>
+        )}
         <button className="btn-text" onClick={() => copyProfileLink(user.username)} data-tip="copy profile link" data-tip-pos="left" aria-label="copy profile link">
           <Link2 />
         </button>

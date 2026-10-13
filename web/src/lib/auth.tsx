@@ -12,6 +12,7 @@ interface AuthContextValue {
   login(login: string, password: string): Promise<void>;
   register(username: string, email: string, password: string): Promise<void>;
   logout(): Promise<void>;
+  setUser(u: PrivateUser): void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -95,6 +96,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         setToken(null);
         applyUser(null);
+      },
+      setUser(u) {
+        applyUser(u);
       },
     }),
     [status, user, applyUser],

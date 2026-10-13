@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
-import { AlertCircle, Check, LogIn, UserPlus, X } from 'lucide-react';
+import { AlertCircle, CalendarDays, Check, Cloud, Crown, LogIn, Swords, UserPlus, X } from 'lucide-react';
 import { Loading, Spinner } from '../components/Spinner';
 import { safeNext } from '../components/social/util';
 import { ApiError } from '../lib/api';
@@ -316,6 +316,20 @@ export default function LoginPage() {
       <RegisterForm />
       <div className="lg-divider" aria-hidden="true" />
       <LoginForm />
+      <div className="lg-perks">
+        <span>
+          <Cloud size={14} /> solves synced across devices
+        </span>
+        <span>
+          <Crown size={14} /> a spot on the leaderboards
+        </span>
+        <span>
+          <CalendarDays size={14} /> daily challenge rankings
+        </span>
+        <span>
+          <Swords size={14} /> race with your name
+        </span>
+      </div>
     </div>
   );
 }

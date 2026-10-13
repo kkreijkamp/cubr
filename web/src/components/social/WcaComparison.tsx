@@ -311,11 +311,12 @@ interface Props {
   wcaId: string | null;
   country: string | null;
   own: boolean;
+  onEdit?: () => void;
   precision: 2 | 3;
 }
 
 /** "Where would my PBs rank at a WCA competition?" — rank/percentile per PB + distribution. */
-export function WcaComparison({ summary, wcaId, country, own, precision }: Props) {
+export function WcaComparison({ summary, wcaId, country, own, onEdit, precision }: Props) {
   const meta = useAsync((signal) => api.wca.meta(signal), []);
   const person = useAsync((signal) => (wcaId ? api.wca.person(wcaId, signal) : Promise.resolve(null)), [wcaId]);
   const rows = useMemo(() => (summary.data ? rowsFromSummary(summary.data) : []), [summary.data]);
@@ -449,6 +450,10 @@ export function WcaComparison({ summary, wcaId, country, own, precision }: Props
             ) : person.loading ? (
               'loading official results…'
             ) : null
+          ) : own && onEdit ? (
+            <button className="btn-text small" style={{ padding: 0, color: 'var(--main-color)' }} onClick={onEdit}>
+              link your wca id to compare official results
+            </button>
           ) : null}
         </span>
       </div>

@@ -46,5 +46,13 @@ export default function ProfilePage() {
 
   const user = profile.data.user;
   const own = me?.id === user.id;
-  return <ProfileView user={own && me ? me : user} own={own} />;
+  return (
+    <ProfileView user={own && me ? me : user} own={own}>
+      {own && (
+        <div className="center small sub">
+          this is your public profile — <Link to="/account" className="link-main">edit it on your account page</Link>
+        </div>
+      )}
+    </ProfileView>
+  );
 }
