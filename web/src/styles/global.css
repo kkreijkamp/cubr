@@ -866,6 +866,37 @@ table.table .secondary {
   animation: spin 0.9s linear infinite;
 }
 
+/* activity heatmap (GitHub / Monkeytype style) */
+.heatmap {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, 1fr);
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 0.2em;
+}
+.heatmap > div {
+  aspect-ratio: 1;
+  border-radius: 0.2em;
+}
+.heatmap > div:hover {
+  outline: 2px solid var(--text-color);
+}
+[data-level='0'] {
+  background: var(--bg-color);
+}
+[data-level='1'] {
+  background: color-mix(in srgb, var(--main-color) 20%, var(--sub-alt-color));
+}
+[data-level='2'] {
+  background: color-mix(in srgb, var(--main-color) 50%, var(--sub-alt-color));
+}
+[data-level='3'] {
+  background: color-mix(in srgb, var(--main-color) 75%, var(--sub-alt-color));
+}
+[data-level='4'] {
+  background: var(--main-color);
+}
+
 /* ---------------------------------------------------------------- animations */
 @keyframes fadeIn {
   from {

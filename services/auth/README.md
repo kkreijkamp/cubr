@@ -19,9 +19,10 @@ Accounts, JWT login/logout, profile and per-user settings (SPEC §7.1, §9.1). O
   so response time doesn't reveal whether an account exists.
 - Tokens: HS256 JWTs from `@cubetype/common` (`sub` = user id, `username`, `jti`), valid for 30 days.
   Every service verifies them with `makeAuth`, which also rejects revoked `jti`s.
+- Events published: `user.registered`, `user.updated` (SPEC §8 fields, eventId `auth-<uuid>`).
 - Readiness gates on Postgres + migrations. Redis is soft: when it is down, register/login/profile
-  still work (rate limits fail open after 500 ms, revocation checks fail open); only logout returns
-  503 because the revocation could not be stored.
+  still work (rate limits fail open after 500 ms, revocation checks fail open, event publishing is
+  skipped with a warning after 1.5 s); only logout returns 503 because the revocation could not be stored.
 - Rate-limit key uses `req.ip` (Fastify `trustProxy: true`, i.e. the left-most `X-Forwarded-For`).
 
 Env: `PORT`, `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, `POD_NAME`, `NODE_NAME`, `APP_VERSION`, `LOG_LEVEL`.

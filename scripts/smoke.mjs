@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // End-to-end smoke test through the public entry point (the docker compose gateway by default).
-// Walks a real user journey across the microservices:
+// Walks a real user journey across the microservices and checks the event pipeline:
 //   node scripts/smoke.mjs http://localhost:8080
 const BASE = (process.argv[2] ?? process.env.BASE_URL ?? 'http://localhost:8080').replace(/\/$/, '');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let failures = 0;
 let token = null;
 
@@ -36,10 +37,25 @@ function check(name, cond, detail = '') {
   }
 }
 
+async function eventually(name, fn, timeoutMs = 15_000) {
+  const deadline = Date.now() + timeoutMs;
+  let last;
+  while (Date.now() < deadline) {
+    try {
+      last = await fn();
+      if (last.ok) return check(name, true, last.detail);
+    } catch (e) {
+      last = { detail: e.message };
+    }
+    await sleep(500);
+  }
+  check(name, false, last?.detail ?? 'timed out');
+}
+
 console.log(`cubetype smoke test → ${BASE}\n`);
 
 console.log('health / info (every service answers through the entry point):');
-for (const p of ['/api/auth/_info', '/api/scrambles/_info', '/api/solves/_info']) {
+for (const p of ['/api/auth/_info', '/api/scrambles/_info', '/api/solves/_info', '/api/stats/_info', '/api/leaderboards/_info']) {
   const r = await req('GET', p);
   check(p, r.status === 200, `${r.data?.service ?? '?'}@${r.data?.version ?? '?'} on ${r.data?.pod ?? '?'} (${r.ms} ms)`);
 }
@@ -62,18 +78,32 @@ console.log('\nscrambles:');
 const sc = await req('GET', '/api/scrambles/333?count=3');
 check('3x3 scrambles', sc.status === 200 && sc.data?.scrambles?.length === 3, `source=${sc.data?.source} (${sc.ms} ms)`);
 
-console.log('\nsolves:');
+console.log('\nsolves → event bus → stats & leaderboard:');
 const sessions = await req('GET', '/api/sessions');
 const session = sessions.data?.sessions?.[0];
 check('default session created', Boolean(session), session?.name);
 const times = [11234, 10456, 12001, 9876, 10987, 11500];
-let saved = 0;
+let lastRolling = null;
 for (const t of times) {
   const r = await req('POST', '/api/solves', { id: crypto.randomUUID(), sessionId: session.id, timeMs: t, penalty: 'OK', scramble: sc.data?.scrambles?.[0] ?? "R U R' U'" });
-  if (r.status === 201) saved++;
-  else check('post solve', false, `status ${r.status} ${JSON.stringify(r.data)}`);
+  if (r.status !== 201) check('post solve', false, `status ${r.status} ${JSON.stringify(r.data)}`);
+  lastRolling = r.data?.rolling;
 }
-check('6 solves saved', saved === times.length, `${saved}/${times.length}`);
+check('6 solves saved, rolling ao5 computed', lastRolling?.ao5 > 0, `ao5=${lastRolling?.ao5}`);
+const userId = me.data?.user?.id;
+await eventually('stats read model updated (single PB)', async () => {
+  const s = await req('GET', `/api/stats/users/${userId}/summary`);
+  const ev = s.data?.events?.find((e) => e.event === '333');
+  return { ok: ev?.pbs?.single?.valueMs === 9876 && ev?.solves === 6, detail: `single=${ev?.pbs?.single?.valueMs} solves=${ev?.solves}` };
+});
+await eventually('leaderboard updated (all-time single)', async () => {
+  const lb = await req('GET', '/api/leaderboards/333/single?period=all');
+  return { ok: lb.data?.me?.valueMs === 9876, detail: `rank=${lb.data?.me?.rank} of ${lb.data?.total}` };
+});
+await eventually('daily leaderboard updated', async () => {
+  const lb = await req('GET', '/api/leaderboards/333/single?period=daily');
+  return { ok: lb.data?.me?.valueMs > 0, detail: `rank=${lb.data?.me?.rank}` };
+});
 
 console.log('\ncleanup:');
 const sessDel = await req('DELETE', `/api/sessions/${session.id}`);

@@ -48,6 +48,9 @@ export const patchSolveBody = z
   .object({ penalty: penalty.optional(), comment: comment.nullable().optional() })
   .refine((b) => b.penalty !== undefined || b.comment !== undefined, { message: 'nothing to update (penalty or comment)' });
 
+export const internalParams = z.object({ userId: uuid });
+export const internalQuery = z.object({ event: eventId.optional() });
+
 /**
  * Resolves the solve timestamp: default now. A device whose clock runs fast must not lose its
  * solves (the web client drops a solve the server answered with 400), so anything more than

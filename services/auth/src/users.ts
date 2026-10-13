@@ -146,3 +146,15 @@ export function conflictMessage(constraint: string | undefined): string {
   if (constraint === 'users_email_lower') return 'Email is already registered';
   return 'Username or email already in use';
 }
+
+/** Payload of user.registered / user.updated events (SPEC §8, besides eventId/occurredAt). */
+export function userEventData(user: PublicUser) {
+  return {
+    userId: user.id,
+    username: user.username,
+    displayName: user.displayName,
+    country: user.country,
+    wcaId: user.wcaId,
+    createdAt: user.createdAt,
+  };
+}

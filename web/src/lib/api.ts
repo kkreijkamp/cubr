@@ -1,11 +1,17 @@
 // Thin typed client for every cubetype microservice. All calls are same-origin paths that the
 // Ingress (cloud) or gateway (local) routes to the right service — see docs/SPEC.md §3.
 import type {
+  ActivityDay,
+  Leaderboard,
+  LbKind,
+  PbKind,
   Penalty,
   PrivateUser,
   PublicUser,
   Session,
   Solve,
+  StatsSummary,
+  UserRank,
 } from './types';
 
 export class ApiError extends Error {
@@ -126,6 +132,8 @@ export const api = {
     updateMe: (body: Partial<Pick<PublicUser, 'displayName' | 'bio' | 'country' | 'wcaId'>>) =>
       request<{ user: PrivateUser }>('PATCH', '/api/auth/me', body),
     saveSettings: (settings: Record<string, unknown>) => request<{ settings: Record<string, unknown> }>('PUT', '/api/auth/me/settings', { settings }),
+    user: (username: string, signal?: AbortSignal) => get<{ user: PublicUser }>(`/api/users/${enc(username)}`, signal),
+    users: (ids: string[]) => get<{ users: PublicUser[] }>(`/api/users${qs({ ids: ids.join(',') })}`),
   },
   scrambles: {
     get: (event: string, count = 1) => get<{ event: string; scrambles: string[]; source: string }>(`/api/scrambles/${enc(event)}${qs({ count })}`),
@@ -138,8 +146,22 @@ export const api = {
     solves: (id: string, signal?: AbortSignal) => get<{ solves: Solve[] }>(`/api/sessions/${enc(id)}/solves`, signal),
   },
   solves: {
-    create: (body: NewSolve) => request<{ solve: Solve }>('POST', '/api/solves', body),
+    create: (body: NewSolve) => request<{ solve: Solve; rolling: { ao5: number | null; ao12: number | null } }>('POST', '/api/solves', body),
     update: (id: string, body: { penalty?: Penalty; comment?: string | null }) => request<{ solve: Solve }>('PATCH', `/api/solves/${enc(id)}`, body),
     remove: (id: string) => request<void>('DELETE', `/api/solves/${enc(id)}`),
+  },
+  stats: {
+    summary: (userId: string, signal?: AbortSignal) => get<StatsSummary>(`/api/stats/users/${enc(userId)}/summary`, signal),
+    activity: (userId: string, from?: string, to?: string, signal?: AbortSignal) =>
+      get<{ days: ActivityDay[] }>(`/api/stats/users/${enc(userId)}/activity${qs({ from, to })}`, signal),
+    pbHistory: (userId: string, event: string, signal?: AbortSignal) =>
+      get<{ history: { kind: PbKind; valueMs: number; achievedAt: string }[] }>(`/api/stats/users/${enc(userId)}/pb-history${qs({ event })}`, signal),
+    hourly: (userId: string, event: string, signal?: AbortSignal) =>
+      get<{ hours: { hour: number; solves: number; meanMs: number | null }[] }>(`/api/stats/users/${enc(userId)}/hourly${qs({ event })}`, signal),
+  },
+  leaderboards: {
+    get: (event: string, kind: LbKind, opts: { period?: 'all' | 'weekly' | 'daily'; page?: number; size?: number; key?: string } = {}, signal?: AbortSignal) =>
+      get<Leaderboard>(`/api/leaderboards/${enc(event)}/${kind}${qs({ period: opts.period ?? 'all', page: opts.page, size: opts.size, key: opts.key })}`, signal),
+    userRanks: (userId: string, signal?: AbortSignal) => get<{ ranks: UserRank[] }>(`/api/leaderboards/users/${enc(userId)}/ranks`, signal),
   },
 };

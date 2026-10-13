@@ -30,6 +30,8 @@ x-service-env: &service-env
   AUTH_URL: http://auth:8080
   SCRAMBLE_URL: http://scramble:8080
   SOLVE_URL: http://solve:8080
+  STATS_URL: http://stats:8080
+  LEADERBOARD_URL: http://leaderboard:8080
 
 x-service: &service
   restart: unless-stopped            # come back after crashes / docker restarts
@@ -69,7 +71,7 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]   # AOF persistence: data survives restarts
+    command: ["redis-server", "--appendonly", "yes"]   # AOF persistence (event stream, boards)
     volumes:
       - redisdata:/data
     ports:
@@ -95,6 +97,18 @@ services:
     <<: *service
     image: cubetype/solve:dev
     build: { context: ., dockerfile: services/solve/Dockerfile, args: *build-args }
+
+  stats:
+    <<: *service
+    image: cubetype/stats:dev
+    build: { context: ., dockerfile: services/stats/Dockerfile, args: *build-args }
+
+  leaderboard:
+    <<: *service
+    image: cubetype/leaderboard:dev
+    build: { context: ., dockerfile: services/leaderboard/Dockerfile, args: *build-args }
+    depends_on:                       # Redis-only service (boards are Redis sorted sets)
+      redis: { condition: service_healthy }
 
   # ---- frontend ----------------------------------------------------------------------------------
   web:

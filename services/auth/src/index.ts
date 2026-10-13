@@ -22,7 +22,7 @@ const server = createServer(config, {
       if (!migrated) throw new Error('migrations pending');
     },
   },
-  // Redis only backs rate limits and logout revocation → degrade, don't gate.
+  // Redis only backs rate limits, logout revocation and event publishing → degrade, don't gate.
   softChecks: { redis: () => redis.ping() },
 });
 const { app } = server;

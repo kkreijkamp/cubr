@@ -19,3 +19,17 @@ export function Loading({ label }: { label?: string }) {
     </div>
   );
 }
+
+/** Friendly error card with a retry button. */
+export function ErrorState({ error, onRetry }: { error: Error; onRetry?: () => void }) {
+  return (
+    <div className="empty stack" style={{ justifyItems: 'center' }}>
+      <div className="error">{error.message || 'Something went wrong'}</div>
+      {onRetry && (
+        <button className="btn small" onClick={onRetry}>
+          try again
+        </button>
+      )}
+    </div>
+  );
+}
