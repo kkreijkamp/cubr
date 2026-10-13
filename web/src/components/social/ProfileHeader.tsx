@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { ExternalLink, Link2 } from 'lucide-react';
 import { formatDuration } from '@cubetype/cubestats';
 import { countryName } from './countries';
@@ -77,7 +78,7 @@ export function ProfileHeader({ user, summary, own }: Props) {
           <div className="pv-detail">
             <span className="label">wca id</span>
             <span className="value">
-              {user.wcaId}
+              <Link to={`/wca?person=${encodeURIComponent(user.wcaId)}`}>{user.wcaId}</Link>
               <a
                 className="ext"
                 href={`https://www.worldcubeassociation.org/persons/${encodeURIComponent(user.wcaId)}`}

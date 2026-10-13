@@ -1,9 +1,59 @@
 import { describe, expect, it } from 'vitest';
+import { FALLBACK_FLOORS, FloorProvider, floorFor, isBelowFloor, parseRecords } from '../src/floors.js';
 import { planDailyCompleted, planPbUpdated, planSolveCreated, planUserInfo } from '../src/ingest.js';
 import { parseUserInfo, splitWithScores } from '../src/board.js';
 
 const U = '00000000-0000-4000-8000-000000000001';
 const NOW = Date.parse('2026-10-14T12:00:00Z');
+const silentLog = { info() {}, warn() {}, error() {}, debug() {} } as never;
+
+describe('anti-cheat floors', () => {
+  it('uses WCA records when present (average for ao5/ao12)', () => {
+    const recs = { '333': { single: 3050, average: 3900 } };
+    expect(floorFor('333', 'single', recs)).toBe(3050);
+    expect(floorFor('333', 'ao5', recs)).toBe(3900);
+    expect(floorFor('333', 'ao12', recs)).toBe(3900);
+  });
+  it('falls back to the hard-coded table', () => {
+    expect(floorFor('333', 'single', null)).toBe(3000);
+    expect(floorFor('333', 'ao5', null)).toBe(3500);
+    expect(floorFor('pyram', 'single', { pyram: { single: null, average: 1500 } })).toBe(700);
+    expect(floorFor('333fm', 'single', null)).toBeNull();
+    expect(Object.keys(FALLBACK_FLOORS)).toHaveLength(15);
+  });
+  it('is strict: equal to the floor passes', () => {
+    expect(isBelowFloor(2999, 3000)).toBe(true);
+    expect(isBelowFloor(3000, 3000)).toBe(false);
+    expect(isBelowFloor(1, null)).toBe(false);
+  });
+  it('parses /internal/records defensively', () => {
+    expect(parseRecords({ records: { '333': { single: 3050, average: null }, x: 5 } })).toEqual({
+      '333': { single: 3050, average: null },
+    });
+    expect(parseRecords({})).toBeNull();
+    expect(parseRecords(null)).toBeNull();
+  });
+  it('FloorProvider caches records and falls back when wca is down', async () => {
+    let calls = 0;
+    const up = new FloorProvider('http://wca', silentLog, 3_600_000, 60_000, async () => {
+      calls++;
+      return { records: { '333': { single: 3050, average: 3900 } } };
+    });
+    expect(await up.floor('333', 'single')).toBe(3050);
+    expect(await up.floor('333', 'ao5')).toBe(3900);
+    expect(calls).toBe(1);
+    expect(up.source).toBe('wca');
+
+    const down = new FloorProvider('http://wca', silentLog, 3_600_000, 60_000, async () => {
+      calls++;
+      throw new Error('ECONNREFUSED');
+    });
+    expect(await down.floor('333', 'single')).toBe(3000);
+    expect(await down.floor('222', 'ao5')).toBe(800);
+    expect(calls).toBe(2); // second call within the retry window doesn't refetch
+    expect(down.source).toBe('fallback');
+  });
+});
 
 describe('planPbUpdated', () => {
   const base = { userId: U, username: 'a', event: '333', kind: 'single', occurredAt: '2026-10-14T11:00:00.000Z' };

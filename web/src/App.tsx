@@ -13,6 +13,7 @@ const RaceRoomPage = lazy(() => import('./pages/RaceRoomPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const AccountPage = lazy(() => import('./pages/AccountPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const WcaPage = lazy(() => import('./pages/WcaPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
@@ -30,6 +31,7 @@ const router = createBrowserRouter([
       { path: '/profile/:username', element: s(<ProfilePage />) },
       { path: '/account', element: s(<AccountPage />) },
       { path: '/settings', element: s(<SettingsPage />) },
+      { path: '/wca', element: s(<WcaPage />) },
       { path: '/login', element: s(<LoginPage />) },
       { path: '*', element: s(<NotFoundPage />) },
     ],

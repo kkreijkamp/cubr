@@ -7,6 +7,7 @@ import {
   consumeEvents,
   type Consumer,
 } from '@cubetype/common';
+import { FloorProvider } from './floors.js';
 import { CONSUMED_TYPES, makeHandler } from './ingest.js';
 import { registerRoutes } from './routes/index.js';
 import { defineScripts } from './scripts.js';
@@ -21,12 +22,14 @@ const server = createServer(config, {
   checks: { redis: () => redis.ping() },
   info: () => ({
     consumer: consumer?.stats() ?? null,
+    antiCheatFloors: floors.source,
   }),
 });
 const { app } = server;
 const redis = createRedis(config.redisUrl, app.log);
 defineScripts(redis);
 const auth = makeAuth(config.jwtSecret, redis);
+const floors = new FloorProvider(config.urls.wca, app.log);
 
 await registerRoutes(app, { redis, auth });
 
@@ -43,6 +46,6 @@ consumer = consumeEvents(redis, {
   group: 'leaderboard',
   consumer: config.podName,
   types: CONSUMED_TYPES,
-  handler: makeHandler({ redis }),
+  handler: makeHandler({ redis, floors, log: app.log }),
   log: app.log,
 });

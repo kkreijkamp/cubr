@@ -2,6 +2,7 @@
 **/dist
 web/dist
 .git
+data
 docs
 **/*.log
 **/.DS_Store
