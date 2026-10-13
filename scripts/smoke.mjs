@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // End-to-end smoke test through the public entry point (the docker compose gateway by default).
-// Walks a real user journey across the microservices:
+// Walks a real user journey across the microservices and checks the event pipeline:
 //   node scripts/smoke.mjs http://localhost:8080
 const BASE = (process.argv[2] ?? process.env.BASE_URL ?? 'http://localhost:8080').replace(/\/$/, '');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let failures = 0;
 let token = null;
 
@@ -36,10 +37,25 @@ function check(name, cond, detail = '') {
   }
 }
 
+async function eventually(name, fn, timeoutMs = 15_000) {
+  const deadline = Date.now() + timeoutMs;
+  let last;
+  while (Date.now() < deadline) {
+    try {
+      last = await fn();
+      if (last.ok) return check(name, true, last.detail);
+    } catch (e) {
+      last = { detail: e.message };
+    }
+    await sleep(500);
+  }
+  check(name, false, last?.detail ?? 'timed out');
+}
+
 console.log(`cubetype smoke test → ${BASE}\n`);
 
 console.log('health / info (every service answers through the entry point):');
-for (const p of ['/api/auth/_info', '/api/scrambles/_info', '/api/solves/_info']) {
+for (const p of ['/api/auth/_info', '/api/scrambles/_info', '/api/solves/_info', '/api/stats/_info']) {
   const r = await req('GET', p);
   check(p, r.status === 200, `${r.data?.service ?? '?'}@${r.data?.version ?? '?'} on ${r.data?.pod ?? '?'} (${r.ms} ms)`);
 }
@@ -62,7 +78,7 @@ console.log('\nscrambles:');
 const sc = await req('GET', '/api/scrambles/333?count=3');
 check('3x3 scrambles', sc.status === 200 && sc.data?.scrambles?.length === 3, `source=${sc.data?.source} (${sc.ms} ms)`);
 
-console.log('\nsolves:');
+console.log('\nsolves → event bus → stats:');
 const sessions = await req('GET', '/api/sessions');
 const session = sessions.data?.sessions?.[0];
 check('default session created', Boolean(session), session?.name);
@@ -74,6 +90,12 @@ for (const t of times) {
   lastRolling = r.data?.rolling;
 }
 check('6 solves saved, rolling ao5 computed', lastRolling?.ao5 > 0, `ao5=${lastRolling?.ao5}`);
+const userId = me.data?.user?.id;
+await eventually('stats read model updated (single PB)', async () => {
+  const s = await req('GET', `/api/stats/users/${userId}/summary`);
+  const ev = s.data?.events?.find((e) => e.event === '333');
+  return { ok: ev?.pbs?.single?.valueMs === 9876 && ev?.solves === 6, detail: `single=${ev?.pbs?.single?.valueMs} solves=${ev?.solves}` };
+});
 
 console.log('\ncleanup:');
 const sessDel = await req('DELETE', `/api/sessions/${session.id}`);

@@ -30,6 +30,7 @@ x-service-env: &service-env
   AUTH_URL: http://auth:8080
   SCRAMBLE_URL: http://scramble:8080
   SOLVE_URL: http://solve:8080
+  STATS_URL: http://stats:8080
 
 x-service: &service
   restart: unless-stopped            # come back after crashes / docker restarts
@@ -95,6 +96,11 @@ services:
     <<: *service
     image: cubetype/solve:dev
     build: { context: ., dockerfile: services/solve/Dockerfile, args: *build-args }
+
+  stats:
+    <<: *service
+    image: cubetype/stats:dev
+    build: { context: ., dockerfile: services/stats/Dockerfile, args: *build-args }
 
   # ---- frontend ----------------------------------------------------------------------------------
   web:
