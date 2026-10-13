@@ -1,0 +1,326 @@
+/* Race lobby + room. Theme tokens only. */
+
+/* ---- lobby ---- */
+.race-lobby-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 21rem;
+  gap: 1.5rem;
+  align-items: start;
+}
+@media (max-width: 960px) {
+  .race-lobby-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .race-lobby-grid > .stack {
+    order: -1;
+  }
+}
+.race-card {
+  display: grid;
+  gap: 0.75rem;
+}
+.race-card .live-section-title {
+  margin-bottom: 0;
+}
+.race-form .field input,
+.race-form .field select {
+  width: 100%;
+}
+.race-join input {
+  flex: 1;
+  min-width: 0;
+}
+.race-rooms {
+  display: grid;
+  gap: 0.75rem;
+}
+.race-rooms .live-section-title {
+  margin-bottom: 0;
+}
+.race-rooms .table td {
+  padding-top: 0.6rem;
+  padding-bottom: 0.6rem;
+}
+.race-rooms .room-name {
+  max-width: 18rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-color);
+}
+.race-rooms tr.clickable:hover .room-name {
+  color: var(--bg-color);
+}
+@media (max-width: 600px) {
+  .race-rooms .hide-sm {
+    display: none;
+  }
+  .race-rooms .room-name {
+    max-width: 9rem;
+  }
+}
+
+/* ---- room ---- */
+.race-back {
+  justify-self: start;
+  padding: 0;
+  font-size: 0.75rem;
+}
+.race-title {
+  flex-wrap: wrap;
+  overflow-wrap: anywhere;
+}
+.race-title .pill {
+  font-size: 0.8rem;
+}
+.race-conn {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 1.1rem;
+}
+.race-conn b {
+  font-weight: 400;
+  color: var(--text-color);
+}
+
+.race-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 21rem;
+  gap: 2rem;
+  align-items: start;
+}
+@media (max-width: 1000px) {
+  .race-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.race-main {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+  min-width: 0;
+}
+.race-side {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+  min-width: 0;
+}
+
+.race-round {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.25rem 1rem;
+  text-align: center;
+}
+.race-round .round-n {
+  color: var(--main-color);
+  font-size: 1.25rem;
+}
+.race-round .round-line {
+  color: var(--sub-color);
+  font-size: 0.85rem;
+}
+.race-round .round-count {
+  color: var(--text-color);
+  font-size: 0.85rem;
+}
+
+.race-invite {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+}
+.invite-link {
+  max-width: 100%;
+  border: 0;
+  border-radius: var(--roundness);
+  padding: 0.6rem 1rem;
+  background: var(--sub-alt-color);
+  color: var(--text-color);
+  font: inherit;
+  font-size: 1rem;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  transition: background var(--dur), color var(--dur);
+}
+.invite-link:hover {
+  background: var(--text-color);
+  color: var(--bg-color);
+}
+
+.race-submitted {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--sub-color);
+  font-size: 0.85rem;
+}
+.race-actions {
+  display: flex;
+  justify-content: center;
+}
+.race-actions kbd {
+  margin-left: 0.25rem;
+}
+.race-actions .btn.primary kbd {
+  background: var(--bg-color);
+  color: var(--main-color);
+}
+
+/* standings */
+.race-standings {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+.race-standings td {
+  text-align: right;
+  padding: 0.4rem 0.35rem;
+  border-top: 2px solid var(--bg-color);
+  white-space: nowrap;
+}
+.race-standings .left {
+  text-align: left;
+}
+.race-standings .player {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+.race-standings .who {
+  min-width: 0;
+}
+.race-standings .name {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--text-color);
+  min-width: 0;
+}
+.race-standings .text-name {
+  max-width: 8.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.race-standings .host {
+  color: var(--main-color);
+  flex-shrink: 0;
+}
+.race-standings .you {
+  font-size: 0.62rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--main-color);
+  color: var(--bg-color);
+}
+.race-standings tr.me .text-name {
+  color: var(--main-color);
+}
+.race-standings tr.offline td {
+  opacity: 0.45;
+}
+
+/* results grid */
+.race-results .live-section-title {
+  margin-bottom: 0.5rem;
+}
+table.table.race-grid {
+  width: auto;
+  min-width: min(100%, 24rem);
+}
+.race-grid th,
+.race-grid td {
+  min-width: 6.5rem;
+}
+.race-grid th:first-child,
+.race-grid td:first-child {
+  min-width: 2.5rem;
+}
+.race-grid th {
+  max-width: 9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.race-grid th.me {
+  color: var(--main-color);
+}
+.race-grid td.best {
+  color: var(--main-color);
+}
+.race-grid td.dnf {
+  color: var(--error-color);
+}
+.race-grid td.pending {
+  color: var(--sub-color);
+  font-size: 0.8em;
+}
+.race-grid tr.current td:first-child {
+  color: var(--main-color);
+}
+
+/* chat */
+.race-chat {
+  gap: 0.5rem;
+}
+.chat-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  height: 14rem;
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+.chat-list li {
+  overflow-wrap: anywhere;
+  color: var(--text-color);
+}
+.chat-list .t {
+  color: var(--sub-color);
+  font-size: 0.68rem;
+  margin-right: 0.45rem;
+}
+.chat-list .n {
+  color: var(--sub-color);
+  margin-right: 0.45rem;
+}
+.chat-list li.mine .n {
+  color: var(--main-color);
+}
+.chat-list li.sys {
+  color: var(--sub-color);
+  font-size: 0.72rem;
+  text-align: center;
+}
+.chat-list .chat-empty {
+  color: var(--sub-color);
+  text-align: center;
+  padding-top: 4rem;
+}
+.chat-form {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: var(--bg-color);
+  border-radius: var(--roundness);
+  padding-right: 0.25rem;
+}
+.chat-form input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  font-size: 0.85rem;
+}
+.chat-form .count {
+  color: var(--sub-color);
+  font-size: 0.7rem;
+}

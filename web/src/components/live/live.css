@@ -87,6 +87,48 @@
   color: var(--sub-color);
 }
 
+/* status dots */
+.live-dot {
+  --dot: var(--sub-color);
+  display: inline-block;
+  flex-shrink: 0;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--dot);
+  transition: background var(--dur), box-shadow var(--dur);
+}
+.live-dot.up,
+.live-dot.done {
+  --dot: var(--timer-ready);
+}
+.live-dot.degraded,
+.live-dot.inspecting,
+.live-dot.solving {
+  --dot: var(--main-color);
+}
+.live-dot.down {
+  --dot: var(--error-color);
+}
+.live-dot.offline {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--sub-color);
+}
+.live-dot.pulse {
+  animation: liveDotPulse 1.6s ease-out infinite;
+}
+@keyframes liveDotPulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--dot) 70%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 0.45rem color-mix(in srgb, var(--dot) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
 /* notices / banners */
 .live-notice {
   display: flex;
@@ -143,6 +185,19 @@
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.live-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--sub-color);
+  font-size: 0.8rem;
+  cursor: pointer;
+  user-select: none;
+}
+.live-checkbox:hover {
+  color: var(--text-color);
 }
 
 @media (max-width: 720px) {

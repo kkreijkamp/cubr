@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { CalendarDays, Crown, Keyboard, Palette, Settings, Timer, User } from 'lucide-react';
+import { CalendarDays, Crown, Keyboard, Palette, Settings, Swords, Timer, User } from 'lucide-react';
 import { CubeLogo } from './CubeLogo';
 import { Toasts } from './Toasts';
 import { CommandPalette, usePaletteHotkeys } from './CommandPalette';
@@ -13,6 +13,7 @@ import { themeLabel } from '../lib/themes';
 const NAV = [
   { to: '/', icon: Timer, label: 'timer', end: true },
   { to: '/daily', icon: CalendarDays, label: 'daily challenge' },
+  { to: '/race', icon: Swords, label: 'race' },
   { to: '/leaderboards', icon: Crown, label: 'leaderboards' },
   { to: '/settings', icon: Settings, label: 'settings' },
 ];

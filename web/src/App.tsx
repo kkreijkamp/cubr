@@ -8,6 +8,8 @@ import TimerPage from './pages/TimerPage';
 // Everything except the timer is code-split so the first paint is just the timer.
 const LeaderboardsPage = lazy(() => import('./pages/LeaderboardsPage'));
 const DailyPage = lazy(() => import('./pages/DailyPage'));
+const RaceLobbyPage = lazy(() => import('./pages/RaceLobbyPage'));
+const RaceRoomPage = lazy(() => import('./pages/RaceRoomPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const AccountPage = lazy(() => import('./pages/AccountPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
@@ -23,6 +25,8 @@ const router = createBrowserRouter([
       { path: '/', element: <TimerPage /> },
       { path: '/leaderboards', element: s(<LeaderboardsPage />) },
       { path: '/daily', element: s(<DailyPage />) },
+      { path: '/race', element: s(<RaceLobbyPage />) },
+      { path: '/race/:roomId', element: s(<RaceRoomPage />) },
       { path: '/profile/:username', element: s(<ProfilePage />) },
       { path: '/account', element: s(<AccountPage />) },
       { path: '/settings', element: s(<SettingsPage />) },

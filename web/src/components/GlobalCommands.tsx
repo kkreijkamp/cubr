@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { CalendarDays, Crown, LogIn, LogOut, Palette, Settings, Timer, Type, User, Zap } from 'lucide-react';
+import { CalendarDays, Crown, LogIn, LogOut, Palette, Settings, Swords, Timer, Type, User, Zap } from 'lucide-react';
 import { useRegisterCommands, type Command } from '../lib/commands';
 import { useAuth } from '../lib/auth';
 import { FONTS, updateSettings, useSettings, type Settings as S } from '../lib/settings';
@@ -43,6 +43,7 @@ export function GlobalCommands() {
       const nav: Command[] = [
         { id: 'go-timer', label: 'Go to timer', icon: <Timer />, run: go('/') },
         { id: 'go-daily', label: 'Go to daily challenge', icon: <CalendarDays />, run: go('/daily') },
+        { id: 'go-race', label: 'Go to race rooms', icon: <Swords />, keywords: ['multiplayer'], run: go('/race') },
         { id: 'go-lb', label: 'Go to leaderboards', icon: <Crown />, run: go('/leaderboards') },
         { id: 'go-settings', label: 'Go to settings', icon: <Settings />, run: go('/settings') },
       ];
