@@ -36,6 +36,29 @@ describe('ScrambleGenerator', () => {
     expect(gen.stats()).toMatchObject({ generated: 3, failed: 0, timeouts: 0, perEvent: { '333': { count: 3 } } });
   });
 
+  it('lets requests overtake queued refills', async () => {
+    const { backend, calls } = fakeBackend(1);
+    const gen = new ScrambleGenerator(backend, { timeoutMs: 1000, maxQueue: 100 });
+    const p = [gen.generate('r1', 'refill'), gen.generate('r2', 'refill'), gen.generate('r3', 'refill')];
+    p.push(gen.generate('req', 'request'));
+    await Promise.all(p);
+    // r1 was already running; the request jumps ahead of r2/r3
+    expect(calls.map((c) => c.event)).toEqual(['r1', 'req', 'r2', 'r3']);
+  });
+
+  it('is busy while requests run and shortly after', async () => {
+    const { backend } = fakeBackend(1);
+    const gen = new ScrambleGenerator(backend, { timeoutMs: 1000, maxQueue: 100 });
+    expect(gen.isBusy()).toBe(false);
+    await gen.generate('333', 'refill');
+    expect(gen.isBusy()).toBe(false); // refills never make the generator "busy"
+    const p = gen.generate('333');
+    expect(gen.isBusy()).toBe(true);
+    await p;
+    expect(gen.isBusy(1000)).toBe(true);
+    expect(gen.isBusy(0)).toBe(false);
+  });
+
   it('uses every slot of a multi-slot backend', async () => {
     const { backend, calls } = fakeBackend(3, 20);
     const gen = new ScrambleGenerator(backend, { timeoutMs: 1000, maxQueue: 100 });

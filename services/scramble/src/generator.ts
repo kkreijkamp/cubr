@@ -1,8 +1,12 @@
 import type { ScrambleBackend } from './backends.js';
 import { GenerationTimeoutError, QueueFullError } from './errors.js';
 
+/** User-facing work always runs before background pool refills. */
+export type Priority = 'request' | 'refill';
+
 interface Task {
   event: string;
+  priority: Priority;
   deadline: number;
   resolve: (scramble: string) => void;
   reject: (err: Error) => void;
@@ -20,14 +24,16 @@ interface EventTiming {
 }
 
 /**
- * A small queue in front of the scramble backend. cubing.js can only run one search at a time
- * per worker, so instead of piling promises onto it we queue them here, which makes the backlog
- * visible (_info.generator.queueDepth), enforces a deadline per scramble and sheds load when the
- * queue is full.
+ * A small priority queue in front of the scramble backend. cubing.js can only run one search at
+ * a time per worker, so instead of piling promises onto it we queue them here, which makes the
+ * backlog visible (_info.generator.queueDepth), lets requests overtake background refills,
+ * enforces a deadline per scramble and sheds load when the queue is full.
  */
 export class ScrambleGenerator {
-  private readonly queue: Task[] = [];
+  private readonly queues: Record<Priority, Task[]> = { request: [], refill: [] };
   private readonly idle: number[];
+  private activeRequests = 0;
+  private lastRequestDoneAt = 0;
   private generated = 0;
   private failed = 0;
   private timeouts = 0;
@@ -47,7 +53,7 @@ export class ScrambleGenerator {
 
   /** Scrambles waiting for a free worker. */
   get queueDepth(): number {
-    return this.queue.length;
+    return this.queues.request.length + this.queues.refill.length;
   }
 
   /** Scrambles currently being searched. */
@@ -55,20 +61,25 @@ export class ScrambleGenerator {
     return this.backend.size - this.idle.length;
   }
 
-  generate(event: string): Promise<string> {
+  /** True while user requests are queued/running (or finished < graceMs ago) → refill backs off. */
+  isBusy(graceMs = 1000): boolean {
+    return this.queues.request.length > 0 || this.activeRequests > 0 || Date.now() - this.lastRequestDoneAt < graceMs;
+  }
+
+  generate(event: string, priority: Priority = 'request'): Promise<string> {
     return new Promise<string>((resolve, reject) => {
-      this.queue.push({ event, deadline: Date.now() + this.opts.timeoutMs, resolve, reject });
+      this.queues[priority].push({ event, priority, deadline: Date.now() + this.opts.timeoutMs, resolve, reject });
       this.pump();
     });
   }
 
   /** Queues `count` scrambles at once; rejects immediately with QueueFullError when overloaded. */
-  generateMany(event: string, count: number): Promise<string[]> {
+  generateMany(event: string, count: number, priority: Priority = 'request'): Promise<string[]> {
     if (this.queueDepth + count > this.opts.maxQueue) {
       this.rejected += count;
       return Promise.reject(new QueueFullError());
     }
-    return Promise.all(Array.from({ length: count }, () => this.generate(event)));
+    return Promise.all(Array.from({ length: count }, () => this.generate(event, priority)));
   }
 
   stats() {
@@ -80,6 +91,7 @@ export class ScrambleGenerator {
       backend: this.backend.kind,
       workers: this.backend.size,
       queueDepth: this.queueDepth,
+      queuedRequests: this.queues.request.length,
       active: this.active,
       generated: this.generated,
       failed: this.failed,
@@ -91,20 +103,24 @@ export class ScrambleGenerator {
 
   /** Rejects everything still queued (shutdown). */
   async close(): Promise<void> {
-    for (const t of this.queue.splice(0)) t.reject(new Error('scramble generator shutting down'));
+    for (const q of Object.values(this.queues)) {
+      for (const t of q.splice(0)) t.reject(new Error('scramble generator shutting down'));
+    }
     await this.backend.close();
   }
 
-  /** Starts queued tasks (FIFO) while slots are free. */
+  /** Starts queued tasks while slots are free. Requests first, then refills, FIFO within each. */
   private pump(): void {
-    while (this.idle.length > 0 && this.queue.length > 0) {
-      const task = this.queue.shift()!;
-      const slot = this.idle.shift()!;
-      void this.run(task, slot);
+    while (this.idle.length > 0) {
+      const task = this.queues.request.shift() ?? this.queues.refill.shift();
+      if (!task) return;
+      void this.run(task, this.idle.shift()!);
     }
   }
 
   private async run(task: Task, slot: number): Promise<void> {
+    const isRequest = task.priority === 'request';
+    if (isRequest) this.activeRequests++;
     try {
       const remaining = task.deadline - Date.now();
       if (remaining <= 0) throw new GenerationTimeoutError('scramble timed out waiting in queue');
@@ -117,6 +133,10 @@ export class ScrambleGenerator {
       else this.failed++;
       task.reject(err instanceof Error ? err : new Error(String(err)));
     } finally {
+      if (isRequest) {
+        this.activeRequests--;
+        this.lastRequestDoneAt = Date.now();
+      }
       this.idle.push(slot);
       this.pump();
     }
