@@ -13,7 +13,7 @@ migrated at startup. Port 8080.
 | `GET /api/sessions/:id/solves` | `{solves}` ascending by `createdAt` |
 | `POST /api/solves` | idempotent on `id` (`ON CONFLICT DO NOTHING`): retry → 200, no second event; id of another user → 409. Returns `{solve, rolling:{ao5,ao12}}` |
 | `PATCH /api/solves/:id` `{penalty?, comment?}` / `DELETE /api/solves/:id` | emit `solve.updated` / `solve.deleted`; a changed solve is returned with the session's `rolling` |
-| `GET /api/solves/daily?date=` | the user's daily attempts per event + ao5 |
+| `GET /api/solves/daily?date=` | the user's daily solves per event + the official ao5 (from the recorded attempts) |
 | `GET /api/solves/_info`, `/api/sessions/_info` | info incl. `outbox: {backlog, published, lastPublishedAt, lastError, healthy}` |
 | `GET /internal/users/:userId/solves?event=` | **no auth, not routed by the gateway**: `{solves:[{id, sessionId, timeMs, penalty, createdAt}]}` ordered by session, time (stats recompute) |
 
@@ -35,9 +35,12 @@ at-least-once: consumers dedupe on `eventId`.
 
 ## Daily challenge
 `POST /api/solves` with `daily: {date, index 0..4}` → `source: 'daily'`. Session event must be a daily event
-(`333 222 444 pyram skewb`); date must be UTC yesterday/today/tomorrow (i.e. "today" somewhere on Earth). A repeated index
-→ 409 `daily attempt already recorded` (partial unique index). When all 5 indexes exist, `daily.completed` (ao5 + times) is
-queued in the same transaction (advisory lock per user/date/event prevents a race).
+(`333 222 444 pyram skewb`); date must be UTC yesterday/today/tomorrow (i.e. "today" somewhere on Earth). Each attempt is
+also recorded in `solve.daily_attempts` exactly as submitted (one row per index, migration `002_daily_attempts`): an index
+that was attempted before → 409 `daily attempt already recorded`, even if its solve has been deleted since, so a known
+scramble can't be redone. When all 5 attempts exist, `daily.completed` (ao5 + times, computed from the attempts) is queued
+in the same transaction (advisory lock per user/date/event prevents a race). Deleting or re-penalising a daily solve later
+changes neither that result nor the ao5 reported by `GET /api/solves/daily`.
 
 ## Choices worth knowing
 - `id` and `scramble`/`penalty` on `POST /api/solves` are optional (server generates the id; defaults `''`/`OK`). `source` may be
@@ -47,7 +50,7 @@ queued in the same transaction (advisory lock per user/date/event prevents a rac
 - `rolling` is computed inside the transaction while the session row is locked (`FOR NO KEY UPDATE`), so concurrent
   solves in one session each see all earlier ones. ao5/ao12 use the WCA trimming rules from `@cubetype/cubestats`
   (ms, `-1` = DNF, `null` = not enough solves).
-- No-op PATCHes (same values) emit nothing. Editing or deleting a daily attempt does not re-emit `daily.completed`.
+- No-op PATCHes (same values) emit nothing.
 - Empty bodies sent with `Content-Type: application/json` (for example a DELETE from a fetch wrapper) are accepted.
 
 ## Env / run

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Penalty } from '@cubetype/cubestats';
-import { dailyResult, effectiveOrNull, rollingFromSolves } from '../src/rolling.js';
+import { dailyOverview, dailyResult, effectiveOrNull, rollingFromSolves } from '../src/rolling.js';
 
 const ok = (ms: number) => ({ timeMs: ms, penalty: 'OK' as Penalty });
 const dnf = (ms = 10_000) => ({ timeMs: ms, penalty: 'DNF' as Penalty });
@@ -47,6 +47,22 @@ describe('dailyResult', () => {
 
   it('is null until all 5 attempts exist', () => {
     expect(dailyResult([ok(1000), ok(2000)]).ao5).toBeNull();
+  });
+});
+
+describe('dailyOverview', () => {
+  const attempts = (event: string, ...solves: { timeMs: number; penalty: Penalty }[]) => solves.map((s) => ({ ...s, event }));
+
+  it('reports the official ao5 from the attempts, not from the solves as they are now', () => {
+    // the solve of attempt 3 was later re-penalised to DNF; the attempt keeps the submitted time
+    const solves = [{ event: '333', id: 'a' }, { event: '333', id: 'b' }];
+    const official = attempts('333', ok(10_000), ok(11_000), ok(12_000), ok(13_000), ok(20_000));
+    expect(dailyOverview(solves, official)).toEqual({ '333': { solves, ao5: 12_000 } });
+  });
+
+  it('keeps events whose solves were deleted and is null until all five attempts exist', () => {
+    expect(dailyOverview([], attempts('222', ok(3_000), ok(4_000)))).toEqual({ '222': { solves: [], ao5: null } });
+    expect(dailyOverview([{ event: 'pyram' }], [])).toEqual({ pyram: { solves: [{ event: 'pyram' }], ao5: null } });
   });
 });
 

@@ -6,7 +6,7 @@ import { currentUser, FK_VIOLATION, pgCode, pgConstraint, tzFrom, UNIQUE_VIOLATI
 import { SOLVE_COLUMNS, toSolve, type Solve, type SolveRow } from '../mapping.js';
 import { enqueue } from '../outbox.js';
 import { sessionRolling, solveDeletedPayload, solveEventPayload } from '../repo.js';
-import { dailyResult, type Rolling } from '../rolling.js';
+import { dailyOverview, dailyResult, type Rolling } from '../rolling.js';
 import { assertDailyAllowed, createSolveBody, dailyQuery, idParams, patchSolveBody, resolveCreatedAt, utcDay } from '../schemas.js';
 
 /** Translates constraint violations raised inside a solve transaction into API errors. */
@@ -19,12 +19,35 @@ function mapPgError(err: unknown): never {
 }
 
 /**
- * After a daily attempt is inserted: if the user now has all 5 attempts for (date, event),
- * queue `daily.completed` with the ao5 (same transaction, so it is emitted exactly once).
+ * Records the official attempt of a daily solve (one per user/date/event/index, kept as submitted).
+ * An index that was used before stays used even if its solve was deleted since → 409, so a known
+ * scramble can't be redone; only the same solve id (a retry) may hold it again. Returns true for a
+ * new attempt.
+ */
+async function recordDailyAttempt(client: PoolClient, user: AuthUser, row: SolveRow): Promise<boolean> {
+  const key = [user.id, row.daily_date, row.event, row.daily_index];
+  const ins = await client.query(
+    `INSERT INTO solve.daily_attempts (user_id, daily_date, event, daily_index, solve_id, time_ms, penalty)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING`,
+    [...key, row.id, row.time_ms, row.penalty],
+  );
+  if (ins.rowCount) return true;
+  const { rows } = await client.query<{ solve_id: string }>(
+    'SELECT solve_id FROM solve.daily_attempts WHERE user_id = $1 AND daily_date = $2 AND event = $3 AND daily_index = $4',
+    key,
+  );
+  if (rows[0]?.solve_id !== row.id) throw conflict('daily attempt already recorded');
+  return false;
+}
+
+/**
+ * After a new daily attempt: if the user now has all 5 attempts for (date, event), queue
+ * `daily.completed` with the official ao5 from the attempts as submitted (same transaction, so it
+ * is emitted exactly once; later edits or deletes of the solves don't change it).
  */
 async function completeDailyIfDone(client: PoolClient, user: AuthUser, date: string, event: string, tz: string): Promise<void> {
   const { rows } = await client.query<{ time_ms: number; penalty: Penalty }>(
-    `SELECT time_ms, penalty FROM solve.solves
+    `SELECT time_ms, penalty FROM solve.daily_attempts
       WHERE user_id = $1 AND daily_date = $2 AND event = $3 ORDER BY daily_index`,
     [user.id, date, event],
   );
@@ -84,9 +107,10 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
       }
 
       const row = ins.rows[0];
+      const newAttempt = daily ? await recordDailyAttempt(client, user, row) : false;
       const rolling = await sessionRolling(client, row.session_id);
       await enqueue(client, 'solve.created', solveEventPayload(user, row, tz, rolling));
-      if (daily) await completeDailyIfDone(client, user, daily.date, event, tz);
+      if (daily && newAttempt) await completeDailyIfDone(client, user, daily.date, event, tz);
       return { created: true, row, rolling };
     }).catch(mapPgError);
 
@@ -137,26 +161,22 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
     return reply.code(204).send();
   });
 
-  // The user's daily-challenge attempts for one UTC day, grouped by event.
+  // The user's daily-challenge solves for one UTC day, grouped by event, with the official ao5.
   app.get('/api/solves/daily', authed, async (req) => {
     const user = currentUser(req);
     const q = parse(dailyQuery, req.query ?? {});
     const date = q.date ?? utcDay(Date.now());
-    const { rows } = await pool.query<SolveRow>(
-      `SELECT ${SOLVE_COLUMNS} FROM solve.solves WHERE user_id = $1 AND daily_date = $2 ORDER BY event, daily_index`,
-      [user.id, date],
-    );
-    const events: Record<string, { solves: Solve[]; ao5: number | null }> = {};
-    const byEvent = new Map<string, SolveRow[]>();
-    for (const r of rows) {
-      const list = byEvent.get(r.event) ?? [];
-      list.push(r);
-      byEvent.set(r.event, list);
-    }
-    for (const [event, list] of byEvent) {
-      const { ao5 } = dailyResult(list.map((r) => ({ timeMs: r.time_ms, penalty: r.penalty })));
-      events[event] = { solves: list.map(toSolve), ao5 };
-    }
-    return { date, events };
+    const [solves, attempts] = await Promise.all([
+      pool.query<SolveRow>(
+        `SELECT ${SOLVE_COLUMNS} FROM solve.solves WHERE user_id = $1 AND daily_date = $2 ORDER BY event, daily_index`,
+        [user.id, date],
+      ),
+      pool.query<{ event: string; time_ms: number; penalty: Penalty }>(
+        'SELECT event, time_ms, penalty FROM solve.daily_attempts WHERE user_id = $1 AND daily_date = $2 ORDER BY event, daily_index',
+        [user.id, date],
+      ),
+    ]);
+    const official = attempts.rows.map((a) => ({ event: a.event, timeMs: a.time_ms, penalty: a.penalty }));
+    return { date, events: dailyOverview(solves.rows.map(toSolve), official) };
   });
 }

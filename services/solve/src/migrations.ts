@@ -47,4 +47,28 @@ CREATE TABLE solve.outbox (
 CREATE INDEX outbox_unpublished ON solve.outbox (id) WHERE published_at IS NULL;
 `,
   },
+  {
+    id: '002_daily_attempts',
+    sql: `
+-- The official daily-challenge attempts: one row per (user, day, event, index), kept exactly as
+-- submitted. Completion and the challenge ao5 are computed from these rows, so deleting or
+-- re-penalising a daily solve afterwards changes neither, and an attempted index can't be redone.
+CREATE TABLE solve.daily_attempts (
+  user_id     uuid NOT NULL,
+  daily_date  date NOT NULL,
+  event       text NOT NULL,
+  daily_index smallint NOT NULL,
+  solve_id    uuid NOT NULL,
+  time_ms     integer NOT NULL,
+  penalty     text NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, daily_date, event, daily_index)
+);
+INSERT INTO solve.daily_attempts (user_id, daily_date, event, daily_index, solve_id, time_ms, penalty, created_at)
+SELECT user_id, daily_date, event, daily_index, id, time_ms, penalty, inserted_at
+  FROM solve.solves
+ WHERE daily_date IS NOT NULL AND daily_index IS NOT NULL
+ON CONFLICT DO NOTHING;
+`,
+  },
 ];
