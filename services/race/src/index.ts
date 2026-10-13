@@ -1,5 +1,6 @@
 import { createRedis, createServer, loadConfig, makeAuth, start } from '@cubetype/common';
 import { registerRoutes } from './routes.js';
+import { makeScrambleFetcher } from './scramble.js';
 import { createSocketServer, registerSocketHandlers } from './socket.js';
 import { RoomStore } from './store.js';
 
@@ -18,7 +19,14 @@ app.log.info({ redis: config.redisUrl.replace(/\/\/.*@/, '//***@') }, 'race serv
 
 const io = createSocketServer(app.server);
 const store = new RoomStore(redis, (roomId, state) => io.to(roomId).emit('room:state', state));
-registerSocketHandlers({ io, store, redis, jwtSecret: config.jwtSecret, log: app.log });
+registerSocketHandlers({
+  io,
+  store,
+  scrambles: makeScrambleFetcher(config.urls.scramble, app.log),
+  redis,
+  jwtSecret: config.jwtSecret,
+  log: app.log,
+});
 registerRoutes(app, { store, redis, auth });
 
 await start(server, config, [() => redis.quit()]);

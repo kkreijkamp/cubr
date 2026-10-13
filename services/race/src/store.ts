@@ -2,18 +2,20 @@ import { randomUUID } from 'node:crypto';
 import { HttpError, notFound, type Redis } from '@cubetype/common';
 import { newRoom, normalize, toRoomState } from './room.js';
 import { newRoomId } from './sanitize.js';
-import type { RoomState, StoredRoom } from './types.js';
+import type { ChatMessage, RoomState, StoredRoom } from './types.js';
 
 /**
  * Redis keyspace (everything prefixed `race:`; no pod keeps authoritative state in memory):
  *   race:room:<id>         string  JSON StoredRoom                          EX 2 h, refreshed on change
  *   race:room:<id>:conns   hash    playerId → open sockets                   EX 2 h
+ *   race:room:<id>:chat    list    last 50 chat messages (JSON)              EX 2 h
  *   race:lock:<id>         string  per-room mutex token                      PX 2 s
  *   race:rooms             zset    public lobby, score = last activity (ms)
  */
 export const keys = {
   room: (id: string) => `race:room:${id}`,
   conns: (id: string) => `race:room:${id}:conns`,
+  chat: (id: string) => `race:room:${id}:chat`,
   lock: (id: string) => `race:lock:${id}`,
   lobby: 'race:rooms',
 };
@@ -23,6 +25,7 @@ export const ROOM_TTL_SEC = 2 * 3600;
 export const LOBBY_IDLE_MS = 10 * 60_000;
 const LOCK_TTL_MS = 2000;
 const LOCK_WAIT_MS = 3000;
+const CHAT_HISTORY = 50;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -73,7 +76,7 @@ export class RoomStore {
     throw new HttpError(503, 'UNAVAILABLE', 'Could not allocate a room id');
   }
 
-  /** Current room + who is connected (read-only, no lock). The host invariant is applied but not saved. */
+  /** Current room + who is connected (read-only, no lock). Host/finished invariants are applied but not saved. */
   async load(id: string): Promise<{ room: StoredRoom; connected: Set<string> } | null> {
     const [[, json], [, conns]] = (await this.redis.multi().get(keys.room(id)).hgetall(keys.conns(id)).exec()) as [
       [Error | null, string | null],
@@ -114,8 +117,9 @@ export class RoomStore {
 
   /**
    * The single write path for room state: lock → load room + connection registry → apply the
-   * connection change and `fn` → enforce invariants (host transfer) → save everything in one
-   * MULTI (refreshing the 2 h TTL on all room keys) → broadcast `room:state` to the Socket.IO room.
+   * connection change and `fn` → enforce invariants (host transfer, round completion) → save
+   * everything in one MULTI (refreshing the 2 h TTL on all room keys) → broadcast `room:state` to
+   * the Socket.IO room.
    * Nothing is written or broadcast when the state did not actually change.
    */
   async mutateRoom(
@@ -163,7 +167,7 @@ export class RoomStore {
         if (n > 0) tx.hset(keys.conns(id), field, String(n));
         else tx.hdel(keys.conns(id), field);
       }
-      tx.expire(keys.conns(id), ROOM_TTL_SEC);
+      tx.expire(keys.conns(id), ROOM_TTL_SEC).expire(keys.chat(id), ROOM_TTL_SEC);
       if (!room.isPrivate) tx.zadd(keys.lobby, room.updatedAt, id);
       await tx.exec();
 
@@ -202,5 +206,21 @@ export class RoomStore {
     });
     if (stale.length) await this.redis.zrem(keys.lobby, ...stale);
     return rooms;
+  }
+
+  async appendChat(id: string, msg: ChatMessage): Promise<void> {
+    await this.redis
+      .multi()
+      .lpush(keys.chat(id), JSON.stringify(msg))
+      .ltrim(keys.chat(id), 0, CHAT_HISTORY - 1)
+      .expire(keys.chat(id), ROOM_TTL_SEC)
+      .expire(keys.room(id), ROOM_TTL_SEC)
+      .expire(keys.conns(id), ROOM_TTL_SEC)
+      .exec();
+  }
+
+  async recentChat(id: string): Promise<ChatMessage[]> {
+    const items = await this.redis.lrange(keys.chat(id), 0, CHAT_HISTORY - 1);
+    return items.reverse().map((s) => JSON.parse(s) as ChatMessage);
   }
 }
