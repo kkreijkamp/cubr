@@ -65,7 +65,7 @@ export interface AddSolveInput {
   penalty: Penalty;
   scramble: string;
   comment?: string | null;
-  source?: 'timer' | 'race' | 'daily';
+  source?: 'timer' | 'manual' | 'race' | 'daily';
   /** daily-challenge attempt (cloud mode only) */
   daily?: { date: string; index: number };
   /** override target session (defaults to the current session) */

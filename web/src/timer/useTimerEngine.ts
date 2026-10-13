@@ -1,4 +1,4 @@
-// The speedcubing timer state machine (keyboard), modelled on csTimer with WCA rules.
+// The speedcubing timer state machine (keyboard + touch), modelled on csTimer with WCA rules.
 //
 //   idle ──press──▶ holding ──(holdMs)──▶ ready ──release──▶ running ──any key──▶ stopped ──release──▶ idle
 //                      └──release early──▶ idle
@@ -43,7 +43,7 @@ export const INSPECTION_MS = 15_000;
 const PLUS2_AT = 15_000;
 const DNF_AT = 17_000;
 const MODIFIERS = new Set(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Tab']);
-/** stop events this soon after the start are ignored (accidental double press), like csTimer */
+/** stop events this soon after the start are ignored (accidental double press / double tap), like csTimer */
 const MIN_RUN_MS = 150;
 
 export function inspectionPenalty(elapsedMs: number): Penalty {
@@ -90,9 +90,9 @@ function blockedByOverlay(): boolean {
 const now = (e?: { timeStamp: number }) => (e && e.timeStamp > 0 ? e.timeStamp : performance.now());
 
 /**
- * Timer engine hook. Attaches window keyboard listeners (space starts/stops, any key stops).
- * State only changes on transitions; the display component animates elapsed time itself with
- * requestAnimationFrame.
+ * Timer engine hook. Attaches window keyboard listeners (space starts/stops, any key stops) and
+ * returns pointer handlers for touch devices. State only changes on transitions; the display
+ * component animates elapsed time itself with requestAnimationFrame.
  */
 export function useTimerEngine(opts: TimerEngineOptions) {
   const optsRef = useRef(opts);
@@ -136,7 +136,7 @@ export function useTimerEngine(opts: TimerEngineOptions) {
     [publish],
   );
 
-  /** press = space keydown */
+  /** press = space keydown / touch start */
   const press = useCallback(
     (t: number) => {
       const s = st.current;
@@ -164,7 +164,7 @@ export function useTimerEngine(opts: TimerEngineOptions) {
     [publish],
   );
 
-  /** release = space keyup */
+  /** release = space keyup / touch end */
   const release = useCallback(
     (t: number) => {
       const s = st.current;
@@ -290,8 +290,64 @@ export function useTimerEngine(opts: TimerEngineOptions) {
     if (!opts.enabled && st.current.phase !== 'running') cancel();
   }, [opts.enabled, cancel]);
 
+  // touch (pointer) ---------------------------------------------------------------------------------
+  const onPointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (!gateOpen() || e.pointerType === 'mouse') return;
+      const s = st.current;
+      if (s.phase === 'running') {
+        stop(now(e.nativeEvent), false);
+        return;
+      }
+      press(now(e.nativeEvent));
+    },
+    [press, stop],
+  );
+  const onPointerUp = useCallback(
+    (e: React.PointerEvent) => {
+      if (!gateOpen() || e.pointerType === 'mouse') return;
+      if (st.current.phase === 'stopped') {
+        publish({ phase: 'idle' });
+        return;
+      }
+      release(now(e.nativeEvent));
+    },
+    [release, publish],
+  );
+
+  const onPointerCancel = useCallback(
+    (e: React.PointerEvent) => {
+      if (e.pointerType === 'mouse') return;
+      const p = st.current.phase;
+      if (p === 'holding' || p === 'ready') {
+        clearHold();
+        publish({ phase: st.current.inInspection ? 'inspecting' : 'idle' });
+      } else if (p === 'stopped') publish({ phase: 'idle' });
+    },
+    [publish],
+  );
+
+  // touch anywhere on the page stops a running solve (and finishes the stop on lift-off), so the
+  // finger does not have to land on the timer area again
+  useEffect(() => {
+    const down = (e: PointerEvent) => {
+      if (e.pointerType === 'mouse' || !gateOpen()) return;
+      if (st.current.phase === 'running') stop(now(e), false);
+    };
+    const up = (e: PointerEvent) => {
+      if (e.pointerType === 'mouse') return;
+      if (st.current.phase === 'stopped' && keysDown.current.size === 0) publish({ phase: 'idle' });
+    };
+    window.addEventListener('pointerdown', down, true);
+    window.addEventListener('pointerup', up, true);
+    return () => {
+      window.removeEventListener('pointerdown', down, true);
+      window.removeEventListener('pointerup', up, true);
+    };
+  }, [stop, publish]);
+
   /** forget the last result (e.g. after deleting it) */
   const clearResult = useCallback(() => publish({ result: null }), [publish]);
 
-  return { state, cancel, clearResult };
+  return { state, cancel, clearResult, touchHandlers: { onPointerDown, onPointerUp, onPointerCancel } };
 }

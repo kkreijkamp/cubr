@@ -46,12 +46,12 @@ interface TimerAreaProps {
   children?: ReactNode;
 }
 
-/** Big timer display. */
+/** Big timer + touch surface (tap / hold on phones). */
 export function TimerArea({ engine, scale = 1, idleDim, children }: TimerAreaProps) {
   const settings = useSettings();
   const size = Math.max(3, settings.timerSize * scale);
   return (
-    <div className={`live-timer${idleDim && engine.state.phase === 'idle' ? ' dim' : ''}`}>
+    <div className={`live-timer${idleDim && engine.state.phase === 'idle' ? ' dim' : ''}`} {...engine.touchHandlers}>
       <TimerDisplay state={engine.state} precision={settings.precision} timerUpdate={settings.timerUpdate} sizeRem={size} />
       {children}
     </div>

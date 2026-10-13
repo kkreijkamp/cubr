@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, Cloud, CloudOff, Eye, HardDrive, Layers, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { Check, ChevronDown, Cloud, CloudOff, Eye, HardDrive, Keyboard, Layers, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { EVENTS, getEvent } from '@cubetype/cubestats';
+import { Modal } from '../Modal';
 import type { Session } from '../../lib/types';
 import { formatNumber } from '../../lib/format';
 
@@ -20,6 +21,8 @@ interface Props {
   onDeleteSession: () => void;
   inspection: boolean;
   onToggleInspection: () => void;
+  manual: boolean;
+  onToggleManual: () => void;
   /** a popover/menu is open (the timer is paused meanwhile) */
   onOverlayChange: (open: boolean) => void;
   mode: 'local' | 'cloud';
@@ -29,16 +32,18 @@ interface Props {
 
 export function ConfigBar(p: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const current = p.sessions.find((s) => s.id === p.currentSessionId) ?? null;
   const eventSessions = p.sessions.filter((s) => s.event === p.event);
   const { onOverlayChange } = p;
 
   useEffect(() => {
-    onOverlayChange(menuOpen);
-  }, [menuOpen, onOverlayChange]);
+    onOverlayChange(menuOpen || pickerOpen);
+  }, [menuOpen, pickerOpen, onOverlayChange]);
 
   return (
     <div className="config-bar tp-config">
+      {/* desktop: every event inline */}
       <div className="config-card tp-events-full" role="group" aria-label="event">
         {EVENTS.map((e) => (
           <button
@@ -52,6 +57,12 @@ export function ConfigBar(p: Props) {
             {shortLabel(e.id)}
           </button>
         ))}
+      </div>
+      {/* narrow screens: one button that opens a picker */}
+      <div className="config-card tp-events-compact">
+        <button className="btn-text active" onClick={() => setPickerOpen(true)} aria-label="choose event" {...noFocus}>
+          {shortLabel(p.event)} <ChevronDown size={14} />
+        </button>
       </div>
 
       <div className="config-card tp-session-card">
@@ -78,11 +89,43 @@ export function ConfigBar(p: Props) {
           {...noFocus}
         >
           <Eye size={14} />
-          <span>inspection</span>
+          <span className="tp-hide-narrow">inspection</span>
+        </button>
+        <div className="divider" />
+        <button
+          className={`btn-text${p.manual ? ' active' : ''}`}
+          onClick={p.onToggleManual}
+          aria-pressed={p.manual}
+          data-tip="type times in manually (alt+m)"
+          data-tip-pos="down"
+          {...noFocus}
+        >
+          <Keyboard size={14} />
+          <span className="tp-hide-narrow">typing</span>
         </button>
       </div>
 
       <SyncStatus mode={p.mode} pending={p.pending} syncError={p.syncError} />
+
+      {pickerOpen && (
+        <Modal title="event" onClose={() => setPickerOpen(false)} center>
+          <div className="tp-event-grid">
+            {EVENTS.map((e) => (
+              <button
+                key={e.id}
+                className={`btn${e.id === p.event ? ' active' : ''}`}
+                onClick={() => {
+                  setPickerOpen(false);
+                  p.onEvent(e.id);
+                }}
+              >
+                <span>{shortLabel(e.id)}</span>
+                <span className="tp-event-grid-name">{e.name}</span>
+              </button>
+            ))}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
@@ -214,7 +257,7 @@ function SyncStatus({ mode, pending, syncError }: { mode: 'local' | 'cloud'; pen
   return (
     <div className={`config-card tp-sync${cls}`} data-tip={tip} data-tip-pos="down" role="status" aria-label={tip}>
       {icon}
-      <span>{label}</span>
+      <span className="tp-hide-narrow">{label}</span>
     </div>
   );
 }

@@ -8,6 +8,8 @@ export interface ScrambleItem {
   text: string;
   /** generated in the browser because the scramble service was unreachable */
   offline: boolean;
+  /** typed in by the user */
+  custom?: boolean;
 }
 
 const BATCH = 5;
@@ -62,6 +64,11 @@ export interface ScrambleQueue {
   current: ScrambleItem | null;
   /** advance to the next scramble (Tab / after a solve) */
   next: () => void;
+  /** go back to the previous scramble, if any */
+  prev: () => void;
+  hasPrev: boolean;
+  /** replace the current scramble with a user-entered one */
+  setCustom: (text: string) => void;
 }
 
 export function useScrambleQueue(event: string): ScrambleQueue {
@@ -69,7 +76,9 @@ export function useScrambleQueue(event: string): ScrambleQueue {
     event,
     item: currentByEvent.get(event) ?? null,
   }));
+  const history = useRef<Map<string, ScrambleItem[]>>(new Map());
   const req = useRef(0);
+  const [, force] = useState(0);
 
   const show = useCallback((ev: string, item: ScrambleItem | null) => {
     if (item) currentByEvent.set(ev, item);
@@ -105,9 +114,36 @@ export function useScrambleQueue(event: string): ScrambleQueue {
   const item = state.event === event ? state.item : null;
 
   const next = useCallback(() => {
+    if (item) {
+      const h = history.current.get(event) ?? [];
+      h.push(item);
+      if (h.length > 20) h.shift();
+      history.current.set(event, h);
+    }
     currentByEvent.delete(event);
     load(event);
-  }, [event, load]);
+  }, [event, item, load]);
 
-  return { current: item, next };
+  const prev = useCallback(() => {
+    const h = history.current.get(event);
+    const back = h?.pop();
+    if (!back) return;
+    if (item && !item.custom) queues.set(event, [item, ...(queues.get(event) ?? [])]);
+    req.current++;
+    show(event, back);
+    force((n) => n + 1);
+  }, [event, item, show]);
+
+  const setCustom = useCallback(
+    (text: string) => {
+      const t = text.trim();
+      if (!t) return;
+      if (item && !item.custom) queues.set(event, [item, ...(queues.get(event) ?? [])]);
+      req.current++;
+      show(event, { text: t.slice(0, 2000), offline: false, custom: true });
+    },
+    [event, item, show],
+  );
+
+  return { current: item, next, prev, hasPrev: (history.current.get(event)?.length ?? 0) > 0, setCustom };
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { fmtAvg, fmtSolveLong, fmtSolveShort, parseAvgKey, statNs } from '../../components/timer/statsUtil';
+import { parseTimeInput } from '@cubetype/cubestats';
+import { fmtAvg, fmtSolveLong, fmtSolveShort, parseAvgKey, parseManualEntry, statNs } from '../../components/timer/statsUtil';
 
 describe('stat keys', () => {
   it('parses mo3/aoN', () => {
@@ -23,5 +24,20 @@ describe('formatting', () => {
     expect(fmtSolveShort({ timeMs: 12349, penalty: 'DNF' }, 2)).toBe('DNF');
     expect(fmtSolveLong({ timeMs: 12349, penalty: 'DNF' }, 2)).toBe('DNF(12.34)');
     expect(fmtSolveLong({ timeMs: 1, penalty: 'DNF' }, 2)).toBe('DNF');
+  });
+});
+
+describe('manual entry', () => {
+  const p = (s: string) => parseManualEntry(s, parseTimeInput);
+  it('understands csTimer typing formats', () => {
+    expect(p('12.34')).toEqual({ timeMs: 12340, penalty: 'OK' });
+    expect(p('1234')).toEqual({ timeMs: 12340, penalty: 'OK' });
+    expect(p('1:02.5')).toEqual({ timeMs: 62500, penalty: 'OK' });
+    expect(p('14.34+')).toEqual({ timeMs: 12340, penalty: '+2' });
+    expect(p('DNF(12.34)')).toEqual({ timeMs: 12340, penalty: 'DNF' });
+    expect(p('dnf')).toEqual({ timeMs: 1, penalty: 'DNF' });
+    expect(p('')).toBeNull();
+    expect(p('abc')).toBeNull();
+    expect(p('1.5+')).toBeNull();
   });
 });

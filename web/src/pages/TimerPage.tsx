@@ -1,5 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Eye, Layers, List, MessageSquare, Pencil, Plus, RefreshCw, Timer as TimerIcon, Trash2 } from 'lucide-react';
+import {
+  Copy,
+  Eye,
+  Keyboard,
+  Layers,
+  List,
+  MessageSquare,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Timer as TimerIcon,
+  Trash2,
+} from 'lucide-react';
 import { EVENTS, effectiveMs, getEvent, rollingAverage, sessionStats, type Penalty } from '@cubetype/cubestats';
 import { TimerDisplay } from '../timer/TimerDisplay';
 import { useTimerEngine, type TimerResult, type TimerState } from '../timer/useTimerEngine';
@@ -10,7 +22,9 @@ import { StatsPanel } from '../components/timer/StatsPanel';
 import { SolveList } from '../components/timer/SolveList';
 import { SolveModal } from '../components/timer/SolveModal';
 import { QuickActions } from '../components/timer/QuickActions';
+import { ManualEntry } from '../components/timer/ManualEntry';
 import { ConfirmModal, PromptModal } from '../components/timer/Dialogs';
+import { copyText, isTouchDevice } from '../components/timer/feedback';
 import { fmtAvg, fmtSolveShort, statNs } from '../components/timer/statsUtil';
 import '../components/timer/timer-page.css';
 import { paletteStore, useRegisterCommands, type Command } from '../lib/commands';
@@ -55,8 +69,11 @@ export default function TimerPage() {
   const eventInfo = getEvent(event) ?? EVENTS[0];
   const scr = useScrambleQueue(event);
 
+  const [manual, setManual] = useState(false);
+  const [editingScramble, setEditingScramble] = useState(false);
   const [overlay, setOverlay] = useState(false);
   const [modal, setModal] = useState<ModalState>(null);
+  const touch = useMemo(isTouchDevice, []);
 
   // ---------------------------------------------------------------- derived stats (memoised per solve change)
   const solves = st.solves;
@@ -73,17 +90,26 @@ export default function TimerPage() {
   scrRef.current = scr;
   const lastRef = useRef(last);
   lastRef.current = last;
+  const lastStopAt = useRef(0);
 
   // ---------------------------------------------------------------- recording solves
-  const onSolve = useCallback((r: TimerResult) => {
+  const record = useCallback((r: { timeMs: number; penalty: Penalty }, source: 'timer' | 'manual') => {
     const scramble = scrRef.current.current?.text ?? '';
-    addSolve({ timeMs: r.timeMs, penalty: r.penalty, scramble }).catch((e: Error) => {
+    addSolve({ timeMs: r.timeMs, penalty: r.penalty, scramble, source }).catch((e: Error) => {
       toast.error(e.message || "couldn't save the solve");
     });
     scrRef.current.next();
   }, []);
 
-  const engineEnabled = !overlay && modal === null && !paletteOpen;
+  const onSolve = useCallback(
+    (r: TimerResult) => {
+      lastStopAt.current = performance.now();
+      record(r, 'timer');
+    },
+    [record],
+  );
+
+  const engineEnabled = !manual && !editingScramble && !overlay && modal === null && !paletteOpen;
   const engine = useTimerEngine({
     enabled: engineEnabled,
     // WCA inspection only applies to events that have it (not blindfolded, not FMC)
@@ -93,9 +119,14 @@ export default function TimerPage() {
     onSolve,
   });
   const { phase } = engine.state;
-  const { clearResult } = engine;
+  const { clearResult, cancel: cancelEngine } = engine;
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
+
+  // leaving manual mode / opening things: never keep a stale engine result around
+  useEffect(() => {
+    if (manual) cancelEngine();
+  }, [manual, cancelEngine]);
 
   // ---------------------------------------------------------------- actions on the latest solve
   const penaltyLast = useCallback((p: Penalty) => {
@@ -122,6 +153,11 @@ export default function TimerPage() {
     if (l) setModal({ kind: 'comment', solveId: l.id });
   }, []);
 
+  const copyScramble = useCallback(async () => {
+    const t = scrRef.current.current?.text;
+    if (t && (await copyText(t))) toast.success('scramble copied', { durationMs: 1500 });
+  }, []);
+
   const cycleSession = useCallback(
     (dir: 1 | -1) => {
       const list = st.sessions.filter((s) => s.event === event);
@@ -133,16 +169,30 @@ export default function TimerPage() {
   );
 
   const changeEvent = useCallback((ev: string) => {
+    setEditingScramble(false);
     void switchEvent(ev).catch((e: Error) => toast.error(e.message));
   }, []);
 
   // ---------------------------------------------------------------- keyboard
   useEffect(() => {
+    // a touch that stopped the timer must not also "click" whatever appears under the finger
+    const guardClick = (e: MouseEvent) => {
+      if (performance.now() - lastStopAt.current < 450) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener('click', guardClick, true);
+    return () => window.removeEventListener('click', guardClick, true);
+  }, []);
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || paletteStore.get().open || document.querySelector('.modal-backdrop')) return;
       const p = phaseRef.current;
       if (p !== 'idle' && p !== 'stopped') return;
-      if (isTyping(e.target)) return;
+      const inManualInput = e.target instanceof HTMLElement && e.target.hasAttribute('data-manual-entry');
+      if (isTyping(e.target) && !(inManualInput && e.altKey)) return;
       if (e.key === 'Tab' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
         scrRef.current.next();
@@ -156,8 +206,11 @@ export default function TimerPage() {
         Backspace: deleteLast,
         KeyZ: deleteLast,
         KeyC: commentLast,
+        ArrowLeft: () => scrRef.current.prev(),
+        ArrowRight: () => scrRef.current.next(),
         ArrowUp: () => cycleSession(-1),
         ArrowDown: () => cycleSession(1),
+        KeyM: () => setManual((m) => !m),
       };
       const fn = actions[e.code];
       if (fn) {
@@ -205,6 +258,8 @@ export default function TimerPage() {
         { id: 'timer-rename-session', label: 'Rename session', icon: <Pencil />, run: () => setModal({ kind: 'renameSession' }) },
         { id: 'timer-delete-session', label: 'Delete session', icon: <Trash2 />, run: () => setModal({ kind: 'deleteSession' }) },
         { id: 'timer-new-scramble', label: 'New scramble', icon: <RefreshCw />, keywords: ['next'], run: () => scrRef.current.next() },
+        { id: 'timer-custom-scramble', label: 'Enter custom scramble', icon: <Pencil />, keywords: ['edit'], run: () => setEditingScramble(true) },
+        { id: 'timer-copy-scramble', label: 'Copy scramble', icon: <Copy />, run: () => void copyScramble() },
       ];
       if (last) {
         cmds.push(
@@ -227,12 +282,14 @@ export default function TimerPage() {
       }
       cmds.push(
         { id: 'timer-toggle-list', label: settings.showSolveList ? 'Hide solve list' : 'Show solve list', icon: <List />, keywords: ['toggle'], run: () => updateSettings({ showSolveList: !settings.showSolveList }) },
+        { id: 'timer-manual', label: manual ? 'Use the timer (leave manual entry)' : 'Manual entry (type times)', icon: <Keyboard />, keywords: ['typing', 'toggle'], run: () => setManual((m) => !m) },
         { id: 'timer-inspection-toggle', label: settings.inspection ? 'Turn inspection off' : 'Turn inspection on', icon: <Eye />, keywords: ['toggle', 'wca'], run: () => updateSettings({ inspection: !settings.inspection }) },
       );
       return cmds;
     },
-    [st.sessions, event, session?.id, last?.id, last?.penalty, settings.showSolveList, settings.inspection, deleteLast],
+    [st.sessions, event, session?.id, last?.id, last?.penalty, settings.showSolveList, settings.inspection, manual, deleteLast],
   );
+
 
   // ---------------------------------------------------------------- display
   // idle: show the latest solve of this session (with its current penalty), like csTimer
@@ -262,22 +319,38 @@ export default function TimerPage() {
         onDeleteSession={() => setModal({ kind: 'deleteSession' })}
         inspection={settings.inspection}
         onToggleInspection={() => updateSettings({ inspection: !settings.inspection })}
+        manual={manual}
+        onToggleManual={() => setManual((m) => !m)}
         onOverlayChange={onOverlayChange}
         mode={st.mode}
         pending={st.pending}
         syncError={st.syncError}
       />
 
-      <ScrambleBar scramble={scr.current} onNext={scr.next} />
+      <ScrambleBar
+        scramble={scr.current}
+        onNext={scr.next}
+        onPrev={scr.prev}
+        hasPrev={scr.hasPrev}
+        onCustom={scr.setCustom}
+        editing={editingScramble}
+        setEditing={setEditingScramble}
+      />
 
-      <div className="tp-timer-area">
-        <TimerDisplay state={displayState} precision={settings.precision} timerUpdate={settings.timerUpdate} sizeRem={settings.timerSize} />
+      <div className="tp-timer-area" {...(manual ? {} : engine.touchHandlers)} aria-label={touch ? 'timer: hold to get ready, release to start' : 'timer'}>
+        {manual ? (
+          <ManualEntry onSubmit={(r) => record(r, 'manual')} disabled={modal !== null || paletteOpen} />
+        ) : (
+          <TimerDisplay state={displayState} precision={settings.precision} timerUpdate={settings.timerUpdate} sizeRem={settings.timerSize} />
+        )}
       </div>
 
       <div className="tp-under">
-        {solves.length === 0 && st.ready ? (
+        {solves.length === 0 && !manual && st.ready ? (
           <div className="tp-hint">
-            {settings.inspection && eventInfo.inspection ? (
+            {touch ? (
+              'hold the timer, release to start · tap anywhere to stop'
+            ) : settings.inspection && eventInfo.inspection ? (
               <>
                 press <kbd>space</kbd> to start inspection
               </>

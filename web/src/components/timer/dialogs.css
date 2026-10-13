@@ -15,6 +15,7 @@
   flex-wrap: wrap;
 }
 
-.modal .field {
+.modal .field,
+.tp-event-grid {
   text-align: left;
 }

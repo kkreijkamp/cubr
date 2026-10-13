@@ -25,3 +25,12 @@ export async function copyText(text: string): Promise<boolean> {
     return false;
   }
 }
+
+/** True on touch-first devices (phones/tablets): used for "tap" vs "press space" wording. */
+export function isTouchDevice(): boolean {
+  try {
+    return window.matchMedia('(pointer: coarse)').matches;
+  } catch {
+    return false;
+  }
+}

@@ -43,3 +43,27 @@ export function fmtSolveLong(s: Pick<Solve, 'timeMs' | 'penalty'>, precision: Pr
   if (s.penalty === 'DNF' && s.timeMs <= 1) return 'DNF';
   return formatSolve(s.timeMs, s.penalty, precision);
 }
+
+/**
+ * Manual time entry (csTimer typing mode): "12.34", "1:02.34", "1234" (= 12.34), "12.34+" (+2
+ * included in the typed time), "dnf(12.34)" and a bare "dnf". Returns null when unparseable.
+ */
+export function parseManualEntry(input: string, parse: (s: string) => number | null): { timeMs: number; penalty: 'OK' | '+2' | 'DNF' } | null {
+  let s = input.trim().toLowerCase().replace(/\s+/g, '');
+  if (!s) return null;
+  if (s === 'dnf') return { timeMs: 1, penalty: 'DNF' };
+  let penalty: 'OK' | '+2' | 'DNF' = 'OK';
+  const dnf = /^dnf\((.+)\)$/.exec(s);
+  if (dnf) {
+    s = dnf[1];
+    penalty = 'DNF';
+  } else if (s.endsWith('+')) {
+    s = s.slice(0, -1);
+    penalty = '+2';
+  }
+  const ms = parse(s);
+  if (ms === null || !Number.isFinite(ms)) return null;
+  const timeMs = penalty === '+2' ? ms - 2000 : ms;
+  if (timeMs < 1 || timeMs > 86_400_000) return null;
+  return { timeMs, penalty };
+}
