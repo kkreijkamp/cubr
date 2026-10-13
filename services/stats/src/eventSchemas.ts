@@ -12,6 +12,10 @@ export const CONSUMED_TYPES = [
   'user.registered',
   'user.updated',
   'solve.created',
+  'solve.updated',
+  'solve.deleted',
+  'session.deleted',
+  'solves.imported',
 ] as const;
 
 export const userEventSchema = z.object({
@@ -38,5 +42,53 @@ export const solveCreatedSchema = z.object({
     .nullish(),
 });
 
+/** solve.updated / solve.deleted: only the routing fields are needed (they trigger a recompute). */
+export const solveChangedSchema = z.object({
+  eventId: z.string().min(1),
+  userId: uuid,
+  username: optUsername,
+  event,
+  sessionId: uuid.nullish(),
+  solveId: uuid,
+  timeMs: z.number().int().nullish(),
+  penalty: penalty.nullish(),
+  createdAt: isoDate.nullish(),
+  tz: optTz,
+});
+
+export const sessionDeletedSchema = z.object({
+  eventId: z.string().min(1),
+  userId: uuid,
+  username: optUsername,
+  sessionId: uuid,
+  event,
+  tz: optTz,
+});
+
+export const solvesImportedSchema = z.object({
+  eventId: z.string().min(1),
+  userId: uuid,
+  username: optUsername,
+  events: z.array(event).nullish(),
+  count: z.number().nullish(),
+  tz: optTz,
+});
+
 export type UserEvent = z.infer<typeof userEventSchema>;
 export type SolveCreated = z.infer<typeof solveCreatedSchema>;
+export type SolveChanged = z.infer<typeof solveChangedSchema>;
+export type SessionDeleted = z.infer<typeof sessionDeletedSchema>;
+export type SolvesImported = z.infer<typeof solvesImportedSchema>;
+
+/** Response of solve-service GET /internal/users/:id/solves?event= */
+export const solveListSchema = z.object({
+  solves: z.array(
+    z.object({
+      id: uuid,
+      sessionId: uuid,
+      timeMs: z.number().int().positive(),
+      penalty,
+      createdAt: isoDate,
+    }),
+  ),
+});

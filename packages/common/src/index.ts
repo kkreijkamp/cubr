@@ -6,4 +6,5 @@ export * from './db.js';
 export * from './redis.js';
 export * from './auth.js';
 export * from './events.js';
+export * from './http.js';
 export * from './time.js';

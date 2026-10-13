@@ -22,13 +22,19 @@ type PB = { valueMs: number; solveId: string | null; achievedAt: string };
 
 const iso = (d: Date | null) => (d ? d.toISOString() : null);
 
+/** The owner's bucketing timezone (days were stored in it) — "today" for streaks / activity. */
+async function userTz(pool: Pool, userId: string): Promise<string> {
+  const { rows } = await pool.query<{ tz: string }>('SELECT tz FROM stats.user_totals WHERE user_id = $1', [userId]);
+  return rows[0]?.tz ?? 'UTC';
+}
+
 export async function registerUserRoutes(app: FastifyInstance, pool: Pool): Promise<void> {
   // Profile summary. Unknown users get zeros (a brand-new account has a clean profile, not a 404).
   app.get('/api/stats/users/:userId/summary', async (req) => {
     const { userId } = parse(userParams, req.params);
     const [totals, days, daily, hourly, pbs] = await Promise.all([
-      pool.query<{ username: string; solves: number; total_ms: number; first_solve_at: Date | null; last_solve_at: Date | null }>(
-        'SELECT username, solves, total_ms, first_solve_at, last_solve_at FROM stats.user_totals WHERE user_id = $1',
+      pool.query<{ username: string; solves: number; total_ms: number; first_solve_at: Date | null; last_solve_at: Date | null; tz: string }>(
+        'SELECT username, solves, total_ms, first_solve_at, last_solve_at, tz FROM stats.user_totals WHERE user_id = $1',
         [userId],
       ),
       pool.query<{ day: string }>('SELECT DISTINCT day FROM stats.daily_activity WHERE user_id = $1', [userId]),
@@ -48,8 +54,7 @@ export async function registerUserRoutes(app: FastifyInstance, pool: Pool): Prom
       ),
     ]);
     const t = totals.rows[0];
-    // days are bucketed in the user's timezone; a day "ahead" of the UTC date still counts as today
-    const today = dayKey(new Date(), 'UTC');
+    const today = dayKey(new Date(), t?.tz ?? 'UTC');
     const streaks = computeStreaks(days.rows.map((r) => r.day), today);
 
     type EventLine = { event: string; solves: number; totalMs: number; meanMs: number | null; pbs: Record<PbKind, PB | null> };
@@ -84,11 +89,11 @@ export async function registerUserRoutes(app: FastifyInstance, pool: Pool): Prom
     };
   });
 
-  // Heatmap data: only days with solves, default the last 365 days.
+  // Heatmap data: only days with solves, default the last 365 days (in the user's timezone).
   app.get('/api/stats/users/:userId/activity', async (req) => {
     const { userId } = parse(userParams, req.params);
     const q = parse(activityQuery, req.query);
-    const to = q.to ?? (q.from ? addDays(q.from, 364) : dayKey(new Date(), 'UTC'));
+    const to = q.to ?? (q.from ? addDays(q.from, 364) : dayKey(new Date(), await userTz(pool, userId)));
     const from = q.from ?? addDays(to, -364);
     if (from > to) throw badRequest('from must not be after to');
     const { rows } = await pool.query<{ day: string; solves: number; total_ms: number }>(
@@ -112,13 +117,13 @@ export async function registerUserRoutes(app: FastifyInstance, pool: Pool): Prom
     return { event, history: rows.map((r) => ({ kind: r.kind, valueMs: r.value_ms, achievedAt: r.achieved_at.toISOString() })) };
   });
 
-  // Time-of-day profile: 24 entries; `solves` = non-DNF solves, meanMs over them.
+  // Time-of-day profile: 24 entries; `solves` = all attempts, meanMs over non-DNF solves.
   // Without ?event= all events are combined.
   app.get('/api/stats/users/:userId/hourly', async (req) => {
     const { userId } = parse(userParams, req.params);
     const { event } = parse(hourlyQuery, req.query);
-    const { rows } = await pool.query<{ hour: number; solves: number; sum_ms: number }>(
-      `SELECT hour, sum(solves)::int AS solves, sum(sum_ms)::bigint AS sum_ms
+    const { rows } = await pool.query<{ hour: number; solves: number; sum_ms: number; dnfs: number }>(
+      `SELECT hour, sum(solves)::int AS solves, sum(sum_ms)::bigint AS sum_ms, sum(dnfs)::int AS dnfs
          FROM stats.hourly WHERE user_id = $1 AND ($2::text IS NULL OR event = $2)
         GROUP BY hour`,
       [userId, event ?? null],
@@ -128,8 +133,9 @@ export async function registerUserRoutes(app: FastifyInstance, pool: Pool): Prom
       const r = byHour.get(hour);
       return {
         hour,
-        solves: r?.solves ?? 0,
+        solves: r ? r.solves + r.dnfs : 0,
         meanMs: r && r.solves > 0 ? Math.round(r.sum_ms / r.solves) : null,
+        dnfs: r?.dnfs ?? 0,
       };
     });
     return { event: event ?? null, hours };

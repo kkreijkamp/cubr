@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { RouteContext } from '../context.js';
+import { registerInternalRoutes } from './internal.js';
 import { registerSessionRoutes } from './sessions.js';
 import { registerSolveRoutes } from './solves.js';
 
@@ -22,4 +23,5 @@ export async function registerRoutes(app: FastifyInstance, ctx: RouteContext): P
   allowEmptyJsonBodies(app);
   registerSessionRoutes(app, ctx);
   registerSolveRoutes(app, ctx);
+  registerInternalRoutes(app, ctx);
 }

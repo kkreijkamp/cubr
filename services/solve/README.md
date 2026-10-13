@@ -3,7 +3,7 @@
 The core write path of cubetype: sessions and solves CRUD and the **transactional outbox** that feeds the
 Redis event bus. Owns the Postgres schema `solve` (SPEC §7.2), migrated at startup. Port 8080.
 
-## Routes (all require `Authorization: Bearer <jwt>`)
+## Routes (all `/api/*` require `Authorization: Bearer <jwt>`)
 | Route | Notes |
 |---|---|
 | `GET /api/sessions` | creates a default `3x3`/`333` session on first call (per-user advisory lock → exactly one) |
@@ -13,6 +13,7 @@ Redis event bus. Owns the Postgres schema `solve` (SPEC §7.2), migrated at star
 | `POST /api/solves` | idempotent on `id` (`ON CONFLICT DO NOTHING`): retry → 200, no second event; id of another user → 409. Returns `{solve, rolling:{ao5,ao12}}` |
 | `PATCH /api/solves/:id` `{penalty?, comment?}` / `DELETE /api/solves/:id` | emit `solve.updated` / `solve.deleted`; a changed solve is returned with the session's `rolling` |
 | `GET /api/solves/_info`, `/api/sessions/_info` | info incl. `outbox: {backlog, published, lastPublishedAt, lastError, healthy}` |
+| `GET /internal/users/:userId/solves?event=` | **no auth, not routed by the gateway**: `{solves:[{id, sessionId, timeMs, penalty, createdAt}]}` ordered by session, time (stats recompute) |
 
 Users only ever see their own rows; foreign ids return 404. A solve always gets the event of its session.
 `X-Timezone` (valid IANA name, else `UTC`) is copied into events as `tz`. Tokens revoked by logout are rejected

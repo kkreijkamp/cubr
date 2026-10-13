@@ -1,43 +1,53 @@
-import {
-  DLQ_STREAM, newEventId, publishEvent, withTx, type EventEnvelope, type Pool, type PoolClient, type Redis,
-} from '@cubetype/common';
+import { DLQ_STREAM, withTx, type EventEnvelope, type Pool, type PoolClient, type Redis } from '@cubetype/common';
 import { effectiveMs } from '@cubetype/cubestats';
 import type { FastifyBaseLogger } from 'fastify';
 import type { ZodType, ZodTypeDef } from 'zod';
 import { makeBucketer, validTz } from './domain/buckets.js';
-import { isImprovement, rollingFromPayload, type PbKind } from './domain/pbs.js';
-import { solveCreatedSchema, userEventSchema, type SolveCreated } from './eventSchemas.js';
-import { ensureUser, loadPbs, lockUser, markProcessed, upsertPb, type PbChange } from './store.js';
+import { isImprovement, rollingFromPayload, tailAverages, type PbKind } from './domain/pbs.js';
+import {
+  sessionDeletedSchema,
+  solveChangedSchema,
+  solveCreatedSchema,
+  solvesImportedSchema,
+  userEventSchema,
+  type SolveCreated,
+} from './eventSchemas.js';
+import { recomputeEvent, type RecomputeDeps } from './recompute.js';
+import { ensureUser, loadPbs, lockUser, markProcessed, queuePbUpdated, refreshTotals, upsertPb } from './store.js';
 
 export interface ProjectorDeps {
   pool: Pool;
   redis: Redis;
   log: FastifyBaseLogger;
+  solveUrl: string;
+  /** Publishes queued pb.updated events right after commit (best effort; a loop retries). */
+  flushPbOutbox: () => Promise<unknown>;
 }
 
 /**
  * Event handler for the `stats` consumer group. Every event is applied in ONE transaction that
- * takes the per-user lock and records the event id in processed_events (duplicate deliveries are
- * skipped); the resulting pb.updated events are published once that transaction has committed.
+ * takes the per-user lock, records the event id in processed_events (duplicate deliveries are
+ * skipped) and writes resulting pb.updated events to the outbox table.
  */
 export function createProjector(deps: ProjectorDeps) {
-  const { pool, redis, log } = deps;
+  const { pool, log } = deps;
+  const rdeps: RecomputeDeps = { solveUrl: deps.solveUrl, log };
 
   /**
-   * Runs `fn` in the per-user, de-duplicated transaction; `fn` returns the personal bests it
-   * changed, which are announced as pb.updated after commit.
+   * Runs `fn` in the per-user, de-duplicated transaction; `fn` returns how many pb.updated events
+   * it queued, and the outbox is flushed after commit when there are any.
    */
-  async function inUserTx(eventId: string, userId: string, fn: (c: PoolClient) => Promise<PbChange[] | void>): Promise<void> {
-    const changes = await withTx(pool, async (c) => {
+  async function inUserTx(eventId: string, userId: string, fn: (c: PoolClient) => Promise<number | void>): Promise<void> {
+    const queued = await withTx(pool, async (c) => {
       await lockUser(c, userId);
       if (!(await markProcessed(c, eventId))) {
         log.debug({ eventId }, 'duplicate event skipped');
-        return [];
+        return 0;
       }
-      return (await fn(c)) ?? [];
+      return (await fn(c)) ?? 0;
     });
-    for (const change of changes) {
-      await publishEvent(redis, 'pb.updated', { eventId: newEventId('stats'), ...change });
+    if (queued > 0) {
+      await deps.flushPbOutbox().catch((err) => log.warn({ err: (err as Error).message }, 'pb outbox flush failed (will retry)'));
     }
   }
 
@@ -48,7 +58,7 @@ export function createProjector(deps: ProjectorDeps) {
     const issue = res.error.issues[0];
     const error = `invalid payload: ${issue.path.join('.')}: ${issue.message}`;
     log.error({ type: evt.type, id: evt.id, error }, 'malformed event moved to dead-letter stream');
-    await redis.xadd(DLQ_STREAM, 'MAXLEN', '~', '10000', '*', 'group', 'stats', 'type', evt.type, 'data', JSON.stringify(evt.data), 'error', error);
+    await deps.redis.xadd(DLQ_STREAM, 'MAXLEN', '~', '10000', '*', 'group', 'stats', 'type', evt.type, 'data', JSON.stringify(evt.data), 'error', error);
     return null;
   }
 
@@ -57,29 +67,52 @@ export function createProjector(deps: ProjectorDeps) {
     const d = await payload(userEventSchema, evt);
     if (!d) return;
     await inUserTx(d.eventId, d.userId, async (c) => {
-      await ensureUser(c, d.userId, d.username);
+      await ensureUser(c, d.userId, d.username, null);
       if (d.createdAt) {
         await c.query('UPDATE stats.user_totals SET registered_at = LEAST(registered_at, $2) WHERE user_id = $1', [d.userId, d.createdAt]);
       }
     });
   }
 
-  // ---- solve.created: totals, activity, time of day and personal bests
+  // ---- solve.created: incremental fast path
   async function onSolveCreated(evt: EventEnvelope) {
     const d = await payload(solveCreatedSchema, evt);
     if (!d) return;
     await inUserTx(d.eventId, d.userId, (c) => applySolveCreated(c, d));
   }
 
-  async function applySolveCreated(c: PoolClient, d: SolveCreated): Promise<PbChange[]> {
-    const user = await ensureUser(c, d.userId, d.username);
+  async function applySolveCreated(c: PoolClient, d: SolveCreated): Promise<number> {
+    const user = await ensureUser(c, d.userId, d.username, validTz(d.tz));
+    const deletedSession = await c.query('SELECT 1 FROM stats.deleted_sessions WHERE session_id = $1', [d.sessionId]);
+    if (deletedSession.rowCount) return 0; // late event for a session that is already gone
+
     const eff = effectiveMs(d);
     const effDb = Number.isFinite(eff) ? eff : null;
+    // Per-solve idempotency: if the ledger already knows this solve (counted by a full recompute
+    // that ran first, or tombstoned by solve.deleted) there is nothing to add.
+    const ins = await c.query(
+      `INSERT INTO stats.solve_ledger (solve_id, user_id, event, session_id, time_ms, effective_ms, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (solve_id) DO NOTHING`,
+      [d.solveId, d.userId, d.event, d.sessionId, d.timeMs, effDb, d.createdAt],
+    );
+    if (!ins.rowCount) return 0;
 
-    // aggregates (raw timeMs = time spent cubing; hourly mean uses effective times of non-DNF solves),
-    // days and hours in the timezone the solve was made in
+    // A back-dated solve lands in the middle of its session and shifts the rolling windows, so an
+    // incremental compare would be wrong: rebuild the event from solve-service instead (rare).
+    const later = await c.query(
+      'SELECT 1 FROM stats.solve_ledger WHERE session_id = $1 AND NOT deleted AND solve_id <> $2 AND created_at > $3 LIMIT 1',
+      [d.sessionId, d.solveId, d.createdAt],
+    );
+    if (later.rowCount) {
+      log.info({ userId: d.userId, solveId: d.solveId }, 'back-dated solve, recomputing event');
+      const { pbChanges } = await recomputeEvent(c, rdeps, { userId: d.userId, username: user.username, event: d.event, tz: user.tz });
+      await refreshTotals(c, d.userId);
+      return pbChanges;
+    }
+
+    // aggregates (raw timeMs = time spent cubing; hourly mean uses effective times of non-DNF solves)
     const at = new Date(d.createdAt);
-    const { day, hour } = makeBucketer(validTz(d.tz) ?? 'UTC')(at);
+    const { day, hour } = makeBucketer(user.tz)(at);
     await c.query(
       `UPDATE stats.user_totals
           SET solves = solves + 1, total_ms = total_ms + $2,
@@ -94,23 +127,35 @@ export function createProjector(deps: ProjectorDeps) {
       [d.userId, day, d.event, d.timeMs],
     );
     await c.query(
-      `INSERT INTO stats.hourly (user_id, event, hour, solves, sum_ms) VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO stats.hourly (user_id, event, hour, solves, sum_ms, dnfs) VALUES ($1, $2, $3, $4, $5, $6)
        ON CONFLICT (user_id, event, hour) DO UPDATE
-         SET solves = stats.hourly.solves + EXCLUDED.solves, sum_ms = stats.hourly.sum_ms + EXCLUDED.sum_ms`,
-      [d.userId, d.event, hour, effDb === null ? 0 : 1, effDb ?? 0],
+         SET solves = stats.hourly.solves + EXCLUDED.solves, sum_ms = stats.hourly.sum_ms + EXCLUDED.sum_ms,
+             dnfs = stats.hourly.dnfs + EXCLUDED.dnfs`,
+      [d.userId, d.event, hour, effDb === null ? 0 : 1, effDb ?? 0, effDb === null ? 1 : 0],
     );
 
     // PB candidates: single from this solve; ao5/ao12 from the payload's rolling values (computed
-    // by solve-service over the session, including this solve)
+    // by solve-service over the session); mo3/ao50/ao100 from the session's last 100 solves in
+    // the ledger (also used for ao5/ao12 if a publisher omitted `rolling`).
+    const { rows: tailRows } = await c.query<{ effective_ms: number | null }>(
+      `SELECT effective_ms FROM stats.solve_ledger WHERE session_id = $1 AND NOT deleted
+        ORDER BY created_at DESC, seq DESC LIMIT 100`,
+      [d.sessionId],
+    );
+    const tail = tailRows.reverse().map((r) => (r.effective_ms === null ? Number.POSITIVE_INFINITY : r.effective_ms));
+    const fromTail = tailAverages(tail);
     const candidates: Partial<Record<PbKind, number | null>> = {
       single: effDb,
-      ao5: rollingFromPayload(d.rolling?.ao5),
-      ao12: rollingFromPayload(d.rolling?.ao12),
+      mo3: fromTail.mo3 ?? null,
+      ao5: d.rolling ? rollingFromPayload(d.rolling.ao5) : (fromTail.ao5 ?? null),
+      ao12: d.rolling ? rollingFromPayload(d.rolling.ao12) : (fromTail.ao12 ?? null),
+      ao50: fromTail.ao50 ?? null,
+      ao100: fromTail.ao100 ?? null,
     };
 
     const current = await loadPbs(c, d.userId, d.event);
     const achievedAt = at.toISOString();
-    const changes: PbChange[] = [];
+    let queued = 0;
     for (const [kind, value] of Object.entries(candidates) as [PbKind, number | null][]) {
       const prev = current.get(kind);
       if (!isImprovement(value, prev?.value_ms)) continue;
@@ -120,12 +165,80 @@ export function createProjector(deps: ProjectorDeps) {
         'INSERT INTO stats.pb_history (user_id, event, kind, value_ms, achieved_at) VALUES ($1, $2, $3, $4, $5)',
         [d.userId, d.event, kind, valueMs, achievedAt],
       );
-      changes.push({
+      await queuePbUpdated(c, {
         userId: d.userId, username: user.username, event: d.event, kind,
         valueMs, previousMs: prev?.value_ms ?? null, achievedAt,
       });
+      queued++;
     }
-    return changes;
+    return queued;
+  }
+
+  // ---- solve.updated / solve.deleted: full recompute of the event
+  async function onSolveChanged(evt: EventEnvelope) {
+    const d = await payload(solveChangedSchema, evt);
+    if (!d) return;
+    await inUserTx(d.eventId, d.userId, async (c) => {
+      const user = await ensureUser(c, d.userId, d.username, validTz(d.tz));
+      if (evt.type === 'solve.updated' && d.timeMs && d.penalty) {
+        // comment-only edits do not change any statistic: skip the (expensive) recompute
+        const eff = effectiveMs({ timeMs: d.timeMs, penalty: d.penalty });
+        const { rows } = await c.query<{ time_ms: number; effective_ms: number | null }>(
+          'SELECT time_ms, effective_ms FROM stats.solve_ledger WHERE solve_id = $1 AND NOT deleted',
+          [d.solveId],
+        );
+        if (rows[0] && rows[0].time_ms === d.timeMs && rows[0].effective_ms === (Number.isFinite(eff) ? eff : null)) return 0;
+      }
+      if (evt.type === 'solve.deleted') {
+        // tombstone: a late / re-delivered solve.created for this solve must not count it again
+        await c.query(
+          `INSERT INTO stats.solve_ledger (solve_id, user_id, event, session_id, time_ms, created_at, deleted)
+           VALUES ($1, $2, $3, coalesce($4::uuid, '00000000-0000-0000-0000-000000000000'), coalesce($5::int, 0), coalesce($6::timestamptz, now()), true)
+           ON CONFLICT (solve_id) DO UPDATE SET deleted = true`,
+          [d.solveId, d.userId, d.event, d.sessionId ?? null, d.timeMs ?? null, d.createdAt ?? null],
+        );
+      }
+      const { pbChanges } = await recomputeEvent(c, rdeps, { userId: d.userId, username: user.username, event: d.event, tz: user.tz });
+      await refreshTotals(c, d.userId);
+      return pbChanges;
+    });
+  }
+
+  // ---- session.deleted: tombstone the session, recompute the event
+  async function onSessionDeleted(evt: EventEnvelope) {
+    const d = await payload(sessionDeletedSchema, evt);
+    if (!d) return;
+    await inUserTx(d.eventId, d.userId, async (c) => {
+      const user = await ensureUser(c, d.userId, d.username, validTz(d.tz));
+      await c.query(
+        'INSERT INTO stats.deleted_sessions (session_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+        [d.sessionId, d.userId],
+      );
+      const { pbChanges } = await recomputeEvent(c, rdeps, { userId: d.userId, username: user.username, event: d.event, tz: user.tz });
+      await refreshTotals(c, d.userId);
+      return pbChanges;
+    });
+  }
+
+  // ---- solves.imported: recompute every imported event
+  async function onSolvesImported(evt: EventEnvelope) {
+    const d = await payload(solvesImportedSchema, evt);
+    if (!d) return;
+    await inUserTx(d.eventId, d.userId, async (c) => {
+      const user = await ensureUser(c, d.userId, d.username, validTz(d.tz));
+      let events = [...new Set(d.events ?? [])];
+      if (events.length === 0) {
+        // publisher did not say which events: recompute everything we know for the user
+        const { rows } = await c.query<{ event: string }>('SELECT DISTINCT event FROM stats.solve_ledger WHERE user_id = $1', [d.userId]);
+        events = rows.map((r) => r.event);
+      }
+      let pbChanges = 0;
+      for (const event of events) {
+        pbChanges += (await recomputeEvent(c, rdeps, { userId: d.userId, username: user.username, event, tz: user.tz })).pbChanges;
+      }
+      await refreshTotals(c, d.userId);
+      return pbChanges;
+    });
   }
 
   return async function handle(evt: EventEnvelope): Promise<void> {
@@ -135,6 +248,13 @@ export function createProjector(deps: ProjectorDeps) {
         return onUser(evt);
       case 'solve.created':
         return onSolveCreated(evt);
+      case 'solve.updated':
+      case 'solve.deleted':
+        return onSolveChanged(evt);
+      case 'session.deleted':
+        return onSessionDeleted(evt);
+      case 'solves.imported':
+        return onSolvesImported(evt);
       default:
         return;
     }

@@ -1,4 +1,4 @@
-import type { PoolClient } from '@cubetype/common';
+import { newEventId, type PoolClient } from '@cubetype/common';
 import type { PbKind } from './domain/pbs.js';
 
 /** Payload of a pb.updated event (SPEC §8). */
@@ -34,22 +34,29 @@ export async function markProcessed(c: PoolClient, eventId: string): Promise<boo
 }
 
 /**
- * Makes sure a user_totals row exists; updates the username when given.
- * Returns the stored username.
+ * Makes sure a user_totals row exists; updates the username / last seen timezone when given.
+ * Returns the stored username and timezone.
  */
 export async function ensureUser(
   c: PoolClient,
   userId: string,
   username: string | null | undefined,
-): Promise<{ username: string }> {
-  const { rows } = await c.query<{ username: string }>(
-    `INSERT INTO stats.user_totals (user_id, username) VALUES ($1, coalesce($2, ''))
+  tz: string | null,
+): Promise<{ username: string; tz: string }> {
+  const { rows } = await c.query<{ username: string; tz: string }>(
+    `INSERT INTO stats.user_totals (user_id, username, tz) VALUES ($1, coalesce($2, ''), coalesce($3, 'UTC'))
      ON CONFLICT (user_id) DO UPDATE
-       SET username = coalesce($2, stats.user_totals.username)
-     RETURNING username`,
-    [userId, username ?? null],
+       SET username = coalesce($2, stats.user_totals.username), tz = coalesce($3, stats.user_totals.tz)
+     RETURNING username, tz`,
+    [userId, username ?? null, tz],
   );
   return rows[0];
+}
+
+/** Queues a pb.updated event in the outbox (same transaction as the PB change). */
+export async function queuePbUpdated(c: PoolClient, change: PbChange): Promise<void> {
+  const payload = { eventId: newEventId('stats'), occurredAt: new Date().toISOString(), ...change };
+  await c.query('INSERT INTO stats.pb_outbox (payload) VALUES ($1)', [JSON.stringify(payload)]);
 }
 
 export async function loadPbs(c: PoolClient, userId: string, event: string): Promise<Map<PbKind, PbRow>> {
@@ -75,5 +82,18 @@ export async function upsertPb(
      ON CONFLICT (user_id, event, kind) DO UPDATE
        SET value_ms = EXCLUDED.value_ms, solve_id = EXCLUDED.solve_id, achieved_at = EXCLUDED.achieved_at`,
     [userId, event, kind, valueMs, solveId, achievedAt],
+  );
+}
+
+/** user_totals solves / total_ms / first / last across all events, from the solve ledger. */
+export async function refreshTotals(c: PoolClient, userId: string): Promise<void> {
+  await c.query(
+    `UPDATE stats.user_totals u
+        SET solves = s.n, total_ms = s.t, first_solve_at = s.f, last_solve_at = s.l
+       FROM (SELECT count(*)::int AS n, coalesce(sum(time_ms), 0)::bigint AS t,
+                    min(created_at) AS f, max(created_at) AS l
+               FROM stats.solve_ledger WHERE user_id = $1 AND NOT deleted) s
+      WHERE u.user_id = $1`,
+    [userId],
   );
 }
