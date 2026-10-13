@@ -21,6 +21,11 @@ export default defineConfig({
       '/socket.io': { target: gateway, ws: true, changeOrigin: true },
     },
   },
+  build: {
+    target: 'es2022',
+    chunkSizeWarningLimit: 1500,
+  },
+  worker: { format: 'es' },
   test: {
     environment: 'node',
     include: ['src/**/__tests__/**/*.test.ts'],

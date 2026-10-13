@@ -359,3 +359,6 @@ table.table.race-grid {
   color: var(--sub-color);
   font-size: 0.7rem;
 }
+.race-preview {
+  padding: 0.5rem;
+}

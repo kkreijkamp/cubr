@@ -4,6 +4,7 @@ import { applyTheme, DEFAULT_THEME } from './themes';
 import { createStore, loadJson, saveJson, useStore } from './store';
 
 export type TimerUpdate = 'realtime' | 'tenths' | 'seconds' | 'hidden';
+export type PreviewMode = 'off' | '2D' | '3D';
 
 export interface Settings {
   theme: string;
@@ -19,10 +20,12 @@ export interface Settings {
   precision: 2 | 3;
   /** timer font size in rem */
   timerSize: number;
+  scramblePreview: PreviewMode;
   /** which averages appear in the timer stats panel */
   statsShown: string[];
   confirmDelete: boolean;
   showSolveList: boolean;
+  showCharts: boolean;
   /** last used event (timer page) */
   lastEvent: string;
 }
@@ -36,9 +39,11 @@ export const DEFAULT_SETTINGS: Settings = {
   timerUpdate: 'realtime',
   precision: 2,
   timerSize: 7,
+  scramblePreview: '2D',
   statsShown: ['mo3', 'ao5', 'ao12', 'ao100'],
   confirmDelete: true,
   showSolveList: true,
+  showCharts: true,
   lastEvent: '333',
 };
 

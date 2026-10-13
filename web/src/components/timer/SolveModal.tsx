@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Copy, Trash2 } from 'lucide-react';
-import type { Penalty, Precision } from '@cubetype/cubestats';
+import { getEvent, type Penalty, type Precision } from '@cubetype/cubestats';
 import { Modal } from '../Modal';
+import { TwistyPreview } from '../TwistyPreview';
 import type { Solve } from '../../lib/types';
+import type { PreviewMode } from '../../lib/settings';
 import { deleteSolve, setComment, setPenalty } from '../../lib/solves';
 import { formatDateTime, timeAgo } from '../../lib/format';
 import { toast } from '../../lib/toast';
@@ -14,6 +16,7 @@ interface Props {
   index: number;
   total: number;
   precision: Precision;
+  preview: PreviewMode;
   confirmDelete: boolean;
   onNavigate: (index: number) => void;
   onClose: () => void;
@@ -21,7 +24,7 @@ interface Props {
 
 const PENALTIES: Penalty[] = ['OK', '+2', 'DNF'];
 
-export function SolveModal({ solve, index, total, precision, confirmDelete, onNavigate, onClose }: Props) {
+export function SolveModal({ solve, index, total, precision, preview, confirmDelete, onNavigate, onClose }: Props) {
   const [comment, setCommentText] = useState(solve.comment ?? '');
   const [armed, setArmed] = useState(false);
   const armTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -67,6 +70,7 @@ export function SolveModal({ solve, index, total, precision, confirmDelete, onNa
     onClose();
   };
 
+  const puzzle = getEvent(solve.event)?.puzzle ?? '3x3x3';
   const dnf = solve.penalty === 'DNF';
 
   return (
@@ -119,6 +123,11 @@ export function SolveModal({ solve, index, total, precision, confirmDelete, onNa
           </button>
         </div>
         <div className="tp-detail-scramble">{solve.scramble || <span className="sub">no scramble recorded</span>}</div>
+        {preview !== 'off' && solve.scramble && (
+          <div className="tp-detail-preview">
+            <TwistyPreview puzzle={puzzle} scramble={solve.scramble} visualization={preview} height={150} />
+          </div>
+        )}
       </div>
 
       <div className="field">

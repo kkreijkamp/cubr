@@ -12,6 +12,7 @@ import { utcDateKey } from '../lib/format';
 import { useAsync } from '../lib/useAsync';
 import { addSolve, ensureSession, solveStore } from '../lib/solves';
 import { ErrorState, Loading, Spinner } from '../components/Spinner';
+import { TwistyPreview } from '../components/TwistyPreview';
 import { formatCountdown, useNow, useStoredState } from '../components/live/hooks';
 import { TimerArea, useLiveTimer } from '../components/live/LiveTimer';
 import { EventPicker, Notice, ScrambleText, Segmented } from '../components/live/ui';
@@ -396,6 +397,11 @@ export default function DailyPage() {
                 )}{' '}
                 · <kbd>esc</kbd> while solving = DNF · one try per scramble
               </div>
+              {settings.scramblePreview !== 'off' && scramble && (
+                <div className="daily-preview fade-on-focus">
+                  <TwistyPreview puzzle={ev.puzzle} scramble={scramble} visualization={settings.scramblePreview === '3D' ? '3D' : '2D'} height={160} />
+                </div>
+              )}
             </>
           ) : (
             <details className="daily-scrambles card">

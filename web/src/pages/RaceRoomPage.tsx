@@ -12,6 +12,7 @@ import { addSolve, ensureSession } from '../lib/solves';
 import { defaultGuestName, getGuestName, inviteLink, RaceError, setGuestName, useRace } from '../lib/race';
 import { Loading, Spinner } from '../components/Spinner';
 import { Modal } from '../components/Modal';
+import { TwistyPreview } from '../components/TwistyPreview';
 import { copyText, isTypingTarget, useStoredState } from '../components/live/hooks';
 import { useLiveTimer, TimerArea } from '../components/live/LiveTimer';
 import { Dot, Notice, ScrambleText } from '../components/live/ui';
@@ -387,6 +388,11 @@ export default function RaceRoomPage() {
 
         <aside className="race-side fade-on-focus">
           <PlayersCard room={room} playerId={state.playerId} precision={settings.precision} />
+          {round && settings.scramblePreview !== 'off' && event && (
+            <section className="card race-card race-preview" aria-label="scramble preview">
+              <TwistyPreview puzzle={event.puzzle} scramble={round.scramble} visualization={settings.scramblePreview === '3D' ? '3D' : '2D'} height={150} />
+            </section>
+          )}
           <RaceChat
             chat={state.chat}
             playerId={state.playerId}

@@ -1,9 +1,12 @@
-import { memo } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { List, MessageSquareText } from 'lucide-react';
 import type { Precision } from '@cubetype/cubestats';
 import type { Solve } from '../../lib/types';
 import { fmtAvg, fmtSolveShort } from './statsUtil';
 import { Loading } from '../Spinner';
+
+const ROW = 30;
+const OVERSCAN = 8;
 
 interface Props {
   solves: Solve[];
@@ -15,17 +18,45 @@ interface Props {
   onOpen: (index: number) => void;
 }
 
-/** Newest-first solve list with the rolling ao5 / ao12 after each solve. */
+/**
+ * Newest-first solve list. Only the rows in view are rendered (fixed row height), so sessions
+ * with tens of thousands of solves scroll smoothly.
+ */
 export const SolveList = memo(function SolveList({ solves, ao5, ao12, bestIndex, precision, loading, onOpen }: Props) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewH, setViewH] = useState(360);
   const n = solves.length;
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setViewH(el.clientHeight || 360));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [n > 0]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // new solve → jump back to the top (the newest row)
+  const prevN = useRef(n);
+  useEffect(() => {
+    if (n > prevN.current && scrollRef.current) {
+      scrollRef.current.scrollTop = 0;
+      setScrollTop(0);
+    }
+    prevN.current = n;
+  }, [n]);
+
+  const first = Math.max(0, Math.floor(scrollTop / ROW) - OVERSCAN);
+  const last = Math.min(n, Math.ceil((scrollTop + viewH) / ROW) + OVERSCAN);
   const rows = [];
-  for (let r = 0; r < n; r++) {
+  for (let r = first; r < last; r++) {
     const i = n - 1 - r;
     const s = solves[i];
     rows.push(
       <div
         key={s.id}
         className={`tp-solve-row${r % 2 === 0 ? ' odd' : ''}${i === bestIndex ? ' best' : ''}`}
+        style={{ transform: `translateY(${r * ROW}px)` }}
         onClick={() => onOpen(i)}
         role="button"
         tabIndex={-1}
@@ -62,7 +93,11 @@ export const SolveList = memo(function SolveList({ solves, ao5, ao12, bestIndex,
             <span>ao5</span>
             <span>ao12</span>
           </div>
-          <div className="tp-solve-scroll">{rows}</div>
+          <div className="tp-solve-scroll" ref={scrollRef} onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}>
+            <div className="tp-solve-inner" style={{ height: n * ROW }}>
+              {rows}
+            </div>
+          </div>
         </>
       )}
     </section>

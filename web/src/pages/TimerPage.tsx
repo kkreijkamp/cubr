@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ChartLine,
   Copy,
   Eye,
   Keyboard,
@@ -16,16 +17,19 @@ import { EVENTS, effectiveMs, getEvent, rollingAverage, sessionStats, type Penal
 import { TimerDisplay } from '../timer/TimerDisplay';
 import { useTimerEngine, type TimerResult, type TimerState } from '../timer/useTimerEngine';
 import { useScrambleQueue } from '../timer/useScrambleQueue';
+import { TwistyPreview } from '../components/TwistyPreview';
 import { ConfigBar } from '../components/timer/ConfigBar';
 import { ScrambleBar } from '../components/timer/ScrambleBar';
 import { StatsPanel } from '../components/timer/StatsPanel';
 import { SolveList } from '../components/timer/SolveList';
 import { SolveModal } from '../components/timer/SolveModal';
+import { AverageModal } from '../components/timer/AverageModal';
 import { QuickActions } from '../components/timer/QuickActions';
 import { ManualEntry } from '../components/timer/ManualEntry';
 import { ConfirmModal, PromptModal } from '../components/timer/Dialogs';
 import { copyText, isTouchDevice } from '../components/timer/feedback';
-import { fmtAvg, fmtSolveShort, statNs } from '../components/timer/statsUtil';
+import { averageWindow, fmtAvg, fmtSolveShort, statNs } from '../components/timer/statsUtil';
+import { noFocus } from '../components/timer/ConfigBar';
 import '../components/timer/timer-page.css';
 import { paletteStore, useRegisterCommands, type Command } from '../lib/commands';
 import { updateSettings, useSettings } from '../lib/settings';
@@ -47,12 +51,18 @@ import { toast } from '../lib/toast';
 
 type ModalState =
   | { kind: 'solve'; index: number }
+  | { kind: 'avg'; n: number; which: 'current' | 'best' }
   | { kind: 'newSession' }
   | { kind: 'renameSession' }
   | { kind: 'deleteSession' }
   | { kind: 'deleteLast' }
   | { kind: 'comment'; solveId: string }
   | null;
+
+// Chart.js is only needed below the fold: keep it out of the first-paint bundle.
+const TrendChart = lazy(() => import('../components/timer/Charts').then((m) => ({ default: m.TrendChart })));
+const HistogramChart = lazy(() => import('../components/timer/Charts').then((m) => ({ default: m.HistogramChart })));
+const chartFallback = <div className="tp-chart-fallback" />;
 
 function isTyping(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
@@ -76,8 +86,11 @@ export default function TimerPage() {
   const touch = useMemo(isTouchDevice, []);
 
   // ---------------------------------------------------------------- derived stats (memoised per solve change)
-  const solves = st.solves;
-  const last = solves.length ? solves[solves.length - 1] : null;
+  // The timer display reads the live list; the heavier panels (stats, list, charts, preview) read
+  // a deferred copy so the final time paints immediately even with 10k+ solves in a session.
+  const liveSolves = st.solves;
+  const last = liveSolves.length ? liveSolves[liveSolves.length - 1] : null;
+  const solves = useDeferredValue(liveSolves);
   const statsKey = settings.statsShown.join(',');
   const ns = useMemo(() => statNs(settings.statsShown), [statsKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const stats = useMemo(() => sessionStats(solves, ns), [solves, ns]);
@@ -281,13 +294,14 @@ export default function TimerPage() {
         );
       }
       cmds.push(
+        { id: 'timer-toggle-charts', label: settings.showCharts ? 'Hide charts' : 'Show charts', icon: <ChartLine />, keywords: ['toggle'], run: () => updateSettings({ showCharts: !settings.showCharts }) },
         { id: 'timer-toggle-list', label: settings.showSolveList ? 'Hide solve list' : 'Show solve list', icon: <List />, keywords: ['toggle'], run: () => updateSettings({ showSolveList: !settings.showSolveList }) },
         { id: 'timer-manual', label: manual ? 'Use the timer (leave manual entry)' : 'Manual entry (type times)', icon: <Keyboard />, keywords: ['typing', 'toggle'], run: () => setManual((m) => !m) },
         { id: 'timer-inspection-toggle', label: settings.inspection ? 'Turn inspection off' : 'Turn inspection on', icon: <Eye />, keywords: ['toggle', 'wca'], run: () => updateSettings({ inspection: !settings.inspection }) },
       );
       return cmds;
     },
-    [st.sessions, event, session?.id, last?.id, last?.penalty, settings.showSolveList, settings.inspection, manual, deleteLast],
+    [st.sessions, event, session?.id, last?.id, last?.penalty, settings.showCharts, settings.showSolveList, settings.inspection, manual, deleteLast],
   );
 
 
@@ -302,9 +316,23 @@ export default function TimerPage() {
   }, [engine.state, last]);
 
   const openSolve = useCallback((index: number) => setModal({ kind: 'solve', index }), []);
+  const openAverage = useCallback((n: number, which: 'current' | 'best') => setModal({ kind: 'avg', n, which }), []);
   const onOverlayChange = useCallback((open: boolean) => setOverlay(open), []);
 
-  const cols = 1 + (settings.showSolveList ? 1 : 0);
+  const avgModal = useMemo(() => {
+    if (modal?.kind !== 'avg') return null;
+    const key = modal.n === 3 ? 'mo3' : `ao${modal.n}`;
+    const line = stats.averages[key] ?? sessionStats(solves, [modal.n]).averages[key];
+    if (!line) return null;
+    const end = modal.which === 'best' ? line.bestIndex : solves.length - 1;
+    const value = modal.which === 'best' ? line.best : line.current;
+    if (end === null || value === null || end < modal.n - 1) return null;
+    return { label: `${modal.which} ${key}`, window: averageWindow(solves, end, modal.n, value) };
+  }, [modal, stats, solves]);
+
+  const showPreview = settings.scramblePreview !== 'off';
+  const previewScramble = useDeferredValue(scr.current?.text ?? null);
+  const cols = 1 + (showPreview ? 1 : 0) + (settings.showSolveList ? 1 : 0);
 
   return (
     <div className="timer-page">
@@ -374,11 +402,42 @@ export default function TimerPage() {
       </div>
 
       <div className={`tp-bottom cols-${cols}`}>
-        <StatsPanel stats={stats} ns={ns} solves={solves} precision={settings.precision} onOpenSolve={openSolve} />
+        <StatsPanel stats={stats} ns={ns} solves={solves} precision={settings.precision} onOpenAverage={openAverage} onOpenSolve={openSolve} />
+        {showPreview && (
+          <section className="tp-panel tp-preview" aria-label="scramble preview">
+            <div className="tp-panel-title">
+              <Eye size={14} /> scramble preview
+            </div>
+            <div className="tp-preview-box">
+              {previewScramble ? (
+                <TwistyPreview puzzle={eventInfo.puzzle} scramble={previewScramble} visualization={settings.scramblePreview === '3D' ? '3D' : '2D'} height={200} />
+              ) : null}
+            </div>
+          </section>
+        )}
         {settings.showSolveList && (
           <SolveList solves={solves} ao5={ao5} ao12={ao12} bestIndex={stats.bestIndex} precision={settings.precision} loading={st.loading || !st.ready} onOpen={openSolve} />
         )}
       </div>
+
+      {settings.showCharts ? (
+        solves.length >= 2 ? (
+          <div className="tp-charts">
+            <Suspense fallback={chartFallback}>
+              <TrendChart times={times} ao5={ao5} ao12={ao12} precision={settings.precision} onOpenSolve={openSolve} />
+            </Suspense>
+            <Suspense fallback={chartFallback}>
+              <HistogramChart times={times} latest={solves.length ? effectiveMs(solves[solves.length - 1]) : null} />
+            </Suspense>
+          </div>
+        ) : null
+      ) : (
+        <div className="tp-charts-toggle">
+          <button className="btn-text small" onClick={() => updateSettings({ showCharts: true })} {...noFocus}>
+            <ChartLine size={14} /> show charts
+          </button>
+        </div>
+      )}
 
       {/* ------------------------------------------------------------ modals */}
       {modal?.kind === 'solve' && solves[modal.index] && (
@@ -387,10 +446,14 @@ export default function TimerPage() {
           index={modal.index}
           total={solves.length}
           precision={settings.precision}
+          preview={settings.scramblePreview}
           confirmDelete={settings.confirmDelete}
           onNavigate={(i) => i >= 0 && i < solves.length && setModal({ kind: 'solve', index: i })}
           onClose={() => setModal(null)}
         />
+      )}
+      {modal?.kind === 'avg' && avgModal && (
+        <AverageModal label={avgModal.label} window={avgModal.window} precision={settings.precision} onOpenSolve={openSolve} onClose={() => setModal(null)} />
       )}
       {modal?.kind === 'newSession' && (
         <PromptModal

@@ -10,10 +10,11 @@ interface Props {
   ns: number[];
   solves: Solve[];
   precision: Precision;
+  onOpenAverage: (n: number, which: 'current' | 'best') => void;
   onOpenSolve: (index: number) => void;
 }
 
-function Cell({ value, onClick, best, label }: { value: string; onClick?: () => void; best?: boolean; label?: string }) {
+function Cell({ value, onClick, best, label }: { value: string; onClick?: () => void; best?: boolean; label: string }) {
   if (value === '-') return <td className="na">-</td>;
   if (!onClick) return <td className={best ? 'best' : undefined}>{value}</td>;
   return (
@@ -26,7 +27,7 @@ function Cell({ value, onClick, best, label }: { value: string; onClick?: () => 
 }
 
 /** current / best table for single + the configured averages, plus count / mean / σ. */
-export const StatsPanel = memo(function StatsPanel({ stats, ns, solves, precision, onOpenSolve }: Props) {
+export const StatsPanel = memo(function StatsPanel({ stats, ns, solves, precision, onOpenAverage, onOpenSolve }: Props) {
   const last = solves.length ? solves[solves.length - 1] : null;
   const sigma = stats.sd === null ? '-' : (stats.sd / 1000).toFixed(2);
   return (
@@ -63,8 +64,8 @@ export const StatsPanel = memo(function StatsPanel({ stats, ns, solves, precisio
             return (
               <tr key={key}>
                 <th scope="row">{key}</th>
-                <Cell value={fmtAvg(line?.current, precision)} />
-                <Cell best value={fmtAvg(line?.best, precision)} />
+                <Cell value={fmtAvg(line?.current, precision)} onClick={() => onOpenAverage(n, 'current')} label={`current ${key} details`} />
+                <Cell best value={fmtAvg(line?.best, precision)} onClick={() => onOpenAverage(n, 'best')} label={`best ${key} details`} />
               </tr>
             );
           })}

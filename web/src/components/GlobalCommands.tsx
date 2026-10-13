@@ -84,6 +84,7 @@ export function GlobalCommands() {
           settings.timerUpdate,
         ),
         options('precision', 'Precision', [{ value: 2, label: '0.01 (centiseconds)' }, { value: 3, label: '0.001 (milliseconds)' }], settings.precision),
+        options('scramblePreview', 'Scramble preview', [{ value: 'off', label: 'off' }, { value: '2D', label: '2D' }, { value: '3D', label: '3D' }], settings.scramblePreview),
         { ...options('inspectionAlerts', 'Inspection alerts', [{ value: 'off', label: 'off' }, { value: 'beep', label: 'beep' }, { value: 'voice', label: 'voice' }], settings.inspectionAlerts), icon: <Zap /> },
       ];
       const auth: Command[] = user

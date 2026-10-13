@@ -131,6 +131,13 @@
   font-size: 0.8rem;
   margin-bottom: -0.6rem;
 }
+.daily-preview {
+  display: flex;
+  justify-content: center;
+}
+.daily-preview .twisty-host {
+  width: min(100%, 22rem);
+}
 
 /* result after 5 attempts */
 .daily-result {

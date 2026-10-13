@@ -1,6 +1,32 @@
 import { describe, expect, it } from 'vitest';
 import { parseTimeInput } from '@cubetype/cubestats';
-import { fmtAvg, fmtSolveLong, fmtSolveShort, parseAvgKey, parseManualEntry, statNs } from '../../components/timer/statsUtil';
+import {
+  averageReport,
+  averageWindow,
+  fmtAvg,
+  fmtSolveLong,
+  fmtSolveShort,
+  histogram,
+  parseAvgKey,
+  parseManualEntry,
+  shortTime,
+  statNs,
+  strideIndices,
+} from '../../components/timer/statsUtil';
+import type { Solve } from '../../lib/types';
+
+const mk = (times: (number | 'DNF')[]): Solve[] =>
+  times.map((t, i) => ({
+    id: `s${i}`,
+    sessionId: 'x',
+    event: '333',
+    timeMs: t === 'DNF' ? 9999 : t,
+    penalty: t === 'DNF' ? 'DNF' : 'OK',
+    scramble: `scr ${i}`,
+    comment: null,
+    source: 'timer',
+    createdAt: new Date(i * 1000).toISOString(),
+  }));
 
 describe('stat keys', () => {
   it('parses mo3/aoN', () => {
@@ -24,6 +50,44 @@ describe('formatting', () => {
     expect(fmtSolveShort({ timeMs: 12349, penalty: 'DNF' }, 2)).toBe('DNF');
     expect(fmtSolveLong({ timeMs: 12349, penalty: 'DNF' }, 2)).toBe('DNF(12.34)');
     expect(fmtSolveLong({ timeMs: 1, penalty: 'DNF' }, 2)).toBe('DNF');
+    expect(shortTime(12500)).toBe('12.5');
+    expect(shortTime(8000)).toBe('8');
+    expect(shortTime(75000)).toBe('1:15');
+  });
+});
+
+describe('average windows', () => {
+  it('marks best and worst as trimmed, DNF counting as worst', () => {
+    const solves = mk([10000, 'DNF', 9000, 11000, 12000, 10500]);
+    const w = averageWindow(solves, 5, 5, 11167);
+    expect(w.start).toBe(1);
+    expect(w.solves.map((s) => s.id)).toEqual(['s1', 's2', 's3', 's4', 's5']);
+    expect(Array.from(w.trimmed).sort()).toEqual([0, 1]); // DNF (worst) and 9.00 (best)
+    const report = averageReport('best ao5', w, 2);
+    expect(report).toContain('best ao5: 11.17');
+    expect(report).toContain('1. (DNF)   scr 1');
+    expect(report).toContain('2. (9.00)   scr 2');
+  });
+  it('mo3 trims nothing', () => {
+    expect(averageWindow(mk([1000, 2000, 3000]), 2, 3, 2000).trimmed.size).toBe(0);
+  });
+});
+
+describe('charts helpers', () => {
+  it('strideIndices keeps first/last and caps the count', () => {
+    expect(strideIndices(5, 10)).toEqual([0, 1, 2, 3, 4]);
+    const s = strideIndices(10_000, 1500);
+    expect(s).toHaveLength(1500);
+    expect(s[0]).toBe(0);
+    expect(s[s.length - 1]).toBe(9999);
+  });
+  it('histogram uses nice buckets and counts every finite time', () => {
+    const times = [10100, 10400, 10900, 11200, 12800, Infinity];
+    const b = histogram(times);
+    expect(b.reduce((a, x) => a + x.count, 0)).toBe(5);
+    const step = b[0].to - b[0].from;
+    expect([100, 200, 250, 500, 1000]).toContain(step);
+    expect(histogram([])).toEqual([]);
   });
 });
 

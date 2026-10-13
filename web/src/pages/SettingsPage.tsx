@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   ArrowUpRight,
   Bell,
+  ChartLine,
   Database,
   Download,
   Eye,
@@ -189,8 +190,22 @@ export default function SettingsPage() {
       </Section>
 
       <Section id="display" title="display">
+        <SettingRow icon={<Eye size={16} />} title="scramble preview" description="Draw the scrambled puzzle next to your stats so you can check you scrambled correctly.">
+          <Options
+            value={s.scramblePreview}
+            options={[
+              { value: 'off', label: 'off' },
+              { value: '2D', label: '2D' },
+              { value: '3D', label: '3D' },
+            ]}
+            onChange={set('scramblePreview')}
+          />
+        </SettingRow>
         <SettingRow icon={<List size={16} />} title="solve list" description="Show the list of solves in the current session on the timer page.">
           <Options value={s.showSolveList} options={onOff} onChange={set('showSolveList')} />
+        </SettingRow>
+        <SettingRow icon={<ChartLine size={16} />} title="charts" description="Show the trend and distribution charts below your solves.">
+          <Options value={s.showCharts} options={onOff} onChange={set('showCharts')} />
         </SettingRow>
         <SettingRow icon={<Type size={16} />} title="font" description="One font for the whole app. Hover to preview." wide>
           <div className="option-group wide st-fonts" onMouseLeave={() => applyVisualSettings()}>
