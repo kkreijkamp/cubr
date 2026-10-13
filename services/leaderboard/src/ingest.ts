@@ -1,6 +1,10 @@
 import type { EventEnvelope, Redis } from '@cubetype/common';
+import type { FastifyBaseLogger } from 'fastify';
+import { isBelowFloor, type FloorSource } from './floors.js';
 import {
   DAILY_TTL_SEC,
+  FLAGGED_KEY,
+  FLAGGED_MAX,
   USERS_KEY,
   WEEKLY_TTL_SEC,
   allTimeKey,
@@ -19,7 +23,7 @@ import {
 
 // ---------------------------------------------------------------------------------------------
 // Turns domain events (SPEC §8) into board writes. The plan* functions are pure (unit-tested);
-// makeHandler executes the plan against Redis.
+// makeHandler executes the plan against Redis with the anti-cheat check in front of every write.
 // All writes are idempotent (exact set / keep-best), so at-least-once redelivery is harmless.
 // ---------------------------------------------------------------------------------------------
 
@@ -129,10 +133,44 @@ export function planUserInfo(type: string, d: Data): UserInfo | null {
 
 export interface IngestDeps {
   redis: Redis;
+  floors: FloorSource;
+  log: FastifyBaseLogger;
 }
 
-export function makeHandler({ redis }: IngestDeps) {
-  async function writeBest(evt: EventEnvelope, w: BestWrite) {
+export function makeHandler({ redis, floors, log }: IngestDeps) {
+  /**
+   * Anti-cheat gate: true if the value may be written, otherwise it is recorded in lb:flagged —
+   * once per event/kind/value per domain event (one solve feeds both a daily and a weekly board).
+   */
+  async function passesFloor(
+    evt: EventEnvelope,
+    w: { board: string; event: string; kind: Kind; valueMs: number },
+    flagged: Set<string>,
+  ) {
+    const floorMs = await floors.floor(w.event, w.kind);
+    if (!isBelowFloor(w.valueMs, floorMs)) return true;
+    const id = `${w.event}:${w.kind}:${w.valueMs}`;
+    if (flagged.has(id)) return false;
+    flagged.add(id);
+    const entry = {
+      userId: evt.data.userId,
+      username: evt.data.username ?? null,
+      event: w.event,
+      kind: w.kind,
+      valueMs: w.valueMs,
+      floorMs,
+      board: w.board,
+      source: evt.type,
+      eventId: evt.data.eventId,
+      flaggedAt: new Date().toISOString(),
+    };
+    await redis.multi().lpush(FLAGGED_KEY, JSON.stringify(entry)).ltrim(FLAGGED_KEY, 0, FLAGGED_MAX - 1).exec();
+    log.warn(entry, 'anti-cheat: value below world-record floor flagged');
+    return false;
+  }
+
+  async function writeBest(evt: EventEnvelope, w: BestWrite, flagged: Set<string>) {
+    if (!(await passesFloor(evt, w, flagged))) return;
     await redis.lbBest(w.board, atKey(w.board), w.valueMs, evt.data.userId as string, w.achievedAt, w.ttlSec);
   }
 
@@ -140,6 +178,7 @@ export function makeHandler({ redis }: IngestDeps) {
     const d = evt.data as Data;
     const userId = d.userId;
     if (typeof userId !== 'string' || !userId) return;
+    const flagged = new Set<string>();
 
     const info = planUserInfo(evt.type, d);
     if (info) {
@@ -151,15 +190,16 @@ export function makeHandler({ redis }: IngestDeps) {
       case 'pb.updated': {
         const w = planPbUpdated(d);
         if (!w) return;
+        if (w.valueMs !== null && !(await passesFloor(evt, { ...w, valueMs: w.valueMs }, flagged))) return;
         await redis.lbSetPb(w.board, atKey(w.board), tsKey(w.board), userId, w.valueMs ?? '', w.achievedAt, w.occurredAtMs);
         return;
       }
       case 'solve.created':
-        for (const w of planSolveCreated(d)) await writeBest(evt, w);
+        for (const w of planSolveCreated(d)) await writeBest(evt, w, flagged);
         return;
       case 'daily.completed': {
         const w = planDailyCompleted(d);
-        if (w) await writeBest(evt, w);
+        if (w) await writeBest(evt, w, flagged);
         return;
       }
       default:

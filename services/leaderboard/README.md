@@ -9,7 +9,7 @@ Readiness gates on Redis. Fastify on :8080.
 | `GET /api/leaderboards/:event/:kind?period=all\|weekly\|daily&page=1&size=50` | kind ∈ single, ao5, ao12 (weekly/daily: single, ao5). `me` filled when a valid token is sent |
 | `GET /api/leaderboards/daily-challenge?date=&event=333` | kind `ao5`, period `challenge`; date defaults to today (UTC); event ∈ daily-challenge events |
 | `GET /api/leaderboards/users/:userId/ranks` | every all-time board the user is on: `{event, kind, period:'all', rank, total, valueMs}` |
-| `GET /api/leaderboards/_info` | info + consumer stats |
+| `GET /api/leaderboards/_info` | info + consumer stats, anti-cheat floor source |
 
 **Events consumed** (group `leaderboard`, consumer = pod name): `pb.updated` → all-time boards (exact
 ZADD, ZREM when null/-1; stale events are dropped via a per-user occurredAt guard in `<board>:ts`);
@@ -25,9 +25,13 @@ Decisions / simplifications:
 - Weekly/daily boards only use `solve.created`; later edits (`solve.updated/deleted`) are not applied.
 - 333fm has no boards (move counts, not times); its routes return an empty board.
 - Unknown users in `lb:users` are shown as `username: "unknown"`.
+- **Anti-cheat:** values strictly below the WCA world record (`GET wca /internal/records`, cached 1 h,
+  ao5/ao12 use the WR average; fallback table in `src/floors.ts` when wca is down) are not ranked but
+  pushed to `lb:flagged` (LPUSH + LTRIM 1000).
 
-Env: `PORT`, `REDIS_URL`, `JWT_SECRET`, `POD_NAME`, `NODE_NAME`, `APP_VERSION`, `LOG_LEVEL`.
+Env: `PORT`, `REDIS_URL`, `JWT_SECRET`, `WCA_URL`, `POD_NAME`, `NODE_NAME`, `APP_VERSION`, `LOG_LEVEL`.
 
-Dev against the compose stack's Redis (`docker compose up -d redis`):
+Dev against the compose stack's Redis (`docker compose up -d redis`; without a wca instance at
+`WCA_URL` the anti-cheat uses its fallback table):
 `PORT=8081 REDIS_URL=redis://localhost:56380 npx tsx services/leaderboard/src/index.ts`
 Tests: `npx vitest run services/leaderboard`.
