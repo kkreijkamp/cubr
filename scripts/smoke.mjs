@@ -55,7 +55,7 @@ async function eventually(name, fn, timeoutMs = 15_000) {
 console.log(`cubetype smoke test → ${BASE}\n`);
 
 console.log('health / info (every service answers through the entry point):');
-for (const p of ['/api/auth/_info', '/api/scrambles/_info', '/api/solves/_info', '/api/stats/_info', '/api/leaderboards/_info']) {
+for (const p of ['/api/auth/_info', '/api/scrambles/_info', '/api/solves/_info', '/api/stats/_info', '/api/leaderboards/_info', '/api/race/_info']) {
   const r = await req('GET', p);
   check(p, r.status === 200, `${r.data?.service ?? '?'}@${r.data?.version ?? '?'} on ${r.data?.pod ?? '?'} (${r.ms} ms)`);
 }
@@ -106,6 +106,12 @@ await eventually('daily leaderboard updated', async () => {
   const lb = await req('GET', '/api/leaderboards/333/single?period=daily');
   return { ok: lb.data?.me?.valueMs > 0, detail: `rank=${lb.data?.me?.rank}` };
 });
+
+console.log('\nrace:');
+const room = await req('POST', '/api/race/rooms', { name: 'smoke room', event: '333' });
+check('create race room', room.status === 201, room.data?.room?.id);
+const rooms = await req('GET', '/api/race/rooms');
+check('room listed in lobby', rooms.data?.rooms?.some((r) => r.id === room.data?.room?.id));
 
 console.log('\ncleanup:');
 const sessDel = await req('DELETE', `/api/sessions/${session.id}`);

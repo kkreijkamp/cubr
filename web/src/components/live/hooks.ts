@@ -1,4 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+/** true while the tab is visible (document.visibilityState). */
+export function usePageVisible(): boolean {
+  const [visible, setVisible] = useState(() => (typeof document === 'undefined' ? true : document.visibilityState !== 'hidden'));
+  useEffect(() => {
+    const on = () => setVisible(document.visibilityState !== 'hidden');
+    document.addEventListener('visibilitychange', on);
+    return () => document.removeEventListener('visibilitychange', on);
+  }, []);
+  return visible;
+}
 
 /** Date.now() refreshed every `ms` (for countdowns / "x s ago" labels). */
 export function useNow(ms = 1000): number {
@@ -8,6 +19,17 @@ export function useNow(ms = 1000): number {
     return () => clearInterval(id);
   }, [ms]);
   return now;
+}
+
+/** setInterval that always calls the latest callback; `null` delay pauses it. */
+export function useInterval(fn: () => void, delay: number | null): void {
+  const ref = useRef(fn);
+  ref.current = fn;
+  useEffect(() => {
+    if (delay === null) return;
+    const id = setInterval(() => ref.current(), delay);
+    return () => clearInterval(id);
+  }, [delay]);
 }
 
 /** useState persisted in localStorage (never throws). */
@@ -32,6 +54,11 @@ export function useStoredState<T>(key: string, initial: T): [T, (v: T) => void] 
     [key],
   );
   return [value, set];
+}
+
+export function isTypingTarget(el: EventTarget | null): boolean {
+  if (!(el instanceof HTMLElement)) return false;
+  return el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName);
 }
 
 /** Copies text to the clipboard; resolves false when the browser refuses. */

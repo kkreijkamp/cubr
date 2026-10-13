@@ -106,3 +106,36 @@ export interface UserRank {
   total: number;
   valueMs: number;
 }
+
+export interface RaceRoomSummary {
+  id: string;
+  name: string;
+  event: string;
+  players: number;
+  status: string;
+  createdAt: string;
+}
+export interface RacePlayer {
+  id: string;
+  name: string;
+  userId: string | null;
+  status: 'idle' | 'inspecting' | 'solving' | 'done' | string;
+  connected: boolean;
+  /** pods this player's sockets are connected to */
+  pods?: string[];
+}
+export interface RoomState {
+  id: string;
+  name: string;
+  event: string;
+  /** monotonically increasing revision — ignore states older than the last one seen */
+  rev?: number;
+  isPrivate?: boolean;
+  hostId: string | null;
+  status: 'lobby' | 'running' | 'finished';
+  round: { n: number; scramble: string; startedAt: string; scrambleSource?: string } | null;
+  players: RacePlayer[];
+  results: Record<string, Record<string, { timeMs: number; penalty: Penalty }>>;
+  standings: { playerId: string; name: string; wins: number; solves: number; meanMs: number | null; ao5: number | null }[];
+  createdAt: string;
+}

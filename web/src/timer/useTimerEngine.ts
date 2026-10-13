@@ -28,12 +28,15 @@ export interface TimerState {
 }
 
 export interface TimerEngineOptions {
-  /** disable when a modal is open, the page is inactive, … */
+  /** disable when a modal is open, the page is inactive, a race round isn't running, … */
   enabled: boolean;
   inspection: boolean;
   holdMs: number;
   alerts: 'off' | 'beep' | 'voice';
   onSolve: (r: TimerResult) => void;
+  onStart?: () => void;
+  onInspectionStart?: () => void;
+  onCancel?: () => void;
 }
 
 export const INSPECTION_MS = 15_000;
@@ -128,6 +131,7 @@ export function useTimerEngine(opts: TimerEngineOptions) {
       if (mode !== 'off') {
         alertTimers.current = [setTimeout(() => alertAt(8, mode), 8000), setTimeout(() => alertAt(12, mode), 12000)];
       }
+      optsRef.current.onInspectionStart?.();
     },
     [publish],
   );
@@ -182,6 +186,7 @@ export function useTimerEngine(opts: TimerEngineOptions) {
         clearAlerts();
         document.activeElement instanceof HTMLElement && document.activeElement.blur();
         publish({ phase: 'running', startedAt: t });
+        optsRef.current.onStart?.();
       }
     },
     [publish, startInspection],
@@ -211,10 +216,13 @@ export function useTimerEngine(opts: TimerEngineOptions) {
     if (s.phase === 'running') return;
     if (s.phase !== 'idle') {
       publish({ phase: 'idle', inInspection: false, inspectionStartedAt: null, startedAt: null });
+      optsRef.current.onCancel?.();
     }
   }, [publish]);
 
-  const gateOpen = () => optsRef.current.enabled;
+  /** Input is accepted when enabled — and always for a solve in progress, so closing the gate
+   *  mid-solve (round ended, modal opened) can never trap a running timer. */
+  const gateOpen = () => optsRef.current.enabled || st.current.phase === 'running' || st.current.phase === 'stopped';
 
   // keyboard ------------------------------------------------------------------------------------
   useEffect(() => {

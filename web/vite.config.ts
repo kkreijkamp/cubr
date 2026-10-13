@@ -3,8 +3,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
 
-// The SPA talks to the backend through same-origin paths (/api/*). In dev, Vite proxies them to
-// the local gateway (docker compose, port 8080) which mimics the K8s Ingress.
+// The SPA talks to the backend through same-origin paths (/api/*, /socket.io). In dev, Vite
+// proxies them to the local gateway (docker compose, port 8080) which mimics the K8s Ingress.
 const gateway = process.env.CUBETYPE_GATEWAY ?? 'http://localhost:8080';
 
 export default defineConfig({
@@ -18,6 +18,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': { target: gateway, changeOrigin: true },
+      '/socket.io': { target: gateway, ws: true, changeOrigin: true },
     },
   },
   test: {

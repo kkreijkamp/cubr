@@ -87,6 +87,13 @@ export function ScrambleText({ scramble, event, muted, actions }: { scramble: st
   );
 }
 
+export type DotState = 'up' | 'down' | 'degraded' | 'pending' | 'idle' | 'inspecting' | 'solving' | 'done' | 'offline';
+
+/** Status dot; "live" states get a soft pulse ring. */
+export function Dot({ state, title, pulse }: { state: DotState; title?: string; pulse?: boolean }) {
+  return <span className={`live-dot ${state}${pulse ? ' pulse' : ''}`} title={title} aria-label={title ?? state} role="img" />;
+}
+
 /** Banner for a service that is temporarily unavailable. */
 export function Notice({ icon, children, tone = 'sub', action }: { icon?: ReactNode; children: ReactNode; tone?: 'sub' | 'error' | 'main'; action?: ReactNode }) {
   return (

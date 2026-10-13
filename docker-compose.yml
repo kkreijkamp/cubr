@@ -32,6 +32,7 @@ x-service-env: &service-env
   SOLVE_URL: http://solve:8080
   STATS_URL: http://stats:8080
   LEADERBOARD_URL: http://leaderboard:8080
+  RACE_URL: http://race:8080
 
 x-service: &service
   restart: unless-stopped            # come back after crashes / docker restarts
@@ -108,6 +109,13 @@ services:
     image: cubetype/leaderboard:dev
     build: { context: ., dockerfile: services/leaderboard/Dockerfile, args: *build-args }
     depends_on:                       # Redis-only service (boards are Redis sorted sets)
+      redis: { condition: service_healthy }
+
+  race:
+    <<: *service
+    image: cubetype/race:dev
+    build: { context: ., dockerfile: services/race/Dockerfile, args: *build-args }
+    depends_on:                       # Redis-only service (room state + Socket.IO adapter)
       redis: { condition: service_healthy }
 
   # ---- frontend ----------------------------------------------------------------------------------

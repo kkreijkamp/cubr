@@ -8,6 +8,7 @@ import type {
   Penalty,
   PrivateUser,
   PublicUser,
+  RaceRoomSummary,
   Session,
   Solve,
   StatsSummary,
@@ -170,5 +171,10 @@ export const api = {
     dailyChallenge: (event: string, date?: string, signal?: AbortSignal, opts: { page?: number; size?: number } = {}) =>
       get<Leaderboard>(`/api/leaderboards/daily-challenge${qs({ event, date, page: opts.page, size: opts.size })}`, signal),
     userRanks: (userId: string, signal?: AbortSignal) => get<{ ranks: UserRank[] }>(`/api/leaderboards/users/${enc(userId)}/ranks`, signal),
+  },
+  race: {
+    rooms: (signal?: AbortSignal) => get<{ rooms: RaceRoomSummary[] }>('/api/race/rooms', signal),
+    createRoom: (body: { name: string; event: string; isPrivate?: boolean }) =>
+      request<{ room: { id: string; name: string; event: string } }>('POST', '/api/race/rooms', body),
   },
 };
