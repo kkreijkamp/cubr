@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { withTx, type AuthUser, type Pool, type PoolClient } from '@cubetype/common';
-import { effectiveMs } from '@cubetype/cubestats';
 import { iso, type SessionRow, type SolveRow } from './mapping.js';
+import { effectiveOrNull, rollingFromSolves, ROLLING_WINDOW, type Rolling } from './rolling.js';
+import type { Penalty } from '@cubetype/cubestats';
 
 // SQL shared by several routes. Every query is scoped by user_id: a user can never see or
 // touch another user's rows (foreign ids simply look like "not found").
@@ -40,9 +41,18 @@ export async function ensureDefaultSession(pool: Pool, userId: string): Promise<
   });
 }
 
+/** The session's current ao5/ao12 from its latest 12 solves (sees uncommitted rows of `db`'s transaction). */
+export async function sessionRolling(db: Db, sessionId: string): Promise<Rolling> {
+  const { rows } = await db.query<{ time_ms: number; penalty: Penalty }>(
+    `SELECT time_ms, penalty FROM solve.solves WHERE session_id = $1
+      ORDER BY created_at DESC, id DESC LIMIT ${ROLLING_WINDOW}`,
+    [sessionId],
+  );
+  return rollingFromSolves(rows.reverse().map((r) => ({ timeMs: r.time_ms, penalty: r.penalty })));
+}
+
 /** `solve.created` / `solve.updated` payload (SPEC §8). */
-export function solveEventPayload(user: AuthUser, row: SolveRow, tz: string): Record<string, unknown> {
-  const effective = effectiveMs({ timeMs: row.time_ms, penalty: row.penalty });
+export function solveEventPayload(user: AuthUser, row: SolveRow, tz: string, rolling: Rolling): Record<string, unknown> {
   return {
     userId: user.id,
     username: user.username,
@@ -51,10 +61,11 @@ export function solveEventPayload(user: AuthUser, row: SolveRow, tz: string): Re
     solveId: row.id,
     timeMs: row.time_ms,
     penalty: row.penalty,
-    effectiveMs: Number.isFinite(effective) ? effective : null, // null = DNF
+    effectiveMs: effectiveOrNull({ timeMs: row.time_ms, penalty: row.penalty }),
     createdAt: iso(row.created_at),
     tz,
     source: row.source,
+    rolling,
   };
 }
 

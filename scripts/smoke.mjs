@@ -67,13 +67,13 @@ const sessions = await req('GET', '/api/sessions');
 const session = sessions.data?.sessions?.[0];
 check('default session created', Boolean(session), session?.name);
 const times = [11234, 10456, 12001, 9876, 10987, 11500];
-let saved = 0;
+let lastRolling = null;
 for (const t of times) {
   const r = await req('POST', '/api/solves', { id: crypto.randomUUID(), sessionId: session.id, timeMs: t, penalty: 'OK', scramble: sc.data?.scrambles?.[0] ?? "R U R' U'" });
-  if (r.status === 201) saved++;
-  else check('post solve', false, `status ${r.status} ${JSON.stringify(r.data)}`);
+  if (r.status !== 201) check('post solve', false, `status ${r.status} ${JSON.stringify(r.data)}`);
+  lastRolling = r.data?.rolling;
 }
-check('6 solves saved', saved === times.length, `${saved}/${times.length}`);
+check('6 solves saved, rolling ao5 computed', lastRolling?.ao5 > 0, `ao5=${lastRolling?.ao5}`);
 
 console.log('\ncleanup:');
 const sessDel = await req('DELETE', `/api/sessions/${session.id}`);
