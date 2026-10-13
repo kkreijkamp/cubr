@@ -1,13 +1,15 @@
 import { badRequest, parse } from '@cubetype/common';
 import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { Cached } from '../cache.js';
 import { WCA_ID_RE, distributionQuery, personParams, personSearchQuery, rankQuery } from '../schemas.js';
 import { requireEvent, type Service } from '../service.js';
 import { validateApiValue } from '../units.js';
 
 /** Public data is identical for every user and changes at most weekly: let browsers/proxies keep it. */
-function send<T>(reply: FastifyReply, value: T, maxAgeSec = 300): T {
+function send<T>(reply: FastifyReply, result: Cached<T> | { value: T; hit?: undefined }, maxAgeSec = 300): T {
+  if (result.hit !== undefined) reply.header('X-Cache', result.hit ? 'HIT' : 'MISS'); // Redis cache-aside result
   reply.header('Cache-Control', `public, max-age=${maxAgeSec}`);
-  return value;
+  return result.value;
 }
 
 export async function registerRoutes(app: FastifyInstance, svc: Service): Promise<void> {
@@ -20,7 +22,7 @@ export async function registerRoutes(app: FastifyInstance, svc: Service): Promis
     requireEvent(q.event); // 404 for unknown events
     const problem = validateApiValue(q.event, q.value);
     if (problem) throw badRequest(problem);
-    return send(reply, await svc.rank(q));
+    return send(reply, { value: await svc.rank(q) }); // value-specific, fast enough uncached
   });
 
   app.get('/api/wca/distribution', async (req, reply) => {
@@ -39,6 +41,8 @@ export async function registerRoutes(app: FastifyInstance, svc: Service): Promis
     const { wcaId } = parse(personParams, req.params);
     return send(reply, await svc.person(wcaId));
   });
+
+  app.get('/api/wca/countries', async (_req, reply) => send(reply, await svc.countries()));
 
   // Service-to-service only (leaderboard anti-cheat); not routed by the Ingress/gateway.
   app.get('/internal/records', async () => svc.internalRecords());

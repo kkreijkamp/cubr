@@ -198,9 +198,22 @@ export function createRepo(pool: Pool) {
     return rows;
   }
 
+  async function countries() {
+    const { rows } = await pool.query<CountryRow & { continentName: string; persons: number }>(
+      `SELECT c.id, c.iso2, c.name, c.continent_id AS "continentId", ct.name AS "continentName",
+              coalesce(pc.n, 0) AS persons
+       FROM wca.countries c
+       JOIN wca.continents ct ON ct.id = c.continent_id
+       LEFT JOIN (SELECT country_id, count(*) AS n FROM wca.persons WHERE sub_id = 1 GROUP BY country_id) pc
+              ON pc.country_id = c.id
+       ORDER BY c.name`,
+    );
+    return rows;
+  }
+
   return {
     findCountry, worldCounts, countryCounts, neighbours, percentiles, distribution, recordHolders,
-    searchPersons, person, personRanks,
+    searchPersons, person, personRanks, countries,
   };
 }
 
