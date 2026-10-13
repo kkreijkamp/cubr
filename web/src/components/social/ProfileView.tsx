@@ -5,6 +5,7 @@ import { ActivityHeatmap } from './Heatmap';
 import { PbCards } from './PbCards';
 import { ProfileHeader } from './ProfileHeader';
 import { RanksCard } from './RanksCard';
+import { WcaComparison } from './WcaComparison';
 import { api } from '../../lib/api';
 import { useSettings } from '../../lib/settings';
 import type { PublicUser } from '../../lib/types';
@@ -34,7 +35,7 @@ export function ProfileView({ user, own, children }: Props) {
     return { events: sorted, defaultEvent: top?.event ?? '333' };
   }, [summary.data]);
 
-  // brand-new cubers: skip the empty charts and let the pb card invite them to solve
+  // brand-new cubers: skip the empty charts / comparison and let the pb card invite them to solve
   const noSolves = summary.data !== undefined && summary.data.totals.solves === 0;
 
   return (
@@ -44,10 +45,13 @@ export function ProfileView({ user, own, children }: Props) {
       <PbCards summary={summary} own={own} precision={precision} />
       <ActivityHeatmap userId={user.id} joinedAt={user.createdAt} />
       {!noSolves && (
-        <div className="pv-charts">
-          <PbHistoryChart key={`pb-${user.id}-${defaultEvent}`} userId={user.id} events={events} defaultEvent={defaultEvent} precision={precision} />
-          <HourlyChart key={`hr-${user.id}-${defaultEvent}`} userId={user.id} events={events} defaultEvent={defaultEvent} precision={precision} />
-        </div>
+        <>
+          <div className="pv-charts">
+            <PbHistoryChart key={`pb-${user.id}-${defaultEvent}`} userId={user.id} events={events} defaultEvent={defaultEvent} precision={precision} />
+            <HourlyChart key={`hr-${user.id}-${defaultEvent}`} userId={user.id} events={events} defaultEvent={defaultEvent} precision={precision} />
+          </div>
+          <WcaComparison summary={summary} wcaId={user.wcaId} country={user.country} own={own} precision={precision} />
+        </>
       )}
       {children}
     </div>

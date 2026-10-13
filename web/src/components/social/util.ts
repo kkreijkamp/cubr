@@ -10,11 +10,27 @@ export function eventLabel(id: string): string {
   return (getEvent(id)?.short ?? id).toLowerCase();
 }
 
+/** Events whose official WCA average is a mean of 3 rather than an average of 5. */
+const MEAN_OF_3 = new Set(['666', '777', '333bf', '444bf', '555bf']);
+/** Which cubetype PB kind corresponds to the WCA "average" of an event. */
+export function wcaAverageKind(event: string): 'ao5' | 'mo3' {
+  return MEAN_OF_3.has(event) ? 'mo3' : 'ao5';
+}
+/** Events that can be compared against WCA results (FMC is counted in moves, not ms). */
+export function isWcaComparable(event: string): boolean {
+  return event !== '333fm' && getEvent(event) !== undefined;
+}
+
 /** Only allow same-origin relative redirects ("/x", never "//evil.com" or "https://…"). */
 export function safeNext(next: string | null | undefined, fallback = '/account'): string {
   if (!next || !next.startsWith('/') || next.startsWith('//') || next.startsWith('/\\')) return fallback;
   if (next.startsWith('/login')) return fallback;
   return next;
+}
+
+/** The WCA service answers 503 UNAVAILABLE until the results export has been imported. */
+export function isWcaNotLoaded(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 503 && (err.code === 'UNAVAILABLE' || /not loaded/i.test(err.message));
 }
 
 /** Friendly, lowercase message for a failed widget request. */
