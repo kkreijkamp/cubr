@@ -1,6 +1,6 @@
 import { badRequest, parse } from '@cubetype/common';
 import type { FastifyInstance, FastifyReply } from 'fastify';
-import { rankQuery } from '../schemas.js';
+import { WCA_ID_RE, distributionQuery, personParams, personSearchQuery, rankQuery } from '../schemas.js';
 import { requireEvent, type Service } from '../service.js';
 import { validateApiValue } from '../units.js';
 
@@ -21,6 +21,23 @@ export async function registerRoutes(app: FastifyInstance, svc: Service): Promis
     const problem = validateApiValue(q.event, q.value);
     if (problem) throw badRequest(problem);
     return send(reply, await svc.rank(q));
+  });
+
+  app.get('/api/wca/distribution', async (req, reply) => {
+    const q = parse(distributionQuery, req.query);
+    requireEvent(q.event);
+    return send(reply, await svc.distribution(q));
+  });
+
+  app.get('/api/wca/persons', async (req, reply) => {
+    const q = parse(personSearchQuery, req.query);
+    const upper = q.q.toUpperCase();
+    return send(reply, await svc.searchPersons(q, WCA_ID_RE.test(upper) ? upper : null), 60);
+  });
+
+  app.get('/api/wca/persons/:wcaId', async (req, reply) => {
+    const { wcaId } = parse(personParams, req.params);
+    return send(reply, await svc.person(wcaId));
   });
 
   // Service-to-service only (leaderboard anti-cheat); not routed by the Ingress/gateway.

@@ -2,7 +2,8 @@ import { notFound } from '@cubetype/common';
 import type { EventInfo } from '@cubetype/cubestats';
 import type { Dataset } from './dataset.js';
 import type { PercentileRow, RankedRow, Repo } from './repo.js';
-import { percentBeaten, rankFromCounts } from './stats.js';
+import { escapeLike } from './schemas.js';
+import { mergeBuckets, percentBeaten, rankFromCounts } from './stats.js';
 import { KINDS, WCA_EVENTS, apiToWca, rawThresholds, supportedEvent, wcaToApi, type Kind } from './units.js';
 
 /**
@@ -90,6 +91,37 @@ export function createService(deps: { repo: Repo; dataset: Dataset }) {
     };
   }
 
+  async function distribution(q: { event: string; kind: Kind; buckets: number }) {
+    await dataset.requireLoaded();
+    const p = (await percentileMap()).get(`${q.event}:${q.kind}`);
+    const unit = requireEvent(q.event).unit;
+    if (!p) {
+      return { event: q.event, kind: q.kind, unit, total: 0, p10: null, p25: null, p50: null, p75: null, p90: null, p99: null, min: null, below: 0, above: 0, buckets: [] };
+    }
+    const fine = await repo.distribution(q.event, q.kind);
+    const conv = (raw: number) => wcaToApi(q.event, q.kind, raw);
+    return {
+      event: q.event,
+      kind: q.kind,
+      unit,
+      total: p.total,
+      p10: conv(p.p10),
+      p25: conv(p.p25),
+      p50: conv(p.p50),
+      p75: conv(p.p75),
+      p90: conv(p.p90),
+      p99: conv(p.p99),
+      min: conv(p.minBest), // = world record
+      below: p.below, // results faster than buckets[0].from
+      above: p.above, // results slower than the last bucket's `to`
+      buckets: mergeBuckets(fine, p.lo, p.bucketWidth, q.buckets).map((b) => ({
+        from: conv(b.from),
+        to: conv(b.to),
+        count: b.count,
+      })),
+    };
+  }
+
   /** Raw record holders for both kinds, grouped by event. */
   async function recordRows() {
     const [single, average] = await Promise.all([
@@ -140,7 +172,42 @@ export function createService(deps: { repo: Repo; dataset: Dataset }) {
     return { records: out };
   }
 
-  return { meta, rank, records, internalRecords };
+  async function searchPersons(q: { q: string; limit: number }, wcaId: string | null) {
+    await dataset.requireLoaded();
+    const like = escapeLike(q.q.toLowerCase());
+    const rows = wcaId
+      ? await repo.searchPersons({ wcaId, prefix: '', substring: false, limit: q.limit })
+      : await repo.searchPersons({
+          // < 3 characters: trigram index can't help, use the lower(name) prefix index instead
+          substring: q.q.length >= 3,
+          pattern: q.q.length >= 3 ? `%${like}%` : `${like}%`,
+          prefix: `${like}%`,
+          limit: q.limit,
+        });
+    return {
+      persons: rows.map((r) => ({ wcaId: r.personId, name: r.personName, countryId: r.countryId, countryIso2: r.countryIso2 })),
+    };
+  }
+
+  async function person(wcaId: string) {
+    await dataset.requireLoaded();
+    const [p, ranks] = await Promise.all([repo.person(wcaId), repo.personRanks(wcaId)]);
+    if (!p) throw notFound(`WCA person ${wcaId} not found`);
+    const pbs = WCA_EVENTS.flatMap((e) => {
+      const entry = (kind: Kind) => {
+        const r = ranks.find((x) => x.eventId === e.id && x.kind === kind);
+        return r
+          ? { value: wcaToApi(e.id, kind, r.best), worldRank: r.worldRank, continentRank: r.continentRank, countryRank: r.countryRank }
+          : null;
+      };
+      const single = entry('single');
+      const average = entry('average');
+      return single || average ? [{ event: e.id, eventName: e.name, unit: e.unit, single, average }] : [];
+    });
+    return { person: p, pbs };
+  }
+
+  return { meta, rank, distribution, records, internalRecords, searchPersons, person };
 }
 
 export type Service = ReturnType<typeof createService>;

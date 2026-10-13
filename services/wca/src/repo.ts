@@ -117,6 +117,15 @@ export function createRepo(pool: Pool) {
     return rows;
   }
 
+  /** Fine histogram counts, bucket 1..n in order. */
+  async function distribution(eventId: string, kind: Kind): Promise<number[]> {
+    const { rows } = await pool.query<{ count: number }>(
+      'SELECT count FROM wca.distribution WHERE event_id = $1 AND kind = $2 ORDER BY bucket',
+      [eventId, kind],
+    );
+    return rows.map((r) => r.count);
+  }
+
   /** Record holders: every person whose best equals the precomputed minimum (ties included). */
   async function recordHolders(kind: Kind, eventIds: string[]): Promise<(RankedRow & { eventId: string })[]> {
     const { rows } = await pool.query<RankedRow & { eventId: string }>(
@@ -131,8 +140,67 @@ export function createRepo(pool: Pool) {
     return rows;
   }
 
+  /**
+   * Person search: exact WCA id, or name match. Short queries use the lower(name) prefix index,
+   * longer ones a substring ILIKE served by the pg_trgm GIN index. Prefix matches rank first.
+   */
+  async function searchPersons(opts: { wcaId?: string; pattern?: string; prefix: string; substring: boolean; limit: number }) {
+    if (opts.wcaId) {
+      const { rows } = await pool.query<PersonRef>(
+        `SELECT p.wca_id AS "personId", p.name AS "personName", p.country_id AS "countryId", c.iso2 AS "countryIso2"
+         FROM wca.persons p JOIN wca.countries c ON c.id = p.country_id
+         WHERE p.wca_id = $1 AND p.sub_id = 1`,
+        [opts.wcaId],
+      );
+      return rows;
+    }
+    const where = opts.substring ? 'p.name ILIKE $1' : 'lower(p.name) LIKE $1';
+    const { rows } = await pool.query<PersonRef>(
+      `SELECT p.wca_id AS "personId", p.name AS "personName", p.country_id AS "countryId", c.iso2 AS "countryIso2"
+       FROM wca.persons p JOIN wca.countries c ON c.id = p.country_id
+       WHERE p.sub_id = 1 AND ${where}
+       ORDER BY (lower(p.name) LIKE $2) DESC, p.name, p.wca_id
+       LIMIT $3`,
+      [opts.pattern, opts.prefix, opts.limit],
+    );
+    return rows;
+  }
+
+  async function person(wcaId: string) {
+    const { rows } = await pool.query<{
+      wcaId: string; name: string; gender: string | null; countryId: string; countryIso2: string | null;
+      countryName: string; continentId: string; continentName: string;
+    }>(
+      `SELECT p.wca_id AS "wcaId", p.name, p.gender, p.country_id AS "countryId", c.iso2 AS "countryIso2",
+              c.name AS "countryName", c.continent_id AS "continentId", ct.name AS "continentName"
+       FROM wca.persons p
+       JOIN wca.countries c ON c.id = p.country_id
+       JOIN wca.continents ct ON ct.id = c.continent_id
+       WHERE p.wca_id = $1 AND p.sub_id = 1`,
+      [wcaId],
+    );
+    return rows[0] ?? null;
+  }
+
+  /** All personal records of one person (both kinds) via the (person_id, event_id) primary keys. */
+  async function personRanks(wcaId: string) {
+    const { rows } = await pool.query<{
+      kind: Kind; eventId: string; best: number; worldRank: number; continentRank: number; countryRank: number;
+    }>(
+      `SELECT 'single' AS kind, event_id AS "eventId", best, world_rank AS "worldRank",
+              continent_rank AS "continentRank", country_rank AS "countryRank"
+       FROM wca.ranks_single WHERE person_id = $1
+       UNION ALL
+       SELECT 'average', event_id, best, world_rank, continent_rank, country_rank
+       FROM wca.ranks_average WHERE person_id = $1`,
+      [wcaId],
+    );
+    return rows;
+  }
+
   return {
-    findCountry, worldCounts, countryCounts, neighbours, percentiles, recordHolders,
+    findCountry, worldCounts, countryCounts, neighbours, percentiles, distribution, recordHolders,
+    searchPersons, person, personRanks,
   };
 }
 
