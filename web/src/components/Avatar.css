@@ -1,0 +1,21 @@
+/* shared circular avatar: <Avatar user size /> sets --avatar-size inline; size overrides from the
+   outside (e.g. responsive profile header) can simply set width/height/font-size. */
+.avatar {
+  --avatar-size: 20px;
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  border-radius: 50%;
+  background: var(--main-color);
+  color: var(--bg-color);
+  font-family: var(--logo-font);
+  font-size: calc(var(--avatar-size) * 0.48);
+  line-height: 1;
+  vertical-align: middle;
+  overflow: hidden;
+  user-select: none;
+  transition: background var(--dur), color var(--dur);
+}

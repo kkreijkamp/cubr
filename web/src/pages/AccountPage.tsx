@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { LogOut } from 'lucide-react';
+import { LogOut, UserCog } from 'lucide-react';
 import { Loading } from '../components/Spinner';
+import { ProfileView } from '../components/social/ProfileView';
 import { useAuth } from '../lib/auth';
 import { toast } from '../lib/toast';
 
@@ -26,14 +27,26 @@ export default function AccountPage() {
   };
 
   return (
-    <div className="stack" style={{ justifyItems: 'center', paddingTop: '4rem' }}>
-      <h1 className="h2">{user.username}</h1>
-      <div className="sub">
-        signed in as <span className="text">{user.username}</span> · {user.email}
-      </div>
-      <button className="btn" onClick={doLogout}>
-        <LogOut /> log out
-      </button>
-    </div>
+    <ProfileView user={user} own>
+      <section className="pv-card" aria-label="account">
+        <div className="ac-rows">
+          <div className="ac-row">
+            <div>
+              <div className="t">
+                <UserCog /> account
+              </div>
+              <div className="d">
+                signed in as <span className="text">{user.username}</span> · {user.email}
+              </div>
+            </div>
+            <div className="ac-actions">
+              <button className="btn danger-text" onClick={doLogout}>
+                <LogOut /> log out
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </ProfileView>
   );
 }

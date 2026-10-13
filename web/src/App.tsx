@@ -2,6 +2,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { AuthProvider } from './lib/auth';
 import TimerPage from './pages/TimerPage';
+import ProfilePage from './pages/ProfilePage';
 import AccountPage from './pages/AccountPage';
 import SettingsPage from './pages/SettingsPage';
 import LoginPage from './pages/LoginPage';
@@ -12,6 +13,7 @@ const router = createBrowserRouter([
     element: <Layout />,
     children: [
       { path: '/', element: <TimerPage /> },
+      { path: '/profile/:username', element: <ProfilePage /> },
       { path: '/account', element: <AccountPage /> },
       { path: '/settings', element: <SettingsPage /> },
       { path: '/login', element: <LoginPage /> },

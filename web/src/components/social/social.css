@@ -1,0 +1,510 @@
+/* profile view (account + public profile) — Monkeytype account page, adapted for cubing */
+.pv {
+  display: grid;
+  gap: 2rem;
+  min-width: 0;
+}
+.pv-card {
+  background: var(--sub-alt-color);
+  border-radius: var(--roundness);
+  padding: 1rem 1.25rem;
+  min-width: 0;
+}
+.pv-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin-bottom: 1rem;
+}
+.pv-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  color: var(--sub-color);
+  font-size: 1rem;
+  min-width: 0;
+}
+.pv-title svg {
+  width: 1em;
+  height: 1em;
+  flex-shrink: 0;
+}
+.pv-title .text {
+  color: var(--text-color);
+}
+.pv-select {
+  font-size: 0.8rem;
+  padding: 0.4em 0.65em;
+  background: var(--bg-color);
+  max-width: 12rem;
+}
+
+/* calm degraded state for one widget (a down microservice never blanks the page) */
+.pv-widget-msg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  padding: 1.75rem 1rem;
+  color: var(--sub-color);
+  font-size: 0.85rem;
+  text-align: center;
+  line-height: 1.5;
+}
+.pv-widget-msg svg {
+  flex-shrink: 0;
+}
+.pv-widget-msg .btn-text {
+  font-size: 0.85rem;
+  color: var(--main-color);
+  padding: 0.25em 0.4em;
+}
+.pv-widget-msg .btn-text:hover {
+  color: var(--text-color);
+}
+.pv-widget-msg.compact {
+  padding: 0.75rem 0;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+/* ---------------------------------------------------------------- header card */
+.pv-header {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, auto) 0.25rem minmax(0, 1fr) 0.25rem auto;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1.25rem 4rem 1.25rem 1.25rem;
+}
+.pv-divider {
+  align-self: stretch;
+  width: 0.25rem;
+  min-height: 4rem;
+  border-radius: 0.25rem;
+  background: var(--bg-color);
+}
+.pv-ident {
+  display: grid;
+  grid-template-columns: 5rem minmax(0, 1fr);
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+  max-width: 24rem;
+}
+/* wrapper around <Avatar> (components/Avatar.css draws the circle / initial) */
+.pv-avatar {
+  position: relative;
+  display: block;
+  width: 5rem;
+  height: 5rem;
+  border-radius: 50%;
+}
+.pv-avatar .avatar {
+  width: 100%;
+  height: 100%;
+  font-size: 2.4rem;
+}
+.pv-name-block {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.pv-name {
+  color: var(--text-color);
+  font-size: clamp(1.4rem, 1rem + 1.2vw, 2rem);
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pv-handle {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.6rem;
+  color: var(--sub-color);
+  font-size: 0.8rem;
+}
+.pv-handle .flag {
+  font-size: 1.1em;
+  line-height: 1;
+}
+.pv-handle .pill {
+  font-size: 0.7rem;
+}
+.pv-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.75rem 1.5rem;
+  min-width: 0;
+}
+.pv-detail {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+.pv-detail.wide {
+  grid-column: 1 / -1;
+}
+.pv-detail .label {
+  color: var(--sub-color);
+  font-size: 0.75rem;
+}
+.pv-detail .value {
+  color: var(--text-color);
+  font-size: 0.875rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+.pv-detail .value a {
+  color: var(--main-color);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+}
+.pv-detail .value a:hover {
+  color: var(--text-color);
+}
+.pv-detail .value a.ext {
+  color: var(--sub-color);
+  margin-left: 0.4em;
+}
+.pv-detail .value a.ext:hover {
+  color: var(--text-color);
+}
+.pv-detail .value.muted {
+  color: var(--sub-color);
+}
+.pv-stats {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 1rem 2rem;
+}
+.pv-stats .stat .value {
+  color: var(--text-color);
+  font-size: 1.75rem;
+}
+.pv-stats .stat .value.dim {
+  color: var(--sub-color);
+}
+.pv-strip {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  width: 2.5rem;
+  border-radius: 0 var(--roundness) var(--roundness) 0;
+  overflow: hidden;
+}
+.pv-strip .btn-text {
+  height: 2.5rem;
+  border-radius: 0;
+  padding: 0;
+}
+.pv-strip .btn-text:hover {
+  background: var(--text-color);
+  color: var(--bg-color);
+}
+.pv-strip .btn-text svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* ---------------------------------------------------------------- personal-best cards */
+.pv-pbs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+.pv-pb-card {
+  background: var(--sub-alt-color);
+  border-radius: var(--roundness);
+  padding: 1rem 1.25rem 1.15rem;
+  min-width: 0;
+}
+.pv-pb-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin-bottom: 0.9rem;
+}
+.pv-pb-event {
+  color: var(--text-color);
+  font-size: 1.05rem;
+}
+.pv-pb-meta {
+  color: var(--sub-color);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.pv-pb-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem 1.5rem;
+}
+.pv-pb-cell {
+  display: grid;
+  min-width: 0;
+  border-radius: calc(var(--roundness) / 2);
+  outline: none;
+}
+.pv-pb-cell > div {
+  grid-area: 1 / 1;
+  display: grid;
+  align-content: center;
+  gap: 0.15rem;
+  min-width: 0;
+  transition: opacity var(--dur);
+}
+.pv-pb-cell .label {
+  color: var(--sub-color);
+  font-size: 0.75rem;
+}
+.pv-pb-cell .value {
+  color: var(--main-color);
+  font-size: 1.75rem;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pv-pb-cell.none .value {
+  color: var(--sub-color);
+}
+.pv-pb-cell .pv-pb-back {
+  opacity: 0;
+  font-size: 0.75rem;
+  color: var(--sub-color);
+  line-height: 1.35;
+}
+.pv-pb-cell .pv-pb-back .d {
+  color: var(--text-color);
+}
+.pv-pb-cell.has:hover .pv-pb-front,
+.pv-pb-cell.has:focus-visible .pv-pb-front {
+  opacity: 0;
+}
+.pv-pb-cell.has:hover .pv-pb-back,
+.pv-pb-cell.has:focus-visible .pv-pb-back {
+  opacity: 1;
+}
+.pv-pb-cell:focus-visible {
+  box-shadow: 0 0 0 0.1rem var(--sub-alt-color), 0 0 0 0.2rem var(--text-color);
+}
+
+/* ---------------------------------------------------------------- activity heatmap */
+.hm-wrap {
+  position: relative;
+}
+.hm-scroll {
+  overflow-x: auto;
+  padding: 0.15rem 0.15rem 0.25rem;
+  scrollbar-width: thin;
+}
+.hm-grid {
+  display: grid;
+  gap: 3px;
+  min-width: 640px;
+}
+.hm-cell {
+  aspect-ratio: 1;
+  border-radius: 0.2em;
+}
+.hm-cell[data-level]:hover {
+  outline: 2px solid var(--text-color);
+  outline-offset: 0;
+}
+.hm-day {
+  display: flex;
+  align-items: center;
+  height: 0;
+  align-self: center;
+  padding-right: 0.5rem;
+  color: var(--sub-color);
+  font-size: 0.65rem;
+  line-height: 0;
+}
+.hm-month {
+  padding-top: 0.4rem;
+  color: var(--sub-color);
+  font-size: 0.65rem;
+  white-space: nowrap;
+}
+.hm-tip {
+  position: absolute;
+  z-index: 20;
+  transform: translate(-50%, calc(-100% - 0.45rem));
+  padding: 0.4em 0.7em;
+  border-radius: calc(var(--roundness) / 2);
+  background: var(--sub-color);
+  color: var(--bg-color);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.hm-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin-top: 0.75rem;
+  color: var(--sub-color);
+  font-size: 0.7rem;
+}
+.hm-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.hm-legend i {
+  display: block;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 0.2em;
+}
+.hm-legend span {
+  margin: 0 0.25rem;
+}
+
+/* ---------------------------------------------------------------- account: data & account rows */
+.ac-rows {
+  display: grid;
+}
+.ac-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem 2rem;
+  padding: 1rem 0;
+}
+.ac-row + .ac-row {
+  border-top: 2px solid var(--bg-color);
+}
+.ac-row .t {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  color: var(--text-color);
+  font-size: 0.95rem;
+}
+.ac-row .t svg {
+  width: 1em;
+  height: 1em;
+  color: var(--sub-color);
+}
+.ac-row .d {
+  color: var(--sub-color);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  margin-top: 0.25rem;
+}
+.ac-row .d a {
+  color: var(--main-color);
+}
+.ac-row .d a:hover {
+  color: var(--text-color);
+}
+.ac-row .ac-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.ac-row .btn {
+  background: var(--bg-color);
+}
+.ac-row .btn:hover {
+  background: var(--text-color);
+}
+.ac-row .btn.danger-text:hover {
+  background: var(--error-color);
+}
+
+/* ---------------------------------------------------------------- responsive */
+@media (max-width: 1100px) {
+  .pv-header {
+    grid-template-columns: minmax(0, 1fr) 0.25rem minmax(0, 1fr);
+  }
+  .pv-header .pv-divider.d2 {
+    display: none;
+  }
+  .pv-header .pv-stats {
+    grid-column: 1 / -1;
+    padding-top: 1rem;
+    border-top: 0.25rem solid var(--bg-color);
+    border-radius: 0.125rem;
+  }
+}
+@media (max-width: 900px) {
+  .pv-pbs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 720px) {
+  .pv {
+    gap: 1.5rem;
+  }
+  .pv-header {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
+    padding: 1rem 3.25rem 1rem 1rem;
+  }
+  .pv-header .pv-divider {
+    display: none;
+  }
+  .pv-header .pv-details {
+    padding-top: 1rem;
+    border-top: 0.25rem solid var(--bg-color);
+  }
+  .pv-header .pv-stats {
+    padding-top: 1rem;
+  }
+  .pv-ident {
+    grid-template-columns: 3.75rem minmax(0, 1fr);
+    gap: 0.85rem;
+  }
+  .pv-avatar {
+    width: 3.75rem;
+    height: 3.75rem;
+  }
+  .pv-avatar .avatar {
+    font-size: 1.8rem;
+  }
+  .pv-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+  }
+  .pv-stats .stat .value {
+    font-size: 1.35rem;
+  }
+  .pv-pb-grid {
+    gap: 0.85rem 1rem;
+  }
+  .pv-pb-cell .value {
+    font-size: 1.4rem;
+  }
+  .pv-card,
+  .pv-pb-card {
+    padding: 0.9rem 1rem;
+  }
+  .pv-header .pv-details {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ac-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ac-row .ac-actions {
+    justify-content: flex-start;
+  }
+}

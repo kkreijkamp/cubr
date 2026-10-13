@@ -1,3 +1,5 @@
+export { formatTime, formatSolve, formatDuration, getEvent, EVENTS } from '@cubetype/cubestats';
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** "14 Oct 2026" */
@@ -40,6 +42,19 @@ export function timeAgo(iso: string | null | undefined): string {
     }
   }
   return `${label} ago`;
+}
+
+/** Local calendar date "YYYY-MM-DD". */
+export function localDateKey(d = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** ISO-3166 alpha-2 → flag emoji. */
+export function flagEmoji(iso2: string | null | undefined): string {
+  if (!iso2 || !/^[A-Za-z]{2}$/.test(iso2)) return '';
+  const base = 0x1f1e6;
+  const up = iso2.toUpperCase();
+  return String.fromCodePoint(base + up.charCodeAt(0) - 65, base + up.charCodeAt(1) - 65);
 }
 
 /** 12345 → "12,345" */
