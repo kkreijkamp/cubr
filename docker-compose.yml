@@ -5,6 +5,7 @@
 #   open http://localhost:8080                   # gateway = same routes as the GKE Ingress
 #   docker compose up -d --scale solve=3         # 3 solve replicas; the gateway round-robins
 #   docker compose logs -f gateway               # access log shows upstream=<container ip>
+#   docker compose --profile jobs run --rm wca-import   # load the WCA public export
 #   docker compose down                          # stop (add -v to also delete the volumes)
 #
 # The gateway is the only entry point for the app (http://localhost:8080). Postgres and Redis
@@ -146,6 +147,22 @@ services:
       interval: 10s
       timeout: 3s
       retries: 3
+
+  # ---- one-off jobs (only with --profile jobs) ---------------------------------------------------
+  # Downloads the WCA public export and loads it into the `wca` schema (staging schema + atomic
+  # swap). Run: docker compose --profile jobs run --rm wca-import
+  # Offline/faster variant: unzip an export to ./data/wca/tsv, then add
+  #   -v "$PWD/data/wca/tsv:/data:ro" -e WCA_TSV_DIR=/data   to the `run` command.
+  wca-import:
+    profiles: ["jobs"]
+    image: cubetype/wca-import:dev
+    build: { context: ., dockerfile: jobs/wca-import/Dockerfile, args: *build-args }
+    restart: "no"
+    environment:
+      DATABASE_URL: postgres://cubetype:cubetype@postgres:5432/cubetype
+      FORCE: ${FORCE:-0}                         # 1 = re-import even if this export is already loaded
+    depends_on:
+      postgres: { condition: service_healthy }
 
 volumes:
   pgdata:
