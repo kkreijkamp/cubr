@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { HttpError, parse } from '@cubetype/common';
 import {
-  assertDailyAllowed, createSessionBody, createSolveBody, patchSolveBody, resolveCreatedAt, utcDay,
+  assertDailyAllowed, createSessionBody, createSolveBody, importBody, MAX_IMPORT_SOLVES, patchSolveBody, resolveCreatedAt, utcDay,
 } from '../src/schemas.js';
 
 const SID = '33333333-3333-4333-8333-333333333333';
@@ -64,6 +64,28 @@ describe('createSessionBody / patchSolveBody', () => {
     expect(() => parse(patchSolveBody, {})).toThrow(HttpError);
     expect(parse(patchSolveBody, { comment: null })).toEqual({ comment: null });
     expect(parse(patchSolveBody, { penalty: 'DNF' })).toEqual({ penalty: 'DNF' });
+  });
+});
+
+describe('importBody', () => {
+  const solve = { timeMs: 9000, penalty: 'OK', scramble: 'R', createdAt: '2020-01-01T00:00:00.000Z' };
+
+  it('accepts sessions with solves', () => {
+    const b = parse(importBody, { sessions: [{ name: 'a', event: '222', solves: [solve, { ...solve, comment: 'c' }] }] });
+    expect(b.sessions[0].solves).toHaveLength(2);
+  });
+
+  it('requires createdAt and a known event', () => {
+    expect(errorOf(() => parse(importBody, { sessions: [{ name: 'a', event: '333', solves: [{ timeMs: 1 }] }] })).message).toMatch(
+      /createdAt/,
+    );
+    expect(errorOf(() => parse(importBody, { sessions: [{ name: 'a', event: 'abc', solves: [] }] })).message).toMatch(/event/);
+  });
+
+  it(`rejects more than ${MAX_IMPORT_SOLVES} solves in total`, () => {
+    const half = Array.from({ length: MAX_IMPORT_SOLVES / 2 + 1 }, () => solve);
+    const err = errorOf(() => parse(importBody, { sessions: [{ name: 'a', event: '333', solves: half }, { name: 'b', event: '333', solves: half }] }));
+    expect(err.message).toMatch(/at most 100000 solves/);
   });
 });
 

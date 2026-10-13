@@ -11,7 +11,13 @@ import { publishEvent, type Pool, type PoolClient, type Redis } from '@cubetype/
  * consumers dedupe on `eventId` = `solve-<outboxId>`).
  */
 
-export type OutboxType = 'solve.created' | 'solve.updated' | 'solve.deleted' | 'session.deleted' | 'daily.completed';
+export type OutboxType =
+  | 'solve.created'
+  | 'solve.updated'
+  | 'solve.deleted'
+  | 'session.deleted'
+  | 'solves.imported'
+  | 'daily.completed';
 
 export async function enqueue(client: PoolClient, type: OutboxType, payload: Record<string, unknown>): Promise<void> {
   // occurredAt = when the change happened, not when the relay got round to publishing it.

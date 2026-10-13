@@ -1,7 +1,7 @@
 # solve service
 
-The core write path of cubetype: sessions and solves CRUD, daily-challenge attempts, and the
-**transactional outbox** that feeds the Redis event bus. Owns the Postgres schema `solve` (SPEC §7.2),
+The core write path of cubetype: sessions and solves CRUD, csTimer bulk import/export, daily-challenge
+attempts, and the **transactional outbox** that feeds the Redis event bus. Owns the Postgres schema `solve` (SPEC §7.2),
 migrated at startup. Port 8080.
 
 ## Routes (all `/api/*` require `Authorization: Bearer <jwt>`)
@@ -10,9 +10,11 @@ migrated at startup. Port 8080.
 | `GET /api/sessions` | creates a default `3x3`/`333` session on first call (per-user advisory lock → exactly one) |
 | `POST /api/sessions` `{id?, name, event}` | 201; same id again for this user → 200 existing; id owned by someone else → 409 |
 | `PATCH /api/sessions/:id` `{name}` / `DELETE /api/sessions/:id` | delete cascades solves, emits `session.deleted` |
-| `GET /api/sessions/:id/solves` | `{solves}` ascending by `createdAt` |
+| `GET /api/sessions/:id/solves` | ascending; capped at the **latest** 50 000 (`truncated: true` when cut) |
 | `POST /api/solves` | idempotent on `id` (`ON CONFLICT DO NOTHING`): retry → 200, no second event; id of another user → 409. Returns `{solve, rolling:{ao5,ao12}}` |
 | `PATCH /api/solves/:id` `{penalty?, comment?}` / `DELETE /api/solves/:id` | emit `solve.updated` / `solve.deleted`; a changed solve is returned with the session's `rolling` |
+| `POST /api/sessions/import` | ≤ 100 000 solves, body ≤ 25 MB; one transaction, `unnest()` batches of 2000, one `solves.imported` event. 100k solves ≈ 1.3 s locally |
+| `GET /api/solves/export` | `{exportedAt, sessions:[Session & {solves}]}` |
 | `GET /api/solves/daily?date=` | the user's daily solves per event + the official ao5 (from the recorded attempts) |
 | `GET /api/solves/_info`, `/api/sessions/_info` | info incl. `outbox: {backlog, published, lastPublishedAt, lastError, healthy}` |
 | `GET /internal/users/:userId/solves?event=` | **no auth, not routed by the gateway**: `{solves:[{id, sessionId, timeMs, penalty, createdAt}]}` ordered by session, time (stats recompute) |
@@ -23,7 +25,7 @@ Users only ever see their own rows; foreign ids return 404. A solve always gets 
 
 ## Events produced (stream `cubetype:events`, `eventId = solve-<outboxId>`)
 `solve.created` (with `rolling` = session's current ao5/ao12 incl. this solve), `solve.updated`, `solve.deleted`,
-`session.deleted`, `daily.completed`. Each is inserted into `solve.outbox` **in the same
+`session.deleted`, `solves.imported`, `daily.completed`. Each is inserted into `solve.outbox` **in the same
 transaction** as the data change. A relay loop in every replica claims up to 500 unpublished rows every 250 ms
 (`FOR UPDATE SKIP LOCKED`, so replicas never double-claim), XADDs each batch in id order, and marks the rows published.
 Published rows older than 1 day are deleted every 10 min.
@@ -46,7 +48,7 @@ changes neither that result nor the ao5 reported by `GET /api/solves/daily`.
 - `id` and `scramble`/`penalty` on `POST /api/solves` are optional (server generates the id; defaults `''`/`OK`). `source` may be
   `timer|manual|race|daily|import|seed`.
 - `createdAt` more than 5 min in the future (a device clock running fast) is clamped to the server time instead of
-  rejecting the solve; unparseable timestamps → 400.
+  rejecting the solve; unparseable timestamps → 400. The import clamps such timestamps the same way per solve.
 - `rolling` is computed inside the transaction while the session row is locked (`FOR NO KEY UPDATE`), so concurrent
   solves in one session each see all earlier ones. ao5/ao12 use the WCA trimming rules from `@cubetype/cubestats`
   (ms, `-1` = DNF, `null` = not enough solves).
@@ -58,6 +60,6 @@ Standard vars (SPEC §4): `PORT DATABASE_URL REDIS_URL JWT_SECRET APP_VERSION PO
 ```
 docker compose up -d postgres redis
 PORT=8083 DATABASE_URL=postgres://cubetype:cubetype@localhost:55433/cubetype REDIS_URL=redis://localhost:56380 npm run dev -w services/solve
-npx vitest run services/solve        # unit tests: mapping, rolling, schemas
+npx vitest run services/solve        # unit tests: mapping, rolling, schemas, import chunking
 docker build -f services/solve/Dockerfile -t cubetype/solve:dev .
 ```

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Speedcubing statistics shared by the cubetype frontend and services: WCA averaging rules, time formatting, event metadata",
+  "description": "Speedcubing statistics shared by the cubetype frontend and services: WCA averaging rules, time formatting, event metadata, csTimer import",
   "exports": {
     ".": "./src/index.ts"
   }

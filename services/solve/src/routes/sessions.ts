@@ -7,6 +7,9 @@ import { enqueue } from '../outbox.js';
 import { ensureDefaultSession, getSession, listSessions } from '../repo.js';
 import { createSessionBody, idParams, patchSessionBody } from '../schemas.js';
 
+/** GET /api/sessions/:id/solves returns at most this many (the latest ones, ascending). */
+export const SESSION_SOLVES_CAP = 50_000;
+
 export function registerSessionRoutes(app: FastifyInstance, { pool, auth }: RouteContext): void {
   const authed = { onRequest: auth.requireAuth };
 
@@ -74,10 +77,15 @@ export function registerSessionRoutes(app: FastifyInstance, { pool, auth }: Rout
     const { id } = parse(idParams, req.params);
     const { rowCount } = await pool.query('SELECT 1 FROM solve.sessions WHERE id = $1 AND user_id = $2', [id, user.id]);
     if (!rowCount) throw notFound('session not found');
+    // Newest CAP+1 solves (the +1 detects truncation), returned oldest-first.
     const { rows } = await pool.query<SolveRow>(
-      `SELECT ${SOLVE_COLUMNS} FROM solve.solves WHERE session_id = $1 AND user_id = $2 ORDER BY created_at, id`,
+      `SELECT ${SOLVE_COLUMNS} FROM solve.solves WHERE session_id = $1 AND user_id = $2
+        ORDER BY created_at DESC, id DESC LIMIT ${SESSION_SOLVES_CAP + 1}`,
       [id, user.id],
     );
-    return { solves: rows.map(toSolve) };
+    const truncated = rows.length > SESSION_SOLVES_CAP;
+    if (truncated) rows.pop();
+    rows.reverse();
+    return { solves: rows.map(toSolve), truncated };
   });
 }

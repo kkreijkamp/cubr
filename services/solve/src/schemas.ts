@@ -6,6 +6,8 @@ import { isEventId, DAILY_EVENTS } from '@cubetype/cubestats';
 // `parse(schema, req.body ?? {})` from common, which turns failures into 400 BAD_REQUEST.
 
 export const MAX_TIME_MS = 86_400_000;
+export const MAX_IMPORT_SOLVES = 100_000;
+export const MAX_IMPORT_SESSIONS = 1_000;
 /** Client clocks drift; timestamps further in the future than this are clamped to the server time. */
 export const MAX_FUTURE_SKEW_MS = 5 * 60 * 1000;
 
@@ -54,6 +56,28 @@ export type CreateSolveBody = z.infer<typeof createSolveBody>;
 export const patchSolveBody = z
   .object({ penalty: penalty.optional(), comment: comment.nullable().optional() })
   .refine((b) => b.penalty !== undefined || b.comment !== undefined, { message: 'nothing to update (penalty or comment)' });
+
+export const importSolve = z.object({
+  timeMs,
+  penalty: penalty.default('OK'),
+  scramble: scramble.default(''),
+  comment: comment.nullish(),
+  createdAt: isoDateTime,
+});
+export type ImportSolve = z.infer<typeof importSolve>;
+
+export const importBody = z
+  .object({
+    sessions: z
+      .array(z.object({ name: sessionName, event: eventId, solves: z.array(importSolve).max(MAX_IMPORT_SOLVES) }))
+      .min(1)
+      .max(MAX_IMPORT_SESSIONS),
+  })
+  .refine((b) => b.sessions.reduce((n, s) => n + s.solves.length, 0) <= MAX_IMPORT_SOLVES, {
+    message: `at most ${MAX_IMPORT_SOLVES} solves per import`,
+    path: ['sessions'],
+  });
+export type ImportBody = z.infer<typeof importBody>;
 
 export const dailyQuery = z.object({ date: ymd.optional() });
 
