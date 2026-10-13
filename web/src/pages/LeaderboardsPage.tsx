@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { CalendarRange, ChevronLeft, ChevronRight, Crown, Globe, Hash, Sigma, Sun, Timer, User, UserX } from 'lucide-react';
-import { EVENTS, isEventId } from '@cubetype/cubestats';
+import { EVENTS } from '@cubetype/cubestats';
 import { Modal } from '../components/Modal';
 import { ErrorState, Loading, Spinner } from '../components/Spinner';
 import { countryName } from '../components/social/countries';
@@ -28,6 +28,8 @@ const KINDS: { id: LbKind; icon: typeof Timer }[] = [
   { id: 'ao5', icon: Sigma },
   { id: 'ao12', icon: Sigma },
 ];
+/** FMC results are move counts, not times, so there are no FMC leaderboards. */
+const BOARD_EVENTS = EVENTS.filter((e) => e.unit === 'time');
 
 interface Selection {
   period: Period;
@@ -45,7 +47,7 @@ function normalize(raw: Partial<Record<keyof Selection, string | number | null>>
   const period = (PERIODS.some((p) => p.id === raw.period) ? raw.period : 'all') as Period;
   const allowedKinds = kindsFor(period);
   const kind = (allowedKinds.includes(raw.kind as LbKind) ? raw.kind : allowedKinds[0]) as LbKind;
-  const event = typeof raw.event === 'string' && isEventId(raw.event) ? raw.event : '333';
+  const event = typeof raw.event === 'string' && BOARD_EVENTS.some((e) => e.id === raw.event) ? raw.event : '333';
   const page = Math.max(1, Math.floor(Number(raw.page) || 1));
   return { period, kind, event, page };
 }
@@ -324,7 +326,7 @@ export default function LeaderboardsPage() {
           label: 'Leaderboard event…',
           icon: <Crown />,
           children: () =>
-            EVENTS.map((e) => ({
+            BOARD_EVENTS.map((e) => ({
               id: `lb-event-${e.id}`,
               label: eventLabel(e.id),
               keywords: [e.name],
@@ -369,7 +371,7 @@ export default function LeaderboardsPage() {
           ))}
         </div>
         <div className="lb-group lb-events" role="group" aria-label="event">
-          {EVENTS.map((e) => (
+          {BOARD_EVENTS.map((e) => (
             <button
               key={e.id}
               className={`btn${sel.event === e.id ? ' active' : ''}`}
