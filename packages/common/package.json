@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Shared server plumbing for cubetype microservices (config, Fastify bootstrap, Postgres, Redis, JWT auth)",
+  "description": "Shared server plumbing for cubetype microservices (config, Fastify bootstrap, Postgres, Redis, JWT auth, domain events)",
   "exports": {
     ".": "./src/index.ts"
   },

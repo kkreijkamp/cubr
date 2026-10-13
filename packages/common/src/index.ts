@@ -5,3 +5,4 @@ export * from './server.js';
 export * from './db.js';
 export * from './redis.js';
 export * from './auth.js';
+export * from './events.js';
