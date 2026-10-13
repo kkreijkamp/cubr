@@ -1,6 +1,8 @@
+import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ExternalLink, Link2, Pencil } from 'lucide-react';
+import { Camera, ExternalLink, Link2, Pencil } from 'lucide-react';
 import { formatDuration } from '@cubetype/cubestats';
+import { AvatarEditor } from './AvatarEditor';
 import { countryName } from './countries';
 import { WidgetError } from './Widget';
 import { plural } from './util';
@@ -9,6 +11,7 @@ import { toast } from '../../lib/toast';
 import type { PublicUser, StatsSummary } from '../../lib/types';
 import type { AsyncState } from '../../lib/useAsync';
 import { Avatar } from '../Avatar';
+import { Modal } from '../Modal';
 
 interface Props {
   user: PublicUser;
@@ -32,13 +35,36 @@ export function ProfileHeader({ user, summary, own, onEdit }: Props) {
   const totals = summary.data?.totals;
   const flag = flagEmoji(user.country);
   const hasDetails = Boolean(user.bio || user.wcaId || user.country);
+  // the picture is editable where the rest of the profile is (account page)
+  const editableAvatar = own && Boolean(onEdit);
+  const [avatarOpen, setAvatarOpen] = useState(false);
+  const closeAvatar = useCallback(() => setAvatarOpen(false), []);
 
   return (
     <section className="pv-card pv-header" aria-label="profile">
       <div className="pv-ident">
-        <span className="pv-avatar">
-          <Avatar user={user} size={80} />
-        </span>
+        {editableAvatar ? (
+          <button
+            type="button"
+            className="pv-avatar pv-avatar-btn"
+            onClick={() => setAvatarOpen(true)}
+            aria-label={user.avatarUrl ? 'change profile picture' : 'add a profile picture'}
+            data-tip={user.avatarUrl ? 'change picture' : 'add a picture'}
+            data-tip-pos="down"
+          >
+            <Avatar user={user} size={80} />
+            <span className="pv-avatar-overlay" aria-hidden="true">
+              <Camera />
+            </span>
+            <span className="pv-avatar-badge" aria-hidden="true">
+              <Camera />
+            </span>
+          </button>
+        ) : (
+          <span className="pv-avatar">
+            <Avatar user={user} size={80} />
+          </span>
+        )}
         <div className="pv-name-block">
           <h1 className="pv-name" title={name}>
             {name}
@@ -151,6 +177,12 @@ export function ProfileHeader({ user, summary, own, onEdit }: Props) {
           <Link2 />
         </button>
       </div>
+
+      {avatarOpen && (
+        <Modal title="profile picture" onClose={closeAvatar}>
+          <AvatarEditor onDone={closeAvatar} onCancel={closeAvatar} />
+        </Modal>
+      )}
     </section>
   );
 }

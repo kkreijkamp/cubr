@@ -16,6 +16,7 @@ import {
   UserX,
 } from 'lucide-react';
 import { DAILY_EVENTS, EVENTS } from '@cubetype/cubestats';
+import { Avatar } from '../components/Avatar';
 import { Modal } from '../components/Modal';
 import { ErrorState, Loading, Spinner } from '../components/Spinner';
 import { countryName } from '../components/social/countries';
@@ -237,7 +238,10 @@ function MeCard({ board, sel, precision, onJump }: { board: Leaderboard | undefi
     <div className="lb-me" aria-label="your rank">
       <div className="lb-me-rank">{me.rank === 1 ? <Crown size={22} aria-label="first place" /> : `#${formatNumber(me.rank)}`}</div>
       <div className="lb-me-who">
-        <span className="name">{user.username}</span>
+        <span className="name">
+          <Avatar user={user} size={20} />
+          {user.username}
+        </span>
         <span className="sub">{me.rank === 1 ? 'goat — nobody is faster' : `you · top ${formatPercent(top)} of ${formatNumber(board.total)}`}</span>
       </div>
       <div className="lb-me-value">{formatTime(me.valueMs, precision)}</div>
@@ -536,6 +540,7 @@ export default function LeaderboardsPage() {
                         <td className="rank">{e.rank === 1 ? <Crown size={18} aria-label="1" /> : formatNumber(e.rank)}</td>
                         <td className="name">
                           <Link to={`/profile/${encodeURIComponent(e.username)}`} className="lb-user">
+                            <Avatar user={e} size={20} />
                             {e.username}
                           </Link>
                           {e.country && flagEmoji(e.country) && (

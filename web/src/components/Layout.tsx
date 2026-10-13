@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { CalendarDays, Crown, Globe, Keyboard, Palette, Settings, Swords, Timer, User } from 'lucide-react';
+import { Avatar } from './Avatar';
 import { CubeLogo } from './CubeLogo';
 import { Toasts } from './Toasts';
 import { CommandPalette, usePaletteHotkeys } from './CommandPalette';
@@ -48,7 +49,7 @@ function Header() {
         <div className="spacer" />
         {status === 'authed' && user ? (
           <NavLink to="/account" className={({ isActive }) => `btn-text nav-user${isActive ? ' active' : ''}`} data-tip="account" data-tip-pos="down">
-            <User size={20} />
+            {user.avatarUrl ? <Avatar user={user} size={20} className="nav-avatar" /> : <User size={20} />}
             <span className="hide-mobile">{user.username}</span>
           </NavLink>
         ) : (

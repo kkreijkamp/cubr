@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { AlertCircle } from 'lucide-react';
+import { AvatarEditor } from './AvatarEditor';
 import { CountrySelect } from './CountrySelect';
 import { friendlyError } from './util';
 import { api } from '../../lib/api';
@@ -21,7 +22,8 @@ function Counter({ n, max }: { n: number; max: number }) {
   );
 }
 
-/** Edit display name, bio, country and WCA id → PATCH /api/auth/me → auth.setUser. */
+/** Edit the profile picture (uploads on its own) plus display name, bio, country and WCA id →
+ *  PATCH /api/auth/me → auth.setUser. */
 export function EditProfileModal({ user, onClose }: { user: PrivateUser; onClose: () => void }) {
   const { setUser } = useAuth();
   const [displayName, setDisplayName] = useState(user.displayName ?? '');
@@ -78,6 +80,12 @@ export function EditProfileModal({ user, onClose }: { user: PrivateUser; onClose
 
   return (
     <Modal title="edit profile" onClose={onClose}>
+      <section className="ep-avatar field" aria-labelledby="ep-avatar-label">
+        <span className="ep-label" id="ep-avatar-label">
+          <span>profile picture</span>
+        </span>
+        <AvatarEditor />
+      </section>
       <form className="ep-form" onSubmit={submit} noValidate>
         <div className="field">
           <label className="ep-label" htmlFor="ep-name">

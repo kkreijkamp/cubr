@@ -1,0 +1,298 @@
+/* AvatarEditor: picker / drop zone → square crop viewport with circular mask, previews, zoom. */
+.ae {
+  display: grid;
+  gap: 0.75rem;
+  container-type: inline-size;
+  min-width: 0;
+}
+
+/* ---------------------------------------------------------------- picker / drop zone */
+.ae-drop {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 1rem 1.25rem;
+  border: 2px dashed var(--sub-alt-color);
+  border-radius: calc(var(--roundness) * 1.5);
+  transition: border-color var(--dur), background var(--dur);
+}
+.ae.dragging .ae-drop {
+  border-color: var(--main-color);
+  background: color-mix(in srgb, var(--main-color) 8%, transparent);
+}
+.ae-current {
+  position: relative;
+  flex-shrink: 0;
+  line-height: 0;
+}
+.ae-current .avatar {
+  width: 4.5rem;
+  height: 4.5rem;
+  font-size: 2.1rem;
+}
+.ae-current-drop {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--bg-color) 65%, transparent);
+  color: var(--main-color);
+}
+.ae-drop-body {
+  display: grid;
+  justify-items: start;
+  gap: 0.45rem;
+  min-width: 0;
+}
+.ae-drop-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.75rem;
+}
+.ae-drop-or {
+  color: var(--sub-color);
+  font-size: 0.8rem;
+}
+.ae.dragging .ae-drop-or {
+  color: var(--main-color);
+}
+.ae-hint {
+  color: var(--sub-color);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+.ae-remove {
+  margin-left: -0.5em;
+  font-size: 0.75rem;
+}
+.ae-remove:hover,
+.ae-remove.confirm {
+  color: var(--error-color);
+}
+
+/* ---------------------------------------------------------------- crop */
+.ae-crop {
+  display: grid;
+  justify-items: center;
+  gap: 1rem;
+}
+.ae-viewport {
+  position: relative;
+  width: min(15rem, 100%);
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--roundness);
+  background: var(--sub-alt-color);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  outline: none;
+}
+.ae-viewport:active {
+  cursor: grabbing;
+}
+.ae-viewport:focus-visible {
+  box-shadow: 0 0 0 0.1rem var(--bg-color), 0 0 0 0.2rem var(--text-color);
+}
+.ae.dragging .ae-viewport {
+  box-shadow: 0 0 0 0.2rem var(--main-color);
+}
+.ae-viewport img,
+.ae-preview img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: none;
+  transform-origin: 0 0;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.ae-viewport img {
+  will-change: transform;
+}
+/* the circle is the visible picture; the dimmed corners only exist in the square file */
+.ae-mask {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 100vmax color-mix(in srgb, var(--bg-color) 68%, transparent),
+    inset 0 0 0 2px color-mix(in srgb, var(--text-color) 55%, transparent);
+  pointer-events: none;
+}
+.ae.busy .ae-viewport {
+  cursor: progress;
+}
+.ae.busy .ae-viewport img {
+  opacity: 0.6;
+}
+
+.ae-side {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 0.6rem;
+  width: 100%;
+  min-width: 0;
+}
+.ae-previews {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.9rem;
+  margin-bottom: 0.4rem;
+}
+.ae-preview {
+  position: relative;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--sub-alt-color);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-color) 14%, transparent);
+}
+
+.ae-zoom {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  width: 100%;
+  max-width: 17rem;
+}
+.ae-zoom .btn-text {
+  padding: 0.35rem;
+}
+.ae-zoom input[type='range'] {
+  flex: 1;
+  min-width: 0;
+  height: 1.25rem;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.ae-zoom input[type='range']::-webkit-slider-runnable-track {
+  height: 0.35rem;
+  border-radius: 999px;
+  background: var(--sub-alt-color);
+}
+.ae-zoom input[type='range']::-moz-range-track {
+  height: 0.35rem;
+  border-radius: 999px;
+  background: var(--sub-alt-color);
+}
+.ae-zoom input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 1rem;
+  height: 1rem;
+  margin-top: -0.325rem;
+  border: 0;
+  border-radius: 50%;
+  background: var(--main-color);
+  transition: background var(--dur);
+}
+.ae-zoom input[type='range']::-moz-range-thumb {
+  width: 1rem;
+  height: 1rem;
+  border: 0;
+  border-radius: 50%;
+  background: var(--main-color);
+  transition: background var(--dur);
+}
+.ae-zoom input[type='range']:hover::-webkit-slider-thumb {
+  background: var(--text-color);
+}
+.ae-zoom input[type='range']:hover::-moz-range-thumb {
+  background: var(--text-color);
+}
+.ae-zoom input[type='range']:focus-visible {
+  box-shadow: none;
+}
+.ae-zoom input[type='range']:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 0.1rem var(--bg-color), 0 0 0 0.2rem var(--text-color);
+}
+.ae-zoom input[type='range']:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 0.1rem var(--bg-color), 0 0 0 0.2rem var(--text-color);
+}
+.ae-zoom input[type='range']:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.ae-hint-touch {
+  display: none;
+}
+.ae-keys {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.3rem;
+}
+.ae-keys kbd {
+  font-size: 0.95em;
+}
+.ae-keys span {
+  margin-right: 0.35rem;
+}
+@media (hover: none) and (pointer: coarse) {
+  .ae-hint-pointer,
+  .ae-keys {
+    display: none;
+  }
+  .ae-hint-touch {
+    display: block;
+  }
+}
+
+.ae-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.ae-actions .btn-text {
+  margin-left: -0.5em;
+}
+.ae-spacer {
+  flex: 1;
+}
+/* the button doing the work stays solid; everything else fades while saving */
+.ae-actions .btn.ae-saving:disabled {
+  opacity: 1;
+}
+.ae-saving .spinner {
+  color: currentColor;
+}
+
+/* side-by-side when there is room (container query: works in any modal width) */
+@container (min-width: 28rem) {
+  .ae-crop {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 1.5rem;
+  }
+  .ae-viewport {
+    width: 15rem;
+  }
+}
+@container (max-width: 22rem) {
+  .ae-drop {
+    gap: 0.9rem;
+    padding: 0.85rem 0.9rem;
+  }
+  .ae-current .avatar {
+    width: 3.5rem;
+    height: 3.5rem;
+    font-size: 1.6rem;
+  }
+  .ae-actions .btn-text {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}

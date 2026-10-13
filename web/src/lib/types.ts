@@ -11,6 +11,9 @@ export interface PublicUser {
   country: string | null;
   wcaId: string | null;
   createdAt: string;
+  /** same-origin, immutable URL of the profile picture (`/api/users/<id>/avatar?v=…`); null = none.
+   *  Optional because older API responses don't include it. */
+  avatarUrl?: string | null;
 }
 export interface PrivateUser extends PublicUser {
   email: string;
@@ -86,6 +89,7 @@ export interface LeaderboardEntry {
   country: string | null;
   valueMs: number;
   achievedAt: string | null;
+  avatarUrl?: string | null;
 }
 export interface Leaderboard {
   event: string;

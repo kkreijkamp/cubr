@@ -121,6 +121,59 @@
   height: 100%;
   font-size: 2.4rem;
 }
+.pv-avatar-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+.pv-avatar-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 0.15rem var(--sub-alt-color), 0 0 0 0.3rem var(--text-color);
+}
+.pv-avatar-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--bg-color) 62%, transparent);
+  color: var(--text-color);
+  opacity: 0;
+  transition: opacity var(--dur);
+}
+.pv-avatar-overlay svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+.pv-avatar-btn:hover .pv-avatar-overlay,
+.pv-avatar-btn:focus-visible .pv-avatar-overlay {
+  opacity: 1;
+}
+/* touch screens can't hover: a small camera badge says the picture is tappable */
+.pv-avatar-badge {
+  position: absolute;
+  right: -0.15rem;
+  bottom: -0.15rem;
+  display: none;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: var(--bg-color);
+  color: var(--sub-color);
+  box-shadow: 0 0 0 0.2rem var(--sub-alt-color);
+}
+.pv-avatar-badge svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+@media (hover: none) {
+  .pv-avatar-badge {
+    display: grid;
+  }
+}
 .pv-name-block {
   display: grid;
   gap: 0.3rem;
@@ -782,6 +835,10 @@ table.im-table label {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
+}
+.ep-avatar .ep-label {
+  color: var(--sub-color);
+  font-size: 0.8rem;
 }
 
 /* ---------------------------------------------------------------- responsive */

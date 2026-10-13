@@ -70,9 +70,13 @@ const timeZone = (() => {
   }
 })();
 
+/** Sends `body` as JSON, or as raw bytes with the blob's own content type when it is a `Blob`
+ *  (avatar upload). */
 export async function request<T>(method: string, path: string, body?: unknown, opts: { signal?: AbortSignal; timeoutMs?: number } = {}): Promise<T> {
   const headers: Record<string, string> = { 'X-Timezone': timeZone };
-  if (body !== undefined) headers['content-type'] = 'application/json';
+  const raw = body instanceof Blob;
+  if (raw) headers['content-type'] = body.type || 'application/octet-stream';
+  else if (body !== undefined) headers['content-type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;
   let res: Response;
   const signal = opts.signal ?? (opts.timeoutMs ? AbortSignal.timeout(opts.timeoutMs) : undefined);
@@ -80,7 +84,7 @@ export async function request<T>(method: string, path: string, body?: unknown, o
     res = await fetch(path, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: raw ? body : body === undefined ? undefined : JSON.stringify(body),
       signal,
       cache: 'no-store',
     });
@@ -149,6 +153,9 @@ export const api = {
     updateMe: (body: Partial<Pick<PublicUser, 'displayName' | 'bio' | 'country' | 'wcaId'>>) =>
       request<{ user: PrivateUser }>('PATCH', '/api/auth/me', body),
     saveSettings: (settings: Record<string, unknown>) => request<{ settings: Record<string, unknown> }>('PUT', '/api/auth/me/settings', { settings }),
+    /** PUT the raw image bytes (image/webp | image/jpeg | image/png, ≤ 300 KB) → user with the new avatarUrl. */
+    uploadAvatar: (blob: Blob) => request<{ user: PrivateUser }>('PUT', '/api/auth/me/avatar', blob, { timeoutMs: 30_000 }),
+    removeAvatar: () => request<{ user: PrivateUser }>('DELETE', '/api/auth/me/avatar'),
     user: (username: string, signal?: AbortSignal) => get<{ user: PublicUser }>(`/api/users/${enc(username)}`, signal),
     users: (ids: string[]) => get<{ users: PublicUser[] }>(`/api/users${qs({ ids: ids.join(',') })}`),
   },

@@ -196,6 +196,10 @@ table.lb-table td.name {
 table.lb-table td.name a {
   color: var(--text-color);
 }
+table.lb-table td.name .avatar {
+  margin-right: 0.6rem;
+  vertical-align: middle;
+}
 table.lb-table td.name a:hover {
   color: var(--main-color);
 }
