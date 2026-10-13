@@ -121,11 +121,15 @@ export interface RacePlayer {
   userId: string | null;
   status: 'idle' | 'inspecting' | 'solving' | 'done' | string;
   connected: boolean;
+  /** pods this player's sockets are connected to */
+  pods?: string[];
 }
 export interface RoomState {
   id: string;
   name: string;
   event: string;
+  /** monotonically increasing revision — ignore states older than the last one seen */
+  rev?: number;
   isPrivate?: boolean;
   hostId: string | null;
   status: 'lobby' | 'running' | 'finished';

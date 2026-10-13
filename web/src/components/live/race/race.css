@@ -82,6 +82,24 @@
   font-weight: 400;
   color: var(--text-color);
 }
+.race-conn .via {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.race-conn .via.on b {
+  color: var(--main-color);
+}
+.race-conn .via.off b {
+  color: var(--error-color);
+}
+.race-conn .moved {
+  color: var(--main-color);
+}
+.btn-text.inline {
+  padding: 0 0.25rem;
+  vertical-align: -0.1em;
+}
 
 .race-layout {
   display: grid;
@@ -178,6 +196,13 @@
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
 }
+.race-standings th {
+  color: var(--sub-color);
+  font-weight: 400;
+  font-size: 0.7rem;
+  text-align: right;
+  padding: 0 0.35rem 0.4rem;
+}
 .race-standings td {
   text-align: right;
   padding: 0.4rem 0.35rem;
@@ -208,6 +233,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.race-standings .rank {
+  color: var(--sub-color);
+  font-size: 0.7rem;
+  min-width: 0.8rem;
+}
 .race-standings .host {
   color: var(--main-color);
   flex-shrink: 0;
@@ -218,6 +248,11 @@
   border-radius: 999px;
   background: var(--main-color);
   color: var(--bg-color);
+}
+.race-standings .status {
+  color: var(--sub-color);
+  font-size: 0.68rem;
+  white-space: nowrap;
 }
 .race-standings tr.me .text-name {
   color: var(--main-color);

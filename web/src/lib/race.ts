@@ -2,18 +2,23 @@
 //
 // - websocket transport only (no long-polling → the load balancer needs no sticky sessions);
 // - handshake auth {token, name, guestId} is re-read on every (re)connect;
-// - every (re)connect re-joins the room;
+// - every (re)connect re-joins the room, so a race pod being killed / drained during a rolling
+//   update is invisible apart from the "connected via pod …" label changing;
 // - ack-based calls become promises with timeouts; calls are rejected (never buffered) while
 //   disconnected so nothing is replayed twice after a reconnect.
 import { useEffect, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import { getToken } from './api';
 import { createStore, type Store } from './store';
-import type { Penalty, RoomState } from './types';
+import type { Penalty, RacePlayer, RoomState } from './types';
 
 export type ConnectionState = 'connecting' | 'connected' | 'reconnecting' | 'closed';
 export type PlayerStatus = 'idle' | 'inspecting' | 'solving' | 'done';
 
+export interface LivePlayer extends RacePlayer {
+  /** extra field from the race service: pods currently holding this player's socket(s) */
+  pods?: string[];
+}
 export interface LiveRound {
   n: number;
   scramble: string;
@@ -21,9 +26,10 @@ export interface LiveRound {
   /** extra field: "scramble-service" | "fallback" */
   scrambleSource?: string;
 }
-/** SPEC RoomState plus the extra fields the race service sends (rev, isPrivate…). */
-export interface LiveRoomState extends Omit<RoomState, 'round' | 'hostId'> {
+/** SPEC RoomState plus the extra fields the race service sends (rev, isPrivate, pods…). */
+export interface LiveRoomState extends Omit<RoomState, 'players' | 'round' | 'hostId'> {
   hostId: string | null;
+  players: LivePlayer[];
   round: LiveRound | null;
   isPrivate?: boolean;
   rev?: number;
@@ -43,9 +49,15 @@ export interface RaceSnapshot {
   room: LiveRoomState | null;
   playerId: string | null;
   name: string | null;
+  /** race pod serving our websocket (from the join ack) */
+  servedBy: string | null;
+  /** pods we were connected via before, most recent first */
+  previousPods: string[];
   chat: ChatMessage[];
   /** fatal: the room does not exist / expired / is full */
   joinError: RaceError | null;
+  /** reconnect attempt counter while reconnecting */
+  attempt: number;
   lastError: string | null;
 }
 
@@ -85,6 +97,16 @@ export function getGuestId(): string {
 }
 let fallbackGuestId: string | null = null;
 
+/** Adopt the guest id the server assigned (when ours was missing / malformed). */
+function storeGuestId(id: string): void {
+  if (!GUEST_ID_RE.test(id)) return;
+  try {
+    localStorage.setItem(GUEST_ID_KEY, id);
+  } catch {
+    fallbackGuestId = id;
+  }
+}
+
 export function getGuestName(): string {
   try {
     return localStorage.getItem(GUEST_NAME_KEY) ?? '';
@@ -123,6 +145,7 @@ type Ack = { ok: boolean; error?: string; code?: string; [k: string]: unknown };
 const JOIN_TIMEOUT_MS = 8000;
 const CALL_TIMEOUT_MS = 6000;
 const CHAT_CAP = 150;
+const FATAL_JOIN_CODES = new Set(['NOT_FOUND', 'CONFLICT', 'BAD_REQUEST', 'FORBIDDEN']);
 
 function chatKey(m: ChatMessage): string {
   return `${m.at}|${m.playerId}|${m.text}`;
@@ -132,6 +155,8 @@ export class RaceConnection {
   readonly store: Store<RaceSnapshot>;
   private socket: Socket | null = null;
   private destroyed = false;
+  private joinRetry: ReturnType<typeof setTimeout> | null = null;
+  private joinedOnce = false;
 
   constructor(readonly roomId: string) {
     this.store = createStore<RaceSnapshot>(initialSnapshot(roomId));
@@ -152,56 +177,89 @@ export class RaceConnection {
       transports: ['websocket'],
       // a function, so token / nickname are re-read on every reconnect
       auth: (cb) => cb({ token: getToken() ?? undefined, name: getGuestName() || undefined, guestId: getGuestId() }),
+      reconnection: true,
+      reconnectionDelay: 500,
+      reconnectionDelayMax: 4000,
+      timeout: 8000,
     });
     this.socket = socket;
 
     socket.on('connect', () => {
-      this.patch({ connection: 'connected', lastError: null });
+      this.patch({ connection: 'connected', attempt: 0, lastError: null });
       void this.join();
     });
-    socket.on('disconnect', () => {
+    socket.on('disconnect', (reason) => {
       if (this.destroyed) return;
-      this.patch({ connection: 'reconnecting', lastError: 'connection lost' });
+      this.patch({ connection: 'reconnecting', lastError: reason === 'io server disconnect' ? 'disconnected by server' : 'connection lost' });
+      // the client does not auto-reconnect after a server-side disconnect — do it ourselves
+      if (reason === 'io server disconnect') setTimeout(() => !this.destroyed && socket.connect(), 1000);
     });
     socket.on('connect_error', (err) => {
       if (this.destroyed) return;
-      this.patch({ lastError: err.message || 'connection failed' });
+      this.patch({ connection: this.joinedOnce ? 'reconnecting' : 'connecting', lastError: err.message || 'connection failed' });
     });
+    socket.io.on('reconnect_attempt', (n) => this.patch({ attempt: n }));
 
     socket.on('room:state', (state: LiveRoomState) => this.applyState(state));
     socket.on('chat:message', (msg: ChatMessage) => this.addChat([msg]));
   }
 
+  /** Reconnect with a fresh handshake (e.g. after changing the guest nickname). */
+  reconnect(): void {
+    if (!this.socket || this.destroyed) return;
+    this.socket.disconnect();
+    this.patch({ connection: 'reconnecting' });
+    this.socket.connect();
+  }
+
   destroy(): void {
     this.destroyed = true;
+    if (this.joinRetry) clearTimeout(this.joinRetry);
     this.socket?.removeAllListeners();
+    this.socket?.io.removeAllListeners();
     this.socket?.disconnect();
     this.socket = null;
     this.patch({ connection: 'closed' });
   }
 
   private async join(): Promise<void> {
+    if (this.joinRetry) clearTimeout(this.joinRetry);
     try {
-      const res = await this.call<{ room: LiveRoomState; playerId: string; name?: string; chat?: ChatMessage[] }>(
+      const res = await this.call<{ room: LiveRoomState; playerId: string; name?: string; servedBy?: string; chat?: ChatMessage[] }>(
         'room:join',
         { roomId: this.roomId },
         JOIN_TIMEOUT_MS,
       );
       const prev = this.snapshot;
-      this.patch({ playerId: res.playerId, name: res.name ?? prev.name, joinError: null });
-      this.applyState(res.room);
+      const servedBy = res.servedBy ?? null;
+      const previousPods = prev.servedBy && servedBy && prev.servedBy !== servedBy ? [prev.servedBy, ...prev.previousPods].slice(0, 5) : prev.previousPods;
+      this.joinedOnce = true;
+      // guests: send the server's playerId back as auth.guestId on every reconnect
+      if (typeof res.playerId === 'string' && res.playerId.startsWith('guest-')) storeGuestId(res.playerId);
+      this.patch({ playerId: res.playerId, name: res.name ?? prev.name, servedBy, previousPods, joinError: null });
+      this.applyState(res.room, true);
       if (Array.isArray(res.chat)) this.addChat(res.chat);
     } catch (err) {
       if (this.destroyed) return;
       const e = err instanceof RaceError ? err : new RaceError('ERROR', String(err));
-      this.patch({ joinError: e });
-      this.socket?.disconnect();
+      if (FATAL_JOIN_CODES.has(e.code)) {
+        this.patch({ joinError: e });
+        this.socket?.disconnect();
+        return;
+      }
+      // transient (timeout, Redis hiccup): try again while connected
+      this.patch({ lastError: e.message });
+      this.joinRetry = setTimeout(() => {
+        if (!this.destroyed && this.socket?.connected) void this.join();
+      }, 2000);
     }
   }
 
-  private applyState(state: LiveRoomState): void {
+  private applyState(state: LiveRoomState, force = false): void {
     if (!state || state.id !== this.roomId) return;
     const cur = this.snapshot.room;
+    // ignore stale broadcasts that arrive out of order across pods
+    if (!force && cur && typeof cur.rev === 'number' && typeof state.rev === 'number' && state.rev < cur.rev) return;
     const system = cur ? diffSystemMessages(cur, state) : [];
     this.patch({ room: state });
     if (system.length) this.addChat(system);
@@ -260,8 +318,11 @@ function initialSnapshot(roomId: string): RaceSnapshot {
     room: null,
     playerId: null,
     name: null,
+    servedBy: null,
+    previousPods: [],
     chat: [],
     joinError: null,
+    attempt: 0,
     lastError: null,
   };
 }

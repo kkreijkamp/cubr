@@ -1,12 +1,38 @@
 import { useEffect, useRef, useState } from 'react';
 import { Crown, MessageSquare, Send, Trophy, Users } from 'lucide-react';
-import { effectiveMs, formatTime, type Penalty, type Precision } from '@cubetype/cubestats';
-import type { ChatMessage, LiveRoomState } from '../../../lib/race';
-import { Dot } from '../ui';
+import { effectiveMs, formatTime, fromApiValue, type Penalty, type Precision } from '@cubetype/cubestats';
+import type { ChatMessage, LivePlayer, LiveRoomState } from '../../../lib/race';
+import { Dot, type DotState } from '../ui';
 
-/** Players with their connection state, host crown and your own row marked. */
-export function PlayersCard({ room, playerId }: { room: LiveRoomState; playerId: string | null }) {
+const STATUS_LABEL: Record<string, string> = {
+  idle: 'ready',
+  inspecting: 'inspecting',
+  solving: 'solving',
+  done: 'done',
+};
+
+function dotFor(p: LivePlayer): DotState {
+  if (!p.connected) return 'offline';
+  if (p.status === 'inspecting' || p.status === 'solving' || p.status === 'done') return p.status;
+  return 'idle';
+}
+
+const shortPod = (pod: string) => {
+  const parts = pod.split('-');
+  return parts.length >= 3 ? parts[parts.length - 1] : pod;
+};
+
+/** Players merged with standings: live status dot, host crown, wins / mean / ao5. */
+export function PlayersCard({ room, playerId, precision }: { room: LiveRoomState; playerId: string | null; precision: Precision }) {
+  const byId = new Map(room.players.map((p) => [p.id, p]));
+  const ordered: { player: LivePlayer; wins: number; solves: number; meanMs: number | null; ao5: number | null }[] = [];
+  for (const s of room.standings ?? []) {
+    const player = byId.get(s.playerId);
+    if (player) ordered.push({ player, wins: s.wins, solves: s.solves, meanMs: s.meanMs, ao5: s.ao5 });
+  }
+  for (const p of room.players) if (!ordered.some((o) => o.player.id === p.id)) ordered.push({ player: p, wins: 0, solves: 0, meanMs: null, ao5: null });
   const connected = room.players.filter((p) => p.connected).length;
+  const anyRounds = Object.keys(room.results ?? {}).length > 0;
 
   return (
     <section className="card race-card" aria-labelledby="players-title">
@@ -19,23 +45,42 @@ export function PlayersCard({ room, playerId }: { room: LiveRoomState; playerId:
         </span>
       </div>
       <table className="race-standings">
+        <thead>
+          <tr>
+            <th className="left">name</th>
+            <th data-tip="rounds won">
+              <Trophy size={12} aria-label="wins" />
+            </th>
+            <th>mean</th>
+            <th>ao5</th>
+          </tr>
+        </thead>
         <tbody>
-          {room.players.map((p) => {
-            const status = p.connected ? 'online' : 'offline';
+          {ordered.map(({ player: p, wins, meanMs, ao5 }, i) => {
+            const pods = p.pods ?? [];
+            const status = !p.connected ? 'offline' : room.status === 'running' || p.status !== 'idle' ? STATUS_LABEL[p.status] ?? p.status : 'online';
             return (
               <tr key={p.id} className={`${p.id === playerId ? 'me' : ''}${p.connected ? '' : ' offline'}`}>
                 <td className="left">
                   <div className="player">
-                    <Dot state={p.connected ? 'up' : 'offline'} title={status} />
+                    <Dot state={dotFor(p)} pulse={p.connected && p.status === 'solving'} title={status} />
                     <div className="who">
                       <div className="name">
+                        {anyRounds && <span className="rank">{i + 1}</span>}
                         <span className="text-name">{p.name}</span>
                         {p.id === room.hostId && <Crown size={12} className="host" aria-label="host" />}
                         {p.id === playerId && <span className="you">you</span>}
                       </div>
+                      <div className="status">
+                        {status}
+                        {pods.length > 0 && <span title={`websocket served by ${pods.join(', ')}`}> · pod {pods.map(shortPod).join(', ')}</span>}
+                      </div>
                     </div>
                   </div>
                 </td>
+                <td>{wins}</td>
+                <td>{formatTime(fromApiValue(meanMs), precision)}</td>
+                <td>{formatTime(fromApiValue(ao5), precision)}</td>
               </tr>
             );
           })}
@@ -57,7 +102,10 @@ export function ResultsGrid({ room, playerId, precision }: { room: LiveRoomState
     .map(Number)
     .filter((n) => Number.isFinite(n))
     .sort((a, b) => b - a);
-  const players = room.players;
+  const order = (room.standings ?? []).map((s) => s.playerId).filter((id) => room.players.some((p) => p.id === id));
+  for (const p of room.players) if (!order.includes(p.id)) order.push(p.id);
+  // players who left still have results? (server removes them) — show only current players
+  const players = order.map((id) => room.players.find((p) => p.id === id)!);
   if (rounds.length === 0) return null;
   return (
     <section className="race-results" aria-labelledby="results-title">

@@ -1,19 +1,20 @@
-// Race room: real-time multiplayer over Socket.IO (lib/race.ts); the room state lives in the race
-// service (Redis), every change is broadcast to all players.
+// Race room: real-time multiplayer over Socket.IO (lib/race.ts). Any race pod can serve any
+// player — room state lives in Redis and the Redis adapter relays broadcasts between pods.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Link2, LogOut, SkipForward, Swords, WifiOff } from 'lucide-react';
+import { ArrowLeft, Link2, LogOut, Pencil, Radio, SkipForward, Swords, WifiOff } from 'lucide-react';
 import { getEvent, formatTime, type Penalty } from '@cubetype/cubestats';
 import { useAuth } from '../lib/auth';
 import { useSettings } from '../lib/settings';
 import { useRegisterCommands } from '../lib/commands';
 import { toast } from '../lib/toast';
 import { addSolve, ensureSession } from '../lib/solves';
-import { defaultGuestName, getGuestName, inviteLink, useRace } from '../lib/race';
+import { defaultGuestName, getGuestName, inviteLink, RaceError, setGuestName, useRace } from '../lib/race';
 import { Loading, Spinner } from '../components/Spinner';
+import { Modal } from '../components/Modal';
 import { copyText, isTypingTarget, useStoredState } from '../components/live/hooks';
 import { useLiveTimer, TimerArea } from '../components/live/LiveTimer';
-import { Notice, ScrambleText } from '../components/live/ui';
+import { Dot, Notice, ScrambleText } from '../components/live/ui';
 import { PlayersCard, RaceChat, ResultsGrid } from '../components/live/race/RaceParts';
 import type { TimerResult } from '../timer/useTimerEngine';
 import '../components/live/live.css';
@@ -25,15 +26,49 @@ interface Pending {
   penalty: Penalty;
 }
 
+const shortPod = (pod: string) => {
+  const parts = pod.split('-');
+  return parts.length >= 3 ? parts.slice(-2).join('-') : pod;
+};
+
+function NicknameModal({ onClose, onSave }: { onClose: () => void; onSave: (name: string) => void }) {
+  const [name, setName] = useState(getGuestName());
+  return (
+    <Modal title="nickname" onClose={onClose} center>
+      <form
+        className="stack"
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSave(name);
+        }}
+      >
+        <div className="field">
+          <label htmlFor="race-nick">how other racers see you (guests only)</label>
+          <input id="race-nick" autoFocus value={name} maxLength={20} placeholder={defaultGuestName()} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className="row" style={{ justifyContent: 'flex-end' }}>
+          <button type="button" className="btn-text" onClick={onClose}>
+            cancel
+          </button>
+          <button type="submit" className="btn primary">
+            save &amp; rejoin
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 export default function RaceRoomPage() {
   const { roomId = '' } = useParams();
   const id = roomId.toLowerCase();
   const navigate = useNavigate();
   const { state, conn } = useRace(id);
-  const { user } = useAuth();
+  const { user, status: authStatus } = useAuth();
   const settings = useSettings();
   const [pending, setPending] = useState<Pending | null>(null);
   const [busy, setBusy] = useState(false);
+  const [nickOpen, setNickOpen] = useState(false);
   const [saveSolves, setSaveSolves] = useStoredState<boolean>('cubetype.race.saveSolves', false);
   const solveRound = useRef<number | null>(null);
   const saveWarned = useRef(false);
@@ -46,6 +81,15 @@ export default function RaceRoomPage() {
   const myResult = round && state.playerId ? room?.results?.[String(round.n)]?.[state.playerId] : undefined;
   const canStart = connected && room!.status === 'running' && !!round && !myResult && !pending;
 
+  // toast when the websocket moves to another pod (pod deleted / drained during a rollout)
+  const lastPod = useRef<string | null>(null);
+  useEffect(() => {
+    if (state.servedBy && lastPod.current && state.servedBy !== lastPod.current) {
+      toast.notice(`reconnected via pod ${state.servedBy} (was ${lastPod.current})`, { title: 'race' });
+    }
+    if (state.servedBy) lastPod.current = state.servedBy;
+  }, [state.servedBy]);
+
   const submit = useCallback(
     (p: Pending) => {
       if (!conn) return;
@@ -53,13 +97,31 @@ export default function RaceRoomPage() {
       conn
         .submitResult(p.round, p.timeMs, p.penalty)
         .then(() => setPending((cur) => (cur === p ? null : cur)))
-        .catch((e: Error) => {
+        .catch((e: RaceError) => {
+          if (e.code === 'OFFLINE' || e.code === 'TIMEOUT') return; // retried after reconnect
           setPending((cur) => (cur === p ? null : cur));
-          toast.error(e.message, { title: 'result not counted' });
+          if (e.code !== 'CONFLICT') toast.error(e.message, { title: 'result not counted' });
         });
     },
     [conn],
   );
+
+  // retry a result that could not be sent while disconnected
+  useEffect(() => {
+    if (!pending || !connected || !room) return;
+    const mine = state.playerId ? room.results?.[String(pending.round)]?.[state.playerId] : undefined;
+    if (mine) {
+      setPending(null);
+      return;
+    }
+    if (room.round?.n !== pending.round) {
+      setPending(null);
+      toast.notice('the round moved on while you were offline — that time was not counted');
+      return;
+    }
+    const t = setTimeout(() => submit(pending), 300);
+    return () => clearTimeout(t);
+  }, [connected, pending, room, state.playerId, submit]);
 
   const onSolve = (r: TimerResult) => {
     const n = solveRound.current ?? round?.n ?? null;
@@ -148,8 +210,9 @@ export default function RaceRoomPage() {
       ...(isHost ? [{ id: 'race-next', label: 'Next race round', icon: <SkipForward />, run: () => void nextRound() }] : []),
       { id: 'race-invite', label: 'Copy race invite link', icon: <Link2 />, run: () => void copyInvite() },
       { id: 'race-leave', label: 'Leave race room', icon: <LogOut />, run: () => void leave() },
+      ...(authStatus !== 'authed' ? [{ id: 'race-nick', label: 'Change race nickname', icon: <Pencil />, run: () => setNickOpen(true) }] : []),
     ],
-    [isHost, nextRound, copyInvite, leave],
+    [isHost, nextRound, copyInvite, leave, authStatus],
   );
 
   // ---- fatal / loading states ----------------------------------------------------------------
@@ -181,7 +244,7 @@ export default function RaceRoomPage() {
               </Link>
             }
           >
-            can't reach the race service{state.lastError ? ` (${state.lastError})` : ''} — retrying…
+            can't reach the race service{state.lastError ? ` (${state.lastError})` : ''} — retrying{state.attempt ? ` · attempt ${state.attempt}` : ''}…
           </Notice>
         )}
       </div>
@@ -198,7 +261,7 @@ export default function RaceRoomPage() {
 
   let roundLine: string;
   if (!round) roundLine = isHost ? 'you are the host — start the first round when everyone is here' : `waiting for ${host?.name ?? 'the host'} to start the first round`;
-  else if (pending) roundLine = 'sending your time…';
+  else if (pending) roundLine = connected ? 'sending your time…' : 'offline — your time will be sent when you reconnect';
   else if (room.status === 'finished') roundLine = isHost ? 'round finished — start the next one' : `round finished — waiting for ${host?.name ?? 'the host'}`;
   else if (myResult) roundLine = `you're done · waiting for ${waitingNames}`;
   else if (phase === 'running') roundLine = 'solving…';
@@ -217,8 +280,19 @@ export default function RaceRoomPage() {
             {room.isPrivate && <span className="pill">private</span>}
           </h1>
           <div className="subtitle race-conn">
+            <span className={`via ${connected ? 'on' : 'off'}`} data-tip={'your websocket is served by this race pod.\nother players may be on other pods —\nthe redis adapter relays broadcasts.'} data-tip-pos="down">
+              <Dot state={connected ? 'up' : 'down'} pulse={connected} />
+              {connected ? 'connected via pod ' : 'reconnecting… last pod '}
+              <b>{state.servedBy ? shortPod(state.servedBy) : '…'}</b>
+            </span>
+            {state.previousPods.length > 0 && <span className="moved">moved from {shortPod(state.previousPods[0])}</span>}
             <span>
               playing as <b>{myName}</b>
+              {authStatus !== 'authed' && (
+                <button className="btn-text inline" onClick={() => setNickOpen(true)} aria-label="change nickname">
+                  <Pencil size={12} />
+                </button>
+              )}
             </span>
           </div>
         </div>
@@ -231,6 +305,12 @@ export default function RaceRoomPage() {
           </button>
         </div>
       </div>
+
+      {!connected && (
+        <Notice tone="error" icon={<Radio />}>
+          connection lost — reconnecting{state.attempt ? ` (attempt ${state.attempt})` : ''}…{pending ? ' your time is saved and will be sent once you are back.' : ' the room keeps going without you.'}
+        </Notice>
+      )}
 
       <div className="race-layout">
         <div className="race-main">
@@ -267,7 +347,7 @@ export default function RaceRoomPage() {
             )}
             {pending && (
               <div className="race-submitted">
-                <Spinner size={14} /> sending…
+                <Spinner size={14} /> {connected ? 'sending…' : 'waiting for connection…'}
               </div>
             )}
           </TimerArea>
@@ -306,7 +386,7 @@ export default function RaceRoomPage() {
         </div>
 
         <aside className="race-side fade-on-focus">
-          <PlayersCard room={room} playerId={state.playerId} />
+          <PlayersCard room={room} playerId={state.playerId} precision={settings.precision} />
           <RaceChat
             chat={state.chat}
             playerId={state.playerId}
@@ -326,6 +406,17 @@ export default function RaceRoomPage() {
           </label>
         </aside>
       </div>
+
+      {nickOpen && (
+        <NicknameModal
+          onClose={() => setNickOpen(false)}
+          onSave={(name) => {
+            setGuestName(name);
+            setNickOpen(false);
+            conn?.reconnect();
+          }}
+        />
+      )}
     </div>
   );
 }
