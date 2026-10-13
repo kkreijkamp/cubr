@@ -78,7 +78,7 @@ export interface ActivityDay {
 }
 
 export type LbKind = 'single' | 'ao5' | 'ao12';
-export type LbPeriod = 'all' | 'weekly' | 'daily';
+export type LbPeriod = 'all' | 'weekly' | 'daily' | 'challenge';
 export interface LeaderboardEntry {
   rank: number;
   userId: string;

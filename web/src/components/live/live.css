@@ -127,8 +127,38 @@
   text-align: center;
 }
 
+/* generic section label row: ".h3" + right-aligned meta */
+.live-section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.live-section-title .h3 {
+  margin: 0;
+}
+.live-section-title .meta {
+  color: var(--sub-color);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 @media (max-width: 720px) {
   .live-seg {
     font-size: 0.78rem;
+  }
+  /* long pickers scroll sideways instead of wrapping into ragged rows */
+  .live-seg.scroll {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .live-seg.scroll::-webkit-scrollbar {
+    display: none;
+  }
+  .live-seg.scroll .btn-text {
+    flex-shrink: 0;
   }
 }

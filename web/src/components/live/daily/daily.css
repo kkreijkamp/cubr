@@ -24,15 +24,26 @@
 
 .daily-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 22rem;
   gap: 2rem;
   align-items: start;
+}
+@media (max-width: 1000px) {
+  .daily-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .daily-main {
   display: grid;
   gap: 1.1rem;
   align-content: start;
   min-width: 0;
+}
+.daily-side {
+  min-width: 0;
+}
+.daily-past {
+  text-align: center;
 }
 
 /* 5-attempt progress strip */
@@ -131,6 +142,75 @@
 }
 .daily-result .stat.lg .value {
   font-size: 5rem;
+}
+.daily-result-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem 3rem;
+}
+.daily-result-stats .small-value {
+  font-size: 1.2rem;
+  line-height: 1.6;
+}
+
+.daily-scrambles summary {
+  cursor: pointer;
+}
+.daily-scrambles ol {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* leaderboard */
+.daily-board {
+  display: grid;
+  gap: 0.5rem;
+}
+.daily-board .live-section-title {
+  margin-bottom: 0.25rem;
+}
+.daily-table td,
+.daily-table th {
+  padding-left: 0.6rem;
+  padding-right: 0.6rem;
+}
+.daily-table td {
+  padding-top: 0.55rem;
+  padding-bottom: 0.55rem;
+}
+.daily-table .name {
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.daily-table .name a {
+  color: var(--text-color);
+}
+.daily-table .name a:hover {
+  color: var(--main-color);
+}
+.daily-table .flag {
+  margin-right: 0.4rem;
+}
+.daily-table .crown {
+  color: var(--main-color);
+  vertical-align: -0.15em;
+}
+.daily-table tr.gap td {
+  background: transparent !important;
+  color: var(--sub-color);
+  text-align: center;
+  padding: 0.1rem;
+}
+.daily-more {
+  justify-self: center;
 }
 @media (max-width: 720px) {
   .daily-countdown {

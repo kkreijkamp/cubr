@@ -1,5 +1,5 @@
 // Daily challenge: 5 scrambles per event per UTC day, identical for everyone, ranked by ao5.
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CalendarDays, CloudOff, LogIn, RotateCcw } from 'lucide-react';
 import { averageOfN, DAILY_EVENTS, effectiveMs, formatSolve, formatTime, getEvent, type Penalty } from '@cubetype/cubestats';
@@ -14,7 +14,8 @@ import { addSolve, ensureSession, solveStore } from '../lib/solves';
 import { ErrorState, Loading, Spinner } from '../components/Spinner';
 import { formatCountdown, useNow, useStoredState } from '../components/live/hooks';
 import { TimerArea, useLiveTimer } from '../components/live/LiveTimer';
-import { EventPicker, Notice, ScrambleText } from '../components/live/ui';
+import { EventPicker, Notice, ScrambleText, Segmented } from '../components/live/ui';
+import { DailyBoard } from '../components/live/daily/DailyBoard';
 import type { TimerResult } from '../timer/useTimerEngine';
 import '../components/live/live.css';
 import '../components/live/daily/daily.css';
@@ -49,6 +50,14 @@ function savePractice(p: PracticeStore): void {
   } catch {
     /* ignore */
   }
+}
+
+function dayLabel(date: string, today: string): string {
+  if (date === today) return 'today';
+  const d = new Date(`${date}T00:00:00Z`);
+  const diff = Math.round((new Date(`${today}T00:00:00Z`).getTime() - d.getTime()) / 86_400_000);
+  if (diff === 1) return 'yesterday';
+  return `${['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][d.getUTCDay()]} ${d.getUTCDate()}`;
 }
 
 /** Session for the solve-service fallback path (store unavailable): first session of the event. */
@@ -88,13 +97,27 @@ export default function DailyPage() {
   const { user, status } = useAuth();
   const settings = useSettings();
   const now = useNow(1000);
-  const date = utcDateKey(new Date(now));
+  const today = utcDateKey(new Date(now));
+  const [date, setDate] = useState(today);
   const [event, setEvent] = useStoredState<string>('cubetype.daily.event', '333');
   const [local, setLocal] = useState<Record<string, Attempt[]>>({});
   const [practice, setPractice] = useState<PracticeStore>(loadPractice);
+  const [boardKey, setBoardKey] = useState(0);
+  const [me, setMe] = useState<{ rank: number; valueMs: number; total: number } | null>(null);
+  const [ranking, setRanking] = useState(false);
   const authed = status === 'authed' && !!user;
+  const isToday = date === today;
   const key = `${date}|${event}`;
   const ev = getEvent(event) ?? getEvent('333')!;
+
+  // follow the UTC rollover while looking at "today"
+  const prevToday = useRef(today);
+  useEffect(() => {
+    if (prevToday.current !== today) {
+      if (date === prevToday.current) setDate(today);
+      prevToday.current = today;
+    }
+  }, [today, date]);
 
   const scr = useAsync(() => api.scrambles.daily(date), [date]);
   const progress = useAsync(() => (authed ? api.solves.daily(date) : Promise.resolve(null)), [date, authed, user?.id]);
@@ -120,7 +143,7 @@ export default function DailyPage() {
   }, [attempts]);
   const done = nextIndex === null;
   const progressReady = !authed || (!!progress.data && !progress.error);
-  const canStart = !!scrambles && progressReady && !done;
+  const canStart = isToday && !!scrambles && progressReady && !done;
   const scramble = scrambles && nextIndex !== null ? scrambles[nextIndex] ?? null : null;
 
   const setLocalAttempt = useCallback((k: string, a: Attempt) => {
@@ -131,7 +154,15 @@ export default function DailyPage() {
     (k: string, ev2: string, d: string, a: Attempt, scr2: string) => {
       setLocalAttempt(k, { ...a, state: 'saving', error: undefined });
       submitDaily(ev2, d, a.index, { timeMs: a.timeMs, penalty: a.penalty }, scr2)
-        .then(() => setLocalAttempt(k, { ...a, state: 'saved' }))
+        .then(() => {
+          setLocalAttempt(k, { ...a, state: 'saved' });
+          if (a.index === ATTEMPTS - 1) {
+            // the board is updated asynchronously from the daily.completed event
+            setRanking(true);
+            [1500, 4000, 9000].forEach((ms) => setTimeout(() => setBoardKey((x) => x + 1), ms));
+            setTimeout(() => setRanking(false), 10_000);
+          }
+        })
         .catch((e: Error) => {
           if (e instanceof ApiError && e.status === 409) {
             // already submitted (e.g. from another tab) — the server copy wins
@@ -166,6 +197,7 @@ export default function DailyPage() {
   useEffect(() => {
     cancel();
     clearResult();
+    setMe(null);
   }, [event, date, cancel, clearResult]);
 
   const retry = (a: Attempt) => scrambles && send(key, event, date, a, scrambles[a.index] ?? '');
@@ -196,11 +228,15 @@ export default function DailyPage() {
   // countdown to the next UTC midnight
   const d = new Date(now);
   const nextMidnight = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
+  const days = Array.from({ length: 7 }, (_, i) => utcDateKey(new Date(Date.parse(`${today}T12:00:00Z`) - i * 86_400_000)));
 
   const ao5 = ao5Of(attempts);
+  const finite = attempts.map(effectiveMs).filter((t) => Number.isFinite(t));
+  const best = finite.length ? Math.min(...finite) : null;
   const effs = attempts.map(effectiveMs);
   const bestIdx = done ? effs.indexOf(Math.min(...effs)) : -1;
   const worstIdx = done ? effs.lastIndexOf(Math.max(...effs)) : -1;
+  const mean = finite.length === ATTEMPTS ? Math.round(finite.reduce((x, y) => x + y, 0) / ATTEMPTS) : null;
 
   const scrError = scr.error && !scrambles;
   const unavailable = scr.error instanceof ApiError && scr.error.isUnavailable;
@@ -222,9 +258,10 @@ export default function DailyPage() {
 
       <div className="daily-config fade-on-focus">
         <EventPicker events={DAILY_EVENTS} value={event} onChange={setEvent} />
+        <Segmented label="day" className="scroll" value={date} onChange={setDate} options={days.map((k) => ({ value: k, label: dayLabel(k, today), tip: k }))} />
       </div>
 
-      {!authed && status !== 'loading' && (
+      {!authed && status !== 'loading' && isToday && (
         <Notice
           icon={<LogIn />}
           action={
@@ -233,16 +270,22 @@ export default function DailyPage() {
             </Link>
           }
         >
-          practice mode — sign in to submit your times.
+          practice mode — sign in to submit your times to today's leaderboard.
         </Notice>
       )}
 
       <div className="daily-layout">
         <div className="daily-main">
+          {!isToday && (
+            <div className="daily-past sub small fade-on-focus">
+              viewing {date} (UTC) — past challenges are closed, leaderboard only.
+            </div>
+          )}
+
           <ol className="daily-strip fade-on-focus" aria-label="attempts">
             {Array.from({ length: ATTEMPTS }, (_, i) => {
               const a = attempts.find((x) => x.index === i);
-              const current = i === nextIndex;
+              const current = isToday && i === nextIndex;
               const paren = done && (i === bestIdx || i === worstIdx);
               return (
                 <li key={i} className={`${current ? 'current' : ''}${a ? ' filled' : ''}${a?.state === 'failed' ? ' failed' : ''}`}>
@@ -295,7 +338,32 @@ export default function DailyPage() {
                 <span className="label">ao5</span>
                 <span className="value">{formatTime(ao5, settings.precision)}</span>
               </div>
-              {!authed && (
+              <div className="daily-result-stats">
+                <div className="stat">
+                  <span className="label">mean</span>
+                  <span className="value text">{formatTime(mean, settings.precision)}</span>
+                </div>
+                <div className="stat">
+                  <span className="label">best</span>
+                  <span className="value text">{formatTime(best, settings.precision)}</span>
+                </div>
+                {authed ? (
+                  <div className="stat">
+                    <span className="label">rank {isToday ? 'today' : ''}</span>
+                    <span className={`value ${me ? '' : 'text small-value'}`}>
+                      {me ? `#${me.rank}` : !attempts.every((a) => a.state === 'saved') ? 'saving…' : ranking ? 'ranking…' : 'unranked'}
+                    </span>
+                    {me && <span className="hint">of {me.total.toLocaleString('en-US')}</span>}
+                    {!me && !ranking && attempts.every((a) => a.state === 'saved') && <span className="hint">not on the board (yet)</span>}
+                  </div>
+                ) : (
+                  <div className="stat">
+                    <span className="label">mode</span>
+                    <span className="value text small-value">practice</span>
+                  </div>
+                )}
+              </div>
+              {!authed && isToday && (
                 <div className="row wrap" style={{ justifyContent: 'center' }}>
                   <button className="btn small" onClick={resetPractice}>
                     <RotateCcw /> practise again
@@ -305,9 +373,9 @@ export default function DailyPage() {
                   </Link>
                 </div>
               )}
-              <div className="sub small center">come back in {formatCountdown(nextMidnight - now)} for new scrambles.</div>
+              {isToday && <div className="sub small center">come back in {formatCountdown(nextMidnight - now)} for new scrambles.</div>}
             </div>
-          ) : (
+          ) : isToday ? (
             <>
               <div className="daily-scramble-label fade-on-focus">
                 scramble <span className="main">{(nextIndex ?? 0) + 1}</span>/{ATTEMPTS}
@@ -329,8 +397,31 @@ export default function DailyPage() {
                 · <kbd>esc</kbd> while solving = DNF · one try per scramble
               </div>
             </>
+          ) : (
+            <details className="daily-scrambles card">
+              <summary className="sub small">show this day's scrambles</summary>
+              <ol>
+                {scrambles.map((s, i) => (
+                  <li key={i}>
+                    <span className="sub">{i + 1}.</span> {s}
+                  </li>
+                ))}
+              </ol>
+            </details>
           )}
         </div>
+
+        <aside className="daily-side fade-on-focus">
+          <DailyBoard
+            event={event}
+            date={date}
+            refreshKey={boardKey}
+            userId={user?.id ?? null}
+            username={user?.username ?? null}
+            precision={settings.precision}
+            onMe={setMe}
+          />
+        </aside>
       </div>
     </div>
   );
