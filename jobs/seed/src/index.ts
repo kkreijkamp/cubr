@@ -1,6 +1,6 @@
 // cubetype seed job — creates realistic synthetic cubers through the PUBLIC APIs, so the whole
 // pipeline (solve → outbox → Redis Stream → stats / leaderboard) is exercised exactly like real
-// traffic. Runs as a one-shot job: `docker compose --profile jobs run seed`.
+// traffic. Runs as a Kubernetes Job (deploy/k8s) or `docker compose --profile jobs run seed`.
 //
 //   1. register (or log in to) N deterministic users + a demo account
 //   2. bulk-import a year of practice history per user   (POST /api/sessions/import)

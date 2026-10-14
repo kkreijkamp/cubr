@@ -20,4 +20,4 @@ Idempotent: re-running logs existing users in and skips users that already have 
 | `SEED_RANDOM_SEED` | 3208 | makes usernames/history reproducible |
 | `SEED_DEMO_USER` / `SEED_DEMO_PASSWORD` | `demo` / `cubetype-demo` | presentation account |
 
-Run: `docker compose --profile jobs run --rm seed`.
+Run: `docker compose --profile jobs run --rm seed` (local) or `kubectl apply -k deploy/k8s/overlays/local/seed` (kind).

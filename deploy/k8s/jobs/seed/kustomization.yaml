@@ -1,0 +1,6 @@
+# Environment-neutral seed Job; use overlays/<env>/seed to apply it with the right image.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: cubetype
+resources:
+  - seed-job.yaml

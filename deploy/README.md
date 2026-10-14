@@ -11,12 +11,13 @@ Both use the same container images and the same routing table.
 |---|---|
 | `../docker-compose.yml` | Full local stack: Postgres, Redis, 7 services, web and the nginx gateway (+ `jobs` profile) |
 | `gateway/nginx.conf` | Compose gateway that mimics the GKE Ingress routes |
-| `k8s/base/` | Environment-neutral manifests (kustomize): namespace, ConfigMap, CloudNativePG `Cluster`, Redis StatefulSet, 8 Deployments + Services + PDBs, 4 HPAs |
+| `k8s/base/` | Environment-neutral manifests (kustomize): namespace, ConfigMap, CloudNativePG `Cluster`, Redis StatefulSet, 8 Deployments + Services + PDBs, 4 HPAs, wca-import CronJob |
 | `k8s/overlays/local/` | kind: local `cubetype/<svc>:dev` images, nginx `gateway` (NodePort 30080 → `localhost:8090`) instead of the Ingress |
-| `k8s/jobs/loadgen` | On-demand Job: HPA load generator. Not part of the base. |
+| `k8s/jobs/seed`, `k8s/jobs/loadgen` | On-demand Jobs: demo data, HPA load generator. Not part of the base. Apply seed via `overlays/<env>/seed` so the image is rewritten. |
 | `k8s/kind/kind-config.yaml` | kind cluster: 1 control-plane + 2 workers, port mapping 8090 → 30080 |
 | `../scripts/build-local.sh` | `docker build` all images as `cubetype/<name>:dev` (`--kind` also loads them into kind) |
 | `../scripts/kind-up.sh` | Repeatable local Kubernetes setup (cluster, CNPG, metrics-server, images, secret, deploy) |
+| `../scripts/kind-wca-import-tsv.sh` | Offline WCA import into kind from an unzipped export (if the WCA API rate-limits you) |
 | `../scripts/smoke.mjs` | End-to-end check through any entry point: `node scripts/smoke.mjs <baseUrl>` |
 
 ---
@@ -78,6 +79,9 @@ brew install kind                                       # once
 export KUBECONFIG=~/.kube/cubetype-kind.yaml            # any separate file
 scripts/kind-up.sh                                      # cluster + CNPG 1.30.1 + metrics-server + build/load images + deploy
 open http://localhost:8090                              # gateway NodePort 30080 (kind port mapping)
+kubectl -n cubetype create job --from=cronjob/wca-import wca-import-now   # WCA data (needs internet)
+scripts/kind-wca-import-tsv.sh ./data/wca/tsv           # ...or offline from unzipped TSVs
+kubectl apply -k deploy/k8s/overlays/local/seed         # demo users + solves
 node scripts/smoke.mjs http://localhost:8090
 ```
 

@@ -1,0 +1,83 @@
+# Weekly refresh of the official WCA results export into the `wca` schema (jobs/wca-import).
+# The importer loads into wca_staging and swaps it in atomically, so the wca service keeps
+# serving the old data until the new data is complete (zero-downtime refresh).
+# Run it immediately (initial load) without waiting for the schedule:
+#   kubectl -n cubetype create job --from=cronjob/wca-import wca-import-now
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: wca-import
+  labels:
+    app.kubernetes.io/name: wca-import
+    app.kubernetes.io/component: batch
+    app.kubernetes.io/part-of: cubetype
+spec:
+  schedule: "0 4 * * 1"                 # every Monday 04:00 (the WCA refreshes its export weekly)
+  timeZone: Australia/Brisbane          # interpret the schedule in local (UQ) time
+  concurrencyPolicy: Forbid             # never run two imports at once (they share wca_staging)
+  startingDeadlineSeconds: 3600         # if the controller missed the slot by > 1 h, skip it
+  successfulJobsHistoryLimit: 3         # keep the last 3 finished Jobs for `kubectl logs`
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    metadata:
+      labels:
+        app.kubernetes.io/name: wca-import
+        app.kubernetes.io/part-of: cubetype
+    spec:
+      backoffLimit: 3                   # retry a failed import up to 3 times (new pod each time)
+      activeDeadlineSeconds: 3600       # kill a stuck import after 1 h
+      ttlSecondsAfterFinished: 604800   # garbage-collect finished Jobs after 7 days
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: wca-import
+            app.kubernetes.io/component: batch
+            app.kubernetes.io/part-of: cubetype
+        spec:
+          restartPolicy: Never          # a failed pod stays around (logs) and the Job creates a new one
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 70               # "postgres" user of postgres:17-alpine
+            runAsGroup: 70
+            fsGroup: 70                 # emptyDir volumes writable for that user
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: wca-import
+              image: cubetype/wca-import:dev   # rewritten per overlay
+              imagePullPolicy: IfNotPresent
+              env:
+                - name: DATABASE_URL    # CloudNativePG-generated connection string (primary, pg-rw)
+                  valueFrom:
+                    secretKeyRef:
+                      name: pg-app
+                      key: uri
+                - name: WORK_DIR        # where the ~381 MB export zip is downloaded (emptyDir below)
+                  value: /work
+                # - name: FORCE         # uncomment to re-import even if this export is already loaded
+                #   value: "1"
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              volumeMounts:
+                - name: work
+                  mountPath: /work
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: work                # scratch disk on the node, deleted with the pod
+              emptyDir:
+                sizeLimit: 2Gi
+            - name: tmp
+              emptyDir:
+                sizeLimit: 64Mi

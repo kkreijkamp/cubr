@@ -75,6 +75,9 @@ kubectl -n "$NS" get pods -o wide
 cat <<EOF
 
 cubetype is running on kind: http://localhost:8090
+  load WCA data : kubectl -n $NS create job --from=cronjob/wca-import wca-import-now
+                  (or offline from unzipped TSVs: scripts/kind-wca-import-tsv.sh <tsv-dir>)
+  seed users    : kubectl apply -k deploy/k8s/overlays/local/seed
   smoke test    : node scripts/smoke.mjs http://localhost:8090
   kubectl       : export KUBECONFIG=$KUBECONFIG
 EOF

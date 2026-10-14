@@ -1,6 +1,6 @@
 # =============================================================================================
 # wca: official WCA results: records, rank/percentile estimator, distributions, person lookup (/api/wca)
-# Reads the wca schema loaded by the wca-import job; caches expensive queries in Redis.
+# Reads the wca schema loaded by the wca-import CronJob; caches expensive queries in Redis.
 # Objects: Deployment (2 replicas, zero-downtime rolling updates) + ClusterIP Service on port
 # 8080 (keeps SPEC's internal URL http://wca:8080 working) + PodDisruptionBudget.
 # =============================================================================================

@@ -158,8 +158,8 @@ services:
       retries: 3
 
   # ---- one-off jobs (only with --profile jobs) ---------------------------------------------------
-  # Downloads the WCA public export and loads it into the `wca` schema (staging schema + atomic
-  # swap). Run: docker compose --profile jobs run --rm wca-import
+  # Equivalent of the K8s CronJob wca-import: downloads the WCA public export and loads it into
+  # the `wca` schema (staging schema + atomic swap). Run: docker compose --profile jobs run --rm wca-import
   # Offline/faster variant: unzip an export to ./data/wca/tsv, then add
   #   -v "$PWD/data/wca/tsv:/data:ro" -e WCA_TSV_DIR=/data   to the `run` command.
   wca-import:
@@ -173,8 +173,8 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
 
-  # Creates synthetic users + solves through the PUBLIC APIs (so events flow through
-  # solve -> Redis -> stats/leaderboard exactly like real traffic).
+  # Equivalent of the K8s Job seed: creates synthetic users + solves through the PUBLIC APIs
+  # (so events flow through solve -> Redis -> stats/leaderboard exactly like real traffic).
   # It talks to the services directly via AUTH_URL / SOLVE_URL / SCRAMBLE_URL (jobs/seed/README.md).
   # Run: docker compose --profile jobs run --rm seed      (smaller: SEED_USERS=20 docker compose ...)
   seed:
