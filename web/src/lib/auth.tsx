@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, ApiError, getToken, onUnauthorized, setToken } from './api';
 import { mergeServerSettings, setSettingsServerSync } from './settings';
+import { loadJson, saveJson } from './store';
 import { toast } from './toast';
 import type { PrivateUser } from './types';
 
@@ -29,12 +30,31 @@ export function getCurrentUser(): PrivateUser | null {
   return currentUser;
 }
 
+/** The last signed-in user, so the app stays signed in while the auth service is unreachable. */
+const USER_KEY = 'cubetype.user';
+function cachedUser(): PrivateUser | null {
+  const u = loadJson<PrivateUser | null>(USER_KEY, null);
+  return u && typeof u.id === 'string' && typeof u.username === 'string' ? u : null;
+}
+function rememberUser(u: PrivateUser | null): void {
+  if (u) {
+    saveJson(USER_KEY, u);
+    return;
+  }
+  try {
+    localStorage.removeItem(USER_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>(getToken() ? 'loading' : 'guest');
   const [user, setUserState] = useState<PrivateUser | null>(null);
 
   const applyUser = useCallback((u: PrivateUser | null) => {
     currentUser = u;
+    rememberUser(u);
     setUserState(u);
     setStatus(u ? 'authed' : 'guest');
     setSettingsServerSync(u ? (s) => api.auth.saveSettings(s as unknown as Record<string, unknown>) : null);
@@ -52,20 +72,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       applyUser(null);
       return;
     }
-    const ctrl = new AbortController();
-    api.auth
-      .me(ctrl.signal)
-      .then(({ user: u, settings }) => {
-        mergeServerSettings(settings);
-        applyUser(u);
-      })
-      .catch((err) => {
-        if (ctrl.signal.aborted) return;
-        if (err instanceof ApiError && err.status === 401) setToken(null);
-        // auth service down: stay logged out locally but keep the token for next time
-        applyUser(null);
-      });
-    return () => ctrl.abort();
+    let ctrl = new AbortController();
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let failures = 0;
+    const check = () => {
+      if (retryTimer) clearTimeout(retryTimer);
+      retryTimer = null;
+      if (!getToken()) return;
+      ctrl.abort();
+      const c = (ctrl = new AbortController());
+      api.auth
+        .me(c.signal)
+        .then(({ user: u, settings }) => {
+          window.removeEventListener('online', check);
+          mergeServerSettings(settings);
+          applyUser(u);
+        })
+        .catch((err) => {
+          if (c.signal.aborted) return;
+          if (err instanceof ApiError && err.status === 401) {
+            window.removeEventListener('online', check);
+            setToken(null);
+            applyUser(null);
+            return;
+          }
+          // auth service unreachable: keep the token and stay signed in as the last known user
+          // (the solve store keeps working from its offline cache); check again later
+          if (failures === 0 && !currentUser) applyUser(cachedUser());
+          retryTimer = setTimeout(check, Math.min(60_000, 2000 * 2 ** failures++));
+        });
+    };
+    window.addEventListener('online', check);
+    check();
+    return () => {
+      ctrl.abort();
+      if (retryTimer) clearTimeout(retryTimer);
+      window.removeEventListener('online', check);
+    };
   }, [applyUser]);
 
   const value = useMemo<AuthContextValue>(
