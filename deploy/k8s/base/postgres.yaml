@@ -1,11 +1,11 @@
-# PostgreSQL 17 managed by the CloudNativePG operator (installed cluster-wide, see
-# deploy/README.md). The operator turns this one object into:
+# PostgreSQL 17 managed by the CloudNativePG operator (installed cluster-wide by
+# scripts/commands.sh §7). The operator turns this one object into:
 #   * Pods pg-1, pg-2, ... : 1 primary + streaming replicas, each with its own PVC
 #   * Services pg-rw (primary, used by the apps), pg-ro (replicas), pg-r (any)
 #   * Secret pg-app with the generated password and a ready-made connection string (key "uri")
 #     which every Deployment maps to DATABASE_URL
 #   * automatic failover: if the primary dies, the most up-to-date replica is promoted and
-#     pg-rw is re-pointed within seconds
+#     pg-rw is re-pointed within seconds (demo: scripts/commands.sh §13)
 #   * two PodDisruptionBudgets, so `kubectl drain` performs a switchover instead of an outage
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
@@ -16,7 +16,7 @@ metadata:
     app.kubernetes.io/component: database
     app.kubernetes.io/part-of: cubetype
 spec:
-  instances: 2                          # primary + 1 replica
+  instances: 2                          # primary + 1 replica (the GKE overlay raises this to 3)
   imageName: ghcr.io/cloudnative-pg/postgresql:17.11-minimal-trixie   # PostgreSQL 17 (SPEC §2), pinned
   primaryUpdateStrategy: unsupervised   # operator may restart/switch over the primary on its own during upgrades
 
@@ -31,7 +31,7 @@ spec:
       owner: cubetype                   # application role; password generated into Secret pg-app
 
   storage:
-    size: 5Gi                           # one PVC per instance (default StorageClass)
+    size: 5Gi                           # one PVC per instance (default StorageClass; GKE overlay: standard-rwo)
 
   resources:
     requests:

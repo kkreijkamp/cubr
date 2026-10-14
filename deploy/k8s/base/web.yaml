@@ -1,6 +1,6 @@
 # =============================================================================================
 # web: the React SPA served by unprivileged nginx (web/Dockerfile, port 8080). Stateless and
-# tiny, so it gets small requests; HPA 2-6 replicas (hpa.yaml).
+# tiny, so it gets small requests; HPA 2-6 replicas (hpa.yaml). It is the Ingress defaultBackend.
 # Objects: Deployment + ClusterIP Service (8080) + PodDisruptionBudget.
 # =============================================================================================
 apiVersion: apps/v1
@@ -49,7 +49,7 @@ spec:
           matchLabelKeys: ["pod-template-hash"]
       containers:
         - name: web
-          image: cubetype/web:dev
+          image: cubetype/web:dev       # rewritten per overlay (GKE: Artifact Registry :1.0.0)
           imagePullPolicy: IfNotPresent
           # APP_VERSION comes from the image (build arg); /_info reports it with the pod name.
           env:

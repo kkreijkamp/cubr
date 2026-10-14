@@ -28,7 +28,7 @@ export interface ProjectorDeps {
  * takes the per-user lock, records the event id in processed_events (duplicate deliveries are
  * skipped) and writes resulting pb.updated events to the outbox table.
  */
-/** Upserts a session's display name (shared by the projector and the backfill loop). */
+/** Upserts a session's display name (from solve.created and session.renamed). */
 export async function upsertSessionName(c: PoolClient | Pool, sessionId: string, userId: string, event: string, name: string): Promise<void> {
   await c.query(
     `INSERT INTO stats.sessions (session_id, user_id, event, name) VALUES ($1, $2, $3, $4)

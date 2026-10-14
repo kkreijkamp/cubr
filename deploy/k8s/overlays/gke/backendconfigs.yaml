@@ -1,0 +1,168 @@
+# BackendConfig = GKE-specific settings of each load-balancer backend (one per Service).
+#   healthCheck        the LB probes every pod (NEG) on /readyz:8080 -- the same endpoint as the
+#                      readinessProbe -- so pods whose dependencies are down get no traffic
+#   connectionDraining after a pod leaves the backend (rollout, scale-in), in-flight requests
+#                      get up to 30 s to finish (pods also sleep 10 s in preStop)
+#   timeoutSec         max time for a backend response (default 30 s). race: 3600 s, because
+#                      the classic ALB closes WebSockets (even active ones) when it expires.
+#                      solve: 120 s for large csTimer imports.
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: auth
+  labels:
+    app.kubernetes.io/name: auth
+    app.kubernetes.io/part-of: cubetype
+spec:
+  timeoutSec: 30
+  connectionDraining:
+    drainingTimeoutSec: 30
+  healthCheck:
+    type: HTTP
+    requestPath: /readyz
+    port: 8080                          # must equal the containerPort (NEG mode)
+    checkIntervalSec: 5
+    timeoutSec: 3
+    healthyThreshold: 1
+    unhealthyThreshold: 2
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: scramble
+  labels:
+    app.kubernetes.io/name: scramble
+    app.kubernetes.io/part-of: cubetype
+spec:
+  timeoutSec: 30
+  connectionDraining:
+    drainingTimeoutSec: 30
+  healthCheck:                          # more tolerant: a CPU-saturated pod answers slower, don't eject it
+    type: HTTP
+    requestPath: /readyz
+    port: 8080                          # must equal the containerPort (NEG mode)
+    checkIntervalSec: 10
+    timeoutSec: 5
+    healthyThreshold: 1
+    unhealthyThreshold: 3
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: solve
+  labels:
+    app.kubernetes.io/name: solve
+    app.kubernetes.io/part-of: cubetype
+spec:
+  timeoutSec: 120   # big csTimer imports (<= 100k solves)
+  connectionDraining:
+    drainingTimeoutSec: 30
+  healthCheck:
+    type: HTTP
+    requestPath: /readyz
+    port: 8080                          # must equal the containerPort (NEG mode)
+    checkIntervalSec: 5
+    timeoutSec: 3
+    healthyThreshold: 1
+    unhealthyThreshold: 2
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: stats
+  labels:
+    app.kubernetes.io/name: stats
+    app.kubernetes.io/part-of: cubetype
+spec:
+  timeoutSec: 30
+  connectionDraining:
+    drainingTimeoutSec: 30
+  healthCheck:
+    type: HTTP
+    requestPath: /readyz
+    port: 8080                          # must equal the containerPort (NEG mode)
+    checkIntervalSec: 5
+    timeoutSec: 3
+    healthyThreshold: 1
+    unhealthyThreshold: 2
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: leaderboard
+  labels:
+    app.kubernetes.io/name: leaderboard
+    app.kubernetes.io/part-of: cubetype
+spec:
+  timeoutSec: 30
+  connectionDraining:
+    drainingTimeoutSec: 30
+  healthCheck:
+    type: HTTP
+    requestPath: /readyz
+    port: 8080                          # must equal the containerPort (NEG mode)
+    checkIntervalSec: 5
+    timeoutSec: 3
+    healthyThreshold: 1
+    unhealthyThreshold: 2
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: race
+  labels:
+    app.kubernetes.io/name: race
+    app.kubernetes.io/part-of: cubetype
+spec:
+  timeoutSec: 3600   # WebSockets (Socket.IO) live up to 1 h; the client reconnects automatically
+  connectionDraining:
+    drainingTimeoutSec: 30
+  healthCheck:
+    type: HTTP
+    requestPath: /readyz
+    port: 8080                          # must equal the containerPort (NEG mode)
+    checkIntervalSec: 5
+    timeoutSec: 3
+    healthyThreshold: 1
+    unhealthyThreshold: 2
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: wca
+  labels:
+    app.kubernetes.io/name: wca
+    app.kubernetes.io/part-of: cubetype
+spec:
+  timeoutSec: 30
+  connectionDraining:
+    drainingTimeoutSec: 30
+  healthCheck:
+    type: HTTP
+    requestPath: /readyz
+    port: 8080                          # must equal the containerPort (NEG mode)
+    checkIntervalSec: 5
+    timeoutSec: 3
+    healthyThreshold: 1
+    unhealthyThreshold: 2
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: web
+  labels:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/part-of: cubetype
+spec:
+  timeoutSec: 30
+  connectionDraining:
+    drainingTimeoutSec: 30
+  healthCheck:
+    type: HTTP
+    requestPath: /readyz
+    port: 8080                          # must equal the containerPort (NEG mode)
+    checkIntervalSec: 5
+    timeoutSec: 3
+    healthyThreshold: 1
+    unhealthyThreshold: 2

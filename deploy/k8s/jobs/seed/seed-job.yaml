@@ -1,6 +1,7 @@
 # On-demand Job: creates synthetic users + solves through the PUBLIC service APIs (jobs/seed),
 # so the data flows exactly like real traffic: solve -> outbox -> Redis Stream -> stats/leaderboard.
 # Not part of the base; applied through the overlay-specific wrapper (image rewrite):
+#   kubectl apply -k deploy/k8s/overlays/gke/seed      (GKE)
 #   kubectl apply -k deploy/k8s/overlays/local/seed    (kind)
 # Jobs are immutable: to run it again, `kubectl -n cubetype delete job seed` first.
 apiVersion: batch/v1

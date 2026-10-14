@@ -1,0 +1,58 @@
+# =============================================================================================
+# GKE Ingress -> Google Cloud external Application Load Balancer (classic), one public IP.
+# Routes by path prefix (docs/SPEC.md §3); everything that matches no rule goes to the SPA
+# (defaultBackend web). /internal/* has no rule, so it is never routed to a service.
+# pathType Prefix: "/api/auth" matches /api/auth and /api/auth/... (not /api/authx).
+# No path rewriting: services receive the full original path.
+# The same routes are implemented for local development by deploy/gateway/nginx.conf.
+# Provisioning takes ~5-10 min; until the health checks pass the LB answers 502/404.
+# =============================================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cubetype
+  labels:
+    app.kubernetes.io/name: cubetype
+    app.kubernetes.io/part-of: cubetype
+  annotations:
+    kubernetes.io/ingress.class: "gce"                          # GKE's built-in external ALB controller
+    kubernetes.io/ingress.global-static-ip-name: "cubetype-ip"  # reserved in scripts/commands.sh §6
+spec:
+  defaultBackend:
+    service:
+      name: web
+      port:
+        number: 8080
+  rules:
+    - http:                                                     # ONE rule with many paths = one URL map
+        paths:
+          - path: /api/auth
+            pathType: Prefix
+            backend: { service: { name: auth, port: { number: 8080 } } }
+          - path: /api/users
+            pathType: Prefix
+            backend: { service: { name: auth, port: { number: 8080 } } }
+          - path: /api/scrambles
+            pathType: Prefix
+            backend: { service: { name: scramble, port: { number: 8080 } } }
+          - path: /api/sessions
+            pathType: Prefix
+            backend: { service: { name: solve, port: { number: 8080 } } }
+          - path: /api/solves
+            pathType: Prefix
+            backend: { service: { name: solve, port: { number: 8080 } } }
+          - path: /api/stats
+            pathType: Prefix
+            backend: { service: { name: stats, port: { number: 8080 } } }
+          - path: /api/leaderboards
+            pathType: Prefix
+            backend: { service: { name: leaderboard, port: { number: 8080 } } }
+          - path: /api/race
+            pathType: Prefix
+            backend: { service: { name: race, port: { number: 8080 } } }
+          - path: /socket.io
+            pathType: Prefix
+            backend: { service: { name: race, port: { number: 8080 } } }
+          - path: /api/wca
+            pathType: Prefix
+            backend: { service: { name: wca, port: { number: 8080 } } }

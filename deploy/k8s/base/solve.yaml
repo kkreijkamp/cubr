@@ -1,6 +1,6 @@
 # =============================================================================================
 # solve: sessions & solves CRUD, csTimer import/export, transactional outbox -> Redis Streams (/api/sessions, /api/solves)
-# HPA 2-6 replicas (hpa.yaml).
+# 512Mi limit: a 25 MB csTimer import is parsed in memory. HPA 2-6 replicas.
 # Objects: Deployment (2 replicas, zero-downtime rolling updates) + ClusterIP Service on port
 # 8080 (keeps SPEC's internal URL http://solve:8080 working) + PodDisruptionBudget.
 # =============================================================================================
@@ -50,7 +50,7 @@ spec:
           matchLabelKeys: ["pod-template-hash"]   # spread each ReplicaSet (rollout) separately
       containers:
         - name: solve
-          image: cubetype/solve:dev
+          image: cubetype/solve:dev    # rewritten per overlay (GKE: Artifact Registry :1.0.0)
           imagePullPolicy: IfNotPresent
           # APP_VERSION is baked into the image at build time (--build-arg) and deliberately not overridden here.
           envFrom:
@@ -105,10 +105,10 @@ spec:
           resources:
             requests:                   # what the scheduler reserves (and what HPA % is relative to)
               cpu: 50m
-              memory: 96Mi
+              memory: 128Mi
             limits:                     # hard caps: CPU is throttled, memory over the limit = OOMKill
               cpu: "500m"
-              memory: 256Mi
+              memory: 512Mi
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

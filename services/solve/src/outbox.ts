@@ -1,5 +1,6 @@
 import type { FastifyBaseLogger } from 'fastify';
 import { publishEvent, type Pool, type PoolClient, type Redis } from '@cubetype/common';
+import { queryWithTimeout } from './pgTimeout.js';
 
 /**
  * Transactional outbox (docs/SPEC.md §7.2, §9.3).
@@ -54,6 +55,10 @@ export interface Relay {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// Every relay query has a client-side timeout (10 s default): a wedged connection must not stall
+// the relay, and with it graceful shutdown, forever.
+const q = queryWithTimeout;
+
 /** Rejects if `p` takes longer than `ms` (a paused/partitioned Redis makes commands hang). */
 export function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
   let timer: NodeJS.Timeout;
@@ -99,9 +104,10 @@ export function startOutboxRelay(opts: RelayOptions): Relay {
   async function relayOnce(): Promise<number> {
     const client = await pool.connect();
     try {
-      await client.query('BEGIN');
+      await q(client, 'BEGIN');
       // SKIP LOCKED: several replicas relay concurrently without blocking or double-claiming.
-      const { rows } = await client.query<{ id: number; type: string; payload: Record<string, unknown> }>(
+      const { rows } = await q<{ id: number; type: string; payload: Record<string, unknown> }>(
+        client,
         `SELECT id, type, payload FROM solve.outbox
           WHERE published_at IS NULL ORDER BY id LIMIT $1 FOR UPDATE SKIP LOCKED`,
         [batchSize],
@@ -112,9 +118,9 @@ export function startOutboxRelay(opts: RelayOptions): Relay {
         for (const row of rows) {
           await withTimeout(publishEvent(redis, row.type, { ...row.payload, eventId: `solve-${row.id}` }), 5000, 'redis xadd');
         }
-        await client.query('UPDATE solve.outbox SET published_at = now() WHERE id = ANY($1::bigint[])', [rows.map((r) => r.id)]);
+        await q(client, 'UPDATE solve.outbox SET published_at = now() WHERE id = ANY($1::bigint[])', [rows.map((r) => r.id)]);
       }
-      await client.query('COMMIT');
+      await q(client, 'COMMIT');
       client.release();
       if (rows.length > 0) {
         published += rows.length;
@@ -122,10 +128,10 @@ export function startOutboxRelay(opts: RelayOptions): Relay {
       }
       return rows.length;
     } catch (err) {
-      // Roll back so the claimed rows stay unpublished and are retried on the next pass. If even
-      // the rollback fails the connection is unusable: release(err) makes the pool drop it.
+      // Redis failure → the connection is fine: roll back and return it to the pool.
+      // Postgres timeout → the connection may be wedged: release(err) makes the pool drop it.
       let connOk = true;
-      await client.query('ROLLBACK').catch(() => {
+      await q(client, 'ROLLBACK', [], 2000).catch(() => {
         connOk = false;
       });
       client.release(connOk ? undefined : (err as Error));
@@ -161,9 +167,11 @@ export function startOutboxRelay(opts: RelayOptions): Relay {
   })();
 
   async function cleanup() {
-    const res = await pool.query(
+    const res = await q(
+      pool,
       `DELETE FROM solve.outbox WHERE published_at IS NOT NULL AND published_at < now() - make_interval(secs => $1)`,
       [retentionMs / 1000],
+      60_000,
     );
     if (res.rowCount) log.info({ deleted: res.rowCount }, 'outbox cleanup');
   }
@@ -174,7 +182,9 @@ export function startOutboxRelay(opts: RelayOptions): Relay {
 
   /** Unpublished rows, or null if Postgres doesn't answer within 1.5 s (keeps _info snappy). */
   async function countBacklog(): Promise<number | null> {
-    const query = pool.query<{ n: number }>('SELECT count(*) AS n FROM solve.outbox WHERE published_at IS NULL');
+    // pool.query releases the client with the error on timeout, so a wedged connection is dropped.
+    const query = q<{ n: number }>(pool, 'SELECT count(*) AS n FROM solve.outbox WHERE published_at IS NULL', [], 1500);
+    // Overall deadline too: acquiring a fresh connection alone may take up to the 5 s connect timeout.
     return withTimeout(query, 1500, 'backlog count').then((r) => r.rows[0].n, () => null);
   }
 

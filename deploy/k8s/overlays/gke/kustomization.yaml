@@ -1,0 +1,57 @@
+# GKE overlay: the base + everything specific to Google Kubernetes Engine.
+#   kubectl apply -k deploy/k8s/overlays/gke
+# * images from Artifact Registry (australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/<svc>:<tag>)
+# * GKE Ingress (external Application Load Balancer) on the reserved global IP "cubetype-ip"
+# * one BackendConfig per backend (LB health check on /readyz, connection draining, race timeout)
+# * container-native load balancing (NEG annotations on every Service)
+# * PersistentVolumes on standard-rwo (pd-balanced) and a 3-instance PostgreSQL cluster
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: cubetype
+resources:
+  - ../../base
+  - backendconfigs.yaml
+  - ingress.yaml
+
+# Rewrite the neutral image names of the base. To release a new version change newTag here
+# (or, for the rollout demo, use `kubectl set image`, see scripts/commands.sh §14).
+images:
+  - name: cubetype/auth
+    newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/auth
+    newTag: "1.0.0"
+  - name: cubetype/scramble
+    newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/scramble
+    newTag: "1.0.0"
+  - name: cubetype/solve
+    newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/solve
+    newTag: "1.0.0"
+  - name: cubetype/stats
+    newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/stats
+    newTag: "1.0.0"
+  - name: cubetype/leaderboard
+    newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/leaderboard
+    newTag: "1.0.0"
+  - name: cubetype/race
+    newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/race
+    newTag: "1.0.0"
+  - name: cubetype/wca
+    newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/wca
+    newTag: "1.0.0"
+  - name: cubetype/web
+    newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/web
+    newTag: "1.0.0"
+  - name: cubetype/wca-import
+    newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/wca-import
+    newTag: "1.0.0"
+
+patches:
+  # Behind the Google load balancer X-Forwarded-For is "<client-ip>, <lb-ip>" -> trust 2 hops.
+  - path: config-gke.yaml
+  # Service annotations for the Ingress: NEG = the load balancer sends traffic straight to pod
+  # IPs (no extra kube-proxy hop) and health-checks each pod; backend-config = which
+  # BackendConfig (health check / timeouts / draining) applies to that Service.
+  - path: service-annotations.yaml
+  # PostgreSQL: 3 instances (1 primary + 2 replicas, one per node) on pd-balanced disks.
+  - path: postgres-gke.yaml
+  # Redis PVC on pd-balanced.
+  - path: redis-gke.yaml

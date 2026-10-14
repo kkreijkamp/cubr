@@ -79,6 +79,31 @@ export interface RawResponse<T> {
   ms: number;
 }
 
+/** GETs give up after this long, so a hanging service fails its own widget instead of spinning. */
+const GET_TIMEOUT_MS = 15_000;
+
+/** The caller's signal combined with a timeout (`AbortSignal.any` where the browser has it). */
+function withTimeout(signal: AbortSignal | undefined, timeoutMs: number | undefined): AbortSignal | undefined {
+  if (!timeoutMs) return signal;
+  const timeout = AbortSignal.timeout(timeoutMs);
+  if (!signal) return timeout;
+  if (typeof AbortSignal.any === 'function') return AbortSignal.any([signal, timeout]);
+  const ctrl = new AbortController();
+  for (const s of [signal, timeout]) {
+    if (s.aborted) ctrl.abort(s.reason);
+    else s.addEventListener('abort', () => ctrl.abort(s.reason), { once: true });
+  }
+  return ctrl.signal;
+}
+
+/** fetch / body-read failures as ApiError; an abort by the caller is passed through unchanged. */
+function transportError(err: unknown): unknown {
+  const name = (err as Error | null)?.name;
+  if (name === 'AbortError') return err;
+  if (name === 'TimeoutError') return new ApiError(0, 'TIMEOUT', 'Request timed out');
+  return new ApiError(0, 'NETWORK', 'Network error — is the server reachable?');
+}
+
 /** Low-level request returning body + headers (used by the status page to show X-Served-By).
  *  A `Blob` body is sent as raw bytes with the blob's own content type (avatar upload); anything
  *  else is sent as JSON. */
@@ -95,7 +120,7 @@ export async function requestRaw<T>(
   if (token) headers.Authorization = `Bearer ${token}`;
   const started = performance.now();
   let res: Response;
-  const signal = opts.signal ?? (opts.timeoutMs ? AbortSignal.timeout(opts.timeoutMs) : undefined);
+  const signal = withTimeout(opts.signal, opts.timeoutMs);
   try {
     res = await fetch(path, {
       method,
@@ -105,18 +130,23 @@ export async function requestRaw<T>(
       cache: 'no-store',
     });
   } catch (err) {
-    if ((err as Error).name === 'AbortError') throw err;
-    throw new ApiError(0, 'NETWORK', 'Network error — is the server reachable?');
+    throw transportError(err);
   }
   const ms = performance.now() - started;
   let json: any = null;
+  let notJson = false;
   if (res.status !== 204) {
-    const text = await res.text();
+    let text: string;
+    try {
+      text = await res.text();
+    } catch (err) {
+      throw transportError(err);
+    }
     if (text) {
       try {
         json = JSON.parse(text);
       } catch {
-        json = null;
+        notJson = true;
       }
     }
   }
@@ -128,6 +158,8 @@ export async function requestRaw<T>(
       json?.error?.message ?? (res.status >= 500 ? 'Service temporarily unavailable' : res.statusText || 'Request failed'),
     );
   }
+  // a 2xx that isn't JSON, e.g. the SPA's index.html for a path no service handles
+  if (notJson) throw new ApiError(res.status, 'BAD_RESPONSE', 'Unexpected response from the server (not JSON)');
   return { data: json as T, status: res.status, headers: res.headers, servedBy: res.headers.get('x-served-by'), ms };
 }
 
@@ -135,7 +167,7 @@ export async function request<T>(method: string, path: string, body?: unknown, o
   return (await requestRaw<T>(method, path, body, opts)).data;
 }
 
-const get = <T>(path: string, signal?: AbortSignal) => request<T>('GET', path, undefined, { signal });
+const get = <T>(path: string, signal?: AbortSignal) => request<T>('GET', path, undefined, { signal, timeoutMs: GET_TIMEOUT_MS });
 const qs = (params: Record<string, string | number | boolean | null | undefined>) => {
   const p = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== '') p.set(k, String(v));
@@ -196,7 +228,8 @@ export const api = {
     create: (body: { id?: string; name: string; event: string }) => request<{ session: Session }>('POST', '/api/sessions', body),
     rename: (id: string, name: string) => request<{ session: Session }>('PATCH', `/api/sessions/${enc(id)}`, { name }),
     remove: (id: string) => request<void>('DELETE', `/api/sessions/${enc(id)}`),
-    solves: (id: string, signal?: AbortSignal) => get<{ solves: Solve[] }>(`/api/sessions/${enc(id)}/solves`, signal),
+    solves: (id: string, signal?: AbortSignal) =>
+      request<{ solves: Solve[] }>('GET', `/api/sessions/${enc(id)}/solves`, undefined, { signal, timeoutMs: 60_000 }),
     import: (payload: ImportPayload) =>
       request<{ imported: { sessions: number; solves: number } }>('POST', '/api/sessions/import', payload, { timeoutMs: 120_000 }),
     /** Moves every solve of `sourceIds` (1–50, same event, not the target) into `targetId` and
@@ -213,7 +246,8 @@ export const api = {
     create: (body: NewSolve) => request<{ solve: Solve; rolling: { ao5: number | null; ao12: number | null } }>('POST', '/api/solves', body),
     update: (id: string, body: { penalty?: Penalty; comment?: string | null }) => request<{ solve: Solve }>('PATCH', `/api/solves/${enc(id)}`, body),
     remove: (id: string) => request<void>('DELETE', `/api/solves/${enc(id)}`),
-    export: () => get<{ exportedAt: string; sessions: (Session & { solves: Solve[] })[] }>('/api/solves/export'),
+    export: () =>
+      request<{ exportedAt: string; sessions: (Session & { solves: Solve[] })[] }>('GET', '/api/solves/export', undefined, { timeoutMs: 120_000 }),
     daily: (date?: string) =>
       get<{ date: string; events: Record<string, { solves: Solve[]; ao5: number | null }> }>(`/api/solves/daily${qs({ date })}`),
   },

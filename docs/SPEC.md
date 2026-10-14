@@ -94,6 +94,7 @@ Ingress/gateway and must never be reachable publicly.
 | `JWT_SECRET` | `dev-secret-change-me` | shared by all services (K8s Secret) |
 | `AUTH_URL` `SCRAMBLE_URL` `SOLVE_URL` `STATS_URL` `LEADERBOARD_URL` `WCA_URL` `RACE_URL` | `http://<name>:8080` | internal base URLs |
 | `LOG_LEVEL` | `info` | |
+| `TRUST_PROXY_HOPS` | `1` | proxies in front of the service whose `X-Forwarded-For` entries are trusted when deriving the client IP (rate limits): 1 behind the compose/kind gateway, 2 behind the Google load balancer. The left-most entries are client-controlled and never trusted. |
 
 `INTERNAL_API_TOKEN` (auth and the seed job; K8s Secret, unset = disabled) is a shared secret of at
 least 16 characters. A trusted caller sends it as `X-Internal-Token` and auth then skips its per-IP

@@ -1,0 +1,8 @@
+# GKE: requests reach the pods through the Google Front End / external Application Load
+# Balancer, which appends "<client-ip>, <lb-ip>" to X-Forwarded-For -> trust 2 proxy hops.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cubetype-config
+data:
+  TRUST_PROXY_HOPS: "2"

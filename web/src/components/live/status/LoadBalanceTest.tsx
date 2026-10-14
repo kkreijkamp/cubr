@@ -35,7 +35,7 @@ function percentile(xs: number[], p: number): number | null {
  * Fires N parallel requests at one service's `_info` and charts which pod answered each one —
  * the Kubernetes Service / Ingress spreading traffic over the replicas.
  */
-export function LoadBalanceTest() {
+export function LoadBalanceTest({ vc, onLog }: { vc: (v: string) => string; onLog: (text: string, service: string) => void }) {
   const [service, setService] = useStoredState<string>('cubetype.status.lbService', 'solve');
   const [n, setN] = useStoredState<number>('cubetype.status.lbN', 50);
   const [result, setResult] = useState<LbResult | null>(null);
@@ -82,6 +82,11 @@ export function LoadBalanceTest() {
     if (runId.current !== id) return;
     acc.durationMs = performance.now() - startedAt;
     setResult({ ...acc, pods: acc.pods.map((p) => ({ ...p })) });
+    const dist = [...acc.pods].sort((a, b) => b.count - a.count).map((p) => p.count).join('/');
+    onLog(
+      `load test: ${n} requests → ${acc.pods.length} pod${acc.pods.length === 1 ? '' : 's'}${acc.pods.length ? ` (${dist})` : ''}${acc.errors ? ` · ${acc.errors} errors` : ''}`,
+      target.name,
+    );
   };
 
   const pods = result ? [...result.pods].sort((a, b) => b.count - a.count || a.pod.localeCompare(b.pod)) : [];
@@ -136,7 +141,7 @@ export function LoadBalanceTest() {
               const { hash, id } = podParts(p.pod, result.service);
               const share = ideal ? (p.count / ideal) * 100 : 0;
               return (
-                <li key={p.pod} title={`${p.pod} · ${vlabel(p.version)}`}>
+                <li key={p.pod} className={vc(p.version)} title={`${p.pod} · ${vlabel(p.version)}`}>
                   <span className="vsq" aria-hidden="true" />
                   <span className="pod-name">
                     <span className="hash">{hash}</span>

@@ -119,4 +119,4 @@ spec:
         accessModes: ["ReadWriteOnce"]
         resources:
           requests:
-            storage: 1Gi                # default StorageClass
+            storage: 1Gi                # default StorageClass (GKE overlay pins standard-rwo)

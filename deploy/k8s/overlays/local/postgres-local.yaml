@@ -10,4 +10,4 @@ spec:
       cpu: 50m
       memory: 192Mi
     limits:
-      memory: 512Mi
+      memory: 768Mi                     # pg-1 uses ~380Mi working set after the WCA import

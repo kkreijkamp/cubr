@@ -1,5 +1,5 @@
-# Local-only gateway (kind has no cloud load balancer): nginx with the routing table of the
-# docker compose gateway, exposed as NodePort 30080 -> http://localhost:8090 thanks to the kind
+# Local-only gateway (kind has no Google load balancer): nginx with the routing table of the
+# GKE Ingress, exposed as NodePort 30080 -> http://localhost:8090 thanks to the kind
 # extraPortMappings (deploy/k8s/kind/kind-config.yaml). Alternative without the port mapping:
 #   kubectl -n cubetype port-forward svc/gateway 8090:80
 apiVersion: apps/v1

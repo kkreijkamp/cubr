@@ -26,6 +26,7 @@ export interface Server {
   markShuttingDown(): void;
 }
 
+const TRUST_PROXY_HOPS = Number(process.env.TRUST_PROXY_HOPS ?? 1);
 const CHECK_TIMEOUT_MS = 2000; // probes must answer fast even when a dependency hangs
 
 async function runCheck(fn: DependencyCheck): Promise<'ok' | 'down'> {
@@ -51,7 +52,10 @@ export function createServer(config: BaseConfig, opts: ServerOptions): Server {
       base: { svc: config.serviceName, pod: config.podName },
     },
     bodyLimit: opts.bodyLimit ?? 1024 * 1024,
-    trustProxy: true, // behind the gateway / Ingress: req.ip comes from X-Forwarded-For
+    // Number of reverse-proxy hops whose X-Forwarded-For we trust when deriving req.ip (used for
+    // rate limiting). Local gateway: 1. GKE Ingress (client → Google Front End → pod): 2.
+    // Trusting every hop would let clients spoof their IP via X-Forwarded-For.
+    trustProxy: (_address: string, hop: number) => hop < TRUST_PROXY_HOPS,
   });
 
   const startedAt = new Date();

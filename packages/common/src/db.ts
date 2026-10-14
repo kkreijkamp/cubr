@@ -13,13 +13,20 @@ export type PoolClient = pg.PoolClient;
 
 export function createPool(
   databaseUrl: string,
-  opts: { max?: number; log?: FastifyBaseLogger } = {},
+  opts: { max?: number; log?: FastifyBaseLogger; queryTimeoutMs?: number } = {},
 ): pg.Pool {
   const pool = new pg.Pool({
     connectionString: databaseUrl,
     max: opts.max ?? 10,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 5_000,
+    // Without these, a database that vanishes without a TCP reset (e.g. a CloudNativePG
+    // failover or a dead node) leaves queries hanging forever and exhausts the pool.
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10_000,
+    query_timeout: opts.queryTimeoutMs ?? 30_000,
+    statement_timeout: opts.queryTimeoutMs ?? 30_000,
+    application_name: process.env.SERVICE_NAME ?? 'cubetype',
   });
   // An idle client erroring (e.g. Postgres failover) must not crash the process.
   pool.on('error', (err) => opts.log?.warn({ err }, 'postgres idle client error'));

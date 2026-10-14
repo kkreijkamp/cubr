@@ -94,7 +94,7 @@ const mmss = (ms: number) => {
  * Drives the scramble HorizontalPodAutoscaler: M workers each request fresh (un-pooled) random-state
  * 4x4 scrambles back-to-back — CPU-heavy work — for 30/60/120 s.
  */
-export function CpuBurst() {
+export function CpuBurst({ onLog }: { onLog: (text: string, service: string) => void }) {
   const [concurrency, setConcurrency] = useStoredState<number>('cubetype.status.burstC', 8);
   const [duration, setDuration] = useStoredState<number>('cubetype.status.burstD', 60);
   const [view, setView] = useState<View | null>(null);
@@ -102,7 +102,7 @@ export function CpuBurst() {
   const ctrl = useRef<AbortController | null>(null);
   const ticker = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const finish = () => {
+  const finish = (reason: 'done' | 'stopped') => {
     const s = stats.current;
     if (!s || s.stoppedAt !== null) return;
     s.stoppedAt = Date.now();
@@ -110,6 +110,11 @@ export function CpuBurst() {
     if (ticker.current) clearInterval(ticker.current);
     ticker.current = null;
     setView(toView(s, Date.now()));
+    const secs = (s.stoppedAt - s.startedAt) / 1000;
+    onLog(
+      `cpu burst ${reason === 'done' ? 'finished' : 'stopped'}: ${s.ok} scramble requests in ${secs.toFixed(0)}s (${(s.ok / Math.max(1, secs)).toFixed(1)}/s) · ${s.errors} errors · served by ${s.pods.size} pod${s.pods.size === 1 ? '' : 's'}`,
+      'scramble',
+    );
   };
 
   const start = () => {
@@ -133,6 +138,7 @@ export function CpuBurst() {
     stats.current = s;
     const c = new AbortController();
     ctrl.current = c;
+    onLog(`cpu burst started: ${concurrency} parallel fresh ${EVENT} scramble requests for ${duration}s`, 'scramble');
 
     const worker = async () => {
       while (!c.signal.aborted && Date.now() < s.endsAt) {
@@ -159,7 +165,7 @@ export function CpuBurst() {
         }
       }
     };
-    void Promise.all(Array.from({ length: concurrency }, worker)).then(finish);
+    void Promise.all(Array.from({ length: concurrency }, worker)).then(() => finish('done'));
 
     let lastSample = now;
     ticker.current = setInterval(() => {
@@ -189,7 +195,7 @@ export function CpuBurst() {
     'status-burst',
     () => [
       running
-        ? { id: 'status-burst-stop', label: 'Stop CPU burst', icon: <Square />, run: finish }
+        ? { id: 'status-burst-stop', label: 'Stop CPU burst', icon: <Square />, run: () => finish('stopped') }
         : { id: 'status-burst-start', label: 'Start CPU burst (scramble HPA)', icon: <Flame />, keywords: ['load', 'hpa', 'autoscaler'], run: start },
     ],
     [running, concurrency, duration],
@@ -218,7 +224,7 @@ export function CpuBurst() {
         <div className="row wrap" style={{ gap: '0.5rem' }}>
           <Segmented label="duration" value={duration} onChange={setDuration} options={DURATIONS.map((d) => ({ value: d, label: `${d}s`, disabled: running }))} />
           {running ? (
-            <button className="btn danger" onClick={finish}>
+            <button className="btn danger" onClick={() => finish('stopped')}>
               <Square /> stop
             </button>
           ) : (

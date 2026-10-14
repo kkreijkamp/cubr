@@ -1,7 +1,8 @@
 # =============================================================================================
 # scramble: WCA random-state scrambles with cubing.js, pooled in Redis; daily challenge (/api/scrambles)
-# CPU-bound (cubing.js random-state search) -> request 250m, limit 500m.
-# HPA 2-8 replicas (hpa.yaml).
+# CPU-bound: one pod saturates ~1 core (1 cubing.js search worker, ~4-5 fresh 4x4 req/s) at
+# 165-240 MB RSS -> request 250m (HPA % is relative to it, so it scales out visibly), limit 1 CPU.
+# HPA 2-8 replicas (hpa.yaml). Probes are more tolerant: warm-up ~15 s, slower when throttled.
 # Objects: Deployment (2 replicas, zero-downtime rolling updates) + ClusterIP Service on port
 # 8080 (keeps SPEC's internal URL http://scramble:8080 working) + PodDisruptionBudget.
 # =============================================================================================
@@ -51,7 +52,7 @@ spec:
           matchLabelKeys: ["pod-template-hash"]   # spread each ReplicaSet (rollout) separately
       containers:
         - name: scramble
-          image: cubetype/scramble:dev
+          image: cubetype/scramble:dev    # rewritten per overlay (GKE: Artifact Registry :1.0.0)
           imagePullPolicy: IfNotPresent
           # APP_VERSION is baked into the image at build time (--build-arg) and deliberately not overridden here.
           envFrom:
@@ -90,15 +91,15 @@ spec:
               path: /readyz
               port: http
             periodSeconds: 5
-            timeoutSeconds: 3
-            failureThreshold: 2
+            timeoutSeconds: 5
+            failureThreshold: 3
           livenessProbe:                # restart only if the process itself hangs (never checks dependencies)
             httpGet:
               path: /healthz
               port: http
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 3
+            failureThreshold: 6
           lifecycle:
             preStop:                    # keep serving for 10 s while endpoints/load balancers drop this pod
               exec:
@@ -108,7 +109,7 @@ spec:
               cpu: 250m
               memory: 256Mi
             limits:                     # hard caps: CPU is throttled, memory over the limit = OOMKill
-              cpu: "500m"
+              cpu: "1"
               memory: 512Mi
           securityContext:
             allowPrivilegeEscalation: false

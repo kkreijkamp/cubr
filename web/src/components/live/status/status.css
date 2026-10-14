@@ -6,6 +6,22 @@
   color: var(--text-color);
 }
 
+/* version colours, derived from the theme: newest = main, then text, error-extra, … */
+.vc0 {
+  --vc: var(--main-color);
+}
+.vc1 {
+  --vc: var(--text-color);
+}
+.vc2 {
+  --vc: color-mix(in srgb, var(--error-extra-color) 60%, var(--text-color));
+}
+.vc3 {
+  --vc: color-mix(in srgb, var(--main-color) 45%, var(--error-color));
+}
+.vc4 {
+  --vc: var(--sub-color);
+}
 .vsq {
   display: inline-block;
   flex-shrink: 0;
@@ -30,6 +46,42 @@
   color: var(--text-color);
 }
 
+/* kubectl cheatsheet */
+.cheatsheet {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.6rem;
+}
+.cheat-row {
+  display: grid;
+  grid-template-columns: 8.5rem minmax(0, 1fr) 1rem;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.45rem 0.6rem;
+  border: 0;
+  border-radius: calc(var(--roundness) * 0.75);
+  background: transparent;
+  color: var(--sub-color);
+  font: inherit;
+  font-size: 0.78rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur), color var(--dur);
+}
+.cheat-row:hover {
+  background: var(--bg-color);
+  color: var(--text-color);
+}
+.cheat-row code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cheat-row .copied {
+  color: var(--main-color);
+  display: flex;
+}
+
 /* summary */
 .status-summary {
   display: grid;
@@ -45,6 +97,46 @@
 }
 .status-summary .stat .value.error {
   color: var(--error-color);
+}
+.status-summary .versions {
+  min-width: 0;
+}
+.status-summary .legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  min-height: 1.95rem;
+  align-items: center;
+}
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 1.15rem;
+  color: var(--vc);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.legend-item .vsq {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+.legend-item .sub {
+  font-size: 0.75rem;
+}
+.status-summary .rollouts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 1rem;
+}
+.status-summary .rolling {
+  color: var(--main-color);
+  animation: statusBlink 1.4s ease-in-out infinite;
+}
+@keyframes statusBlink {
+  50% {
+    opacity: 0.45;
+  }
 }
 
 /* service grid */
@@ -95,8 +187,8 @@
   padding: 0.05rem 0.4rem;
   border-radius: 999px;
   font-size: 0.7rem;
-  color: var(--text-color);
-  box-shadow: inset 0 0 0 1px var(--sub-color);
+  color: var(--vc);
+  box-shadow: inset 0 0 0 1px var(--vc);
   white-space: nowrap;
 }
 .svc-lat {
@@ -226,8 +318,8 @@
 }
 @keyframes podGlow {
   0% {
-    box-shadow: inset 0 0 0 1.5px var(--main-color), 0 0 0.9rem -0.1rem var(--main-color);
-    background: color-mix(in srgb, var(--main-color) 22%, transparent);
+    box-shadow: inset 0 0 0 1.5px var(--vc), 0 0 0.9rem -0.1rem var(--vc);
+    background: color-mix(in srgb, var(--vc) 22%, transparent);
   }
   100% {
     box-shadow: inset 0 0 0 1.5px transparent, 0 0 0 0 transparent;
@@ -266,7 +358,7 @@
   color: var(--bg-color);
 }
 .pod-name .tag.new {
-  background: var(--main-color);
+  background: var(--vc);
 }
 .pod-node {
   color: var(--sub-color);
@@ -283,7 +375,7 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--main-color);
+  background: var(--vc);
   transition: width 0.4s ease-out;
 }
 .pod-hits {
@@ -406,7 +498,7 @@
 .lb-bars .bar i {
   display: block;
   height: 100%;
-  background: var(--vc, var(--main-color));
+  background: var(--vc);
   border-radius: inherit;
   transition: width 0.25s ease-out;
 }
@@ -535,9 +627,121 @@
   }
 }
 
+/* event log */
+.event-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 22rem;
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: 0.1rem;
+  font-size: 0.74rem;
+}
+.event-log li {
+  display: grid;
+  grid-template-columns: 4.3rem 6.2rem minmax(0, 1fr);
+  gap: 0.6rem;
+  padding: 0.28rem 0.4rem;
+  border-radius: calc(var(--roundness) * 0.6);
+  color: var(--text-color);
+  animation: fadeIn 0.3s ease-out;
+}
+.event-log li:nth-child(odd) {
+  background: color-mix(in srgb, var(--bg-color) 45%, transparent);
+}
+.event-log .t {
+  color: var(--sub-color);
+}
+.event-log .svc {
+  color: var(--sub-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.event-log .msg {
+  overflow-wrap: anywhere;
+}
+.event-log li.sub .msg {
+  color: var(--sub-color);
+}
+.event-log li.good .msg {
+  color: var(--timer-ready);
+}
+.event-log li.bad .msg {
+  color: var(--error-color);
+}
+.event-log li.new .msg {
+  color: var(--main-color);
+}
+.event-log li.warn .msg {
+  color: color-mix(in srgb, var(--main-color) 55%, var(--error-color));
+}
+
+/* node map */
+.node-map {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 0.6rem;
+}
+.node-card {
+  display: grid;
+  align-content: start;
+  gap: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: calc(var(--roundness) * 0.8);
+  background: color-mix(in srgb, var(--bg-color) 60%, transparent);
+  min-width: 0;
+}
+.node-name {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: var(--text-color);
+  font-size: 0.74rem;
+  overflow-wrap: anywhere;
+}
+.node-name .count {
+  color: var(--main-color);
+}
+.node-pods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.node-pod {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.1rem 0.45rem 0.1rem 0.35rem;
+  border-radius: 999px;
+  background: var(--sub-alt-color);
+  color: var(--text-color);
+  font-size: 0.68rem;
+  white-space: nowrap;
+  transition: opacity 0.4s;
+}
+.node-pod .vsq {
+  width: 0.5rem;
+  height: 0.5rem;
+}
+.node-pod .id {
+  color: var(--sub-color);
+}
+.node-pod.stale {
+  opacity: 0.38;
+}
+.node-pod.fresh {
+  animation: podGlow 1.5s ease-out 3;
+}
+
 @media (max-width: 900px) {
   .status-summary {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .status-summary .versions {
+    grid-column: 1 / -1;
   }
 }
 @media (max-width: 520px) {
@@ -555,8 +759,20 @@
   .svc-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+  .cheat-row {
+    grid-template-columns: minmax(0, 1fr) 1rem;
+  }
+  .cheat-row .label {
+    display: none;
+  }
   .lb-bars li {
     grid-template-columns: 0.6rem minmax(4.5rem, 7rem) minmax(0, 1fr) 2rem 2.2rem;
     gap: 0.45rem;
+  }
+  .event-log li {
+    grid-template-columns: 4rem minmax(0, 1fr);
+  }
+  .event-log .svc {
+    display: none;
   }
 }
