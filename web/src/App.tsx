@@ -15,6 +15,7 @@ const AccountPage = lazy(() => import('./pages/AccountPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const WcaPage = lazy(() => import('./pages/WcaPage'));
 const StatusPage = lazy(() => import('./pages/StatusPage'));
+const AboutPage = lazy(() => import('./pages/AboutPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
@@ -34,6 +35,7 @@ const router = createBrowserRouter([
       { path: '/settings', element: s(<SettingsPage />) },
       { path: '/wca', element: s(<WcaPage />) },
       { path: '/status', element: s(<StatusPage />) },
+      { path: '/about', element: s(<AboutPage />) },
       { path: '/login', element: s(<LoginPage />) },
       { path: '*', element: s(<NotFoundPage />) },
     ],

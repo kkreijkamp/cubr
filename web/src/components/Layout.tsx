@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Activity, CalendarDays, Crown, Globe, Keyboard, Palette, Settings, Swords, Timer, User } from 'lucide-react';
+import { Activity, CalendarDays, Crown, Globe, Info, Keyboard, Palette, Settings, Swords, Timer, User } from 'lucide-react';
 import { Avatar } from './Avatar';
 import { CubeLogo } from './CubeLogo';
 import { Toasts } from './Toasts';
@@ -19,6 +19,7 @@ const NAV = [
   { to: '/race', icon: Swords, label: 'race' },
   { to: '/leaderboards', icon: Crown, label: 'leaderboards' },
   { to: '/wca', icon: Globe, label: 'wca rankings' },
+  { to: '/about', icon: Info, label: 'about', hideMobile: true },
   { to: '/settings', icon: Settings, label: 'settings' },
 ];
 
@@ -34,12 +35,12 @@ function Header() {
         </span>
       </Link>
       <nav className="nav">
-        {NAV.map(({ to, icon: Icon, label, end }) => (
+        {NAV.map(({ to, icon: Icon, label, end, hideMobile }) => (
           <NavLink
             key={to}
             to={to}
             end={end}
-            className={({ isActive }) => `btn-text${isActive ? ' active' : ''}`}
+            className={({ isActive }) => `btn-text${isActive ? ' active' : ''}${hideMobile ? ' hide-mobile' : ''}`}
             data-tip={label}
             data-tip-pos="down"
             aria-label={label}
@@ -83,6 +84,9 @@ function Footer() {
         </button>
         <Link to="/status" className="btn-text">
           <Activity size={14} /> status
+        </Link>
+        <Link to="/about" className="btn-text">
+          <Info size={14} /> about
         </Link>
       </div>
       <div className="footer-right">

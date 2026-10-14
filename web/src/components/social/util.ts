@@ -1,4 +1,4 @@
-// Small helpers shared by the social pages (login, profile/account, leaderboards).
+// Small helpers shared by the social pages (login, profile/account, leaderboards, about).
 import { getEvent } from '@cubetype/cubestats';
 import { ApiError } from '../../lib/api';
 import type { PbKind } from '../../lib/types';
@@ -87,3 +87,6 @@ export function addDaysKey(key: string, days: number): string {
 export function plural(n: number, word: string, pluralWord = `${word}s`): string {
   return `${n.toLocaleString('en-US')} ${n === 1 ? word : pluralWord}`;
 }
+
+export const prefersReducedMotion = (): boolean =>
+  typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;

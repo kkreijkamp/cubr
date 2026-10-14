@@ -80,6 +80,14 @@ export interface ActivityDay {
   totalMs: number;
 }
 
+export interface GlobalStats {
+  users: number;
+  solves: number;
+  totalMs: number;
+  solvesToday: number;
+  activeUsersToday: number;
+}
+
 export type LbKind = 'single' | 'ao5' | 'ao12';
 export type LbPeriod = 'all' | 'weekly' | 'daily' | 'challenge';
 export interface LeaderboardEntry {

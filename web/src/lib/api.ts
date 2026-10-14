@@ -2,6 +2,7 @@
 // Ingress (cloud) or gateway (local) routes to the right service — see docs/SPEC.md §3.
 import type {
   ActivityDay,
+  GlobalStats,
   Leaderboard,
   LbKind,
   PbKind,
@@ -271,6 +272,7 @@ export const api = {
       ),
     hourly: (userId: string, event: string, signal?: AbortSignal) =>
       get<{ hours: { hour: number; solves: number; meanMs: number | null }[] }>(`/api/stats/users/${enc(userId)}/hourly${qs({ event })}`, signal),
+    global: (signal?: AbortSignal) => get<GlobalStats>('/api/stats/global', signal),
   },
   leaderboards: {
     get: (event: string, kind: LbKind, opts: { period?: 'all' | 'weekly' | 'daily'; page?: number; size?: number; key?: string } = {}, signal?: AbortSignal) =>
