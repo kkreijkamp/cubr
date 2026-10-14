@@ -1,6 +1,7 @@
 # =============================================================================================
 # stats: event-driven read model: PBs, activity heatmap, streaks, global stats (/api/stats)
-# Consumes the Redis stream with a consumer group, so replicas share the work.
+# Consumes the Redis stream with a consumer group, so replicas share the work. 512Mi limit: bulk
+# imports trigger per-user PB recomputes over full solve histories (256Mi was OOMKilled while seeding).
 # Objects: Deployment (2 replicas, zero-downtime rolling updates) + ClusterIP Service on port
 # 8080 (keeps SPEC's internal URL http://stats:8080 working) + PodDisruptionBudget.
 # =============================================================================================
@@ -104,10 +105,10 @@ spec:
           resources:
             requests:                   # what the scheduler reserves (and what HPA % is relative to)
               cpu: 50m
-              memory: 96Mi
+              memory: 128Mi
             limits:                     # hard caps: CPU is throttled, memory over the limit = OOMKill
               cpu: "500m"
-              memory: 256Mi
+              memory: 512Mi
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

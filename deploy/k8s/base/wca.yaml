@@ -107,7 +107,7 @@ spec:
               memory: 128Mi
             limits:                     # hard caps: CPU is throttled, memory over the limit = OOMKill
               cpu: "500m"
-              memory: 256Mi
+              memory: 384Mi
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

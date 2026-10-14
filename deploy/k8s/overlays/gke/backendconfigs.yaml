@@ -38,14 +38,14 @@ spec:
   timeoutSec: 30
   connectionDraining:
     drainingTimeoutSec: 30
-  healthCheck:
+  healthCheck:                          # more tolerant: a CPU-saturated pod answers slower, don't eject it
     type: HTTP
     requestPath: /readyz
     port: 8080                          # must equal the containerPort (NEG mode)
-    checkIntervalSec: 5
-    timeoutSec: 3
+    checkIntervalSec: 10
+    timeoutSec: 5
     healthyThreshold: 1
-    unhealthyThreshold: 2
+    unhealthyThreshold: 3
 ---
 apiVersion: cloud.google.com/v1
 kind: BackendConfig

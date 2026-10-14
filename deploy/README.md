@@ -76,6 +76,22 @@ All three use the same container images and the same routing table.
   - Secrets are never committed. `cubetype-secrets` holds `JWT_SECRET` and `INTERNAL_API_TOKEN` and is created by `commands.sh` §8.
 - **Images.** One image per service, tagged `<version>` and built with `--build-arg APP_VERSION`. The version shows in `X-Service` and on the `/status` page.
 
+### Resource sizing (requests → limits)
+
+| Workload | CPU req | Mem req | CPU lim | Mem lim | Why |
+|---|---|---|---|---|---|
+| scramble | 250m | 256Mi | 1 | 512Mi | Saturates about 1 core (1 cubing.js worker, ~4–5 fresh 4×4 req/s) at 165–240 MB RSS. The 250m request makes HPA % rise visibly. |
+| solve | 50m | 128Mi | 500m | 512Mi | 25 MB csTimer imports are parsed in memory |
+| stats | 50m | 128Mi | 500m | 512Mi | Bulk-import recomputes. 256Mi was OOMKilled while seeding. |
+| auth | 50m | 96Mi | 500m | 256Mi | bcrypt cost 10 bursts CPU |
+| leaderboard, race | 50m | 96Mi | 300–500m | 256Mi | Redis-bound |
+| wca | 50m | 128Mi | 500m | 384Mi | SQL-heavy, cached in Redis |
+| web | 20m | 32Mi | 200m | 128Mi | nginx static files |
+| Postgres (GKE ×3) | 100m | 512Mi | – | 1Gi | No CPU limit (avoids throttling the DB). `shared_buffers` 128MB. |
+| Redis | 50m | 128Mi | 500m | 512Mi | `maxmemory 300mb`, `noeviction` |
+
+Baseline requests on GKE come to about **1.6 vCPU / 3.5 GiB**. Three e2-standard-2 nodes give about 5 vCPU / 16 GiB allocatable. That leaves headroom for 8 scramble pods (2 vCPU requested) plus jobs before the autoscaler needs node 4.
+
 ---
 
 ## 2. Local development with docker compose
