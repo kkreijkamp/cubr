@@ -38,6 +38,11 @@ spec:
             - configMapRef:
                 name: cubetype-config   # AUTH_URL, SOLVE_URL, SCRAMBLE_URL = in-cluster service addresses
           env:
+            - name: INTERNAL_API_TOKEN  # sent as X-Internal-Token so auth skips its per-IP rate limits for the seeder
+              valueFrom:
+                secretKeyRef:
+                  name: cubetype-secrets
+                  key: INTERNAL_API_TOKEN
             # tuning knobs (jobs/seed/README.md)
             - name: SEED_USERS          # synthetic users (+1 demo account)
               value: "150"

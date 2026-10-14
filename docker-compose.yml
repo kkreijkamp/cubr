@@ -91,6 +91,10 @@ services:
     <<: *service
     image: cubetype/auth:dev          # same tag scripts/build-local.sh uses (can be `kind load`ed)
     build: { context: ., dockerfile: services/auth/Dockerfile, args: *build-args }
+    environment:
+      <<: *service-env
+      # Requests carrying X-Internal-Token=<this> (the seed job) skip the per-IP rate limits.
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-dev-internal-token-0123456789}
 
   scramble:
     <<: *service
@@ -191,6 +195,7 @@ services:
       SEED_CONCURRENCY: ${SEED_CONCURRENCY:-6}   # users seeded in parallel
       SEED_DEMO_USER: demo                       # presentation account
       SEED_DEMO_PASSWORD: cubetype-demo
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-dev-internal-token-0123456789}   # must match auth's
     depends_on:
       auth: { condition: service_healthy }
       solve: { condition: service_healthy }

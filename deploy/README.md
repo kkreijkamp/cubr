@@ -42,7 +42,7 @@ Both use the same container images and the same routing table.
 - **Security.**
   - Pods run as non-root (`runAsNonRoot`, numeric UID), with no privilege escalation, all capabilities dropped and a read-only root filesystem (writable `/tmp` via emptyDir).
   - No ServiceAccount token is mounted.
-  - Secrets are never committed. `cubetype-secrets` holds `JWT_SECRET` and is created by `kind-up.sh` (see §3).
+  - Secrets are never committed. `cubetype-secrets` holds `JWT_SECRET` and `INTERNAL_API_TOKEN` and is created by `kind-up.sh` (see §3).
 - **Images.** One image per service, tagged `<version>` and built with `--build-arg APP_VERSION`. The version shows in `X-Service` and on the `/status` page.
 
 ---
@@ -97,7 +97,7 @@ kubectl -n kube-system patch deployment metrics-server --type=json \
 scripts/build-local.sh --kind                      # docker build + kind load (worker nodes only)
 kubectl create namespace cubetype
 kubectl -n cubetype create secret generic cubetype-secrets \
-  --from-literal=JWT_SECRET="$(openssl rand -hex 32)"
+  --from-literal=JWT_SECRET="$(openssl rand -hex 32)" --from-literal=INTERNAL_API_TOKEN="$(openssl rand -hex 24)"
 kubectl apply -k deploy/k8s/overlays/local
 kubectl -n cubetype wait cluster/pg --for=condition=Ready --timeout=600s
 ```

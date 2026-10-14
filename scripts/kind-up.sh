@@ -57,11 +57,12 @@ if [ "${SKIP_BUILD:-0}" != "1" ]; then
   KIND_CLUSTER="$KIND_CLUSTER" scripts/build-local.sh --kind
 fi
 
-# 5. Namespace + Secret (random JWT key; kept if it already exists).
+# 5. Namespace + Secret (random JWT key and internal token; kept if it already exists).
 kubectl create namespace "$NS" --dry-run=client -o yaml | kubectl apply -f -
 kubectl -n "$NS" get secret cubetype-secrets >/dev/null 2>&1 || \
   kubectl -n "$NS" create secret generic cubetype-secrets \
-    --from-literal=JWT_SECRET="$(openssl rand -hex 32)"
+    --from-literal=JWT_SECRET="$(openssl rand -hex 32)" \
+    --from-literal=INTERNAL_API_TOKEN="$(openssl rand -hex 24)"
 
 # 6. Deploy the local overlay and wait for PostgreSQL, Redis and every Deployment.
 kubectl apply -k deploy/k8s/overlays/local

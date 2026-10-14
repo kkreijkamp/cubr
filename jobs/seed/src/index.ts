@@ -21,6 +21,9 @@ const SEED = Number(process.env.SEED_RANDOM_SEED ?? 3208);
 const PASSWORD_PREFIX = process.env.SEED_PASSWORD_PREFIX ?? 'seed-pass-';
 const DEMO_USER = process.env.SEED_DEMO_USER ?? 'demo';
 const DEMO_PASSWORD = process.env.SEED_DEMO_PASSWORD ?? 'cubetype-demo';
+// Lets auth skip its per-IP registration/login rate limits for this trusted job (all requests
+// come from one pod IP). Must match auth's INTERNAL_API_TOKEN.
+const INTERNAL_TOKEN = process.env.INTERNAL_API_TOKEN ?? '';
 
 // ---------------------------------------------------------------- deterministic randomness
 function mulberry32(a: number) {
@@ -188,6 +191,7 @@ async function call<T>(method: string, url: string, body?: unknown, token?: stri
           ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
           ...(token ? { authorization: `Bearer ${token}` } : {}),
           'x-timezone': 'Australia/Brisbane',
+          ...(INTERNAL_TOKEN ? { 'x-internal-token': INTERNAL_TOKEN } : {}),
         },
         body: body !== undefined ? JSON.stringify(body) : undefined,
         signal: AbortSignal.timeout(120_000),
@@ -412,6 +416,7 @@ async function seedUser(u: SeedUser, idx: number, daily: Record<string, string[]
 async function main() {
   const t0 = Date.now();
   console.log(`cubetype seed: ${USERS} users (+ demo), ~${AVG_SOLVES} solves each, concurrency ${CONCURRENCY}`);
+  if (!INTERNAL_TOKEN) console.warn('INTERNAL_API_TOKEN not set — auth rate limits will cap how many users can be created');
   await waitFor(`${AUTH_URL}/readyz`, 'auth');
   await waitFor(`${SOLVE_URL}/readyz`, 'solve');
 
