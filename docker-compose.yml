@@ -25,6 +25,9 @@ x-service-env: &service-env
   DATABASE_URL: postgres://cubetype:cubetype@postgres:5432/cubetype
   REDIS_URL: redis://redis:6379
   JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}   # override with JWT_SECRET=... docker compose up
+  # Shared secret for /internal/* calls between services (X-Internal-Token); auth also lets the
+  # seed job, which sends it too, skip its per-IP rate limits.
+  INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-dev-internal-token-0123456789}
   LOG_LEVEL: ${LOG_LEVEL:-info}
   TRUST_PROXY_HOPS: 1                                # one reverse proxy (the gateway) in front -> req.ip = real client
   NODE_NAME: docker-compose                          # K8s sets this from spec.nodeName
@@ -92,10 +95,6 @@ services:
     <<: *service
     image: cubetype/auth:dev          # same tag scripts/build-local.sh uses (can be `kind load`ed)
     build: { context: ., dockerfile: services/auth/Dockerfile, args: *build-args }
-    environment:
-      <<: *service-env
-      # Requests carrying X-Internal-Token=<this> (the seed job) skip the per-IP rate limits.
-      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-dev-internal-token-0123456789}
 
   scramble:
     <<: *service

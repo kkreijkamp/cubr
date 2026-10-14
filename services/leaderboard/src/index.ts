@@ -32,7 +32,7 @@ const { app } = server;
 const redis = createRedis(config.redisUrl, app.log);
 defineScripts(redis);
 const auth = makeAuth(config.jwtSecret, redis);
-const floors = new FloorProvider(config.urls.wca, app.log);
+const floors = new FloorProvider(config.urls.wca, config.internalToken, app.log);
 
 await registerRoutes(app, { redis, auth });
 
@@ -53,4 +53,11 @@ consumer = consumeEvents(redis, {
   handler: makeHandler({ redis, floors, log: app.log }),
   log: app.log,
 });
-rebuild = startRebuildLoop({ redis, statsUrl: config.urls.stats, podName: config.podName, floors, log: app.log });
+rebuild = startRebuildLoop({
+  redis,
+  statsUrl: config.urls.stats,
+  internalToken: config.internalToken,
+  podName: config.podName,
+  floors,
+  log: app.log,
+});

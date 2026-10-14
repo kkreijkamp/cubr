@@ -36,7 +36,7 @@ describe('anti-cheat floors', () => {
   });
   it('FloorProvider caches records and falls back when wca is down', async () => {
     let calls = 0;
-    const up = new FloorProvider('http://wca', silentLog, 3_600_000, 60_000, async () => {
+    const up = new FloorProvider('http://wca', '', silentLog, 3_600_000, 60_000, async () => {
       calls++;
       return { records: { '333': { single: 3050, average: 3900 } } };
     });
@@ -45,7 +45,7 @@ describe('anti-cheat floors', () => {
     expect(calls).toBe(1);
     expect(up.source).toBe('wca');
 
-    const down = new FloorProvider('http://wca', silentLog, 3_600_000, 60_000, async () => {
+    const down = new FloorProvider('http://wca', '', silentLog, 3_600_000, 60_000, async () => {
       calls++;
       throw new Error('ECONNREFUSED');
     });
@@ -53,6 +53,15 @@ describe('anti-cheat floors', () => {
     expect(await down.floor('222', 'ao5')).toBe(800);
     expect(calls).toBe(2); // second call within the retry window doesn't refetch
     expect(down.source).toBe('fallback');
+  });
+  it('FloorProvider sends the internal token to wca', async () => {
+    let headers: Record<string, string> | undefined;
+    const p = new FloorProvider('http://wca', 'secret', silentLog, 3_600_000, 60_000, async (_url, opts) => {
+      headers = opts?.headers;
+      return { records: {} };
+    });
+    await p.floor('333', 'single');
+    expect(headers).toEqual({ 'x-internal-token': 'secret' });
   });
 });
 

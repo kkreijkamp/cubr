@@ -1,4 +1,4 @@
-import { fetchJson, type FetchOptions } from '@cubetype/common';
+import { fetchJson, internalHeaders, type FetchOptions } from '@cubetype/common';
 import type { FastifyBaseLogger } from 'fastify';
 import type { Kind } from './keys.js';
 
@@ -75,6 +75,8 @@ export class FloorProvider implements FloorSource {
 
   constructor(
     private readonly wcaUrl: string,
+    /** sent as X-Internal-Token to wca's /internal/records */
+    private readonly internalToken: string,
     private readonly log: FastifyBaseLogger,
     private readonly ttlMs = 3_600_000,
     private readonly retryMs = 60_000,
@@ -102,7 +104,13 @@ export class FloorProvider implements FloorSource {
 
   private async refresh(): Promise<void> {
     try {
-      const recs = parseRecords(await this.fetcher(`${this.wcaUrl}/internal/records`, { timeoutMs: 2000, retries: 0 }));
+      const recs = parseRecords(
+        await this.fetcher(`${this.wcaUrl}/internal/records`, {
+          timeoutMs: 2000,
+          retries: 0,
+          headers: internalHeaders(this.internalToken),
+        }),
+      );
       if (!recs) throw new Error('malformed /internal/records response');
       this.records = recs;
       this.fetchedAt = Date.now();

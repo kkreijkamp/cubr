@@ -19,6 +19,8 @@ export interface ProjectorDeps {
   redis: Redis;
   log: FastifyBaseLogger;
   solveUrl: string;
+  /** X-Internal-Token for solve-service's /internal routes (recomputes) */
+  internalToken: string;
   /** Publishes queued pb.updated events right after commit (best effort; a loop retries). */
   flushPbOutbox: () => Promise<unknown>;
 }
@@ -39,7 +41,7 @@ export async function upsertSessionName(c: PoolClient | Pool, sessionId: string,
 
 export function createProjector(deps: ProjectorDeps) {
   const { pool, log } = deps;
-  const rdeps: RecomputeDeps = { solveUrl: deps.solveUrl, log };
+  const rdeps: RecomputeDeps = { solveUrl: deps.solveUrl, internalToken: deps.internalToken, log };
 
   /**
    * Runs `fn` in the per-user, de-duplicated transaction; `fn` returns how many pb.updated events

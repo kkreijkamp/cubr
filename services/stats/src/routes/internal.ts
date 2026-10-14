@@ -1,4 +1,4 @@
-import { parse, type Pool } from '@cubetype/common';
+import { parse, requireInternal, type Pool } from '@cubetype/common';
 import { isEventId } from '@cubetype/cubestats';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -9,10 +9,10 @@ const internalPbsQuery = z.object({
   kind: z.enum(PB_KINDS).optional(),
 });
 
-export async function registerInternalRoutes(app: FastifyInstance, pool: Pool): Promise<void> {
-  // Service-to-service (not routed by the Ingress): all PB rows, used by leaderboard to rebuild
-  // its all-time boards after a Redis loss.
-  app.get('/internal/pbs', async (req) => {
+export async function registerInternalRoutes(app: FastifyInstance, pool: Pool, internalToken: string): Promise<void> {
+  // Service-to-service (not routed by the Ingress, callers send X-Internal-Token): all PB rows,
+  // used by leaderboard to rebuild its all-time boards after a Redis loss.
+  app.get('/internal/pbs', { preHandler: requireInternal(internalToken, app.log) }, async (req) => {
     const { event, kind } = parse(internalPbsQuery, req.query);
     const { rows } = await pool.query<{
       user_id: string; username: string; event: string; kind: PbKind; value_ms: number; solve_id: string | null; achieved_at: Date;

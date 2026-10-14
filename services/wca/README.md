@@ -19,7 +19,7 @@ rank?" estimator, result distributions for charts, and person lookup.
 | `GET /api/wca/persons/:wcaId` | person + PBs with world/continent/country rank for every event |
 | `GET /api/wca/countries` | `{countries:[{id, iso2, name, continentId, continentName, persons}]}` |
 | `GET /api/wca/_info` | standard info + `dataLoaded` and the loaded export's date/row counts |
-| `GET /internal/records` | `{records:{[event]:{single, average}}}` for leaderboard anti-cheat (not public) |
+| `GET /internal/records` | `{records:{[event]:{single, average}}}` for leaderboard anti-cheat (not public; requires `X-Internal-Token` when `INTERNAL_API_TOKEN` is set) |
 
 **Units.** WCA centiseconds × 10 → `value` in **ms** for timed events; 333fm in **moves**
 (`unit: "moves"`; averages are stored ×100 in the export and divided here, e.g. `24.67`).
@@ -64,7 +64,7 @@ World rank = two counts on the `(event_id, best)` index (index-only scan, 2–6 
 (from Postgres). Before the import (empty DB) all data routes return 503 while `/readyz` stays 200.
 
 ## Env
-Standard (`PORT`, `DATABASE_URL`, `REDIS_URL`, `LOG_LEVEL`, …). No service-specific variables.
+Standard (`PORT`, `DATABASE_URL`, `REDIS_URL`, `INTERNAL_API_TOKEN`, `LOG_LEVEL`, …). No service-specific variables.
 
 ## Local run
 ```

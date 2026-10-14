@@ -14,7 +14,7 @@ for personal bests (emits `pb.updated`, consumed by leaderboard).
 | `GET /api/stats/users/:userId/hourly?event=333` | 24 entries; `solves` = all attempts, `meanMs` over non-DNF (null if none), plus `dnfs`. No `event` = all events combined. |
 | `GET /api/stats/users/:userId/solves?event=333&limit=20000` | Chronological solve series from `solve_ledger` for the profile history chart: `{event, total, truncated, sessions: [{id, name, solves, firstAt, lastAt}], solves: [[unixSeconds, timeMs, effectiveMs\|null, sessionIndex]]}` (newest `limit` ≤ 50 000; compact arrays keep 20k solves ≈ 450 KB). `sessionIndex` points into `sessions`, so the web client filters by session without another request. |
 | `GET /api/stats/global` | cached 10 s in Redis `cache:stats:global` (fails open, `X-Cache: hit/miss`). "today" = UTC day. |
-| `GET /internal/pbs?event=&kind=` | all PB rows (+ username) for leaderboard rebuilds. |
+| `GET /internal/pbs?event=&kind=` | all PB rows (+ username) for leaderboard rebuilds; requires `X-Internal-Token` when `INTERNAL_API_TOKEN` is set. |
 | `GET /api/stats/_info`, `/healthz`, `/readyz` | readiness = Postgres + migrations; Redis is soft. `_info` adds consumer stats and `pbOutboxPending`. |
 
 ## Events
@@ -66,7 +66,8 @@ Consumes (group `stats`, consumer = `POD_NAME`): `user.registered`, `user.update
   (Postgres or solve-service unreachable) is logged and retried 20 s later.
 
 ## Env
-Common vars (SPEC §4); uses `DATABASE_URL`, `REDIS_URL`, `SOLVE_URL`, `POD_NAME`.
+Common vars (SPEC §4); uses `DATABASE_URL`, `REDIS_URL`, `SOLVE_URL`, `POD_NAME` and
+`INTERNAL_API_TOKEN` (required on `/internal/pbs`, sent to solve's `/internal` routes).
 Dev against the compose stack's Postgres and Redis (`docker compose up -d postgres redis`; recomputes
 and the session-name backfill need a solve instance at `SOLVE_URL`):
 `PORT=8081 DATABASE_URL=postgres://cubetype:cubetype@localhost:55433/cubetype REDIS_URL=redis://localhost:56380 SOLVE_URL=http://localhost:8083 npx tsx services/stats/src/index.ts`

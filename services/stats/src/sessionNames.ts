@@ -1,4 +1,4 @@
-import { fetchJson, type Pool, type PoolClient } from '@cubetype/common';
+import { fetchJson, internalHeaders, type Pool, type PoolClient } from '@cubetype/common';
 import type { FastifyBaseLogger } from 'fastify';
 import { sessionListSchema } from './eventSchemas.js';
 
@@ -14,8 +14,8 @@ const BATCH_USERS = 25;
  * The backfill only inserts missing names: a name that arrived through an event meanwhile (for
  * example a newer rename) always wins.
  */
-export function startSessionNameBackfill(deps: { pool: Pool; solveUrl: string; log: FastifyBaseLogger }): () => void {
-  const { pool, solveUrl, log } = deps;
+export function startSessionNameBackfill(deps: { pool: Pool; solveUrl: string; internalToken: string; log: FastifyBaseLogger }): () => void {
+  const { pool, solveUrl, internalToken, log } = deps;
   let stopped = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -37,7 +37,9 @@ export function startSessionNameBackfill(deps: { pool: Pool; solveUrl: string; l
         );
         for (const { user_id: userId } of rows) {
           if (stopped) return;
-          const res = sessionListSchema.parse(await fetchJson(`${solveUrl}/internal/users/${userId}/sessions`, { timeoutMs: 5000 }));
+          const res = sessionListSchema.parse(
+            await fetchJson(`${solveUrl}/internal/users/${userId}/sessions`, { timeoutMs: 5000, headers: internalHeaders(internalToken) }),
+          );
           for (const s of res.sessions) {
             await c.query(
               `INSERT INTO stats.sessions (session_id, user_id, event, name) VALUES ($1, $2, $3, $4)

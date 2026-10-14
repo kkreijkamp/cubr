@@ -34,7 +34,8 @@ Decisions / simplifications:
   exponential backoff up to 30 s; existing boards keep serving meanwhile. Upsert only (does not delete
   entries stats no longer has).
 
-Env: `PORT`, `REDIS_URL`, `JWT_SECRET`, `STATS_URL`, `WCA_URL`, `POD_NAME`, `NODE_NAME`, `APP_VERSION`, `LOG_LEVEL`.
+Env: `PORT`, `REDIS_URL`, `JWT_SECRET`, `STATS_URL`, `WCA_URL`, `INTERNAL_API_TOKEN` (sent to the stats and wca
+`/internal` routes), `POD_NAME`, `NODE_NAME`, `APP_VERSION`, `LOG_LEVEL`.
 
 Dev against the compose stack's Redis (`docker compose up -d redis`; without stats and wca instances at
 `STATS_URL`/`WCA_URL` the rebuild keeps retrying and the anti-cheat uses its fallback table):

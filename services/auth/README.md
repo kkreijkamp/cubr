@@ -34,9 +34,10 @@ schema `auth` (`users`, `user_settings`, `avatars`), migrated at startup. Fastif
 - Rate-limit key uses `req.ip`: common's server trusts only a fixed number of reverse-proxy hops
   (`TRUST_PROXY_HOPS`: 1 behind the local gateway, 2 behind the GKE load balancer) when reading
   `X-Forwarded-For`, so a client can't pick its own address with a fake header.
-- Trusted in-cluster callers (the seed job) send `X-Internal-Token: <INTERNAL_API_TOKEN>` and skip the per-IP
-  register/login limits — they legitimately create many accounts from one pod IP. Disabled unless the secret is set
-  (≥ 16 chars); compared in constant time.
+- Trusted in-cluster callers (the seed job) send `X-Internal-Token: <INTERNAL_API_TOKEN>` — the same shared secret
+  that protects the services' `/internal/*` routes — and skip the per-IP register/login limits: they legitimately
+  create many accounts from one pod IP. Disabled unless the secret is set (≥ 16 chars); compared in constant time
+  (common's `internalTokenMatches`).
 
 Env: `PORT`, `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, `INTERNAL_API_TOKEN`, `TRUST_PROXY_HOPS`, `POD_NAME`, `NODE_NAME`,
 `APP_VERSION`, `LOG_LEVEL`.

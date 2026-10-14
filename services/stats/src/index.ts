@@ -33,7 +33,7 @@ const server = createServer(config, {
 const { app } = server;
 const relay = createPbRelay(pool, redis, app.log);
 
-await registerRoutes(app, { pool, redis });
+await registerRoutes(app, { pool, redis, internalToken: config.internalToken });
 
 // Listen first so liveness passes while Postgres boots; readiness stays 503 until migrated.
 await start(server, config, [
@@ -54,6 +54,7 @@ const handle = createProjector({
   redis,
   log: app.log,
   solveUrl: config.urls.solve,
+  internalToken: config.internalToken,
   flushPbOutbox: () => relay.flush(),
 });
 consumer = consumeEvents(redis, {
@@ -67,5 +68,5 @@ consumer = consumeEvents(redis, {
 });
 relay.start();
 stopMaintenance = startMaintenance(pool, app.log);
-stopBackfill = startSessionNameBackfill({ pool, solveUrl: config.urls.solve, log: app.log });
+stopBackfill = startSessionNameBackfill({ pool, solveUrl: config.urls.solve, internalToken: config.internalToken, log: app.log });
 app.log.info({ group: 'stats', consumer: config.podName }, 'stats projection started');

@@ -21,7 +21,7 @@ const server = createServer(config, {
 const { app } = server;
 
 const service = createService({ repo: createRepo(pool), dataset, cache: createCache(redis, app.log) });
-await registerRoutes(app, service);
+await registerRoutes(app, service, config.internalToken);
 
 await start(server, config, [() => pool.end(), () => redis.quit()]);
 await waitForPostgres(pool, app.log);

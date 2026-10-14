@@ -1,4 +1,4 @@
-import { badRequest, parse } from '@cubetype/common';
+import { badRequest, parse, requireInternal } from '@cubetype/common';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { Cached } from '../cache.js';
 import { WCA_ID_RE, distributionQuery, personParams, personSearchQuery, rankQuery } from '../schemas.js';
@@ -12,7 +12,7 @@ function send<T>(reply: FastifyReply, result: Cached<T> | { value: T; hit?: unde
   return result.value;
 }
 
-export async function registerRoutes(app: FastifyInstance, svc: Service): Promise<void> {
+export async function registerRoutes(app: FastifyInstance, svc: Service, internalToken: string): Promise<void> {
   app.get('/api/wca/meta', async (_req, reply) => send(reply, await svc.meta(), 60));
 
   app.get('/api/wca/records', async (_req, reply) => send(reply, await svc.records()));
@@ -44,6 +44,7 @@ export async function registerRoutes(app: FastifyInstance, svc: Service): Promis
 
   app.get('/api/wca/countries', async (_req, reply) => send(reply, await svc.countries()));
 
-  // Service-to-service only (leaderboard anti-cheat); not routed by the Ingress/gateway.
-  app.get('/internal/records', async () => svc.internalRecords());
+  // Service-to-service only (leaderboard anti-cheat); not routed by the Ingress/gateway, and
+  // callers must send X-Internal-Token.
+  app.get('/internal/records', { preHandler: requireInternal(internalToken, app.log) }, async () => svc.internalRecords());
 }

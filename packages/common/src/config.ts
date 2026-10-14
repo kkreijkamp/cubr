@@ -19,6 +19,8 @@ export interface BaseConfig {
   databaseUrl: string;
   redisUrl: string;
   jwtSecret: string;
+  /** Shared secret for /internal/* routes (X-Internal-Token); empty = not enforced (local development). */
+  internalToken: string;
   logLevel: string;
   urls: ServiceUrls;
 }
@@ -39,6 +41,7 @@ export function loadConfig(serviceName: string): BaseConfig {
     databaseUrl: env('DATABASE_URL', 'postgres://cubetype:cubetype@postgres:5432/cubetype'),
     redisUrl: env('REDIS_URL', 'redis://redis:6379'),
     jwtSecret: env('JWT_SECRET', 'dev-secret-change-me'),
+    internalToken: env('INTERNAL_API_TOKEN', ''),
     logLevel: env('LOG_LEVEL', 'info'),
     urls: {
       auth: env('AUTH_URL', 'http://auth:8080'),

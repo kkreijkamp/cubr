@@ -73,7 +73,7 @@ All three use the same container images and the same routing table.
 - **Security.**
   - Pods run as non-root (`runAsNonRoot`, numeric UID), with no privilege escalation, all capabilities dropped and a read-only root filesystem (writable `/tmp` via emptyDir).
   - No ServiceAccount token is mounted.
-  - Secrets are never committed. `cubetype-secrets` holds `JWT_SECRET` and `INTERNAL_API_TOKEN` and is created by `commands.sh` §8.
+  - Secrets are never committed. `cubetype-secrets` holds `JWT_SECRET` and `INTERNAL_API_TOKEN` (required on `/internal/*` calls between services) and is created by `commands.sh` §8.
 - **Images.** One image per service, tagged `<version>` and built with `--build-arg APP_VERSION`. The version shows in `X-Service` and on the `/status` page.
 
 ### Resource sizing (requests → limits)

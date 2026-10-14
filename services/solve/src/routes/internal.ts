@@ -1,15 +1,19 @@
 import type { FastifyInstance } from 'fastify';
-import { parse } from '@cubetype/common';
+import { parse, requireInternal } from '@cubetype/common';
 import type { RouteContext } from '../context.js';
 import { internalParams, internalQuery } from '../schemas.js';
 
 /**
- * Service-to-service routes. Not under /api, so the public gateway never routes them; no auth.
+ * Service-to-service routes. Not under /api, so the gateway/Ingress never routes them, and every
+ * call must carry the shared X-Internal-Token (INTERNAL_API_TOKEN; not enforced while unset in
+ * local development).
  * GET /internal/users/:userId/solves?event= feeds the stats service's PB recompute.
  * GET /internal/users/:userId/sessions lets read models backfill session names.
  */
-export function registerInternalRoutes(app: FastifyInstance, { pool }: RouteContext): void {
-  app.get('/internal/users/:userId/solves', async (req, reply) => {
+export function registerInternalRoutes(app: FastifyInstance, { config, pool }: RouteContext): void {
+  const internalOnly = { preHandler: requireInternal(config.internalToken, app.log) };
+
+  app.get('/internal/users/:userId/solves', internalOnly, async (req, reply) => {
     const { userId } = parse(internalParams, req.params);
     const { event } = parse(internalQuery, req.query ?? {});
     const where = event ? 'user_id = $1 AND event = $2' : 'user_id = $1';
@@ -29,7 +33,7 @@ export function registerInternalRoutes(app: FastifyInstance, { pool }: RouteCont
     return reply.send({ solves });
   });
 
-  app.get('/internal/users/:userId/sessions', async (req) => {
+  app.get('/internal/users/:userId/sessions', internalOnly, async (req) => {
     const { userId } = parse(internalParams, req.params);
     const { rows } = await pool.query<{ id: string; name: string; event: string }>(
       'SELECT id, name, event FROM solve.sessions WHERE user_id = $1 ORDER BY created_at, id',

@@ -1,4 +1,4 @@
-import { fetchJson, type FetchOptions, type Redis } from '@cubetype/common';
+import { fetchJson, internalHeaders, type FetchOptions, type Redis } from '@cubetype/common';
 import type { FastifyBaseLogger } from 'fastify';
 import { isBelowFloor, type FloorSource } from './floors.js';
 import {
@@ -49,6 +49,8 @@ type Fetcher = (url: string, opts?: FetchOptions) => Promise<unknown>;
 export interface RebuildDeps {
   redis: Redis;
   statsUrl: string;
+  /** sent as X-Internal-Token to stats' /internal/pbs */
+  internalToken: string;
   podName: string;
   floors: FloorSource;
   log: FastifyBaseLogger;
@@ -79,7 +81,11 @@ export async function rebuildOnce(deps: RebuildDeps): Promise<{ entries: number;
   // Fetch everything first so a stats failure half-way doesn't leave a partial rebuild.
   const perKind: [Kind, StatsPb[]][] = [];
   for (const kind of KINDS) {
-    const res = (await fetcher(`${statsUrl}/internal/pbs?kind=${kind}`, { timeoutMs: 15_000, retries: 1 })) as {
+    const res = (await fetcher(`${statsUrl}/internal/pbs?kind=${kind}`, {
+      timeoutMs: 15_000,
+      retries: 1,
+      headers: internalHeaders(deps.internalToken),
+    })) as {
       pbs?: StatsPb[];
     } | null;
     if (!res || !Array.isArray(res.pbs)) throw new Error(`malformed /internal/pbs response for kind ${kind}`);

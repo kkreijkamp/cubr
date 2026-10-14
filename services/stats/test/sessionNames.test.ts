@@ -18,7 +18,7 @@ describe('session name backfill', () => {
     vi.useFakeTimers();
     const log = fakeLog();
     const connect = vi.fn().mockRejectedValue(new Error('connect ECONNREFUSED'));
-    const stop = startSessionNameBackfill({ pool: { connect } as never, solveUrl: 'http://solve', log: log as never });
+    const stop = startSessionNameBackfill({ pool: { connect } as never, solveUrl: 'http://solve', internalToken: '', log: log as never });
     await vi.advanceTimersByTimeAsync(5_000);
     expect(connect).toHaveBeenCalledTimes(1);
     expect(log.warn).toHaveBeenCalledTimes(1);
@@ -36,6 +36,7 @@ describe('session name backfill', () => {
     const stop = startSessionNameBackfill({
       pool: { connect: vi.fn().mockResolvedValue(client) } as never,
       solveUrl: 'http://solve',
+      internalToken: 'secret',
       log: fakeLog() as never,
     });
     await vi.advanceTimersByTimeAsync(5_000);
@@ -43,7 +44,7 @@ describe('session name backfill', () => {
     stop();
   });
 
-  it('only inserts missing names, so a newer rename is never overwritten', async () => {
+  it('only inserts missing names (a newer rename is never overwritten) and sends the internal token', async () => {
     vi.useFakeTimers();
     const sql: string[] = [];
     const client = {
@@ -55,10 +56,12 @@ describe('session name backfill', () => {
       }),
       release: vi.fn(),
     };
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ sessions: [{ id: S1, name: 'Main', event: '333' }] }))));
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({ sessions: [{ id: S1, name: 'Main', event: '333' }] })));
+    vi.stubGlobal('fetch', fetchMock);
     const stop = startSessionNameBackfill({
       pool: { connect: vi.fn().mockResolvedValue(client) } as never,
       solveUrl: 'http://solve',
+      internalToken: 'secret',
       log: fakeLog() as never,
     });
     await vi.advanceTimersByTimeAsync(5_000);
@@ -66,6 +69,7 @@ describe('session name backfill', () => {
     expect(inserts).toHaveLength(2);
     for (const s of inserts) expect(s).toContain('ON CONFLICT (session_id) DO NOTHING');
     expect(client.release).toHaveBeenCalledWith(undefined);
+    expect(fetchMock.mock.calls[0][1]?.headers).toMatchObject({ 'x-internal-token': 'secret' });
     stop();
   });
 });

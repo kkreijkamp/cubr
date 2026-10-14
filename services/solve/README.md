@@ -18,8 +18,8 @@ migrated at startup. Port 8080.
 | `GET /api/solves/export` | `{exportedAt, sessions:[Session & {solves}]}` |
 | `GET /api/solves/daily?date=` | the user's daily solves per event + the official ao5 (from the recorded attempts) |
 | `GET /api/solves/_info`, `/api/sessions/_info` | info incl. `outbox: {backlog, published, lastPublishedAt, lastError, healthy}` |
-| `GET /internal/users/:userId/solves?event=` | **no auth, not routed by the gateway**: `{solves:[{id, sessionId, timeMs, penalty, createdAt}]}` ordered by session, time (stats recompute) |
-| `GET /internal/users/:userId/sessions` | same: `{sessions:[{id, name, event}]}` (read models backfill session names) |
+| `GET /internal/users/:userId/solves?event=` | **service-to-service only**: not routed by the gateway/Ingress and requires `X-Internal-Token` (403 otherwise): `{solves:[{id, sessionId, timeMs, penalty, createdAt}]}` ordered by session, time (stats recompute) |
+| `GET /internal/users/:userId/sessions` | same protection: `{sessions:[{id, name, event}]}` (read models backfill session names) |
 
 Users only ever see their own rows; foreign ids return 404. A solve always gets the event of its session.
 `X-Timezone` (valid IANA name, else `UTC`) is copied into events as `tz`. Tokens revoked by logout are rejected
@@ -68,7 +68,9 @@ changes neither that result nor the ao5 reported by `GET /api/solves/daily`.
   client is released with its error, so the pool drops it.
 
 ## Env / run
-Standard vars (SPEC §4): `PORT DATABASE_URL REDIS_URL JWT_SECRET APP_VERSION POD_NAME NODE_NAME LOG_LEVEL`.
+Standard vars (SPEC §4): `PORT DATABASE_URL REDIS_URL JWT_SECRET INTERNAL_API_TOKEN APP_VERSION POD_NAME NODE_NAME LOG_LEVEL`.
+`INTERNAL_API_TOKEN` is the shared secret callers of `/internal/*` send as `X-Internal-Token`; while it is unset (local
+development) the internal routes accept any call and log one warning at startup.
 ```
 docker compose up -d postgres redis
 PORT=8083 DATABASE_URL=postgres://cubetype:cubetype@localhost:55433/cubetype REDIS_URL=redis://localhost:56380 npm run dev -w services/solve

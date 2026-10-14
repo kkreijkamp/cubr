@@ -1,9 +1,11 @@
-import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import type { FastifyInstance } from 'fastify';
 import {
   HttpError,
+  INTERNAL_TOKEN_HEADER,
   conflict,
+  internalTokenMatches,
   parse,
   rateLimited,
   revokedKey,
@@ -42,11 +44,8 @@ const pgCode = (err: unknown) => (err as { code?: string }).code;
 // Trusted in-cluster callers (the seed job) present INTERNAL_API_TOKEN in X-Internal-Token and
 // skip the per-IP limits below — they legitimately create many accounts from one pod IP.
 // Disabled unless the secret is configured (≥ 16 chars).
-const INTERNAL_TOKEN = Buffer.from(process.env.INTERNAL_API_TOKEN ?? '');
-function isInternalCaller(header: string | string[] | undefined): boolean {
-  if (INTERNAL_TOKEN.length < 16 || typeof header !== 'string') return false;
-  const given = Buffer.from(header);
-  return given.length === INTERNAL_TOKEN.length && timingSafeEqual(given, INTERNAL_TOKEN);
+function isInternalCaller(token: string, header: string | string[] | undefined): boolean {
+  return token.length >= 16 && internalTokenMatches(token, header);
 }
 
 export async function registerAuthRoutes(app: FastifyInstance, { config, pool, redis, auth }: Deps) {
@@ -60,7 +59,7 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
 
   // ---- POST /api/auth/register ----------------------------------------------------------------
   app.post('/api/auth/register', async (req, reply) => {
-    if (!isInternalCaller(req.headers['x-internal-token']) && !(await allow(redis, `register:${req.ip}`, 20, 3600))) {
+    if (!isInternalCaller(config.internalToken, req.headers[INTERNAL_TOKEN_HEADER]) && !(await allow(redis, `register:${req.ip}`, 20, 3600))) {
       throw rateLimited('Too many registrations from this address, try again later');
     }
     const body = parse(registerSchema, req.body);
@@ -89,7 +88,7 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
 
   // ---- POST /api/auth/login -------------------------------------------------------------------
   app.post('/api/auth/login', async (req) => {
-    if (!isInternalCaller(req.headers['x-internal-token']) && !(await allow(redis, `login:${req.ip}`, 10, 60))) {
+    if (!isInternalCaller(config.internalToken, req.headers[INTERNAL_TOKEN_HEADER]) && !(await allow(redis, `login:${req.ip}`, 10, 60))) {
       throw rateLimited('Too many login attempts, try again in a minute');
     }
     const body = parse(loginSchema, req.body);

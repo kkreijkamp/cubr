@@ -1,4 +1,4 @@
-import { fetchJson, HttpError, parse, type PoolClient } from '@cubetype/common';
+import { fetchJson, HttpError, internalHeaders, parse, type PoolClient } from '@cubetype/common';
 import { effectiveMs } from '@cubetype/cubestats';
 import type { FastifyBaseLogger } from 'fastify';
 import { bucketSolves } from './domain/buckets.js';
@@ -8,6 +8,8 @@ import { loadPbs, queuePbUpdated, upsertPb } from './store.js';
 
 export interface RecomputeDeps {
   solveUrl: string;
+  /** sent as X-Internal-Token to solve-service's /internal routes */
+  internalToken: string;
   log: FastifyBaseLogger;
 }
 
@@ -18,7 +20,7 @@ export interface RecomputeDeps {
 export async function fetchSolveList(deps: RecomputeDeps, userId: string, event: string): Promise<ListSolve[]> {
   const url = `${deps.solveUrl}/internal/users/${encodeURIComponent(userId)}/solves?event=${encodeURIComponent(event)}`;
   try {
-    const body = await fetchJson<unknown>(url, { timeoutMs: 15_000, retries: 1 });
+    const body = await fetchJson<unknown>(url, { timeoutMs: 15_000, retries: 1, headers: internalHeaders(deps.internalToken) });
     return parse(solveListSchema, body).solves;
   } catch (err) {
     if (err instanceof HttpError && err.statusCode === 404) return []; // unknown user → no solves
