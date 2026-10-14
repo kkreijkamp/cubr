@@ -19,6 +19,7 @@ export default defineConfig({
     proxy: {
       '/api': { target: gateway, changeOrigin: true },
       '/socket.io': { target: gateway, ws: true, changeOrigin: true },
+      '/_info': { target: gateway, changeOrigin: true },
     },
   },
   build: {

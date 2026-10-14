@@ -204,3 +204,14 @@ export interface WcaPerson {
   person: { wcaId: string; name: string; countryId: string; countryIso2: string | null; gender: string | null };
   pbs: { event: string; single: WcaRankValue | null; average: WcaRankValue | null }[];
 }
+
+export interface ServiceInfo {
+  service: string;
+  version: string;
+  pod: string;
+  node: string;
+  startedAt: string;
+  uptimeSec: number;
+  deps: Record<string, 'ok' | 'down'>;
+  [k: string]: unknown;
+}

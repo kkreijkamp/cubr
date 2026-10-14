@@ -55,7 +55,7 @@ async function eventually(name, fn, timeoutMs = 15_000) {
 console.log(`cubetype smoke test → ${BASE}\n`);
 
 console.log('health / info (every service answers through the entry point):');
-for (const p of ['/api/auth/_info', '/api/scrambles/_info', '/api/solves/_info', '/api/stats/_info', '/api/leaderboards/_info', '/api/race/_info', '/api/wca/_info']) {
+for (const p of ['/_info', '/api/auth/_info', '/api/scrambles/_info', '/api/solves/_info', '/api/stats/_info', '/api/leaderboards/_info', '/api/race/_info', '/api/wca/_info']) {
   const r = await req('GET', p);
   check(p, r.status === 200, `${r.data?.service ?? '?'}@${r.data?.version ?? '?'} on ${r.data?.pod ?? '?'} (${r.ms} ms)`);
 }
@@ -123,6 +123,14 @@ const room = await req('POST', '/api/race/rooms', { name: 'smoke room', event: '
 check('create race room', room.status === 201, room.data?.room?.id);
 const rooms = await req('GET', '/api/race/rooms');
 check('room listed in lobby', rooms.data?.rooms?.some((r) => r.id === room.data?.room?.id));
+
+console.log('\nload balancing (20 requests to /api/scrambles/_info):');
+const pods = new Map();
+await Promise.all(Array.from({ length: 20 }, async () => {
+  const r = await req('GET', '/api/scrambles/_info');
+  pods.set(r.data?.pod, (pods.get(r.data?.pod) ?? 0) + 1);
+}));
+check('requests spread over ≥ 1 pod', pods.size >= 1, [...pods].map(([p, n]) => `${p}:${n}`).join(' '));
 
 console.log('\ncleanup:');
 const sessDel = await req('DELETE', `/api/sessions/${session.id}`);

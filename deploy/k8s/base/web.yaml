@@ -51,7 +51,12 @@ spec:
         - name: web
           image: cubetype/web:dev
           imagePullPolicy: IfNotPresent
-          # APP_VERSION comes from the image (build arg).
+          # APP_VERSION comes from the image (build arg); /_info reports it with the pod name.
+          env:
+            - name: NODE_NAME           # downward API -> shown by /_info on the status page
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
           ports:
             - name: http
               containerPort: 8080

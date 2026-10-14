@@ -9,6 +9,7 @@ import type {
   PrivateUser,
   PublicUser,
   RaceRoomSummary,
+  ServiceInfo,
   Session,
   Solve,
   StatsSummary,
@@ -70,14 +71,29 @@ const timeZone = (() => {
   }
 })();
 
-/** Sends `body` as JSON, or as raw bytes with the blob's own content type when it is a `Blob`
- *  (avatar upload). */
-export async function request<T>(method: string, path: string, body?: unknown, opts: { signal?: AbortSignal; timeoutMs?: number } = {}): Promise<T> {
+export interface RawResponse<T> {
+  data: T;
+  status: number;
+  headers: Headers;
+  servedBy: string | null;
+  ms: number;
+}
+
+/** Low-level request returning body + headers (used by the status page to show X-Served-By).
+ *  A `Blob` body is sent as raw bytes with the blob's own content type (avatar upload); anything
+ *  else is sent as JSON. */
+export async function requestRaw<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  opts: { signal?: AbortSignal; timeoutMs?: number } = {},
+): Promise<RawResponse<T>> {
   const headers: Record<string, string> = { 'X-Timezone': timeZone };
   const raw = body instanceof Blob;
   if (raw) headers['content-type'] = body.type || 'application/octet-stream';
   else if (body !== undefined) headers['content-type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;
+  const started = performance.now();
   let res: Response;
   const signal = opts.signal ?? (opts.timeoutMs ? AbortSignal.timeout(opts.timeoutMs) : undefined);
   try {
@@ -92,6 +108,7 @@ export async function request<T>(method: string, path: string, body?: unknown, o
     if ((err as Error).name === 'AbortError') throw err;
     throw new ApiError(0, 'NETWORK', 'Network error — is the server reachable?');
   }
+  const ms = performance.now() - started;
   let json: any = null;
   if (res.status !== 204) {
     const text = await res.text();
@@ -111,7 +128,11 @@ export async function request<T>(method: string, path: string, body?: unknown, o
       json?.error?.message ?? (res.status >= 500 ? 'Service temporarily unavailable' : res.statusText || 'Request failed'),
     );
   }
-  return json as T;
+  return { data: json as T, status: res.status, headers: res.headers, servedBy: res.headers.get('x-served-by'), ms };
+}
+
+export async function request<T>(method: string, path: string, body?: unknown, opts?: { signal?: AbortSignal; timeoutMs?: number }): Promise<T> {
+  return (await requestRaw<T>(method, path, body, opts)).data;
 }
 
 const get = <T>(path: string, signal?: AbortSignal) => request<T>('GET', path, undefined, { signal });
@@ -161,7 +182,13 @@ export const api = {
   },
   scrambles: {
     events: () => get<{ events: { id: string; name: string; puzzle: string }[] }>('/api/scrambles/events'),
-    get: (event: string, count = 1) => get<{ event: string; scrambles: string[]; source: string }>(`/api/scrambles/${enc(event)}${qs({ count })}`),
+    get: (event: string, count = 1, fresh = false, opts: { signal?: AbortSignal; timeoutMs?: number } = {}) =>
+      request<{ event: string; scrambles: string[]; source: string }>(
+        'GET',
+        `/api/scrambles/${enc(event)}${qs({ count, fresh: fresh ? 1 : undefined })}`,
+        undefined,
+        opts,
+      ),
     daily: (date?: string) => get<{ date: string; events: Record<string, string[]> }>(`/api/scrambles/daily${qs({ date })}`),
   },
   sessions: {
@@ -235,4 +262,18 @@ export const api = {
     countries: (signal?: AbortSignal) =>
       get<{ countries: { id: string; iso2: string | null; name: string; continentId: string }[] }>('/api/wca/countries', signal),
   },
+  /** Service _info endpoints used by the status page (one per microservice). */
+  info: (path: string, timeoutMs = 2500) => requestRaw<ServiceInfo>('GET', path, undefined, { timeoutMs }),
 };
+
+/** The _info path of every service, in display order. */
+export const SERVICE_INFO_PATHS: { name: string; path: string }[] = [
+  { name: 'web', path: '/_info' },
+  { name: 'auth', path: '/api/auth/_info' },
+  { name: 'scramble', path: '/api/scrambles/_info' },
+  { name: 'solve', path: '/api/solves/_info' },
+  { name: 'stats', path: '/api/stats/_info' },
+  { name: 'leaderboard', path: '/api/leaderboards/_info' },
+  { name: 'race', path: '/api/race/_info' },
+  { name: 'wca', path: '/api/wca/_info' },
+];

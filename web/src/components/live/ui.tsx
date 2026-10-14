@@ -1,4 +1,4 @@
-// Small presentational pieces shared by the live pages.
+// Small presentational pieces shared by the live pages (daily, race, wca, status).
 import { useState, type ReactNode } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { getEvent } from '@cubetype/cubestats';
@@ -92,6 +92,40 @@ export type DotState = 'up' | 'down' | 'degraded' | 'pending' | 'idle' | 'inspec
 /** Status dot; "live" states get a soft pulse ring. */
 export function Dot({ state, title, pulse }: { state: DotState; title?: string; pulse?: boolean }) {
   return <span className={`live-dot ${state}${pulse ? ' pulse' : ''}`} title={title} aria-label={title ?? state} role="img" />;
+}
+
+/**
+ * Tiny inline SVG sparkline. `null` values are gaps (drawn as error ticks on the baseline), so a
+ * service outage is visible in the latency history.
+ */
+export function Sparkline({ values, height = 22, max: maxIn, className }: { values: (number | null)[]; height?: number; max?: number; className?: string }) {
+  const w = 120;
+  const n = Math.max(values.length, 2);
+  const finite = values.filter((v): v is number => v !== null && Number.isFinite(v));
+  const max = maxIn ?? Math.max(1, ...finite) * 1.15;
+  const x = (i: number) => (i / (n - 1)) * w;
+  const y = (v: number) => height - 2 - (Math.min(v, max) / max) * (height - 4);
+  const segments: string[] = [];
+  let cur = '';
+  values.forEach((v, i) => {
+    if (v === null || !Number.isFinite(v)) {
+      if (cur) segments.push(cur);
+      cur = '';
+      return;
+    }
+    cur += `${cur ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`;
+  });
+  if (cur) segments.push(cur);
+  const last = values.length ? values[values.length - 1] : null;
+  return (
+    <svg className={`live-spark ${className ?? ''}`} viewBox={`0 0 ${w} ${height}`} preserveAspectRatio="none" height={height} aria-hidden="true">
+      {segments.map((d, i) => (
+        <path key={i} d={d} fill="none" vectorEffect="non-scaling-stroke" />
+      ))}
+      {values.map((v, i) => (v === null ? <rect key={`g${i}`} className="gap" x={x(i) - 0.6} y={height - 3} width={1.2} height={3} /> : null))}
+      {last !== null && Number.isFinite(last) && <circle className="tip" cx={x(values.length - 1)} cy={y(last)} r={1.6} />}
+    </svg>
+  );
 }
 
 /** Banner for a service that is temporarily unavailable. */
