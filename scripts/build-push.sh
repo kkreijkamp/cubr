@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================================
-# Alternative to Cloud Build (cloudbuild.yaml): build the images on this laptop for
+# Alternative to Cloud Build (scripts/commands.sh §4): build the images on this laptop for
 # linux/amd64 (GKE e2 nodes are x86-64; Apple Silicon builds arm64 by default, which would
 # crash on GKE with "exec format error") and push them straight to Artifact Registry.
 # Slower than Cloud Build for npm steps under emulation, but handy for a quick single-image fix.

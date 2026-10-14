@@ -19,6 +19,7 @@ All three use the same container images and the same routing table.
 | `k8s/kind/kind-config.yaml` | kind cluster: 1 control-plane + 2 workers, port mapping 8090 → 30080 |
 | `cloudbuild/single-image.yaml` | Cloud Build for one image (e.g. `web:1.1.0` for the rollout demo) |
 | `../cloudbuild.yaml` | Cloud Build for all 10 images in parallel |
+| `../scripts/commands.sh` | **Every GKE command, numbered sections 0–10, each one commented** |
 | `../scripts/build-local.sh` | `docker build` all images as `cubetype/<name>:dev` (`--kind` also loads them into kind) |
 | `../scripts/build-push.sh` | Alternative to Cloud Build: `docker buildx --platform linux/amd64 --push` to Artifact Registry |
 | `../scripts/kind-up.sh` | Repeatable local Kubernetes setup (cluster, CNPG, metrics-server, images, secret, deploy) |
@@ -72,7 +73,7 @@ All three use the same container images and the same routing table.
 - **Security.**
   - Pods run as non-root (`runAsNonRoot`, numeric UID), with no privilege escalation, all capabilities dropped and a read-only root filesystem (writable `/tmp` via emptyDir).
   - No ServiceAccount token is mounted.
-  - Secrets are never committed. `cubetype-secrets` holds `JWT_SECRET` and `INTERNAL_API_TOKEN` and is created by `kind-up.sh` (see §3).
+  - Secrets are never committed. `cubetype-secrets` holds `JWT_SECRET` and `INTERNAL_API_TOKEN` and is created by `commands.sh` §8.
 - **Images.** One image per service, tagged `<version>` and built with `--build-arg APP_VERSION`. The version shows in `X-Service` and on the `/status` page.
 
 ---
@@ -147,19 +148,21 @@ To match GKE's version exactly, create the cluster with `NODE_IMAGE=kindest/node
 
 ## 4. GKE deployment
 
-In short (zone `australia-southeast1-a`, Artifact Registry `australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype`):
+Run `scripts/commands.sh` section by section (`scripts/commands.sh list` prints them). Every command carries a comment explaining it and its flags.
 
-```bash
-gcloud builds submit --region=australia-southeast1 --config=cloudbuild.yaml --substitutions=_VERSION=1.0.0 .
-gcloud container clusters create cubetype --zone=australia-southeast1-a --machine-type=e2-standard-2 \
-  --num-nodes=3 --enable-autoscaling --min-nodes=3 --max-nodes=5 --enable-ip-alias
-gcloud compute addresses create cubetype-ip --global          # the Ingress refers to it by name
-kubectl apply --server-side -f https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.30/releases/cnpg-1.30.1.yaml
-kubectl create namespace cubetype
-kubectl -n cubetype create secret generic cubetype-secrets \
-  --from-literal=JWT_SECRET="$(openssl rand -hex 32)" --from-literal=INTERNAL_API_TOKEN="$(openssl rand -hex 24)"
-kubectl apply -k deploy/k8s/overlays/gke
-```
+| § | Step |
+|---|---|
+| 0 | Variables (`PROJECT_ID=infs3208-a2-koen`, `ZONE=australia-southeast1-a`, `CLUSTER=cubetype`, `REPO=cubetype`, `VERSION=1.0.0`) |
+| 1 | `gcloud auth list`, select `koen@mangotree.info`, set project/region/zone |
+| 2 | Enable container, artifactregistry, cloudbuild and compute APIs |
+| 3 | Artifact Registry repo |
+| 4 | `gcloud builds submit --config cloudbuild.yaml --substitutions _VERSION=1.0.0,…` (10 images in parallel, native amd64) |
+| 5 | `gcloud container clusters create` (3× e2-standard-2, autoscaling 3–5, 30 GB pd-balanced, regular channel, VPC-native) + `get-credentials` |
+| 6 | Reserve the global static IP `cubetype-ip` |
+| 7 | Install CloudNativePG 1.30.1 (server-side apply) and wait for the operator |
+| 8 | Namespace + `cubetype-secrets` (random `JWT_SECRET`, `INTERNAL_API_TOKEN`) |
+| 9 | `kubectl apply -k deploy/k8s/overlays/gke`, wait for pg/redis/rollouts, watch the Ingress get its IP, smoke test |
+| 10 | `kubectl create job --from=cronjob/wca-import wca-import-now`, seed Job |
 
 To release a new version, change `newTag` in `k8s/overlays/gke/kustomization.yaml` and re-apply.
 
@@ -171,7 +174,7 @@ To release a new version, change `newTag` in `k8s/overlays/gke/kustomization.yam
 | A single backend permanently `UNHEALTHY` | `kubectl -n cubetype logs deploy/<svc>` and `curl` its `/readyz` via `kubectl port-forward`. BackendConfig changes can take minutes to sync. |
 | `exec format error` | arm64 image on amd64 nodes. Build with Cloud Build or `scripts/build-push.sh` (`--platform linux/amd64`). |
 | `failed calling webhook "...cnpg.io"` when applying | The CNPG operator isn't ready yet: `kubectl rollout status deployment/cnpg-controller-manager -n cnpg-system`, then re-apply. On private-node clusters, open TCP 9443 from the control plane. |
-| Pods stuck `CreateContainerConfigError` | The Secret is missing: `cubetype-secrets` or `pg-app` (created by CNPG once the Cluster exists; pods recover automatically). |
+| Pods stuck `CreateContainerConfigError` | The Secret is missing: `cubetype-secrets` (§8) or `pg-app` (created by CNPG once the Cluster exists; pods recover automatically). |
 | wca-import Job fails `curl: (22) … 429` | The WCA export endpoint is rate-limiting your IP. Retry later (`kubectl delete job wca-import-now` then create it again). Locally, use `scripts/kind-wca-import-tsv.sh`. |
 | HPA `TARGETS <unknown>` | metrics-server missing (kind: see §3) or the container has no CPU request. |
 | `kubectl drain` hangs | A PDB is blocking (by design, e.g. only one ready replica). Wait for the replacement pod, or check `kubectl get pdb -n cubetype`. Use `--delete-emptydir-data`. |

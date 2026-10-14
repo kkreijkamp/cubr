@@ -1,5 +1,5 @@
-# PostgreSQL 17 managed by the CloudNativePG operator (installed cluster-wide, see
-# deploy/README.md). The operator turns this one object into:
+# PostgreSQL 17 managed by the CloudNativePG operator (installed cluster-wide by
+# scripts/commands.sh §7). The operator turns this one object into:
 #   * Pods pg-1, pg-2, ... : 1 primary + streaming replicas, each with its own PVC
 #   * Services pg-rw (primary, used by the apps), pg-ro (replicas), pg-r (any)
 #   * Secret pg-app with the generated password and a ready-made connection string (key "uri")
