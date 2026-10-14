@@ -31,7 +31,14 @@ spec:
         app.kubernetes.io/component: api
         app.kubernetes.io/part-of: cubetype
     spec:
+      automountServiceAccountToken: false   # the app never talks to the Kubernetes API
       terminationGracePeriodSeconds: 30     # preStop 10 s + up to 20 s graceful shutdown (common/start())
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000                 # the "node" user of node:22-alpine (numeric so runAsNonRoot can verify it)
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       topologySpreadConstraints:
         - maxSkew: 1                    # replicas spread evenly over nodes -> a node failure takes out at most ~half
           topologyKey: kubernetes.io/hostname
@@ -101,6 +108,18 @@ spec:
             limits:                     # hard caps: CPU is throttled, memory over the limit = OOMKill
               cpu: "500m"
               memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp           # the only writable path (root filesystem is read-only)
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
 ---
 apiVersion: v1
 kind: Service

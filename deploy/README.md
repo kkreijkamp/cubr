@@ -38,6 +38,10 @@ Both use the same container images and the same routing table.
 - **Stateful pieces run self-managed on the cluster.** Managed Cloud SQL HA plus Memorystore would add about US$185/month.
   - **CloudNativePG** gives a primary with streaming replicas, automatic failover (`pg-rw` follows the primary), and generated credentials (`pg-app` Secret → `DATABASE_URL`).
   - **Redis** has a PVC. It is designed to be loseable: the scramble pool refills and the solve outbox re-delivers events.
+- **Security.**
+  - Pods run as non-root (`runAsNonRoot`, numeric UID), with no privilege escalation, all capabilities dropped and a read-only root filesystem (writable `/tmp` via emptyDir).
+  - No ServiceAccount token is mounted.
+  - Secrets are never committed. `cubetype-secrets` holds `JWT_SECRET` and is created by `kind-up.sh` (see §3).
 - **Images.** One image per service, tagged `<version>` and built with `--build-arg APP_VERSION`. The version shows in `X-Service` and in every `_info` response.
 
 ---

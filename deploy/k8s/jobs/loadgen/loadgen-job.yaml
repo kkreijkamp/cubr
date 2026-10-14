@@ -29,6 +29,12 @@ spec:
         app.kubernetes.io/part-of: cubetype
     spec:
       restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534                # nobody
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: fortio
           image: fortio/fortio:1.75.3   # multi-arch (amd64 for GKE, arm64 for kind on Apple Silicon)
@@ -60,3 +66,8 @@ spec:
             limits:
               cpu: 500m
               memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
