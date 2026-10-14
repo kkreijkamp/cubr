@@ -31,12 +31,15 @@ schema `auth` (`users`, `user_settings`, `avatars`), migrated at startup. Fastif
 - Readiness gates on Postgres + migrations. Redis is soft: when it is down, register/login/profile
   still work (rate limits fail open after 500 ms, revocation checks fail open, event publishing is
   skipped with a warning after 1.5 s); only logout returns 503 because the revocation could not be stored.
-- Rate-limit key uses `req.ip` (Fastify `trustProxy: true`, i.e. the left-most `X-Forwarded-For`).
+- Rate-limit key uses `req.ip`: common's server trusts only a fixed number of reverse-proxy hops
+  (`TRUST_PROXY_HOPS`: 1 behind the local gateway, 2 behind the GKE load balancer) when reading
+  `X-Forwarded-For`, so a client can't pick its own address with a fake header.
 - Trusted in-cluster callers (the seed job) send `X-Internal-Token: <INTERNAL_API_TOKEN>` and skip the per-IP
   register/login limits — they legitimately create many accounts from one pod IP. Disabled unless the secret is set
   (≥ 16 chars); compared in constant time.
 
-Env: `PORT`, `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, `INTERNAL_API_TOKEN`, `POD_NAME`, `NODE_NAME`, `APP_VERSION`, `LOG_LEVEL`.
+Env: `PORT`, `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, `INTERNAL_API_TOKEN`, `TRUST_PROXY_HOPS`, `POD_NAME`, `NODE_NAME`,
+`APP_VERSION`, `LOG_LEVEL`.
 
 Dev against the compose stack: `docker compose up -d postgres redis`, then
 `PORT=8081 DATABASE_URL=postgres://cubetype:cubetype@localhost:55433/cubetype REDIS_URL=redis://localhost:56380 npm run dev -w services/auth`

@@ -4,6 +4,7 @@
 #   copied into the kind nodes with `kind load docker-image` (imagePullPolicy IfNotPresent)
 # * no Google load balancer: an nginx "gateway" Deployment + NodePort Service replaces the Ingress
 # * smaller PostgreSQL footprint
+# * TRUST_PROXY_HOPS stays at the base value 1 (client -> gateway nginx -> pod)
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: cubetype

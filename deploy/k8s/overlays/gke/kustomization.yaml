@@ -44,6 +44,8 @@ images:
     newTag: "1.0.0"
 
 patches:
+  # Behind the Google load balancer X-Forwarded-For is "<client-ip>, <lb-ip>" -> trust 2 hops.
+  - path: config-gke.yaml
   # Service annotations for the Ingress: NEG = the load balancer sends traffic straight to pod
   # IPs (no extra kube-proxy hop) and health-checks each pod; backend-config = which
   # BackendConfig (health check / timeouts / draining) applies to that Service.

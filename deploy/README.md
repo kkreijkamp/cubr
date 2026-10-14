@@ -13,7 +13,7 @@ All three use the same container images and the same routing table.
 | `../docker-compose.yml` | Full local stack: Postgres, Redis, 7 services, web and the nginx gateway (+ `jobs` profile) |
 | `gateway/nginx.conf` | Compose gateway that mimics the GKE Ingress routes |
 | `k8s/base/` | Environment-neutral manifests (kustomize): namespace, ConfigMap, CloudNativePG `Cluster`, Redis StatefulSet, 8 Deployments + Services + PDBs, 4 HPAs, wca-import CronJob |
-| `k8s/overlays/gke/` | Artifact Registry images, Ingress, BackendConfigs, NEG annotations, `standard-rwo` storage, 3 Postgres instances |
+| `k8s/overlays/gke/` | Artifact Registry images, Ingress, BackendConfigs, NEG annotations, `standard-rwo` storage, 3 Postgres instances, `TRUST_PROXY_HOPS=2` |
 | `k8s/overlays/local/` | kind: local `cubetype/<svc>:dev` images, nginx `gateway` (NodePort 30080 → `localhost:8090`) instead of the Ingress |
 | `k8s/jobs/seed`, `k8s/jobs/loadgen` | On-demand Jobs: demo data, HPA load generator. Not part of the base. Apply seed via `overlays/<env>/seed` so the image is rewritten. |
 | `k8s/kind/kind-config.yaml` | kind cluster: 1 control-plane + 2 workers, port mapping 8090 → 30080 |

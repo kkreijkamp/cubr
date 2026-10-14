@@ -11,6 +11,10 @@ metadata:
     app.kubernetes.io/part-of: cubetype
 data:
   LOG_LEVEL: info
+  # Reverse-proxy hops in front of the pods whose X-Forwarded-For entries are trusted for
+  # req.ip (login rate limiting). 1 = one proxy (local nginx gateway); the GKE overlay sets 2
+  # (client -> Google Front End / load balancer -> pod, Google appends client-ip and lb-ip).
+  TRUST_PROXY_HOPS: "1"
   REDIS_URL: redis://redis:6379
   AUTH_URL: http://auth:8080
   SCRAMBLE_URL: http://scramble:8080
