@@ -4,7 +4,7 @@
 # Google Kubernetes Engine (GKE Standard, project infs3208-a2-koen, zone australia-southeast1-a).
 #
 # HOW TO USE
-#   This file is organised in numbered sections (0-10) that are meant to be executed IN ORDER,
+#   This file is organised in numbered sections (0-15) that are meant to be executed IN ORDER,
 #   ideally copy-pasted one command at a time from a terminal in the repository root so you
 #   can watch each result. Every command has a comment above it explaining what it does and
 #   what its flags/parameters mean.
@@ -12,8 +12,10 @@
 #   A whole section can also be run non-interactively:
 #       scripts/commands.sh 5          # runs section 0 (variables) + section 5
 #       scripts/commands.sh list       # lists the sections
+#   The demo sections (11-14) contain `kubectl ... -w` (watch) commands that run until you
+#   press Ctrl+C -- run those sections by copy-pasting.
 #
-# PREREQUISITES on the laptop: gcloud CLI, kubectl, openssl, curl, node.
+# PREREQUISITES on the laptop: gcloud CLI, kubectl, openssl, curl, jq (optional: hey).
 # Local alternatives (no cloud): docker compose (docker-compose.yml) and kind
 # (scripts/kind-up.sh) -- see deploy/README.md.
 # =============================================================================================
@@ -342,6 +344,246 @@ section_10() {
   curl -s "http://$(ingress_ip)/api/wca/meta"; echo
 }
 
+# =============================================================================================
+# 11. DEMO: scalability (manual scaling, HorizontalPodAutoscaler, cluster autoscaler)
+# =============================================================================================
+section_11() {
+  # --- manual horizontal scaling (a Deployment without HPA) ---
+  # Scale the stats service from 2 to 4 replicas. --replicas: desired pod count.
+  kubectl -n "$NS" scale deployment/stats --replicas=4
+
+  # Watch the 2 new pods get scheduled (spread across nodes) and become Ready (Ctrl+C).
+  #   -l  label selector (only stats pods)    -o wide  show the node    -w  watch
+  kubectl -n "$NS" get pods -l app.kubernetes.io/name=stats -o wide -w || true
+
+  # Scale back to the declared 2 replicas.
+  kubectl -n "$NS" scale deployment/stats --replicas=2
+
+  # --- automatic scaling with the HPA ---
+  # Show the autoscalers: current CPU utilisation vs target and min/max replicas.
+  kubectl -n "$NS" get hpa
+
+  # Start the in-cluster load generator (fortio, 16 connections for 4 min against
+  # /api/scrambles/444?count=5&fresh=1 -> CPU-heavy scramble generation). A Job can only be
+  # created once, so delete a previous run first (--ignore-not-found: no error if absent).
+  kubectl -n "$NS" delete job loadgen --ignore-not-found
+  kubectl apply -k deploy/k8s/jobs/loadgen
+
+  # Watch the scramble HPA react: CPU % rises above 60 %, REPLICAS goes 2 -> ... -> 8 (Ctrl+C).
+  kubectl -n "$NS" get hpa scramble -w || true
+
+  # In a second terminal: watch the new scramble pods appear and spread over the nodes.
+  kubectl -n "$NS" get pods -l app.kubernetes.io/name=scramble -o wide -w || true
+
+  # Live CPU/memory per pod and per node (from metrics-server, pre-installed on GKE).
+  kubectl -n "$NS" top pods -l app.kubernetes.io/name=scramble
+  kubectl top nodes
+
+  # The HPA's decisions with reasons (Events at the bottom: "New size: 4; reason: cpu ...").
+  kubectl -n "$NS" describe hpa scramble
+
+  # If pods are Pending for lack of CPU, the cluster autoscaler adds a node (up to 5) within
+  # ~1-2 minutes -- watch the node list (Ctrl+C).
+  kubectl get nodes -w || true
+
+  # fortio's summary: requests per second, latency percentiles, error count.
+  kubectl -n "$NS" logs job/loadgen --tail=25
+
+  # Optional, from the laptop through the public load balancer instead (brew install hey):
+  #   -z 60s  duration     -c 50  concurrent workers
+  # hey -z 60s -c 50 "http://$(ingress_ip)/api/scrambles/444?count=5&fresh=1"
+
+  # After the load stops, the HPA scales back down to 2 (60 s stabilisation, -1 pod / 30 s).
+  kubectl -n "$NS" get hpa scramble -w || true
+}
+
+# =============================================================================================
+# 12. DEMO: load balancing
+# =============================================================================================
+section_12() {
+  # Send 10 requests through the Google load balancer and print which pod answered each one
+  # (every service sets the X-Served-By response header to its pod name):
+  #   -s  silent    -o /dev/null  discard the body    -D -  dump response headers to stdout
+  for _ in $(seq 1 10); do
+    curl -s -o /dev/null -D - "http://$(ingress_ip)/api/scrambles/_info" | grep -i '^x-served-by'
+  done
+
+  # Same via the JSON body: pod name + node of the solve replica that served each request.
+  #   jq -r  raw string output; .pod/.node fields of the _info document
+  for _ in $(seq 1 10); do
+    curl -s "http://$(ingress_ip)/api/solves/_info" | jq -r '"\(.pod)  on  \(.node)"'
+  done
+
+  # The in-app cluster status page polls every service's _info and visualises the replicas
+  # that answer (open in the browser during the demo):
+  echo "open http://$(ingress_ip)/status"
+
+  # Inside the cluster: the ready pod IPs behind the scramble Service (what kube-proxy and the
+  # NEG balance across). -l kubernetes.io/service-name=...: slices belonging to that Service.
+  kubectl -n "$NS" get endpointslices -l kubernetes.io/service-name=scramble -o wide
+
+  # Google side: the network endpoint groups (one per Service/zone, containing pod IPs) and
+  # the backend services with their health checks that the Ingress controller created.
+  gcloud compute network-endpoint-groups list
+  gcloud compute backend-services list
+}
+
+# =============================================================================================
+# 13. DEMO: reliability (self-healing, node failure, database failover)
+# =============================================================================================
+section_13() {
+  # In a SECOND terminal keep probing the API (prints HTTP status codes; 200 = OK) to show
+  # that users see no errors during the following failures:
+  #   -w '%{http_code} '  print only the status code    sleep 0.5  two requests per second
+  # while true; do curl -s -o /dev/null -w '%{http_code} ' "http://$(ingress_ip)/api/leaderboards/333/single"; sleep 0.5; done
+
+  # --- 1) pod failure / self-healing ---
+  # Pick one solve pod (jsonpath .items[0] = first pod of the list).
+  POD="$(kubectl -n "$NS" get pods -l app.kubernetes.io/name=solve -o jsonpath='{.items[0].metadata.name}')"
+
+  # Kill it. The ReplicaSet notices the missing replica and starts a replacement; the other
+  # replica keeps serving in the meantime. --wait=false: return immediately.
+  kubectl -n "$NS" delete pod "$POD" --wait=false
+
+  # Watch the replacement pod being created and becoming Ready (Ctrl+C).
+  kubectl -n "$NS" get pods -l app.kubernetes.io/name=solve -o wide -w || true
+
+  # --- 2) node failure / maintenance ---
+  # Choose the node that currently runs the PostgreSQL primary (most dramatic case).
+  NODE="$(kubectl -n "$NS" get pod "$(kubectl -n "$NS" get cluster pg -o jsonpath='{.status.currentPrimary}')" -o jsonpath='{.spec.nodeName}')"
+  echo "draining $NODE"
+
+  # Mark the node unschedulable: no new pods will be placed on it.
+  kubectl cordon "$NODE"
+
+  # Evict all pods from the node, respecting PodDisruptionBudgets (never the last ready
+  # replica; CloudNativePG switches the primary over to another node first):
+  #   --ignore-daemonsets       node-level system pods (logging, kube-proxy) stay
+  #   --delete-emptydir-data    allow evicting pods with emptyDir volumes (our /tmp)
+  #   --timeout                 give up after 5 min
+  kubectl drain "$NODE" --ignore-daemonsets --delete-emptydir-data --timeout=300s
+
+  # All app pods are now running on the remaining nodes.
+  kubectl -n "$NS" get pods -o wide
+
+  # Bring the node back into service (new pods may be scheduled on it again).
+  kubectl uncordon "$NODE"
+
+  # --- 3) PostgreSQL primary failure -> automatic failover ---
+  # Show the instances and their role (primary / replica) as a column.
+  #   -l cnpg.io/cluster=pg  pods of the cluster    -L cnpg.io/instanceRole  label as column
+  kubectl -n "$NS" get pods -l cnpg.io/cluster=pg -L cnpg.io/instanceRole
+
+  # Find and delete the current primary pod.
+  PRIMARY="$(kubectl -n "$NS" get cluster pg -o jsonpath='{.status.currentPrimary}')"
+  kubectl -n "$NS" delete pod "$PRIMARY" --wait=false
+
+  # Watch a replica being promoted to primary within seconds and the old pod rejoining as a
+  # replica (Ctrl+C). Writes fail for a few seconds, reads/cached pages keep working.
+  kubectl -n "$NS" get pods -l cnpg.io/cluster=pg -L cnpg.io/instanceRole -w || true
+
+  # Cluster summary: the PRIMARY column now names a different instance.
+  kubectl -n "$NS" get cluster pg
+
+  # --- 4) Redis restart: data survives on its PersistentVolume ---
+  kubectl -n "$NS" delete pod redis-0
+  kubectl -n "$NS" rollout status statefulset/redis --timeout=120s
+}
+
+# =============================================================================================
+# 14. DEMO: rolling update and rollback
+# =============================================================================================
+section_14() {
+  # Build + push version 1.1.0 of the web image only (deploy/cloudbuild/single-image.yaml):
+  #   _IMAGE  image name   _DOCKERFILE  its Dockerfile   _VERSION  new tag + APP_VERSION
+  gcloud builds submit \
+    --region="$REGION" \
+    --config=deploy/cloudbuild/single-image.yaml \
+    --substitutions="_IMAGE=web,_DOCKERFILE=web/Dockerfile,_VERSION=1.1.0,_REGION=$REGION,_REPO=$REPO" \
+    .
+
+  # Revision history before the update (revision 1 = initial release).
+  kubectl -n "$NS" rollout history deployment/web
+
+  # Start the rolling update: change the container image of Deployment web, container "web".
+  # With maxSurge 1 / maxUnavailable 0 Kubernetes starts one new pod, waits until it is Ready
+  # (+5 s minReadySeconds), then removes one old pod, and so on -- zero downtime.
+  kubectl -n "$NS" set image deployment/web web="$REGISTRY/web:1.1.0"
+
+  # Describe the change for the history (stored on the new ReplicaSet as its change-cause).
+  kubectl -n "$NS" annotate deployment/web kubernetes.io/change-cause="web 1.1.0" --overwrite
+
+  # Follow the rollout until all replicas run 1.1.0 (the /status page shows versions flip).
+  kubectl -n "$NS" rollout status deployment/web
+
+  # Old and new ReplicaSets side by side (old one scaled to 0, kept for rollback).
+  kubectl -n "$NS" get replicasets -l app.kubernetes.io/name=web
+
+  # History now has revision 2 ("web 1.1.0").
+  kubectl -n "$NS" rollout history deployment/web
+
+  # --- a broken release is contained ---
+  # Deploy a tag that does not exist: the new pod hangs in ImagePullBackOff, and because
+  # maxUnavailable is 0 the old pods keep serving -- users are not affected.
+  kubectl -n "$NS" set image deployment/web web="$REGISTRY/web:9.9.9-broken"
+  kubectl -n "$NS" annotate deployment/web kubernetes.io/change-cause="web 9.9.9 (broken)" --overwrite
+
+  # See the stuck new pod next to the still-running old ones.
+  kubectl -n "$NS" get pods -l app.kubernetes.io/name=web
+
+  # Roll back to the previous revision (1.1.0).
+  kubectl -n "$NS" rollout undo deployment/web
+
+  # Or jump to any revision from the history, e.g. back to the initial release.
+  #   --to-revision  revision number from `kubectl rollout history`
+  kubectl -n "$NS" rollout undo deployment/web --to-revision=1
+
+  # Wait until the rollback has finished and show the final history.
+  kubectl -n "$NS" rollout status deployment/web
+  kubectl -n "$NS" rollout history deployment/web
+
+  # NOTE: `kubectl apply -k deploy/k8s/overlays/gke` resets images to the tag in the overlay's
+  # kustomization.yaml -- for a permanent release change newTag there and apply again.
+}
+
+# =============================================================================================
+# 15. Cost control and clean-up
+# =============================================================================================
+section_15() {
+  # --- pause (keep everything, pay only for disks / LB / registry, ~US$21/month) ---
+  # Allow the autoscaler to go down to 0 nodes (otherwise it restores the minimum of 3).
+  #   --node-pool  the pool created with the cluster    --min-nodes/--max-nodes new bounds
+  gcloud container clusters update "$CLUSTER" --zone="$ZONE" --node-pool=default-pool \
+    --enable-autoscaling --min-nodes=0 --max-nodes=5
+
+  # Remove all nodes (VMs stop being billed; pods become Pending). --quiet: no prompt.
+  gcloud container clusters resize "$CLUSTER" --zone="$ZONE" --node-pool=default-pool \
+    --num-nodes=0 --quiet
+
+  # --- resume ---
+  # Back to 3 nodes; pods (and PostgreSQL, from its persistent disks) start again.
+  # gcloud container clusters resize "$CLUSTER" --zone="$ZONE" --node-pool=default-pool --num-nodes=3 --quiet
+  # gcloud container clusters update "$CLUSTER" --zone="$ZONE" --node-pool=default-pool --enable-autoscaling --min-nodes=3 --max-nodes=5
+
+  # --- delete everything (end of the project) ---
+  # 1) Delete the app namespace first: removes the Ingress (-> Google deletes the load
+  #    balancer and NEGs) and the PVCs (-> the persistent disks are deleted).
+  kubectl delete namespace "$NS" --timeout=600s
+
+  # 2) Delete the cluster (all node VMs and their boot disks).
+  gcloud container clusters delete "$CLUSTER" --zone="$ZONE" --quiet
+
+  # 3) Release the static IP (a reserved but unused address is billed).
+  gcloud compute addresses delete cubetype-ip --global --quiet
+
+  # 4) Delete the image repository (storage billed per GB).
+  gcloud artifacts repositories delete "$REPO" --location="$REGION" --quiet
+
+  # 5) Check that nothing billable is left behind: orphaned disks (name pvc-...) and LB rules.
+  gcloud compute disks list
+  gcloud compute forwarding-rules list
+}
+
 # ---------------------------------------------------------------------------------------------
 # Section runner: `scripts/commands.sh <n>` runs one section; `scripts/commands.sh list` lists them.
 # ---------------------------------------------------------------------------------------------
@@ -353,6 +595,6 @@ usage() {
 case "${1:-list}" in
   list|-h|--help) usage ;;
   0) echo "variables: PROJECT_ID=$PROJECT_ID ZONE=$ZONE CLUSTER=$CLUSTER REGISTRY=$REGISTRY VERSION=$VERSION" ;;
-  [1-9]|10) "section_$1" ;;
+  [1-9]|1[0-5]) "section_$1" ;;
   *) echo "unknown section '$1'" >&2; usage; exit 1 ;;
 esac

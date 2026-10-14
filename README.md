@@ -12,10 +12,10 @@ Koen Kreijkamp (s4890458)
 | System spec (APIs, schemas, events) | [`docs/SPEC.md`](docs/SPEC.md) |
 | Writing a service | [`docs/BUILDING.md`](docs/BUILDING.md) |
 | Frontend guide | [`docs/FRONTEND.md`](docs/FRONTEND.md) |
+| Deployment guide & demo runbook | [`deploy/README.md`](deploy/README.md) |
+| Every deploy/demo command, commented | [`scripts/commands.sh`](scripts/commands.sh) |
 
-**Status:** every service runs locally with docker compose: the timer with accounts and cloud sync,
-statistics, leaderboards, the daily challenge, race rooms and the WCA comparison. Next: csTimer
-import/export and the Kubernetes deployment.
+**Status:** cubetype runs with docker compose, on a local Kubernetes cluster (kind) and on GKE.
 
 ## What works so far
 
@@ -81,6 +81,7 @@ formatting and event metadata — used by both the browser and the services).
 | Dataset | Rows | Storage |
 |---|---|---|
 | WCA export v2 (persons, ranks_single, ranks_average, competitions, countries, continents, events) | ≈ 2.3 M | PostgreSQL `wca` schema (loaded by the `wca-import` job) |
+| Seeded users / sessions / solves | ≈ 150 / 600 / 100 k | PostgreSQL `auth`, `solve`; derived rows in `stats` (created by the `seed` job) |
 | Leaderboards, scramble pool, race rooms, event stream | — | Redis |
 
 ## Run locally
@@ -90,6 +91,7 @@ Requirements: Docker Desktop, Node 22.
 ```bash
 docker compose up --build -d                       # Postgres, Redis, 7 services, web, gateway → http://localhost:8080
 docker compose --profile jobs run --rm wca-import  # download and load the WCA export (see jobs/wca-import/README.md)
+docker compose --profile jobs run --rm seed        # synthetic users + ~100k solves (demo login: demo / cubetype-demo)
 node scripts/smoke.mjs http://localhost:8080       # end-to-end check through the gateway
 docker compose down                                # stop (-v also deletes the database volumes)
 ```
@@ -97,6 +99,23 @@ docker compose down                                # stop (-v also deletes the d
 Frontend dev with hot reload: `cd web && npm install && npm run dev` (proxies `/api` to the gateway).
 Tests: `npm install && npm test` at the root (packages and services) and `npm test` in `web/` (web
 app); typecheck: `npm run typecheck` in both places.
+
+## Deploy to Kubernetes
+
+The same images run on Kubernetes (kustomize manifests in `deploy/k8s`): one Deployment per service
+with at least two replicas (HPAs for scramble, solve, race and web), PodDisruptionBudgets and
+readiness/liveness probes, PostgreSQL as a CloudNativePG cluster (primary + replicas, automatic
+failover) and Redis as a StatefulSet.
+
+- **Local (kind):** `scripts/kind-up.sh` creates the cluster, installs CloudNativePG and
+  metrics-server, builds and loads the images and deploys `overlays/local` (http://localhost:8090).
+- **GKE:** run [`scripts/commands.sh`](scripts/commands.sh) section by section (Artifact Registry +
+  Cloud Build → GKE cluster → CloudNativePG → kustomize overlay → data jobs → demos for scaling,
+  load balancing, reliability, rollout & rollback).
+
+The in-app `/status` page shows which pod and version answered each request, so scaling, load
+balancing and rolling updates are visible during the demo. See [`deploy/README.md`](deploy/README.md)
+for the deployment architecture, resource sizing, troubleshooting and the demo runbook.
 
 ## Credits
 

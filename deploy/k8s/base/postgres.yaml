@@ -5,7 +5,7 @@
 #   * Secret pg-app with the generated password and a ready-made connection string (key "uri")
 #     which every Deployment maps to DATABASE_URL
 #   * automatic failover: if the primary dies, the most up-to-date replica is promoted and
-#     pg-rw is re-pointed within seconds
+#     pg-rw is re-pointed within seconds (demo: scripts/commands.sh §13)
 #   * two PodDisruptionBudgets, so `kubectl drain` performs a switchover instead of an outage
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster

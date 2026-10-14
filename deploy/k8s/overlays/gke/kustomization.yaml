@@ -13,7 +13,8 @@ resources:
   - backendconfigs.yaml
   - ingress.yaml
 
-# Rewrite the neutral image names of the base. To release a new version change newTag here.
+# Rewrite the neutral image names of the base. To release a new version change newTag here
+# (or, for the rollout demo, use `kubectl set image`, see scripts/commands.sh §14).
 images:
   - name: cubetype/auth
     newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/auth
