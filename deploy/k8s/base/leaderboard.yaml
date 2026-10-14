@@ -1,6 +1,6 @@
 # =============================================================================================
 # leaderboard: global/weekly/daily leaderboards in Redis sorted sets (/api/leaderboards)
-# Redis-only (no DATABASE_URL).
+# Redis-only (no DATABASE_URL); boards are rebuilt from stats if Redis is lost.
 # Objects: Deployment (2 replicas, zero-downtime rolling updates) + ClusterIP Service on port
 # 8080 (keeps SPEC's internal URL http://leaderboard:8080 working) + PodDisruptionBudget.
 # =============================================================================================

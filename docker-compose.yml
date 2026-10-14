@@ -115,7 +115,7 @@ services:
     <<: *service
     image: cubetype/leaderboard:dev
     build: { context: ., dockerfile: services/leaderboard/Dockerfile, args: *build-args }
-    depends_on:                       # Redis-only service (boards are Redis sorted sets)
+    depends_on:                       # Redis-only service (rebuilds boards from stats over HTTP)
       redis: { condition: service_healthy }
 
   race:

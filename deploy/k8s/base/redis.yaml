@@ -1,7 +1,7 @@
 # Redis 7: event bus (Streams), cache, leaderboards, scramble pool, race state, rate limits.
 # A single-replica StatefulSet with a PersistentVolumeClaim, so data (incl. the AOF log)
 # survives pod restarts and rescheduling. Losing Redis completely is survivable by design:
-# the scramble pool refills and solve's outbox re-delivers.
+# leaderboards are rebuilt from stats, the scramble pool refills, solve's outbox re-delivers.
 apiVersion: v1
 kind: Service
 metadata:

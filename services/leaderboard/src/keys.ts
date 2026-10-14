@@ -13,6 +13,7 @@ import { isEventId } from '@cubetype/cubestats';
 //                                          pb.updated (all-time boards only; drops stale events)
 //   lb:users                         hash  userId → JSON {username, country, avatarUrl}
 //   lb:flagged                       list  rejected (anti-cheat) entries, newest first, capped
+//   lb:meta:built / lb:rebuild-lock  string
 // ---------------------------------------------------------------------------------------------
 
 export const KINDS = ['single', 'ao5', 'ao12'] as const;
@@ -31,6 +32,8 @@ export const PERIOD_KINDS: Record<Period, readonly Kind[]> = {
 export const USERS_KEY = 'lb:users';
 export const FLAGGED_KEY = 'lb:flagged';
 export const FLAGGED_MAX = 1000;
+export const META_BUILT_KEY = 'lb:meta:built';
+export const REBUILD_LOCK_KEY = 'lb:rebuild-lock';
 
 export const DAILY_TTL_SEC = 3 * 86_400;
 export const WEEKLY_TTL_SEC = 15 * 86_400;
