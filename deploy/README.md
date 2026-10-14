@@ -34,6 +34,7 @@ Both use the same container images and the same routing table.
 - **Scalability.**
   - HPAs act on CPU relative to each pod's request. scramble is the deliberate CPU hotspot.
   - The behavior block is tuned for a live demo: scale up immediately, scale down after 60 s.
+  - HPA-managed Deployments have **no `spec.replicas`**, so `kubectl apply` never resets a scaled-out service.
 - **Stateful pieces run self-managed on the cluster.** Managed Cloud SQL HA plus Memorystore would add about US$185/month.
   - **CloudNativePG** gives a primary with streaming replicas, automatic failover (`pg-rw` follows the primary), and generated credentials (`pg-app` Secret → `DATABASE_URL`).
   - **Redis** has a PVC. It is designed to be loseable: the scramble pool refills and the solve outbox re-delivers events.

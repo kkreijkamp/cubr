@@ -13,7 +13,8 @@ metadata:
     app.kubernetes.io/component: api
     app.kubernetes.io/part-of: cubetype
 spec:
-  replicas: 2                           # >= 2 so one pod can die/roll without downtime
+  # no `replicas:` -- the HorizontalPodAutoscaler (hpa.yaml) owns the count (min 2). Leaving it out
+  # means `kubectl apply` never resets a scaled-out Deployment back to 2 in the middle of a demo.
   revisionHistoryLimit: 10              # old ReplicaSets kept for `kubectl rollout undo --to-revision`
   minReadySeconds: 5                    # a new pod must stay Ready 5 s before the rollout continues
   strategy:
