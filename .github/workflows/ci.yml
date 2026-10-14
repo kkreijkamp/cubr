@@ -1,0 +1,78 @@
+name: CI
+
+on: [push, pull_request]
+
+# A newer push to the same branch makes the running check pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  services:
+    name: Services, jobs and shared packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: Bundle every service and the seed job
+        run: npm run build:all
+
+  web:
+    name: Web app
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: Production build
+        run: npx vite build
+
+  manifests:
+    name: Kubernetes manifests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Render every kustomization
+        run: |
+          for dir in $(find deploy/k8s -name kustomization.yaml -exec dirname {} \; | sort); do
+            echo "kubectl kustomize $dir"
+            kubectl kustomize "$dir" > /dev/null
+          done
+
+  image:
+    # scramble is the one image that ships an npm package next to its bundle (cubing.js),
+    # so it is the one most likely to break when dependencies or the Dockerfile change.
+    name: Scramble image
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build
+        run: docker build -f services/scramble/Dockerfile -t cubetype/scramble:ci .
+      - name: cubing.js resolves inside the image
+        run: docker run --rm cubetype/scramble:ci node -e "import('cubing/scramble').then(() => console.log('cubing ok'))"
