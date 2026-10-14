@@ -6,7 +6,9 @@
 This document describes the design of cubetype: the repository layout, the services and what each
 of them owns, the database schemas, the domain events and the HTTP contracts between the services
 and the web client. The contracts come first: every service is built and tested on its own against
-them, and this document changes together with the code whenever a contract changes.
+them, and this document changes together with the code whenever a contract changes. How a service
+is written is covered in `docs/BUILDING.md`, the web app in `docs/FRONTEND.md`, and the deployment
+in `deploy/README.md`.
 
 ---
 
@@ -15,24 +17,31 @@ them, and this document changes together with the code whenever a contract chang
 ```
 cubetype/
   package.json                # npm workspaces: packages/*, services/*, jobs/*
-  tsconfig.base.json
-  docker-compose.yml          # full local stack: Postgres, Redis, all services, web, gateway
+  tsconfig.base.json          # strict TypeScript settings shared by all workspaces
+  vitest.config.ts            # unit tests of packages, services and jobs
+  docker-compose.yml          # full local stack: Postgres, Redis, all services, web, gateway (+ "jobs" profile)
+  cloudbuild.yaml             # Cloud Build: all images in parallel
+  .github/workflows/ci.yml    # typecheck, tests, bundles, web build and kustomize render on every push
   packages/
-    common/                   # @cubetype/common  (server bootstrap, db, redis, auth, events, http)
+    common/                   # @cubetype/common  (server bootstrap, db, redis, auth, events, http, internal calls)
     cubestats/                # @cubetype/cubestats (WCA averaging, formatting, events, csTimer import) — used by web AND services
   services/
     auth/  scramble/  solve/  stats/  leaderboard/  race/  wca/
   jobs/
-    wca-import/               # K8s Job/CronJob: loads the WCA public export into Postgres (schema wca)
+    wca-import/               # K8s CronJob/Job: loads the WCA public export into Postgres (schema wca)
     seed/                     # K8s Job: creates synthetic users + ~100k solves through the public APIs
   web/                        # React 18 + Vite + TypeScript SPA, served by nginx (own package.json, not a workspace)
   deploy/
-    gateway/nginx.conf        # local reverse proxy mimicking the K8s Ingress routes
-    k8s/                      # Kubernetes manifests (kustomize)
+    gateway/nginx.conf        # compose gateway mimicking the K8s Ingress routes
+    k8s/                      # Kubernetes manifests (kustomize): base/, overlays/{local,gke}/, jobs/{seed,loadgen}/, kind/
+    cloudbuild/               # Cloud Build for a single image (rollout demo)
   scripts/
     build-service.mjs         # esbuild bundler: node scripts/build-service.mjs services/auth
+    smoke.mjs                 # end-to-end check through any entry point: node scripts/smoke.mjs <baseUrl>
+    build-local.sh  build-push.sh  kind-up.sh  kind-wca-import-tsv.sh   # images, local kind cluster
     commands.sh               # every deploy/demo command, each with a comment (marking requirement)
-  docs/                       # this specification and the project proposal
+    package-submission.sh     # builds the submission archive
+  docs/                       # SPEC.md (this file), BUILDING.md, FRONTEND.md, proposal/
 ```
 
 Each service folder: `src/index.ts` (entry), `src/routes/*.ts`, `src/migrations.ts` (if it owns a
@@ -56,8 +65,9 @@ in the browser and in the services.
 | Realtime | `socket.io` 4 + `@socket.io/redis-adapter` (race service only) |
 | Scrambles | `cubing` (cubing.js) `randomScrambleForEvent` (scramble service only) |
 | Tests | vitest |
-| Bundling | esbuild → single `dist/index.mjs` per service (pure-JS deps only; no native modules) |
-| Frontend | React 18, react-router 6, Vite 6, chart.js 4, cubing.js `<twisty-player>` |
+| Bundling | esbuild → single `dist/index.mjs` per service (pure-JS deps only; no native modules; cubing.js stays external in the scramble image) |
+| Frontend | React 18, react-router 6, Vite 6, chart.js 4, socket.io-client 4, cubing.js `<twisty-player>` |
+| Deployment | Docker multi-stage images, Kubernetes + kustomize, CloudNativePG operator, GKE with Ingress, Cloud Build + Artifact Registry |
 
 All services listen on **port 8080** inside their container. Logging via Fastify's built-in pino
 logger (JSON to stdout). No pino transports (they break bundling).
@@ -67,19 +77,24 @@ logger (JSON to stdout). No pino transports (they break bundling).
 | Service | K8s/compose DNS name | Public route prefixes (Ingress) | Owns schema | Purpose |
 |---|---|---|---|---|
 | web | `web` | `/` | – | nginx serving the SPA |
-| auth | `auth` | `/api/auth`, `/api/users` | `auth` | accounts, JWT, settings, profiles |
+| auth | `auth` | `/api/auth`, `/api/users` | `auth` | accounts, JWT, settings, profiles, profile pictures |
 | scramble | `scramble` | `/api/scrambles` | `scramble` | WCA random-state scrambles (CPU-bound, pooled in Redis), daily challenge |
 | solve | `solve` | `/api/sessions`, `/api/solves` | `solve` | sessions & solves CRUD, csTimer import/export, transactional outbox → events |
 | stats | `stats` | `/api/stats` | `stats` | event-driven read model: PBs, activity heatmap, streaks, time-of-day, global stats |
 | leaderboard | `leaderboard` | `/api/leaderboards` | – (Redis only) | global/weekly/daily leaderboards in Redis sorted sets, rebuildable |
 | race | `race` | `/api/race`, `/socket.io` | – (Redis only) | real-time multiplayer race rooms (WebSockets, scales via Redis adapter) |
-| wca | `wca` | `/api/wca` | `wca` | official WCA results data: records, rank/percentile estimator, distributions, person lookup |
+| wca | `wca` | `/api/wca` | `wca` (filled by wca-import) | official WCA results data: records, rank/percentile estimator, distributions, person lookup |
 | postgres | `postgres` (compose) / `pg-rw` (K8s CloudNativePG) | – | – | source of truth |
 | redis | `redis` | – | – | event bus (Streams), cache, leaderboards, scramble pool, race state, rate limits |
 
+Jobs: `wca-import` (weekly CronJob, also a compose one-shot) owns the `wca` schema and reloads it
+from the official export; `seed` (Job) creates demo users and solves through the public APIs.
+
 `/internal/*` routes exist only for service-to-service calls; they are NOT routed by the
 Ingress/gateway and must never be reachable publicly. They also require the shared
-`X-Internal-Token` (§4), so other workloads inside the cluster cannot call them either.
+`X-Internal-Token` (§4), so other workloads inside the cluster cannot call them either. Requests for
+unknown `/api/*` or `/internal/*` paths that reach the web nginx (the Ingress default backend) get a
+JSON 404 instead of the SPA's `index.html`.
 
 ## 4. Environment variables (all services)
 
@@ -96,18 +111,24 @@ Ingress/gateway and must never be reachable publicly. They also require the shar
 | `AUTH_URL` `SCRAMBLE_URL` `SOLVE_URL` `STATS_URL` `LEADERBOARD_URL` `WCA_URL` `RACE_URL` | `http://<name>:8080` | internal base URLs |
 | `LOG_LEVEL` | `info` | |
 | `INTERNAL_API_TOKEN` | empty | shared secret for service-to-service calls (K8s Secret): `/internal/*` routes require it in `X-Internal-Token` (403 otherwise) and callers send it; auth also exempts such callers (the seed job) from its per-IP rate limits. Empty = not enforced, with a warning at startup (local development). |
-| `TRUST_PROXY_HOPS` | `1` | proxies in front of the service whose `X-Forwarded-For` entries are trusted when deriving the client IP (rate limits): 1 behind the compose/kind gateway, 2 behind the Google load balancer. The left-most entries are client-controlled and never trusted. |
+| `TRUST_PROXY_HOPS` | `1` | proxies in front of the service whose `X-Forwarded-For` entries are trusted when deriving the client IP (rate limits): 1 behind the compose/kind gateway, 2 behind the Google load balancer. Entries a client adds itself are never trusted. |
+
+Compose sets these in its `x-service-env` block; Kubernetes in the `cubetype-config` ConfigMap and
+the `cubetype-secrets` Secret (plus CloudNativePG's `pg-app` Secret for `DATABASE_URL`).
+Service-specific variables (e.g. scramble's `SCRAMBLE_WORKERS`, the seed job's `SEED_USERS`) are
+documented in the service READMEs.
 
 ## 5. Cross-cutting conventions
 
-- **JSON everywhere.** Errors: HTTP status + `{ "error": { "code": "BAD_REQUEST"|"UNAUTHORIZED"|"FORBIDDEN"|"NOT_FOUND"|"CONFLICT"|"RATE_LIMITED"|"UNAVAILABLE"|"INTERNAL", "message": "human readable" } }`. Use `HttpError` from `@cubetype/common`. zod failures → 400 BAD_REQUEST with the first issue as message.
+- **JSON everywhere.** Errors: HTTP status + `{ "error": { "code": "BAD_REQUEST"|"UNAUTHORIZED"|"FORBIDDEN"|"NOT_FOUND"|"CONFLICT"|"RATE_LIMITED"|"UNAVAILABLE"|"INTERNAL", "message": "human readable" } }`. Use `HttpError` from `@cubetype/common`. zod failures → 400 BAD_REQUEST with the first issue as message; a body over the size limit → 413 `PAYLOAD_TOO_LARGE`.
 - **Auth:** `Authorization: Bearer <jwt>`. JWT HS256, issuer `cubetype`, claims `{ sub: userId, username, jti }`, TTL 30 days. Verify with `requireAuth` / `optionalAuth` from common (also checks Redis `auth:revoked:<jti>`; fails open if Redis is down).
 - **Internal calls:** `/internal/*` routes are guarded by `requireInternal(config.internalToken)` from common (constant-time comparison of `X-Internal-Token`, 403 FORBIDDEN on mismatch); callers add `internalHeaders(config.internalToken)` to their requests.
+- **Rate limits:** `rateLimit()` from common, a fixed window per key (`INCR` + `EXPIRE … NX` in one `MULTI`); it fails open while Redis is down, so an outage never locks users out.
 - **Times are integer milliseconds.** In averages/PBs JSON: a number = ms, `-1` = DNF, `null` = not available. Raw solves have `timeMs` (without penalty) + `penalty` ∈ `"OK" | "+2" | "DNF"`.
 - **Timestamps** ISO-8601 strings in JSON, `timestamptz` in Postgres.
 - **IDs** are UUID strings. Solve and session ids MAY be generated by the client (`crypto.randomUUID()`), which makes writes idempotent (safe retries).
 - **Every response** carries `X-Served-By: <POD_NAME>` and `X-Service: <name>@<version>` (common does this).
-- **Health:** `GET /healthz` (liveness: process alive, no dependency checks) → `{status:"ok"}`; `GET /readyz` (readiness: Postgres/Redis reachable as applicable) → 200 `{status:"ready"}` or 503. `GET <prefix>/_info` for each public prefix of the service (e.g. `/api/solves/_info`, `/api/sessions/_info`) → `{service, version, pod, node, startedAt, uptimeSec, deps:{postgres?:"ok"|"down", redis?:"ok"|"down"}}`; web serves `/_info`. The frontend status page polls these to visualise load balancing, scaling and rolling updates.
+- **Health:** `GET /healthz` (liveness: process alive, no dependency checks) → `{status:"ok"}`; `GET /readyz` (readiness: Postgres/Redis reachable as applicable) → 200 `{status:"ready"}` or 503. `GET <prefix>/_info` for each public prefix of the service (e.g. `/api/solves/_info`, `/api/sessions/_info`) → `{service, version, pod, node, startedAt, uptimeSec, deps:{postgres?:"ok"|"down", redis?:"ok"|"down"}}` plus service-specific details; web serves a static `/_info` from nginx (`startedAt`/`uptimeSec` null, empty `deps`). The frontend status page polls these to visualise load balancing, scaling and rolling updates.
 - **Timezone:** the web client sends `X-Timezone: <IANA tz>` on every API call; solve-service copies it into events as `tz` (default `UTC`), stats uses it for day bucketing.
 - **Graceful shutdown:** on SIGTERM stop accepting, wait for in-flight requests, close pools (common `start()` does this). K8s adds a `preStop` sleep.
 - **Migrations:** each service that owns a schema runs its own idempotent SQL migrations at startup via `migrate()` from common (uses a Postgres advisory lock so concurrent replicas don't race; records applied ids in `<schema>.schema_migrations`).
@@ -119,7 +140,8 @@ Ingress/gateway and must never be reachable publicly. They also require the shar
 Supported event ids (WCA ids): `333, 222, 444, 555, 666, 777, 333oh, 333bf, 333fm, 444bf, 555bf, clock, minx, pyram, skewb, sq1`.
 Event metadata (names, cubing.js puzzle ids, inspection, default scramble count) lives in
 `@cubetype/cubestats` `EVENTS`. `333oh` scrambles like `333`; `333bf/444bf/555bf` use the cubing.js
-bld scramblers (orientation-randomised); `333fm` uses `333fm` scrambler.
+bld scramblers (orientation-randomised); `333fm` uses `333fm` scrambler. The daily challenge uses
+`333, 222, 444, pyram, skewb` (`DAILY_EVENTS`).
 
 ## 7. Database design (PostgreSQL, schema-per-service)
 
@@ -196,6 +218,19 @@ CREATE TABLE solve.outbox (           -- transactional outbox: events are writte
   published_at timestamptz
 );
 CREATE INDEX outbox_unpublished ON solve.outbox (id) WHERE published_at IS NULL;
+-- daily-challenge attempts (migration 002): one row per attempted scramble, as submitted. The row
+-- outlives the solve, so a deleted attempt can't be redone on the now-known scramble.
+CREATE TABLE solve.daily_attempts (
+  user_id     uuid NOT NULL,
+  daily_date  date NOT NULL,
+  event       text NOT NULL,
+  daily_index smallint NOT NULL,
+  solve_id    uuid NOT NULL,
+  time_ms     integer NOT NULL,
+  penalty     text NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, daily_date, event, daily_index)
+);
 ```
 
 ### 7.3 `stats` schema (stats-service, read model built from events)
@@ -229,6 +264,12 @@ CREATE TABLE stats.hourly (
 );
 CREATE TABLE stats.processed_events (event_id text PRIMARY KEY, processed_at timestamptz NOT NULL DEFAULT now());
 ```
+Two later migrations add the bookkeeping that keeps the read model exact (details in
+`services/stats/README.md`): `002_ledger_outbox` — `solve_ledger` (one row per solve: idempotent
+projection, tombstones for deleted solves, the tail for incremental mo3/ao50/ao100),
+`deleted_sessions`, `pb_outbox` (transactional outbox for `pb.updated`), `user_totals.tz` (last
+timezone seen) and `hourly.dnfs`; `003_session_names` — `sessions` (display name per session for
+the history chart).
 
 ### 7.4 `scramble` schema (scramble-service)
 ```sql
@@ -240,9 +281,11 @@ CREATE TABLE scramble.daily_challenges (
 
 ### 7.5 `wca` schema (loaded by jobs/wca-import, read by wca-service)
 Mirrors the official WCA public export (persons, countries, continents, events, competitions,
-ranks_single, ranks_average, plus a `meta` table with export date/version and row counts).
-Exact columns follow the export's TSV headers. The importer loads into a staging schema
-`wca_staging` then atomically swaps it in (zero-downtime refresh).
+ranks_single, ranks_average) plus derived tables: `percentiles` (per event/kind: total, world
+record, p10…p99), `distribution` (fine histogram buckets) and `meta` (export date/version, import
+time, row count per table, size). Exact columns follow the export's TSV headers (see
+`jobs/wca-import/README.md`). The importer loads into a staging schema `wca_staging` then atomically
+swaps it in (zero-downtime refresh).
 Indexes: `ranks_single(event_id, best)`, `ranks_average(event_id, best)`, `persons(wca_id)`,
 trigram/lower index on person name for search.
 
@@ -257,12 +300,14 @@ trigram/lower index on person name for search.
 | `lb:<event>:<kind>:all` | zset (score=ms, member=userId) | leaderboard | all-time boards |
 | `lb:<event>:<kind>:w:<isoWeek>` / `:d:<YYYY-MM-DD>` | zset, TTL 15d/3d | leaderboard | weekly/daily boards |
 | `lb:dc:<YYYY-MM-DD>:<event>` | zset | leaderboard | daily-challenge ao5 board |
+| `<board>:at` / `<board>:ts` | hash userId → ISO / ms | leaderboard | achievedAt per entry / last applied event time (drops stale events) |
 | `lb:users` | hash userId → JSON {username,country,avatarUrl} | leaderboard | display info |
 | `lb:flagged` | list | leaderboard | results rejected by the anti-cheat check |
-| `lb:meta:built` | string | leaderboard | marks boards as rebuilt after Redis loss |
-| `race:room:<id>` etc. | hash/json | race | room state (shared across replicas) |
+| `lb:meta:built` / `lb:rebuild-lock` | string | leaderboard | marks boards as rebuilt after Redis loss / one rebuilding replica |
+| `race:room:<id>` (+ `:conns`, `:chat`) | string JSON, hash, list | race | room state, connected sockets per pod, last 50 chat messages (shared across replicas) |
+| `race:rooms`, `race:pods`, `race:lock:<id>` | zset, zset, string | race | public lobby, pod heartbeats, per-room lock |
 | `cache:stats:global` | string JSON, TTL 10 s | stats | global counters |
-| `cache:wca:*` | string JSON, TTL | wca | cache-aside for expensive queries |
+| `cache:wca:<exportDate>.<importedAt>:*` | string JSON, TTL | wca | cache-aside for expensive queries (the dataset version in the key invalidates it on re-import) |
 
 ## 8. Domain events (Redis Stream `cubetype:events`)
 
@@ -270,8 +315,8 @@ Each stream entry has fields `type` and `data` (JSON string). Every `data` conta
 (globally unique string — solve outbox uses `solve-<outboxId>`, others use `<svc>-<uuid>`) and
 `occurredAt` (ISO). Consumers use consumer groups, ack after successful handling, reclaim stale
 pending entries (XAUTOCLAIM, idle > 60 s), and are idempotent (stats keeps `processed_events`).
-An entry that still fails after 5 attempts is moved to `cubetype:events:dlq`.
-Use `publishEvent()` / `consumeEvents()` from common.
+An entry that still fails after 5 attempts (20 for stats, whose recomputes depend on solve) is moved
+to `cubetype:events:dlq`. Use `publishEvent()` / `consumeEvents()` from common.
 
 | type | publisher | data fields (besides eventId, occurredAt) |
 |---|---|---|
@@ -284,7 +329,7 @@ Use `publishEvent()` / `consumeEvents()` from common.
 | `session.renamed` | solve | `userId, username, sessionId, event, name` (stats keeps session display names) |
 | `sessions.merged` | solve | `userId, username, event, targetId, sourceIds, solves, tz` (stats tombstones the sources and recomputes the event) |
 | `solves.imported` | solve | `userId, username, events: string[], count, tz` (bulk import: consumers recompute that user's events) |
-| `daily.completed` | solve | `userId, username, date, event, ao5 (ms or -1), times: number[], tz` |
+| `daily.completed` | solve | `userId, username, date, event, ao5 (ms or -1), times: number[], tz` (the five attempts as submitted) |
 | `pb.updated` | stats | `userId, username, event, kind, valueMs (int or null if no longer exists), previousMs, achievedAt` |
 
 ## 9. HTTP API contracts
@@ -307,58 +352,69 @@ type PB = { valueMs: number; solveId: string|null; achievedAt: string };
 | POST `/api/auth/login` | – | `{login, password}` (login = username or email) | 200 `{token, user: PrivateUser}`; 401; 429 after 10 attempts/min/IP |
 | POST `/api/auth/logout` | req | – | 204 (revokes jti) |
 | GET `/api/auth/me` | req | – | `{user: PrivateUser, settings: object}` |
-| PATCH `/api/auth/me` | req | `{displayName?, bio?, country?, wcaId?}` (null clears) | `{user: PrivateUser}` |
+| PATCH `/api/auth/me` | req | `{displayName?, bio?, country?, wcaId?}` (null clears) | `{user: PrivateUser}` (+ `user.updated`) |
 | PUT `/api/auth/me/settings` | req | `{settings: object}` (≤ 16 KB JSON) | `{settings}` |
 | PUT `/api/auth/me/avatar` | req | raw image body, `Content-Type: image/webp\|image/jpeg\|image/png`, ≤ 300 KB (magic bytes must match) | `{user: PrivateUser}`; 400, 413, 429 (10/h) (+ `user.updated`) |
 | DELETE `/api/auth/me/avatar` | req | – | `{user: PrivateUser}` (+ `user.updated`) |
 | GET `/api/users/:idOrUsername/avatar` | – | `?v=` version | image bytes (immutable cache when `v` matches, ETag/304); 404 |
 | GET `/api/users/:username` | – | – | `{user: PublicUser}`; 404 |
 | GET `/api/users?ids=a,b,c` | – | ≤ 100 ids | `{users: PublicUser[]}` |
-| GET `/api/auth/_info` | – | – | info |
+| GET `/api/auth/_info`, `/api/users/_info` | – | – | info |
 
-Rate limits are per client IP; callers that present `INTERNAL_API_TOKEN` (§4) are exempt.
+Rate limits are per client IP; callers that present `INTERNAL_API_TOKEN` (§4) are exempt. Redis is
+a soft dependency: while it is down, rate limits and revocation checks fail open, `user.*` events
+are skipped, and only logout answers 503 (the revocation could not be stored).
 
 ### 9.2 scramble (`/api/scrambles`)
 | Method & path | Response |
 |---|---|
-| GET `/api/scrambles/events` | `{events: [{id, name, puzzle}]}` |
-| GET `/api/scrambles/daily?date=YYYY-MM-DD` (default today, UTC) | `{date, events: {"333": string[5], "222": [...], "444": [...], "pyram": [...], "skewb": [...]}}` (generated once, persisted, identical for everyone) |
-| GET `/api/scrambles/:event?count=1..25&fresh=0/1` | `{event, scrambles: string[], source: "pool"|"generated"}`; `fresh=1` bypasses the pool (used for load tests / HPA demo); 404 unknown event |
-| GET `/api/scrambles/_info` | info |
+| GET `/api/scrambles/events` | `{events: [{id, name, short, puzzle}]}` |
+| GET `/api/scrambles/daily?date=YYYY-MM-DD` (default today, UTC; the last 30 days) | `{date, events: {"333": string[5], "222": [...], "444": [...], "pyram": [...], "skewb": [...]}}` (generated once, persisted, identical for everyone); 400 for future dates; 503 while Postgres is unreachable and nothing is cached |
+| GET `/api/scrambles/:event?count=1..25&fresh=0/1` | `{event, scrambles: string[], source: "pool"\|"generated"}`; `fresh=1` bypasses the pool (used for load tests / HPA demo); 404 unknown event; 503 when generation times out or the queue is full |
+| GET `/api/scrambles/_info` | info (+ warm-up, generator queue, pool sizes) |
 
-Pool: keep `scramble:pool:<event>` topped up (333/222/pyram/skewb: 200; 444/sq1/clock/minx/333oh/333bf/333fm: 50; 555–777/444bf/555bf: 20) by a background loop in every replica (check LLEN, generate up to the target, `LTRIM` to cap).
+Pool: keep `scramble:pool:<event>` topped up (333/222/pyram/skewb: 200; 444/sq1/clock/minx/333oh/333bf/333fm: 50; 555–777/444bf/555bf: 20) by a background loop in every replica (check LLEN, generate up to the target, `LTRIM` to cap). The loop only uses idle CPU; requests that find the pool short generate the rest on the fly.
 
 ### 9.3 solve (`/api/sessions`, `/api/solves`) — all routes require auth
 | Method & path | Body / query | Response |
 |---|---|---|
 | GET `/api/sessions` | – | `{sessions: Session[]}` (created_at asc). If the user has none, create a default "3x3" session (event 333) first. |
-| POST `/api/sessions` | `{id?, name, event}` | 201 `{session}` (idempotent on id) |
+| POST `/api/sessions` | `{id?, name, event}` | 201 `{session}` (idempotent on id: same id again → 200; an id of another user → 409) |
 | PATCH `/api/sessions/:id` | `{name}` | `{session}` (+ `session.renamed`) |
 | DELETE `/api/sessions/:id` | – | 204 (+ `session.deleted`) |
 | POST `/api/sessions/:id/merge` | `{sourceIds: uuid[]}` (1–50, ≠ `:id`) | `{session, merged: {sessions, solves}}` — moves all solves of the source sessions into `:id` and deletes the sources in one transaction; 404 unknown session, 409 different event (+ `sessions.merged`) |
 | GET `/api/sessions/:id/solves` | – | `{solves: Solve[], truncated: boolean}` all solves, created_at asc (capped at the latest 50 000) |
-| POST `/api/solves` | `{id, sessionId, timeMs, penalty, scramble, comment?, source?, createdAt?, daily?: {date, index}}` | 201 `{solve, rolling: {ao5, ao12}}`; if `id` already exists for this user → 200 same shape (idempotent). `daily` solves: event must match session, 409 if that index already done; once all five indexes are recorded, emit `daily.completed`. |
+| POST `/api/solves` | `{id, sessionId, timeMs, penalty, scramble, comment?, source?, createdAt?, daily?: {date, index}}` | 201 `{solve, rolling: {ao5, ao12}}`; if `id` already exists for this user → 200 same shape (idempotent). A `createdAt` in the future (fast device clock) is clamped to the server time. `daily` solves: see below. |
 | PATCH `/api/solves/:id` | `{penalty?, comment?}` | `{solve}` (+ `solve.updated`) |
 | DELETE `/api/solves/:id` | – | 204 (+ `solve.deleted`) |
 | POST `/api/sessions/import` | `{sessions: [{name, event, solves: [{timeMs, penalty, scramble, comment?, createdAt}]}]}` (≤ 1 000 sessions, ≤ 100 000 solves, body ≤ 25 MB) | `{imported: {sessions, solves}}` (+ one `solves.imported`) — bulk insert in batches inside a transaction |
 | GET `/api/solves/export` | – | `{exportedAt, sessions: [Session & {solves: Solve[]}]}` |
-| GET `/api/solves/daily?date=` | – | `{date, events: {"333": {solves: Solve[], ao5: number|-1|null}, ...}}` (only events with ≥1 solve) |
-| GET `/api/solves/_info` | – | info |
+| GET `/api/solves/daily?date=` | – | `{date, events: {"333": {solves: Solve[], ao5: number\|-1\|null}, ...}}` (only events with ≥1 attempt; ao5 = the official result of the five attempts as submitted) |
+| GET `/api/solves/_info`, `/api/sessions/_info` | – | info (+ outbox backlog and relay state) |
 | GET `/internal/users/:userId/solves?event=` | – | `{solves: [{id, sessionId, timeMs, penalty, createdAt}]}` ordered by session_id, created_at (for stats recompute) |
 | GET `/internal/users/:userId/sessions` | – | `{sessions: [{id, name, event}]}` (stats backfills session display names) |
 
+Daily challenge: a `daily: {date, index 0..4}` solve gets `source: 'daily'`; its session's event must
+be a daily-challenge event and `date` the UTC date of yesterday, today or tomorrow (today somewhere
+on Earth). Each index can be attempted once: the attempt is recorded in `solve.daily_attempts` in the
+same transaction, and a second attempt for that index → 409, even after the first solve was deleted
+(a retry with the same solve id stays idempotent). Once all five attempts exist, `daily.completed`
+is emitted with the ao5 of the attempts as submitted, so later edits or deletes of the solves change
+neither the result nor the board.
+
 Outbox relay: every 250 ms each replica claims unpublished rows (`FOR UPDATE SKIP LOCKED`, LIMIT 500),
 XADDs them, sets `published_at`. If Redis is down, solves still succeed and events are delivered later.
+Published rows older than a day are deleted.
 
 ### 9.4 stats (`/api/stats`)
 | Method & path | Response |
 |---|---|
-| GET `/api/stats/users/:userId/summary` | `{userId, totals: {solves, totalMs, firstSolveAt, lastSolveAt, activeDays, currentStreak, longestStreak}, events: [{event, solves, totalMs, meanMs, pbs: {single: PB|null, mo3: PB|null, ao5: PB|null, ao12: PB|null, ao50: PB|null, ao100: PB|null}}]}` |
-| GET `/api/stats/users/:userId/activity?from=&to=` (default last 365 days) | `{days: [{date: "YYYY-MM-DD", solves, totalMs}]}` (only days with solves) |
+| GET `/api/stats/users/:userId/summary` | `{userId, username, totals: {solves, totalMs, firstSolveAt, lastSolveAt, activeDays, currentStreak, longestStreak}, events: [{event, solves, totalMs, meanMs, pbs: {single: PB\|null, mo3: PB\|null, ao5: PB\|null, ao12: PB\|null, ao50: PB\|null, ao100: PB\|null}}]}` (unknown user → zeros) |
+| GET `/api/stats/users/:userId/activity?from=&to=` (default the 365 days ending today in the user's tz) | `{from, to, days: [{date: "YYYY-MM-DD", solves, totalMs}]}` (only days with solves) |
 | GET `/api/stats/users/:userId/pb-history?event=333` | `{history: [{kind, valueMs, achievedAt}]}` asc |
-| GET `/api/stats/users/:userId/hourly?event=333` | `{hours: [{hour, solves, meanMs}]}` 24 entries |
+| GET `/api/stats/users/:userId/hourly?event=333` | `{hours: [{hour, solves, dnfs, meanMs}]}` 24 entries; `solves` counts every attempt, `meanMs` is the mean of the non-DNF ones (null if none); no `event` = all events |
 | GET `/api/stats/users/:userId/solves?event=333&limit=20000` | `{event, total, truncated, sessions: [{id, name\|null, solves, firstAt, lastAt}], solves: [[unixSeconds, timeMs, effectiveMs \| null, sessionIndex], …]}` — chronological solve series (newest `limit`, max 50 000) from the read model, for the profile history chart (session filter) |
-| GET `/api/stats/global` | `{users, solves, totalMs, solvesToday, activeUsersToday}` (cache 10 s) |
+| GET `/api/stats/global` | `{users, solves, totalMs, solvesToday, activeUsersToday}` ("today" = UTC day; cached 10 s) |
 | GET `/api/stats/_info` | info |
 | GET `/internal/pbs?event=&kind=` | `{pbs: [{userId, username, event, kind, valueMs, achievedAt}]}` |
 
@@ -374,64 +430,73 @@ worsens or disappears).
 ### 9.5 leaderboard (`/api/leaderboards`)
 | Method & path | Response |
 |---|---|
-| GET `/api/leaderboards/:event/:kind?period=all|weekly|daily&page=1&size=50&key=` | `{event, kind, period, periodKey, total, page, size, entries: [{rank, userId, username, country, avatarUrl, valueMs, achievedAt}], me: {rank, valueMs}|null}` — kind ∈ single, ao5, ao12 (weekly/daily: single, ao5). `key` (optional) selects a past daily/weekly board (`YYYY-MM-DD` / `YYYY-Www`). `me` filled when a valid token is sent. |
-| GET `/api/leaderboards/daily-challenge?date=&event=333` | same shape, kind `"ao5"`, period `"challenge"` |
+| GET `/api/leaderboards/:event/:kind?period=all\|weekly\|daily&page=1&size=50&key=` | `{event, kind, period, periodKey, total, page, size, entries: [{rank, userId, username, country, avatarUrl, valueMs, achievedAt}], me: {rank, valueMs}\|null}` — kind ∈ single, ao5, ao12 (weekly/daily: single, ao5). `key` (optional) selects a past daily/weekly board (`YYYY-MM-DD` / `YYYY-Www`). `me` filled when a valid token is sent. |
+| GET `/api/leaderboards/daily-challenge?date=&event=333&page=1&size=50` | same shape, kind `"ao5"`, period `"challenge"` |
 | GET `/api/leaderboards/users/:userId/ranks` | `{ranks: [{event, kind, period:"all", rank, total, valueMs}]}` |
-| GET `/api/leaderboards/_info` | info |
+| GET `/api/leaderboards/_info` | info (+ consumer, rebuild and anti-cheat status) |
 
 Sources: all-time boards from `pb.updated` (ZADD exact value; ZREM when valueMs is null or -1).
-Weekly/daily boards from `solve.created` (single = effectiveMs, ao5 = rolling.ao5, `ZADD LT`, skip DNF).
+Weekly/daily boards from `solve.created` (single = effectiveMs, ao5 = rolling.ao5, `ZADD LT`, skip DNF),
+bucketed by the UTC day / ISO week of `createdAt`; later edits and deletes don't change them.
 Daily-challenge board from `daily.completed`. Display info (username, country, avatar URL) from `user.*` events and usernames in payloads.
+Board writes are small Lua scripts (score and achievedAt change atomically); all-time writes drop `pb.updated` events older than the last one applied for that user.
+Rank = position + 1 (equal values don't share a rank). 333fm has no boards (results are move counts).
 Anti-cheat: ignore values below the WCA world record for that event/kind (fetch `GET wca /internal/records`, cache 1 h, fallback hard-coded floors e.g. 333 single 3000 ms) — store rejected entries in `lb:flagged`.
-Rebuild: a background loop checks for `lb:meta:built`; when it is missing (Redis lost its data), one
-replica acquires `SET lb:rebuild-lock NX EX 120`, rebuilds the all-time boards from
+Rebuild: a background loop checks for `lb:meta:built` every 60 s; when it is missing (Redis lost its
+data), one replica acquires `SET lb:rebuild-lock NX EX 120`, rebuilds the all-time boards from
 `GET stats /internal/pbs`, then sets `lb:meta:built`.
 
 ### 9.6 race (`/api/race`, Socket.IO at `/socket.io`)
-REST: GET `/api/race/rooms` → `{rooms: [{id, name, event, players, status, createdAt}]}` (public rooms, most recently active first);
-POST `/api/race/rooms` (optional auth) `{name, event, isPrivate?}` → 201 `{room: {id, name, event, isPrivate}}`;
+REST: GET `/api/race/rooms` → `{rooms: [{id, name, event, players, status, createdAt}]}` (public rooms, most recently active first, ≤ 50; `players` = connected players);
+POST `/api/race/rooms` (optional auth) `{name, event, isPrivate?}` → 201 `{room: {id, name, event, isPrivate}}` (20 rooms/min per user or IP);
 GET `/api/race/_info` → info.
 
 Socket.IO (client uses `transports: ["websocket"]` so no sticky sessions are needed; the Redis
 adapter fans out broadcasts across all race pods; all room state lives in Redis so any pod can
-serve any player). Handshake `auth: {token?, name?}` (guests choose a nickname).
+serve any player). Handshake `auth: {token?, name?, guestId?}` (guests choose a nickname).
 
-client → server (with ack callbacks `{ok:true,...}|{ok:false,error}`):
-- `room:join {roomId}` → ack `{ok, room: RoomState, playerId}`
+client → server (with ack callbacks `{ok:true,...}|{ok:false,error,code}`):
+- `room:join {roomId}` → ack `{ok, room: RoomState, playerId, name, servedBy, chat}` (`servedBy` = the pod holding this socket, `chat` = last 50 messages)
 - `room:leave {}`
-- `round:next {}` (host only; fetches 1 scramble from scramble-service, starts round n+1)
+- `round:next {}` (host only; fetches 1 scramble from scramble-service, falling back to a local random-move scramble, and starts round n+1) → ack `{ok, round}`
 - `player:status {status: "idle"|"inspecting"|"solving"|"done"}`
-- `player:result {round, timeMs, penalty}`
-- `chat:send {text}` (≤ 200 chars)
+- `player:result {round, timeMs, penalty}` (current round only, once per player)
+- `chat:send {text}` (≤ 200 chars, 5 per 10 s)
 
 server → client: `room:state RoomState` (full state after every change), `chat:message {playerId, name, text, at}`.
 
 ```ts
-type RoomState = { id; name; event; hostId: string /*playerId*/; status: "lobby"|"running"|"finished";
-  round: { n: number; scramble: string; startedAt: string } | null;
-  players: { id: string; name: string; userId: string|null; status: string; connected: boolean }[];
+type RoomState = { id; name; event; isPrivate: boolean; rev: number /* +1 per saved change; ignore a lower rev */;
+  hostId: string|null /*playerId*/; status: "lobby"|"running"|"finished";
+  round: { n: number; scramble: string; scrambleSource: "scramble-service"|"fallback"; startedAt: string } | null;
+  players: { id: string; name: string; userId: string|null; status: string; connected: boolean; pods: string[] }[];
   results: Record<string /*round n*/, Record<string /*playerId*/, { timeMs: number; penalty: string }>>;
   standings: { playerId: string; name: string; wins: number; solves: number; meanMs: number|null; ao5: number|null }[];
   createdAt: string };
 ```
 playerId = userId for logged-in users, else a stable guest id derived from the socket handshake
 (`guest-<random>`; client stores it in localStorage and sends it as `auth.guestId`). Rooms expire
-after 2 h without activity. Host leaves → oldest connected player becomes host.
+after 2 h without activity and hold at most 16 players. Host leaves → oldest connected player
+becomes host. Socket.IO does not keep room membership across reconnects, so the client re-emits
+`room:join` on every `connect`.
 
 ### 9.7 wca (`/api/wca`) — values converted to ms (WCA centiseconds × 10); 333fm kept as moves (`unit:"moves"`, averages ×100 in export → divide); 333mbf excluded
 | Method & path | Response |
 |---|---|
-| GET `/api/wca/meta` | `{exportDate, exportVersion, counts: {persons, competitions, ranksSingle, ranksAverage, countries}}` |
-| GET `/api/wca/records` | `{records: [{event, eventName, unit, single: {value, personId, personName, countryId}|null, average: {...}|null}]}` |
-| GET `/api/wca/rank?event=333&kind=single|average&value=12345&country=AU` | `{event, kind, value, world: {rank, total, percentile}, country: {rank, total, percentile, countryId}|null, neighbours: [{personId, name, countryId, value, worldRank}]}` — rank = 1 + number of people strictly faster; percentile = % of people you beat; neighbours = 3 just faster + 3 just slower |
-| GET `/api/wca/distribution?event=333&kind=single&buckets=50` | `{event, kind, total, p10, p25, p50, p75, p90, buckets: [{from, to, count}]}` (log-ish or trimmed to p99) |
-| GET `/api/wca/persons?q=&limit=20` | `{persons: [{wcaId, name, countryId}]}` |
-| GET `/api/wca/persons/:wcaId` | `{person: {wcaId, name, countryId, gender}, pbs: [{event, single: {value, worldRank, continentRank, countryRank}|null, average: {...}|null}]}` |
+| GET `/api/wca/meta` | `{exportDate, exportVersion, counts: {persons, competitions, ranksSingle, ranksAverage, countries}, tables, sizeBytes, citation}` (`citation` = the WCA attribution text to show next to the data) |
+| GET `/api/wca/records` | `{records: [{event, eventName, unit, single: {value, personId, personName, countryId, holders}\|null, average: {...}\|null}]}` (`holders` lists ties) |
+| GET `/api/wca/rank?event=333&kind=single\|average&value=12345&country=AU` | `{event, kind, value, world: {rank, total, percentile}, country: {rank, total, percentile, countryId}\|null, neighbours: [{personId, name, countryId, value, worldRank}]}` — rank = 1 + number of people strictly faster; percentile = % of people you beat; neighbours = 3 just faster + 3 just slower |
+| GET `/api/wca/distribution?event=333&kind=single&buckets=50` | `{event, kind, total, p10, p25, p50, p75, p90, p99, min, buckets: [{from, to, count}], below, above}` (equal-width buckets between ~p0.5 and ~p99; `below`/`above` count the results outside them) |
+| GET `/api/wca/persons?q=&limit=20` | `{persons: [{wcaId, name, countryId}]}` (name substring or exact WCA id; `limit` ≤ 50) |
+| GET `/api/wca/persons/:wcaId` | `{person: {wcaId, name, countryId, gender}, pbs: [{event, single: {value, worldRank, continentRank, countryRank}\|null, average: {...}\|null}]}` |
+| GET `/api/wca/countries` | `{countries: [{id, iso2, name, continentId, continentName, persons}]}` |
 | GET `/api/wca/_info` | info (deps include postgres and whether wca data is loaded) |
-| GET `/internal/records` | `{records: {[event]: {single: number|null, average: number|null}}}` (ms) |
+| GET `/internal/records` | `{records: {[event]: {single: number\|null, average: number\|null}}}` (ms) |
 
-Expensive queries are cached in Redis (`cache:wca:*`, TTL 1 h). If the wca schema is empty
-(import not yet run) return 503 UNAVAILABLE with message "WCA data not loaded yet".
+Objects with a `countryId` also carry `countryIso2` (for flags). Expensive queries are cached in
+Redis (`cache:wca:<dataset version>:*`, TTL 1 h, searches 10 min); a re-import changes the version
+and so invalidates everything at once. If the wca schema is empty (import not yet run) return 503
+UNAVAILABLE with message "WCA data not loaded yet".
 
 ## 10. Frontend (web) overview
 
@@ -447,7 +512,14 @@ The design system and the page layouts are described in `docs/FRONTEND.md`.
 Namespace `cubetype`. One Deployment + ClusterIP Service per microservice (2+ replicas,
 rolling update maxSurge 1 / maxUnavailable 0, readiness/liveness probes on /readyz /healthz,
 resource requests/limits, topology spread across nodes, PDB minAvailable 1, preStop sleep),
-HPA (CPU) for scramble, solve, web, race. PostgreSQL via CloudNativePG Cluster `pg` (primary +
-replica, automatic failover). Redis StatefulSet with PVC. GKE Ingress (external Application
-Load Balancer) with BackendConfig (WebSocket timeout for race). wca-import CronJob (weekly) and
-seed Job. Images in Artifact Registry `australia-southeast1-docker.pkg.dev/<project>/cubetype/<svc>:<version>`.
+HPA (CPU) for scramble, solve, web, race; HPA-managed Deployments don't set `replicas`. Pods run as
+non-root with a read-only root filesystem, no privilege escalation, all capabilities dropped and no
+service account token. PostgreSQL via CloudNativePG Cluster `pg` (primary + replicas, automatic
+failover; `pg-rw` follows the primary). Redis StatefulSet with PVC. wca-import CronJob (weekly) and
+seed Job. Overlays: `local` (kind, local images, an nginx gateway on a NodePort instead of the
+Ingress) and `gke` (GKE Ingress = external Application Load Balancer with container-native load
+balancing, BackendConfigs with `/readyz` health checks and a 1 h timeout for the race WebSockets,
+three Postgres instances, `TRUST_PROXY_HOPS=2`). The Ingress serves plain HTTP on a reserved static
+IP; TLS with a Google-managed certificate is possible future work. Images in Artifact Registry
+`australia-southeast1-docker.pkg.dev/<project>/cubetype/<svc>:<version>`. Details and the demo
+runbook: `deploy/README.md`.
