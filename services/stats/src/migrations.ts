@@ -80,4 +80,20 @@ CREATE INDEX personal_bests_event_kind ON stats.personal_bests (event, kind, val
 CREATE INDEX processed_events_at ON stats.processed_events (processed_at);
 `,
   },
+  {
+    // Session display names for the profile history chart's session filter. Names are owned by
+    // solve-service; this copy is fed by solve.created (sessionName) and session.renamed events,
+    // and backfilled from GET solve /internal/users/:id/sessions for sessions seen without one.
+    id: '003_session_names',
+    sql: `
+CREATE TABLE stats.sessions (
+  session_id uuid PRIMARY KEY,
+  user_id    uuid NOT NULL,
+  event      text NOT NULL,
+  name       text NOT NULL,           -- '' = solve-service didn't know the session (not retried)
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX sessions_user ON stats.sessions (user_id);
+`,
+  },
 ];

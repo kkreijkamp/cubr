@@ -17,6 +17,10 @@ const eventParam = z.string().refine(isEventId, 'unknown event');
 const activityQuery = z.object({ from: dateStr.optional(), to: dateStr.optional() });
 const pbHistoryQuery = z.object({ event: eventParam.default('333') });
 const hourlyQuery = z.object({ event: eventParam.optional() });
+const solvesQuery = z.object({
+  event: eventParam.default('333'),
+  limit: z.coerce.number().int().min(1).max(50_000).default(20_000),
+});
 
 type PB = { valueMs: number; solveId: string | null; achievedAt: string };
 
@@ -119,6 +123,53 @@ export async function registerUserRoutes(app: FastifyInstance, pool: Pool): Prom
 
   // Time-of-day profile: 24 entries; `solves` = all attempts, meanMs over non-DNF solves.
   // Without ?event= all events are combined.
+  // Every solve of one event as a compact chronological series for the profile history chart:
+  // rows are [unixSeconds, rawTimeMs, effectiveMs | null (= DNF), sessionIndex] where sessionIndex
+  // points into `sessions` (display names come from this service's session-name read model).
+  // Served from the read model (solve_ledger), so viewing a profile never touches solve-service.
+  // Returns the newest `limit` solves (oldest first); `truncated` says there is older history.
+  app.get('/api/stats/users/:userId/solves', async (req) => {
+    const { userId } = parse(userParams, req.params);
+    const { event, limit } = parse(solvesQuery, req.query);
+    const [series, sessions] = await Promise.all([
+      pool.query<{ t: number; time_ms: number; effective_ms: number | null; session_id: string }>(
+        `SELECT t, time_ms, effective_ms, session_id FROM (
+           SELECT extract(epoch FROM created_at)::bigint AS t, time_ms, effective_ms, session_id, created_at, seq
+             FROM stats.solve_ledger
+            WHERE user_id = $1 AND event = $2 AND NOT deleted
+            ORDER BY created_at DESC, seq DESC
+            LIMIT $3) newest
+         ORDER BY created_at, seq`,
+        [userId, event, limit],
+      ),
+      pool.query<{ session_id: string; name: string | null; solves: number; first_at: Date; last_at: Date }>(
+        `SELECT l.session_id, nullif(s.name, '') AS name, count(*)::int AS solves,
+                min(l.created_at) AS first_at, max(l.created_at) AS last_at
+           FROM stats.solve_ledger l
+           LEFT JOIN stats.sessions s ON s.session_id = l.session_id
+          WHERE l.user_id = $1 AND l.event = $2 AND NOT l.deleted
+          GROUP BY l.session_id, s.name
+          ORDER BY min(l.created_at)`,
+        [userId, event],
+      ),
+    ]);
+    const index = new Map(sessions.rows.map((r, i) => [r.session_id, i]));
+    const total = sessions.rows.reduce((a, r) => a + r.solves, 0);
+    return {
+      event,
+      total,
+      truncated: total > series.rows.length,
+      sessions: sessions.rows.map((r) => ({
+        id: r.session_id,
+        name: r.name,
+        solves: r.solves,
+        firstAt: r.first_at.toISOString(),
+        lastAt: r.last_at.toISOString(),
+      })),
+      solves: series.rows.map((r) => [r.t, r.time_ms, r.effective_ms, index.get(r.session_id) ?? -1]),
+    };
+  });
+
   app.get('/api/stats/users/:userId/hourly', async (req) => {
     const { userId } = parse(userParams, req.params);
     const { event } = parse(hourlyQuery, req.query);

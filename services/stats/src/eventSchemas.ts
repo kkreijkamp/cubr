@@ -15,6 +15,8 @@ export const CONSUMED_TYPES = [
   'solve.updated',
   'solve.deleted',
   'session.deleted',
+  'session.renamed',
+  'sessions.merged',
   'solves.imported',
 ] as const;
 
@@ -40,6 +42,7 @@ export const solveCreatedSchema = z.object({
     .object({ ao5: z.number().nullish(), ao12: z.number().nullish() })
     .partial()
     .nullish(),
+  sessionName: z.string().max(200).nullish(),
 });
 
 /** solve.updated / solve.deleted: only the routing fields are needed (they trigger a recompute). */
@@ -65,6 +68,31 @@ export const sessionDeletedSchema = z.object({
   tz: optTz,
 });
 
+export const sessionRenamedSchema = z.object({
+  eventId: z.string().min(1),
+  userId: uuid,
+  username: optUsername,
+  sessionId: uuid,
+  event,
+  name: z.string().min(1).max(200),
+});
+
+/** sessions.merged: solves of sourceIds moved into targetId, sources deleted. */
+export const sessionsMergedSchema = z.object({
+  eventId: z.string().min(1),
+  userId: uuid,
+  username: optUsername,
+  event,
+  targetId: uuid,
+  sourceIds: z.array(uuid).min(1),
+  tz: optTz,
+});
+
+/** Response of solve-service GET /internal/users/:id/sessions */
+export const sessionListSchema = z.object({
+  sessions: z.array(z.object({ id: uuid, name: z.string(), event })),
+});
+
 export const solvesImportedSchema = z.object({
   eventId: z.string().min(1),
   userId: uuid,
@@ -78,6 +106,7 @@ export type UserEvent = z.infer<typeof userEventSchema>;
 export type SolveCreated = z.infer<typeof solveCreatedSchema>;
 export type SolveChanged = z.infer<typeof solveChangedSchema>;
 export type SessionDeleted = z.infer<typeof sessionDeletedSchema>;
+export type SessionRenamed = z.infer<typeof sessionRenamedSchema>;
 export type SolvesImported = z.infer<typeof solvesImportedSchema>;
 
 /** Response of solve-service GET /internal/users/:id/solves?event= */

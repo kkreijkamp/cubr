@@ -6,6 +6,7 @@ import { internalParams, internalQuery } from '../schemas.js';
 /**
  * Service-to-service routes. Not under /api, so the public gateway never routes them; no auth.
  * GET /internal/users/:userId/solves?event= feeds the stats service's PB recompute.
+ * GET /internal/users/:userId/sessions lets read models backfill session names.
  */
 export function registerInternalRoutes(app: FastifyInstance, { pool }: RouteContext): void {
   app.get('/internal/users/:userId/solves', async (req, reply) => {
@@ -26,5 +27,14 @@ export function registerInternalRoutes(app: FastifyInstance, { pool }: RouteCont
       solves[i] = { id: r[0], sessionId: r[1], timeMs: r[2], penalty: r[3], createdAt: r[4] };
     }
     return reply.send({ solves });
+  });
+
+  app.get('/internal/users/:userId/sessions', async (req) => {
+    const { userId } = parse(internalParams, req.params);
+    const { rows } = await pool.query<{ id: string; name: string; event: string }>(
+      'SELECT id, name, event FROM solve.sessions WHERE user_id = $1 ORDER BY created_at, id',
+      [userId.toLowerCase()],
+    );
+    return { sessions: rows };
   });
 }

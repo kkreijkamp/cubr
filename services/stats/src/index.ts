@@ -7,6 +7,7 @@ import { migrations } from './migrations.js';
 import { createPbRelay, startMaintenance } from './outbox.js';
 import { createProjector } from './projector.js';
 import { registerRoutes } from './routes/index.js';
+import { startSessionNameBackfill } from './sessionNames.js';
 
 const config = loadConfig('stats');
 const pool = createPool(config.databaseUrl);
@@ -15,6 +16,7 @@ const redis = createRedis(config.redisUrl);
 let migrated = false;
 let consumer: Consumer | null = null;
 let stopMaintenance: (() => void) | null = null;
+let stopBackfill: (() => void) | null = null;
 
 const server = createServer(config, {
   infoPrefixes: ['/api/stats'],
@@ -38,6 +40,7 @@ await start(server, config, [
   () => consumer?.stop(),
   () => relay.stop(),
   () => stopMaintenance?.(),
+  () => stopBackfill?.(),
   () => pool.end(),
   () => redis.quit(),
 ]);
@@ -64,4 +67,5 @@ consumer = consumeEvents(redis, {
 });
 relay.start();
 stopMaintenance = startMaintenance(pool, app.log);
+stopBackfill = startSessionNameBackfill({ pool, solveUrl: config.urls.solve, log: app.log });
 app.log.info({ group: 'stats', consumer: config.podName }, 'stats projection started');

@@ -10,8 +10,7 @@ import {
   solveCreatedSchema,
   solvesImportedSchema,
   userEventSchema,
-  type SolveCreated,
-} from './eventSchemas.js';
+  type SolveCreated, sessionRenamedSchema, sessionsMergedSchema} from './eventSchemas.js';
 import { recomputeEvent, type RecomputeDeps } from './recompute.js';
 import { ensureUser, loadPbs, lockUser, markProcessed, queuePbUpdated, refreshTotals, upsertPb } from './store.js';
 
@@ -29,6 +28,15 @@ export interface ProjectorDeps {
  * takes the per-user lock, records the event id in processed_events (duplicate deliveries are
  * skipped) and writes resulting pb.updated events to the outbox table.
  */
+/** Upserts a session's display name (shared by the projector and the backfill loop). */
+export async function upsertSessionName(c: PoolClient | Pool, sessionId: string, userId: string, event: string, name: string): Promise<void> {
+  await c.query(
+    `INSERT INTO stats.sessions (session_id, user_id, event, name) VALUES ($1, $2, $3, $4)
+     ON CONFLICT (session_id) DO UPDATE SET name = excluded.name, event = excluded.event, updated_at = now()`,
+    [sessionId, userId, event, name],
+  );
+}
+
 export function createProjector(deps: ProjectorDeps) {
   const { pool, log } = deps;
   const rdeps: RecomputeDeps = { solveUrl: deps.solveUrl, log };
@@ -96,6 +104,7 @@ export function createProjector(deps: ProjectorDeps) {
       [d.solveId, d.userId, d.event, d.sessionId, d.timeMs, effDb, d.createdAt],
     );
     if (!ins.rowCount) return 0;
+    if (d.sessionName) await upsertSessionName(c, d.sessionId, d.userId, d.event, d.sessionName);
 
     // A back-dated solve lands in the middle of its session and shifts the rolling windows, so an
     // incremental compare would be wrong: rebuild the event from solve-service instead (rare).
@@ -214,6 +223,36 @@ export function createProjector(deps: ProjectorDeps) {
         'INSERT INTO stats.deleted_sessions (session_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
         [d.sessionId, d.userId],
       );
+      await c.query('DELETE FROM stats.sessions WHERE session_id = $1', [d.sessionId]);
+      const { pbChanges } = await recomputeEvent(c, rdeps, { userId: d.userId, username: user.username, event: d.event, tz: user.tz });
+      await refreshTotals(c, d.userId);
+      return pbChanges;
+    });
+  }
+
+  // ---- session.renamed: update the display name (no stats change)
+  async function onSessionRenamed(evt: EventEnvelope) {
+    const d = await payload(sessionRenamedSchema, evt);
+    if (!d) return;
+    await inUserTx(d.eventId, d.userId, async (c) => {
+      await upsertSessionName(c, d.sessionId, d.userId, d.event, d.name);
+      return 0;
+    });
+  }
+
+  // ---- sessions.merged: sources are gone (tombstone + drop names), recompute the event —
+  //      merging interleaves solves, so within-session rolling PBs (ao5, ao12, …) change
+  async function onSessionsMerged(evt: EventEnvelope) {
+    const d = await payload(sessionsMergedSchema, evt);
+    if (!d) return;
+    await inUserTx(d.eventId, d.userId, async (c) => {
+      const user = await ensureUser(c, d.userId, d.username, validTz(d.tz));
+      await c.query(
+        `INSERT INTO stats.deleted_sessions (session_id, user_id)
+         SELECT unnest($1::uuid[]), $2 ON CONFLICT DO NOTHING`,
+        [d.sourceIds, d.userId],
+      );
+      await c.query('DELETE FROM stats.sessions WHERE session_id = ANY($1::uuid[])', [d.sourceIds]);
       const { pbChanges } = await recomputeEvent(c, rdeps, { userId: d.userId, username: user.username, event: d.event, tz: user.tz });
       await refreshTotals(c, d.userId);
       return pbChanges;
@@ -253,6 +292,10 @@ export function createProjector(deps: ProjectorDeps) {
         return onSolveChanged(evt);
       case 'session.deleted':
         return onSessionDeleted(evt);
+      case 'session.renamed':
+        return onSessionRenamed(evt);
+      case 'sessions.merged':
+        return onSessionsMerged(evt);
       case 'solves.imported':
         return onSolvesImported(evt);
       default:

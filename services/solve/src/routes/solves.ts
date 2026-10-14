@@ -75,8 +75,8 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
     const result = await withTx(pool, async (client) => {
       // Row lock on the session serialises concurrent writes to one session, so every
       // solve.created carries a rolling ao5/ao12 that includes all earlier solves.
-      const session = await client.query<{ event: string }>(
-        'SELECT event FROM solve.sessions WHERE id = $1 AND user_id = $2 FOR NO KEY UPDATE',
+      const session = await client.query<{ event: string; name: string }>(
+        'SELECT event, name FROM solve.sessions WHERE id = $1 AND user_id = $2 FOR NO KEY UPDATE',
         [body.sessionId, user.id],
       );
       if (!session.rows[0]) throw notFound('session not found');
@@ -109,7 +109,8 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
       const row = ins.rows[0];
       const newAttempt = daily ? await recordDailyAttempt(client, user, row) : false;
       const rolling = await sessionRolling(client, row.session_id);
-      await enqueue(client, 'solve.created', solveEventPayload(user, row, tz, rolling));
+      // sessionName lets read models (stats) label sessions without querying this service
+      await enqueue(client, 'solve.created', { ...solveEventPayload(user, row, tz, rolling), sessionName: session.rows[0].name });
       if (daily && newAttempt) await completeDailyIfDone(client, user, daily.date, event, tz);
       return { created: true, row, rolling };
     }).catch(mapPgError);

@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import { conflict, notFound, parse, withTx } from '@cubetype/common';
+import { badRequest, conflict, notFound, parse, withTx } from '@cubetype/common';
 import { currentUser, tzFrom, type RouteContext } from '../context.js';
 import { SOLVE_COLUMNS, toSession, toSolve, type SessionRow, type SolveRow } from '../mapping.js';
 import { enqueue } from '../outbox.js';
 import { ensureDefaultSession, getSession, listSessions } from '../repo.js';
-import { createSessionBody, idParams, patchSessionBody } from '../schemas.js';
+import { createSessionBody, idParams, mergeSessionsBody, patchSessionBody } from '../schemas.js';
 
 /** GET /api/sessions/:id/solves returns at most this many (the latest ones, ascending). */
 export const SESSION_SOLVES_CAP = 50_000;
@@ -44,14 +44,21 @@ export function registerSessionRoutes(app: FastifyInstance, { pool, auth }: Rout
     const user = currentUser(req);
     const { id } = parse(idParams, req.params);
     const { name } = parse(patchSessionBody, req.body ?? {});
-    const { rows } = await pool.query<SessionRow>(
-      `UPDATE solve.sessions s SET name = $3, updated_at = now() WHERE s.id = $1 AND s.user_id = $2
-       RETURNING s.id, s.name, s.event, s.created_at, s.updated_at,
-                 (SELECT count(*) FROM solve.solves v WHERE v.session_id = s.id) AS solve_count`,
-      [id, user.id, name],
-    );
-    if (!rows[0]) throw notFound('session not found');
-    return { session: toSession(rows[0]) };
+    const row = await withTx(pool, async (client) => {
+      const { rows } = await client.query<SessionRow>(
+        `UPDATE solve.sessions s SET name = $3, updated_at = now() WHERE s.id = $1 AND s.user_id = $2
+         RETURNING s.id, s.name, s.event, s.created_at, s.updated_at,
+                   (SELECT count(*) FROM solve.solves v WHERE v.session_id = s.id) AS solve_count`,
+        [id, user.id, name],
+      );
+      if (!rows[0]) throw notFound('session not found');
+      // read models that show session names (stats) learn about the rename via the outbox
+      await enqueue(client, 'session.renamed', {
+        userId: user.id, username: user.username, sessionId: rows[0].id, event: rows[0].event, name: rows[0].name,
+      });
+      return rows[0];
+    });
+    return { session: toSession(row) };
   });
 
   // Cascades to the session's solves; consumers recompute the user's stats for the event.
@@ -70,6 +77,51 @@ export function registerSessionRoutes(app: FastifyInstance, { pool, auth }: Rout
       });
     });
     return reply.code(204).send();
+  });
+
+  // Merge: move every solve of the source sessions into the target session, then delete the
+  // (now empty) sources — all in one transaction. Only sessions of the same event can be merged
+  // (a solve's event is its session's event). sessions.merged makes stats recompute the event's
+  // PBs, because combining sessions changes the within-session ao5/ao12 windows.
+  app.post('/api/sessions/:id/merge', authed, async (req) => {
+    const user = currentUser(req);
+    const { id } = parse(idParams, req.params);
+    const { sourceIds } = parse(mergeSessionsBody, req.body ?? {});
+    const targetId = id.toLowerCase();
+    if (sourceIds.includes(targetId)) throw badRequest('sourceIds must not include the target session');
+    const tz = tzFrom(req);
+
+    const result = await withTx(pool, async (client) => {
+      // Lock every involved session in id order: concurrent merges/writes can't deadlock or race.
+      const { rows } = await client.query<{ id: string; event: string }>(
+        'SELECT id, event FROM solve.sessions WHERE user_id = $1 AND id = ANY($2::uuid[]) ORDER BY id FOR UPDATE',
+        [user.id, [targetId, ...sourceIds]],
+      );
+      const byId = new Map(rows.map((r) => [r.id, r]));
+      const target = byId.get(targetId);
+      if (!target) throw notFound('session not found');
+      const missing = sourceIds.find((s) => !byId.has(s));
+      if (missing) throw notFound(`session not found: ${missing}`);
+      if (sourceIds.some((s) => byId.get(s)!.event !== target.event)) throw conflict('can only merge sessions of the same event');
+
+      const moved = await client.query(
+        'UPDATE solve.solves SET session_id = $1 WHERE user_id = $2 AND session_id = ANY($3::uuid[])',
+        [targetId, user.id, sourceIds],
+      );
+      await client.query('DELETE FROM solve.sessions WHERE user_id = $1 AND id = ANY($2::uuid[])', [user.id, sourceIds]);
+      const { rows: updated } = await client.query<SessionRow>(
+        `UPDATE solve.sessions s SET updated_at = now() WHERE s.id = $1
+         RETURNING s.id, s.name, s.event, s.created_at, s.updated_at,
+                   (SELECT count(*) FROM solve.solves v WHERE v.session_id = s.id) AS solve_count`,
+        [targetId],
+      );
+      const solves = moved.rowCount ?? 0;
+      await enqueue(client, 'sessions.merged', {
+        userId: user.id, username: user.username, event: target.event, targetId, sourceIds, solves, tz,
+      });
+      return { session: updated[0], solves };
+    });
+    return { session: toSession(result.session), merged: { sessions: sourceIds.length, solves: result.solves } };
   });
 
   app.get('/api/sessions/:id/solves', authed, async (req) => {

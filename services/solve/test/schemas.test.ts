@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { HttpError, parse } from '@cubetype/common';
 import {
-  assertDailyAllowed, createSessionBody, createSolveBody, importBody, MAX_IMPORT_SOLVES, patchSolveBody, resolveCreatedAt, utcDay,
+  assertDailyAllowed, createSessionBody, createSolveBody, importBody, MAX_IMPORT_SOLVES, mergeSessionsBody, patchSolveBody,
+  resolveCreatedAt, utcDay,
 } from '../src/schemas.js';
 
 const SID = '33333333-3333-4333-8333-333333333333';
@@ -115,5 +116,19 @@ describe('assertDailyAllowed', () => {
     expect(errorOf(() => assertDailyAllowed('2026-10-12', '333', now)).statusCode).toBe(400);
     expect(errorOf(() => assertDailyAllowed('2026-10-16', '333', now)).statusCode).toBe(400);
     expect(errorOf(() => assertDailyAllowed('2026-10-14', '777', now)).message).toMatch(/no daily challenge/);
+  });
+});
+
+describe('mergeSessionsBody', () => {
+  it('accepts 1–50 unique uuids and lower-cases them', () => {
+    expect(parse(mergeSessionsBody, { sourceIds: [SID.toUpperCase()] })).toEqual({ sourceIds: [SID] });
+  });
+  it('rejects empty, duplicate, non-uuid and oversized lists', () => {
+    expect(errorOf(() => parse(mergeSessionsBody, { sourceIds: [] })).statusCode).toBe(400);
+    expect(errorOf(() => parse(mergeSessionsBody, { sourceIds: [SID, SID] })).statusCode).toBe(400);
+    expect(errorOf(() => parse(mergeSessionsBody, { sourceIds: ['nope'] })).statusCode).toBe(400);
+    const many = Array.from({ length: 51 }, (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`);
+    expect(errorOf(() => parse(mergeSessionsBody, { sourceIds: many })).statusCode).toBe(400);
+    expect(errorOf(() => parse(mergeSessionsBody, {})).statusCode).toBe(400);
   });
 });

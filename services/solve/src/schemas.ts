@@ -34,6 +34,15 @@ export const createSessionBody = z.object({
 
 export const patchSessionBody = z.object({ name: sessionName });
 
+/** POST /api/sessions/:id/merge — the sessions whose solves move into :id (then deleted). */
+export const mergeSessionsBody = z.object({
+  sourceIds: z
+    .array(uuid.transform((s) => s.toLowerCase()))
+    .min(1, 'pick at least one session to merge')
+    .max(50)
+    .refine((a) => new Set(a).size === a.length, 'sourceIds must be unique'),
+});
+
 export const createSolveBody = z
   .object({
     // SPEC lists `id` as required; we accept a missing id and generate one (not idempotent then).
