@@ -17,6 +17,7 @@ import { formatCountdown, useNow, useStoredState } from '../components/live/hook
 import { TimerArea, useLiveTimer } from '../components/live/LiveTimer';
 import { EventPicker, Notice, ScrambleText, Segmented } from '../components/live/ui';
 import { DailyBoard } from '../components/live/daily/DailyBoard';
+import { uuid } from '../timer/storeUtils';
 import type { TimerResult } from '../timer/useTimerEngine';
 import '../components/live/live.css';
 import '../components/live/daily/daily.css';
@@ -68,7 +69,7 @@ async function directSessionId(event: string): Promise<string> {
   if (cached) return cached;
   const { sessions } = await api.sessions.list();
   let s = sessions.find((x) => x.event === event);
-  if (!s) s = (await api.sessions.create({ id: crypto.randomUUID(), name: getEvent(event)?.short ?? event, event })).session;
+  if (!s) s = (await api.sessions.create({ id: uuid(), name: getEvent(event)?.short ?? event, event })).session;
   directSessions.set(event, s.id);
   return s.id;
 }
@@ -86,7 +87,7 @@ async function submitDaily(event: string, date: string, index: number, r: TimerR
       // store not ready / not implemented → direct API below
     }
   }
-  await api.solves.create({ id: crypto.randomUUID(), sessionId: await directSessionId(event), ...body });
+  await api.solves.create({ id: uuid(), sessionId: await directSessionId(event), ...body });
 }
 
 function ao5Of(attempts: Attempt[]): number | null {
