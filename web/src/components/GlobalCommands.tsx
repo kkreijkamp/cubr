@@ -1,9 +1,9 @@
 import { useNavigate } from 'react-router-dom';
-import { Activity, CalendarDays, Crown, Eye, Globe, Info, LogIn, LogOut, Palette, Settings, Swords, Timer, Type, User, Zap } from 'lucide-react';
+import { Activity, CalendarDays, Crown, Eye, Globe, Info, LogIn, LogOut, Palette, Settings, Shuffle, Swords, Timer, Type, User, Zap } from 'lucide-react';
 import { useRegisterCommands, type Command } from '../lib/commands';
 import { useAuth } from '../lib/auth';
 import { FONTS, updateSettings, useSettings, type Settings as S } from '../lib/settings';
-import { applyTheme, getTheme, THEMES, themeLabel } from '../lib/themes';
+import { applyTheme, getTheme, isLightTheme, randomTheme, THEMES, themeLabel } from '../lib/themes';
 
 function ThemeBubbles({ name }: { name: string }) {
   const t = getTheme(name);
@@ -55,15 +55,25 @@ export function GlobalCommands() {
         label: 'Theme…',
         icon: <Palette />,
         keywords: ['color', 'colour'],
-        children: () =>
-          THEMES.map((t) => ({
+        children: () => [
+          ...(['', 'light', 'dark'] as const).map((kind) => ({
+            id: `theme-random${kind && `-${kind}`}`,
+            label: `random${kind && ` ${kind}`} theme`,
+            icon: <Shuffle />,
+            keywords: ['shuffle', 'surprise'],
+            run: () => updateSettings({ theme: randomTheme(settings.theme, kind || undefined).name }),
+          })),
+          ...THEMES.map((t) => ({
             id: `theme-${t.name}`,
             label: themeLabel(t.name),
             icon: <ThemeBubbles name={t.name} />,
+            // "theme light", "theme original" etc. narrow the list
+            keywords: [isLightTheme(t) ? 'light' : 'dark', ...(t.original ? ['cubetype', 'original'] : ['monkeytype'])],
             active: settings.theme === t.name,
             preview: () => applyTheme(t.name, false),
             run: () => updateSettings({ theme: t.name }),
           })),
+        ],
       };
       const font: Command = {
         id: 'font',

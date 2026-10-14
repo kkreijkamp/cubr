@@ -36,7 +36,7 @@ const FEATURES = [
   { icon: Swords, t: 'live races', d: 'real-time multiplayer rooms over websockets — share a link and race any event.' },
   { icon: Crown, t: 'leaderboards', d: 'all-time, weekly and daily boards for every event, single, ao5 and ao12.' },
   { icon: Globe, t: 'wca comparison', d: 'see where your personal bests would rank among every official wca competitor.' },
-  { icon: Palette, t: 'themes & command line', d: `${THEMES.length} monkeytype themes with live preview. press esc and type — everything is a command.` },
+  { icon: Palette, t: 'themes & command line', d: `${THEMES.length} themes — monkeytype classics plus cube-inspired originals — with live preview. press esc and type — everything is a command.` },
   { icon: WifiOff, t: 'offline first', d: 'guest mode works with no backend at all; sign in to sync solves to the cloud.' },
 ];
 

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   ArrowUpRight,
   Bell,
+  Box,
   ChartLine,
   Database,
   Download,
@@ -16,6 +17,8 @@ import {
   Palette,
   Play,
   RotateCcw,
+  Search,
+  Shuffle,
   Sigma,
   Timer,
   Trash2,
@@ -33,7 +36,7 @@ import { useAuth } from '../lib/auth';
 import { formatNumber } from '../lib/format';
 import { applyVisualSettings, DEFAULT_SETTINGS, FONTS, updateSettings, useSettings, type Settings } from '../lib/settings';
 import { clearLocalData, exportAll, importSessions, localDataSummary, useSolveState } from '../lib/solves';
-import { applyTheme, THEMES, themeLabel } from '../lib/themes';
+import { applyTheme, isLightTheme, randomTheme, THEMES, themeLabel, type Theme } from '../lib/themes';
 import { toast } from '../lib/toast';
 
 const SECTIONS = [
@@ -426,43 +429,95 @@ function Section({ id, title, children }: { id: string; title: string; children:
   );
 }
 
+type ThemeFilter = 'all' | 'dark' | 'light' | 'originals';
+
+const THEME_FILTERS: { value: ThemeFilter; label: string; test: (t: Theme) => boolean }[] = [
+  { value: 'all', label: 'all', test: () => true },
+  { value: 'dark', label: 'dark', test: (t) => !isLightTheme(t) },
+  { value: 'light', label: 'light', test: (t) => isLightTheme(t) },
+  { value: 'originals', label: 'originals', test: (t) => Boolean(t.original) },
+];
+
 function ThemeGrid({ current }: { current: string }) {
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<ThemeFilter>('all');
   const previewing = useRef(false);
   const restore = () => {
     if (previewing.current) applyTheme(current, false);
     previewing.current = false;
   };
+  const shown = useMemo(() => {
+    const test = THEME_FILTERS.find((f) => f.value === filter)!.test;
+    const q = query.trim().toLowerCase().replace(/[\s-]+/g, '_');
+    return THEMES.filter((t) => test(t) && t.name.includes(q));
+  }, [query, filter]);
+  const shuffle = () => {
+    // random within the current filter when it has more than the active theme
+    const pool = shown.filter((t) => t.name !== current);
+    const next = pool.length ? pool[Math.floor(Math.random() * pool.length)] : randomTheme(current);
+    previewing.current = false;
+    updateSettings({ theme: next.name });
+  };
   return (
-    <div className="st-themes" onMouseLeave={restore} role="radiogroup" aria-label="theme">
-      {THEMES.map((t) => (
-        <button
-          key={t.name}
-          role="radio"
-          aria-checked={t.name === current}
-          className={`st-theme${t.name === current ? ' active' : ''}`}
-          style={{ background: t.bg, color: t.text }}
-          onMouseEnter={() => {
-            previewing.current = true;
-            applyTheme(t.name, false);
-          }}
-          onFocus={() => {
-            previewing.current = true;
-            applyTheme(t.name, false);
-          }}
-          onBlur={restore}
-          onClick={() => {
-            previewing.current = false;
-            updateSettings({ theme: t.name });
-          }}
-        >
-          <span className="st-theme-name">{themeLabel(t.name)}</span>
-          <span className="st-theme-dots" aria-hidden="true">
-            <i style={{ background: t.main }} />
-            <i style={{ background: t.sub }} />
-            <i style={{ background: t.text }} />
-          </span>
+    <div className="st-theme-picker">
+      <div className="st-theme-tools">
+        <label className="st-theme-search">
+          <Search size={14} aria-hidden="true" />
+          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="search themes" aria-label="search themes" />
+        </label>
+        <div className="st-theme-filters">
+          {THEME_FILTERS.map((f) => (
+            <button key={f.value} className={`btn${f.value === filter ? ' active' : ''}`} onClick={() => setFilter(f.value)} aria-pressed={f.value === filter}>
+              {f.value === 'originals' && <Box size={14} />}
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <button className="btn" onClick={shuffle} data-tip="pick a random theme from this list">
+          <Shuffle size={14} /> random
         </button>
-      ))}
+        <span className="st-theme-count">
+          {shown.length} / {THEMES.length}
+        </span>
+      </div>
+      {shown.length === 0 ? (
+        <div className="st-theme-empty">no themes match “{query}”</div>
+      ) : (
+        <div className="st-themes" onMouseLeave={restore} role="radiogroup" aria-label="theme">
+          {shown.map((t) => (
+            <button
+              key={t.name}
+              role="radio"
+              aria-checked={t.name === current}
+              className={`st-theme${t.name === current ? ' active' : ''}`}
+              style={{ background: t.bg, color: t.text }}
+              onMouseEnter={() => {
+                previewing.current = true;
+                applyTheme(t.name, false);
+              }}
+              onFocus={() => {
+                previewing.current = true;
+                applyTheme(t.name, false);
+              }}
+              onBlur={restore}
+              onClick={() => {
+                previewing.current = false;
+                updateSettings({ theme: t.name });
+              }}
+            >
+              <span className="st-theme-name">
+                {t.original && <Box size={11} className="st-theme-original" style={{ color: t.main }} aria-label="cubetype original" />}
+                {themeLabel(t.name)}
+              </span>
+              <span className="st-theme-dots" aria-hidden="true">
+                <i style={{ background: t.main }} />
+                <i style={{ background: t.sub }} />
+                <i style={{ background: t.text }} />
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
