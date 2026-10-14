@@ -142,6 +142,7 @@ const str = (v: unknown, fallback: string) => (typeof v === 'string' && v.trim()
 
 function describeError(e: unknown): { message: string; status: number | null } {
   if (e instanceof ApiError) {
+    if (e.code === 'TIMEOUT') return { message: `timeout (${TIMEOUT_MS / 1000}s)`, status: null };
     if (e.status === 0) return { message: 'unreachable', status: null };
     return { message: e.message || `HTTP ${e.status}`, status: e.status };
   }
