@@ -1,0 +1,62 @@
+# =============================================================================================
+# Load generator for the HPA demo.
+# Runs fortio (an HTTP load tester) inside the cluster against the scramble Service with
+# fresh=1, which bypasses the Redis scramble pool and forces CPU-heavy cubing.js generation.
+# Change the three env values below to tune the demo:
+#   TARGET_URL   what to hit (444 = 4x4x4 random-state scrambles, expensive; 5 per request)
+#   CONCURRENCY  parallel connections (more = more load)
+#   DURATION     how long to run (fortio duration syntax: 90s, 3m, ...)
+# Start:  kubectl -n cubetype delete job loadgen --ignore-not-found && kubectl apply -k deploy/k8s/jobs/loadgen
+# Watch:  kubectl -n cubetype get hpa scramble -w
+# Stop:   kubectl -n cubetype delete job loadgen
+# =============================================================================================
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: loadgen
+  labels:
+    app.kubernetes.io/name: loadgen
+    app.kubernetes.io/component: batch
+    app.kubernetes.io/part-of: cubetype
+spec:
+  backoffLimit: 0                       # a load test is not retried
+  ttlSecondsAfterFinished: 600          # clean up 10 min after it finished
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: loadgen
+        app.kubernetes.io/component: batch
+        app.kubernetes.io/part-of: cubetype
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: fortio
+          image: fortio/fortio:1.75.3   # multi-arch (amd64 for GKE, arm64 for kind on Apple Silicon)
+          env:
+            - name: TARGET_URL
+              value: "http://scramble:8080/api/scrambles/444?count=5&fresh=1"
+            - name: CONCURRENCY
+              value: "16"
+            - name: DURATION
+              value: "4m"
+          # $(VAR) is expanded by Kubernetes from the env list above.
+          args:
+            - load
+            - -c                        # number of parallel connections
+            - $(CONCURRENCY)
+            - -qps                      # 0 = as many requests per second as possible
+            - "0"
+            - -t                        # test duration
+            - $(DURATION)
+            - -timeout                  # per-request timeout (4x4 generation can be slow under load)
+            - 30s
+            - -keepalive=false          # new TCP connection per request, so kube-proxy spreads load over NEW pods too
+            - -allow-initial-errors     # don't abort if the first requests fail
+            - $(TARGET_URL)
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi

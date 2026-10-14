@@ -1,8 +1,8 @@
 # =============================================================================================
 # wca: official WCA results: records, rank/percentile estimator, distributions, person lookup (/api/wca)
 # Reads the wca schema loaded by the wca-import job; caches expensive queries in Redis.
-# Objects: Deployment (2 replicas) + ClusterIP Service on port 8080 (keeps SPEC's internal URL
-# http://wca:8080 working).
+# Objects: Deployment (2 replicas, zero-downtime rolling updates) + ClusterIP Service on port
+# 8080 (keeps SPEC's internal URL http://wca:8080 working) + PodDisruptionBudget.
 # =============================================================================================
 apiVersion: apps/v1
 kind: Deployment
@@ -14,6 +14,13 @@ metadata:
     app.kubernetes.io/part-of: cubetype
 spec:
   replicas: 2                           # >= 2 so one pod can die/roll without downtime
+  revisionHistoryLimit: 10              # old ReplicaSets kept for `kubectl rollout undo --to-revision`
+  minReadySeconds: 5                    # a new pod must stay Ready 5 s before the rollout continues
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1                       # start 1 extra new pod at a time...
+      maxUnavailable: 0                 # ...and never drop below the desired number of ready pods
   selector:
     matchLabels:
       app.kubernetes.io/name: wca
@@ -24,6 +31,15 @@ spec:
         app.kubernetes.io/component: api
         app.kubernetes.io/part-of: cubetype
     spec:
+      terminationGracePeriodSeconds: 30     # preStop 10 s + up to 20 s graceful shutdown (common/start())
+      topologySpreadConstraints:
+        - maxSkew: 1                    # replicas spread evenly over nodes -> a node failure takes out at most ~half
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway   # prefer spreading, but never leave a pod Pending because of it
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: wca
+          matchLabelKeys: ["pod-template-hash"]   # spread each ReplicaSet (rollout) separately
       containers:
         - name: wca
           image: cubetype/wca:dev
@@ -54,6 +70,12 @@ spec:
           ports:
             - name: http
               containerPort: 8080
+          startupProbe:                 # allow up to 60 s for the process to start listening
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 2
+            failureThreshold: 30
           readinessProbe:               # gate traffic on dependencies (Postgres/Redis) -- 503 removes the pod from the Service
             httpGet:
               path: /readyz
@@ -68,8 +90,12 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
+          lifecycle:
+            preStop:                    # keep serving for 10 s while endpoints/load balancers drop this pod
+              exec:
+                command: ["sleep", "10"]
           resources:
-            requests:                   # what the scheduler reserves
+            requests:                   # what the scheduler reserves (and what HPA % is relative to)
               cpu: 50m
               memory: 128Mi
             limits:                     # hard caps: CPU is throttled, memory over the limit = OOMKill
@@ -92,3 +118,16 @@ spec:
     - name: http
       port: 8080
       targetPort: http
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: wca
+  labels:
+    app.kubernetes.io/name: wca
+    app.kubernetes.io/part-of: cubetype
+spec:
+  minAvailable: 1                       # `kubectl drain` / node upgrades may never evict the last ready pod
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: wca

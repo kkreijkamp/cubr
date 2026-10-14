@@ -3,7 +3,7 @@
 # Local Kubernetes for cubetype: creates (or reuses) a kind cluster and deploys the full stack
 # with the kustomize manifests (deploy/k8s/overlays/local). Idempotent -- safe to re-run.
 #
-#   scripts/kind-up.sh                 # cluster + operator + build/load images + deploy
+#   scripts/kind-up.sh                 # cluster + operators + build/load images + deploy
 #   SKIP_BUILD=1 scripts/kind-up.sh    # images already loaded, just (re)deploy
 #   open http://localhost:8090         # gateway NodePort 30080 mapped by the kind config
 #
@@ -20,6 +20,7 @@ cd "$(dirname "$0")/.."
 export KUBECONFIG="${KUBECONFIG:-$HOME/.kube/cubetype-kind.yaml}"
 KIND_CLUSTER="${KIND_CLUSTER:-cubetype}"
 CNPG_VERSION="1.30.1"
+METRICS_SERVER_VERSION="v0.8.0"
 NS="cubetype"
 echo "KUBECONFIG=$KUBECONFIG"
 
@@ -41,18 +42,28 @@ kubectl apply --server-side -f \
 # Wait until the operator (and its validating webhook) is ready to accept Cluster objects.
 kubectl rollout status deployment/cnpg-controller-manager -n cnpg-system --timeout=300s
 
-# 3. Images: build cubetype/<svc>:dev locally and copy them into the kind worker nodes.
+# 3. metrics-server (kind does not ship it) so HPAs and `kubectl top` work.
+kubectl apply -f "https://github.com/kubernetes-sigs/metrics-server/releases/download/${METRICS_SERVER_VERSION}/components.yaml" >/dev/null
+# kind's kubelets use self-signed certificates -> add --kubelet-insecure-tls once (JSON patch
+# appends to the container's args; skipped if the flag is already there).
+if ! kubectl -n kube-system get deployment metrics-server -o jsonpath='{.spec.template.spec.containers[0].args}' | grep -q kubelet-insecure-tls; then
+  kubectl -n kube-system patch deployment metrics-server --type=json \
+    -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+fi
+kubectl -n kube-system rollout status deployment/metrics-server --timeout=180s
+
+# 4. Images: build cubetype/<svc>:dev locally and copy them into the kind worker nodes.
 if [ "${SKIP_BUILD:-0}" != "1" ]; then
   KIND_CLUSTER="$KIND_CLUSTER" scripts/build-local.sh --kind
 fi
 
-# 4. Namespace + Secret (random JWT key; kept if it already exists).
+# 5. Namespace + Secret (random JWT key; kept if it already exists).
 kubectl create namespace "$NS" --dry-run=client -o yaml | kubectl apply -f -
 kubectl -n "$NS" get secret cubetype-secrets >/dev/null 2>&1 || \
   kubectl -n "$NS" create secret generic cubetype-secrets \
     --from-literal=JWT_SECRET="$(openssl rand -hex 32)"
 
-# 5. Deploy the local overlay and wait for PostgreSQL, Redis and every Deployment.
+# 6. Deploy the local overlay and wait for PostgreSQL, Redis and every Deployment.
 kubectl apply -k deploy/k8s/overlays/local
 kubectl -n "$NS" wait cluster/pg --for=condition=Ready --timeout=600s
 kubectl -n "$NS" rollout status statefulset/redis --timeout=300s

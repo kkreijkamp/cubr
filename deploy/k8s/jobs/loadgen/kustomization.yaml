@@ -1,0 +1,7 @@
+# HPA demo load generator (public fortio image, identical on GKE and kind):
+#   kubectl apply -k deploy/k8s/jobs/loadgen
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: cubetype
+resources:
+  - loadgen-job.yaml

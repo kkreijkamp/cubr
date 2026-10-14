@@ -1,0 +1,161 @@
+# HorizontalPodAutoscalers (autoscaling/v2): add/remove pods based on average CPU usage
+# relative to the pod's CPU *request* (e.g. scramble requests 250m, target 60% => scale out when
+# pods average > 150m). metrics-server provides the numbers (pre-installed on GKE).
+# The behavior block is tuned for a live demo: scale up immediately (no stabilization, up to
+# +100% or +2 pods every 15 s), scale down after only 60 s of low load (default is 300 s).
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: scramble
+  labels:
+    app.kubernetes.io/name: scramble
+    app.kubernetes.io/part-of: cubetype
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: scramble
+  minReplicas: 2                        # never below 2 (availability)
+  maxReplicas: 8                     # upper bound (cost / cluster capacity)
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60       # % of the CPU request -- CPU-bound scramble generation, the HPA demo target
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0     # react at once
+      selectPolicy: Max                 # use whichever policy allows the bigger step
+      policies:
+        - type: Percent
+          value: 100                    # double...
+          periodSeconds: 15
+        - type: Pods
+          value: 2                      # ...or +2 pods per 15 s
+          periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 60    # wait 60 s of low load before removing pods
+      policies:
+        - type: Pods
+          value: 1                      # remove 1 pod per 30 s (gentle)
+          periodSeconds: 30
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: solve
+  labels:
+    app.kubernetes.io/name: solve
+    app.kubernetes.io/part-of: cubetype
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: solve
+  minReplicas: 2                        # never below 2 (availability)
+  maxReplicas: 6                     # upper bound (cost / cluster capacity)
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70       # % of the CPU request
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0     # react at once
+      selectPolicy: Max                 # use whichever policy allows the bigger step
+      policies:
+        - type: Percent
+          value: 100                    # double...
+          periodSeconds: 15
+        - type: Pods
+          value: 2                      # ...or +2 pods per 15 s
+          periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 60    # wait 60 s of low load before removing pods
+      policies:
+        - type: Pods
+          value: 1                      # remove 1 pod per 30 s (gentle)
+          periodSeconds: 30
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: race
+  labels:
+    app.kubernetes.io/name: race
+    app.kubernetes.io/part-of: cubetype
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: race
+  minReplicas: 2                        # never below 2 (availability)
+  maxReplicas: 6                     # upper bound (cost / cluster capacity)
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70       # % of the CPU request
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0     # react at once
+      selectPolicy: Max                 # use whichever policy allows the bigger step
+      policies:
+        - type: Percent
+          value: 100                    # double...
+          periodSeconds: 15
+        - type: Pods
+          value: 2                      # ...or +2 pods per 15 s
+          periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 60    # wait 60 s of low load before removing pods
+      policies:
+        - type: Pods
+          value: 1                      # remove 1 pod per 30 s (gentle)
+          periodSeconds: 30
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: web
+  labels:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/part-of: cubetype
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: web
+  minReplicas: 2                        # never below 2 (availability)
+  maxReplicas: 6                     # upper bound (cost / cluster capacity)
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70       # % of the CPU request
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0     # react at once
+      selectPolicy: Max                 # use whichever policy allows the bigger step
+      policies:
+        - type: Percent
+          value: 100                    # double...
+          periodSeconds: 15
+        - type: Pods
+          value: 2                      # ...or +2 pods per 15 s
+          periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 60    # wait 60 s of low load before removing pods
+      policies:
+        - type: Pods
+          value: 1                      # remove 1 pod per 30 s (gentle)
+          periodSeconds: 30

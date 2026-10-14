@@ -11,11 +11,12 @@ Both use the same container images and the same routing table.
 |---|---|
 | `../docker-compose.yml` | Full local stack: Postgres, Redis, 7 services, web and the nginx gateway (+ `jobs` profile) |
 | `gateway/nginx.conf` | Compose gateway that mimics the GKE Ingress routes |
-| `k8s/base/` | Environment-neutral manifests (kustomize): namespace, ConfigMap, CloudNativePG `Cluster`, Redis StatefulSet, 8 Deployments + Services |
+| `k8s/base/` | Environment-neutral manifests (kustomize): namespace, ConfigMap, CloudNativePG `Cluster`, Redis StatefulSet, 8 Deployments + Services + PDBs, 4 HPAs |
 | `k8s/overlays/local/` | kind: local `cubetype/<svc>:dev` images, nginx `gateway` (NodePort 30080 → `localhost:8090`) instead of the Ingress |
+| `k8s/jobs/loadgen` | On-demand Job: HPA load generator. Not part of the base. |
 | `k8s/kind/kind-config.yaml` | kind cluster: 1 control-plane + 2 workers, port mapping 8090 → 30080 |
 | `../scripts/build-local.sh` | `docker build` all images as `cubetype/<name>:dev` (`--kind` also loads them into kind) |
-| `../scripts/kind-up.sh` | Repeatable local Kubernetes setup (cluster, CNPG, images, secret, deploy) |
+| `../scripts/kind-up.sh` | Repeatable local Kubernetes setup (cluster, CNPG, metrics-server, images, secret, deploy) |
 | `../scripts/smoke.mjs` | End-to-end check through any entry point: `node scripts/smoke.mjs <baseUrl>` |
 
 ---
@@ -25,6 +26,14 @@ Both use the same container images and the same routing table.
 **Why it is built this way**
 
 - **Kubernetes-native building blocks.** Each microservice is a Deployment with a ClusterIP Service. Service discovery is plain DNS (`http://solve:8080`), the same names compose uses.
+- **Zero-downtime rollouts.** Rolling updates use `maxSurge 1` / `maxUnavailable 0` / `minReadySeconds 5`. Readiness gates traffic on dependencies; liveness only checks that the process is alive. A `preStop` sleep of 10 s means pods leave the Service endpoints before they stop.
+- **Availability.**
+  - Every Deployment has at least 2 replicas.
+  - `topologySpreadConstraints` spread replicas over nodes, with `ScheduleAnyway` so spreading never blocks scheduling.
+  - `PodDisruptionBudget minAvailable 1` stops `kubectl drain` or node upgrades from evicting the last ready pod.
+- **Scalability.**
+  - HPAs act on CPU relative to each pod's request. scramble is the deliberate CPU hotspot.
+  - The behavior block is tuned for a live demo: scale up immediately, scale down after 60 s.
 - **Stateful pieces run self-managed on the cluster.** Managed Cloud SQL HA plus Memorystore would add about US$185/month.
   - **CloudNativePG** gives a primary with streaming replicas, automatic failover (`pg-rw` follows the primary), and generated credentials (`pg-app` Secret → `DATABASE_URL`).
   - **Redis** has a PVC. It is designed to be loseable: the scramble pool refills and the solve outbox re-delivers events.
@@ -61,7 +70,7 @@ This uses the kustomize manifests (`overlays/local`), with an nginx gateway inst
 ```bash
 brew install kind                                       # once
 export KUBECONFIG=~/.kube/cubetype-kind.yaml            # any separate file
-scripts/kind-up.sh                                      # cluster + CNPG 1.30.1 + build/load images + deploy
+scripts/kind-up.sh                                      # cluster + CNPG 1.30.1 + metrics-server + build/load images + deploy
 open http://localhost:8090                              # gateway NodePort 30080 (kind port mapping)
 node scripts/smoke.mjs http://localhost:8090
 ```
@@ -72,6 +81,9 @@ What `kind-up.sh` does, step by step (equivalent manual commands):
 kind create cluster --config deploy/k8s/kind/kind-config.yaml --kubeconfig "$KUBECONFIG"
 kubectl apply --server-side -f https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.30/releases/cnpg-1.30.1.yaml
 kubectl rollout status deployment/cnpg-controller-manager -n cnpg-system
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.8.0/components.yaml
+kubectl -n kube-system patch deployment metrics-server --type=json \
+  -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
 scripts/build-local.sh --kind                      # docker build + kind load (worker nodes only)
 kubectl create namespace cubetype
 kubectl -n cubetype create secret generic cubetype-secrets \
@@ -79,3 +91,14 @@ kubectl -n cubetype create secret generic cubetype-secrets \
 kubectl apply -k deploy/k8s/overlays/local
 kubectl -n cubetype wait cluster/pg --for=condition=Ready --timeout=600s
 ```
+
+The rollout demo also works locally:
+
+```bash
+TAG=1.1.0 scripts/build-local.sh --kind web
+kubectl -n cubetype set image deployment/web web=cubetype/web:1.1.0
+kubectl -n cubetype rollout status deployment/web
+kubectl -n cubetype rollout undo deployment/web
+```
+
+The HPA demo works the same way: `kubectl apply -k deploy/k8s/jobs/loadgen; kubectl -n cubetype get hpa scramble -w`.
