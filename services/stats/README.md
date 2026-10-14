@@ -62,6 +62,8 @@ Consumes (group `stats`, consumer = `POD_NAME`): `user.registered`, `user.update
   removed on `session.deleted`. Sessions that arrive without a name (bulk imports, older data) are
   backfilled every 20 s by one replica (`pg_try_advisory_lock`) from solve-service
   `GET /internal/users/:id/sessions`; unknown sessions are stored with name `''` so they are not refetched.
+  The backfill only inserts missing names, so it can never overwrite a newer rename, and a failed pass
+  (Postgres or solve-service unreachable) is logged and retried 20 s later.
 
 ## Env
 Common vars (SPEC §4); uses `DATABASE_URL`, `REDIS_URL`, `SOLVE_URL`, `POD_NAME`.
