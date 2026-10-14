@@ -50,12 +50,12 @@ export function shortNode(node: string): string {
   return parts.length > 2 ? parts[parts.length - 1] : node;
 }
 
-function PodRow({ p, max, serving }: { p: PodView; max: number; serving: boolean }) {
+function PodRow({ p, max, serving, vc }: { p: PodView; max: number; serving: boolean; vc: string }) {
   const { hash, id } = podParts(p.pod, p.service);
   const ago = Math.max(0, Math.round((Date.now() - p.lastSeen) / 1000));
   const tip = `${p.pod}\n${vlabel(p.version)} · node ${p.node}\n${p.hits} hit${p.hits === 1 ? '' : 's'} in 30s · last ${ago}s ago`;
   return (
-    <li className={`pod-row${p.fresh ? ' fresh' : ''}${p.stale ? ' stale' : ''}${serving ? ' serving' : ''}`} title={tip}>
+    <li className={`pod-row ${vc}${p.fresh ? ' fresh' : ''}${p.stale ? ' stale' : ''}${serving ? ' serving' : ''}`} title={tip}>
       <span className="vsq" aria-hidden="true" />
       <span className="pod-name">
         <span className="hash">{hash}</span>
@@ -72,7 +72,7 @@ function PodRow({ p, max, serving }: { p: PodView; max: number; serving: boolean
   );
 }
 
-function ServiceCardImpl({ s, now }: { s: ServiceView; now: number }) {
+function ServiceCardImpl({ s, vc, now }: { s: ServiceView; vc: (v: string) => string; now: number }) {
   const info = s.info;
   const version = typeof info?.version === 'string' ? info.version : null;
   const down = s.status === 'down';
@@ -89,7 +89,7 @@ function ServiceCardImpl({ s, now }: { s: ServiceView; now: number }) {
       <header className="svc-head">
         <Dot state={s.status} pulse={s.status === 'up'} title={statusLabel} />
         <span className="svc-name">{s.name}</span>
-        {version && <span className="ver-chip">{vlabel(version)}</span>}
+        {version && <span className={`ver-chip ${vc(version)}`}>{vlabel(version)}</span>}
         <span className={`svc-lat ${latencyClass(s.latency)}`} title="latency of the last _info request">
           {s.latency !== null ? `${Math.round(s.latency)}ms` : down ? 'no reply' : '…'}
         </span>
@@ -145,7 +145,7 @@ function ServiceCardImpl({ s, now }: { s: ServiceView; now: number }) {
         ) : (
           <ul>
             {s.pods.map((p) => (
-              <PodRow key={p.key} p={p} max={max} serving={!down && p.pod === s.servedBy} />
+              <PodRow key={p.key} p={p} max={max} serving={!down && p.pod === s.servedBy} vc={vc(p.version)} />
             ))}
           </ul>
         )}
