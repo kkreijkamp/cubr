@@ -24,12 +24,17 @@ export function createRedis(redisUrl: string, log?: FastifyBaseLogger): Redis {
   return client;
 }
 
-/** Fixed-window rate limiter. Returns true if the call is allowed. Fails open if Redis is down. */
+/**
+ * Fixed-window rate limiter. Returns true if the call is allowed. Fails open if Redis is down.
+ * INCR and EXPIRE NX go out as one MULTI, so a counter can never be left without a TTL (which
+ * would block the key for good). EXPIRE NX needs Redis 7.
+ */
 export async function rateLimit(redis: Redis, key: string, limit: number, windowSec: number): Promise<boolean> {
   try {
     const k = `rl:${key}`;
-    const n = await redis.incr(k);
-    if (n === 1) await redis.expire(k, windowSec);
+    const res = await redis.multi().incr(k).expire(k, windowSec, 'NX').exec();
+    const [err, n] = res?.[0] ?? [];
+    if (err || typeof n !== 'number') return true;
     return n <= limit;
   } catch {
     return true;
