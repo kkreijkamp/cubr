@@ -3,7 +3,7 @@ import { Server, type DefaultEventsMap, type Socket } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { z, ZodError } from 'zod';
 import type { FastifyBaseLogger } from 'fastify';
-import { HttpError, badRequest, forbidden, notFound, rateLimit, rateLimited, type Redis } from '@cubetype/common';
+import { HttpError, badRequest, forbidden, notFound, rateLimit, rateLimited, unavailable, type Redis } from '@cubetype/common';
 import { resolveIdentity } from './identity.js';
 import { MAX_RESULT_MS, addPlayer, removePlayer, setStatus, startRound, submitResult } from './room.js';
 import { ROOM_ID_RE, sanitizeText } from './sanitize.js';
@@ -238,6 +238,9 @@ export function registerSocketHandlers(deps: SocketDeps) {
       const roomId = currentRoom(socket);
       const clean = sanitizeText(text, 200);
       if (!clean) throw badRequest('text: message is empty');
+      // Without Redis a message can neither be stored nor reach players on other pods (and the
+      // rate limit below fails open): refuse it instead of delivering it after the outage.
+      if (redis.status !== 'ready') throw unavailable('Chat is unavailable while the server reconnects');
       if (!(await rateLimit(redis, `race-chat:${me.playerId}`, 5, 10))) {
         throw rateLimited('Slow down: at most 5 messages per 10 seconds');
       }

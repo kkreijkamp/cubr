@@ -56,6 +56,9 @@ export class PodPresence {
   async stop(): Promise<void> {
     for (const t of this.timers) clearInterval(t);
     this.timers = [];
+    // Redis unreachable: don't wait for retries that cannot succeed — the heartbeat simply goes
+    // stale and another pod's janitor cleans up after us.
+    if (this.redis.status !== 'ready') return;
     try {
       // Everything cleaned up → forget this pod. Otherwise leave the room set for the janitor.
       if (this.store.local.size === 0) await this.redis.del(keys.podRooms(this.pod));
