@@ -9,7 +9,7 @@ import { withTimeout } from '../src/util.js';
 function fakeBackend(size: number, ms = 5) {
   const calls: { slot: number; event: string }[] = [];
   const backend: ScrambleBackend = {
-    kind: 'fake',
+    kind: size > 1 ? 'worker-pool' : 'in-process',
     size,
     run: (slot, event, timeoutMs) => {
       calls.push({ slot, event });
@@ -59,13 +59,19 @@ describe('ScrambleGenerator', () => {
     expect(gen.isBusy(0)).toBe(false);
   });
 
-  it('uses every slot of a multi-slot backend', async () => {
+  it('uses all slots of a pool backend and honours pinned slots', async () => {
     const { backend, calls } = fakeBackend(3, 20);
     const gen = new ScrambleGenerator(backend, { timeoutMs: 1000, maxQueue: 100 });
     const many = gen.generateMany('444', 3);
     expect(gen.active).toBe(3);
     await many;
     expect(new Set(calls.map((c) => c.slot))).toEqual(new Set([0, 1, 2]));
+
+    calls.length = 0;
+    await Promise.all([0, 1, 2].flatMap((slot) => [gen.generate('a', 'request', slot), gen.generate('b', 'request', slot)]));
+    for (const slot of [0, 1, 2]) {
+      expect(calls.filter((c) => c.slot === slot).map((c) => c.event)).toEqual(['a', 'b']);
+    }
   });
 
   it('times out stuck searches and expires tasks that waited too long', async () => {

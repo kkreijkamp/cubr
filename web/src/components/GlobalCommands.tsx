@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { CalendarDays, Crown, Eye, Globe, LogIn, LogOut, Palette, Settings, Swords, Timer, Type, User, Zap } from 'lucide-react';
+import { Activity, CalendarDays, Crown, Eye, Globe, LogIn, LogOut, Palette, Settings, Swords, Timer, Type, User, Zap } from 'lucide-react';
 import { useRegisterCommands, type Command } from '../lib/commands';
 import { useAuth } from '../lib/auth';
 import { FONTS, updateSettings, useSettings, type Settings as S } from '../lib/settings';
@@ -47,6 +47,7 @@ export function GlobalCommands() {
         { id: 'go-lb', label: 'Go to leaderboards', icon: <Crown />, run: go('/leaderboards') },
         { id: 'go-wca', label: 'Go to WCA rankings', icon: <Globe />, run: go('/wca') },
         { id: 'go-settings', label: 'Go to settings', icon: <Settings />, run: go('/settings') },
+        { id: 'go-status', label: 'Go to cluster status', icon: <Activity />, keywords: ['kubernetes', 'pods'], run: go('/status') },
       ];
       const theme: Command = {
         id: 'theme',

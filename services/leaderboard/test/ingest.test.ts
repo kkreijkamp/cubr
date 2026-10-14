@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FALLBACK_FLOORS, FloorProvider, floorFor, isBelowFloor, parseRecords } from '../src/floors.js';
 import { planDailyCompleted, planPbUpdated, planSolveCreated, planUserInfo } from '../src/ingest.js';
+import { toBoardWrite } from '../src/rebuild.js';
 import { parseUserInfo, splitWithScores } from '../src/board.js';
 
 const U = '00000000-0000-4000-8000-000000000001';
@@ -135,7 +136,14 @@ describe('planUserInfo', () => {
   });
 });
 
-describe('read helpers', () => {
+describe('rebuild / read helpers', () => {
+  it('toBoardWrite validates stats PB rows', () => {
+    const pb = { userId: U, username: 'a', event: '333', kind: 'ao5', valueMs: 12000, achievedAt: '2026-10-01T00:00:00Z' };
+    expect(toBoardWrite(pb, 'ao5')).toEqual({ board: 'lb:333:ao5:all', valueMs: 12000, achievedAt: '2026-10-01T00:00:00.000Z' });
+    expect(toBoardWrite({ ...pb, kind: 'single' }, 'ao5')).toBeNull();
+    expect(toBoardWrite({ ...pb, valueMs: -1 }, 'ao5')).toBeNull();
+    expect(toBoardWrite({ ...pb, event: '333fm' }, 'ao5')).toBeNull();
+  });
   it('parseUserInfo tolerates missing / bad JSON', () => {
     expect(parseUserInfo('{"username":"x","country":"AU"}')).toEqual({ username: 'x', country: 'AU', avatarUrl: null });
     expect(parseUserInfo('{"username":"x"}')).toEqual({ username: 'x', country: null, avatarUrl: null });

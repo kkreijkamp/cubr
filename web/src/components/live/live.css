@@ -1,4 +1,4 @@
-/* Shared styles for the live pages. Theme tokens only. */
+/* Shared styles for the live pages (daily, race, wca, status). Theme tokens only. */
 
 /* grid columns must be allowed to shrink below their content's min-width, otherwise wide tables
    (inside .table-wrap) or nowrap pickers widen the whole page on phones */
@@ -129,6 +129,26 @@
   100% {
     box-shadow: 0 0 0 0 transparent;
   }
+}
+
+/* sparkline */
+.live-spark {
+  display: block;
+  width: 100%;
+  overflow: visible;
+  color: var(--sub-color);
+}
+.live-spark path {
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.live-spark .tip {
+  fill: currentColor;
+}
+.live-spark .gap {
+  fill: var(--error-color);
 }
 
 /* notices / banners */

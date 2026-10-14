@@ -9,12 +9,14 @@ import {
 } from '@cubetype/common';
 import { FloorProvider } from './floors.js';
 import { CONSUMED_TYPES, makeHandler } from './ingest.js';
+import { startRebuildLoop } from './rebuild.js';
 import { registerRoutes } from './routes/index.js';
 import { defineScripts } from './scripts.js';
 
 const config = loadConfig('leaderboard');
 
 let consumer: Consumer | null = null;
+let rebuild: ReturnType<typeof startRebuildLoop> | null = null;
 
 const server = createServer(config, {
   infoPrefixes: ['/api/leaderboards'],
@@ -22,6 +24,7 @@ const server = createServer(config, {
   checks: { redis: () => redis.ping() },
   info: () => ({
     consumer: consumer?.stats() ?? null,
+    rebuild: rebuild?.status() ?? null,
     antiCheatFloors: floors.source,
   }),
 });
@@ -35,13 +38,14 @@ await registerRoutes(app, { redis, auth });
 
 await start(server, config, [
   async () => {
+    rebuild?.stop();
     await consumer?.stop();
   },
   () => redis.quit(),
 ]);
 
 // Background work starts after listen: the event consumer (one group shared by all replicas,
-// each stream entry handled by exactly one pod).
+// each stream entry handled by exactly one pod) and the rebuild check.
 consumer = consumeEvents(redis, {
   group: 'leaderboard',
   consumer: config.podName,
@@ -49,3 +53,4 @@ consumer = consumeEvents(redis, {
   handler: makeHandler({ redis, floors, log: app.log }),
   log: app.log,
 });
+rebuild = startRebuildLoop({ redis, statsUrl: config.urls.stats, podName: config.podName, floors, log: app.log });

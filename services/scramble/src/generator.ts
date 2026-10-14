@@ -7,6 +7,8 @@ export type Priority = 'request' | 'refill';
 interface Task {
   event: string;
   priority: Priority;
+  /** Pin to one backend slot (warm-up uses this so every pool thread initialises its tables). */
+  slot?: number;
   deadline: number;
   resolve: (scramble: string) => void;
   reject: (err: Error) => void;
@@ -66,9 +68,9 @@ export class ScrambleGenerator {
     return this.queues.request.length > 0 || this.activeRequests > 0 || Date.now() - this.lastRequestDoneAt < graceMs;
   }
 
-  generate(event: string, priority: Priority = 'request'): Promise<string> {
+  generate(event: string, priority: Priority = 'request', slot?: number): Promise<string> {
     return new Promise<string>((resolve, reject) => {
-      this.queues[priority].push({ event, priority, deadline: Date.now() + this.opts.timeoutMs, resolve, reject });
+      this.queues[priority].push({ event, priority, slot, deadline: Date.now() + this.opts.timeoutMs, resolve, reject });
       this.pump();
     });
   }
@@ -112,10 +114,25 @@ export class ScrambleGenerator {
   /** Starts queued tasks while slots are free. Requests first, then refills, FIFO within each. */
   private pump(): void {
     while (this.idle.length > 0) {
-      const task = this.queues.request.shift() ?? this.queues.refill.shift();
-      if (!task) return;
-      void this.run(task, this.idle.shift()!);
+      const next = this.takeNext();
+      if (!next) return;
+      void this.run(next.task, next.slot);
     }
+  }
+
+  private takeNext(): { task: Task; slot: number } | null {
+    for (const queue of [this.queues.request, this.queues.refill]) {
+      for (let i = 0; i < queue.length; i++) {
+        const task = queue[i];
+        const slot = task.slot === undefined ? this.idle[0] : task.slot;
+        const idleIndex = this.idle.indexOf(slot);
+        if (idleIndex === -1) continue; // pinned to a busy slot
+        queue.splice(i, 1);
+        this.idle.splice(idleIndex, 1);
+        return { task, slot };
+      }
+    }
+    return null;
   }
 
   private async run(task: Task, slot: number): Promise<void> {

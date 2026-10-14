@@ -95,6 +95,10 @@ Ingress/gateway and must never be reachable publicly.
 | `AUTH_URL` `SCRAMBLE_URL` `SOLVE_URL` `STATS_URL` `LEADERBOARD_URL` `WCA_URL` `RACE_URL` | `http://<name>:8080` | internal base URLs |
 | `LOG_LEVEL` | `info` | |
 
+`INTERNAL_API_TOKEN` (auth and the seed job; K8s Secret, unset = disabled) is a shared secret of at
+least 16 characters. A trusted caller sends it as `X-Internal-Token` and auth then skips its per-IP
+rate limits: the seed job creates many accounts, and all of its requests come from one pod IP.
+
 ## 5. Cross-cutting conventions
 
 - **JSON everywhere.** Errors: HTTP status + `{ "error": { "code": "BAD_REQUEST"|"UNAUTHORIZED"|"FORBIDDEN"|"NOT_FOUND"|"CONFLICT"|"RATE_LIMITED"|"UNAVAILABLE"|"INTERNAL", "message": "human readable" } }`. Use `HttpError` from `@cubetype/common`. zod failures → 400 BAD_REQUEST with the first issue as message.
@@ -311,6 +315,8 @@ type PB = { valueMs: number; solveId: string|null; achievedAt: string };
 | GET `/api/users/:username` | – | – | `{user: PublicUser}`; 404 |
 | GET `/api/users?ids=a,b,c` | – | ≤ 100 ids | `{users: PublicUser[]}` |
 | GET `/api/auth/_info` | – | – | info |
+
+Rate limits are per client IP; callers that present `INTERNAL_API_TOKEN` (§4) are exempt.
 
 ### 9.2 scramble (`/api/scrambles`)
 | Method & path | Response |

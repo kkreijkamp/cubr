@@ -6,6 +6,7 @@
 #   docker compose up -d --scale solve=3         # 3 solve replicas; the gateway round-robins
 #   docker compose logs -f gateway               # access log shows upstream=<container ip>
 #   docker compose --profile jobs run --rm wca-import   # load the WCA public export
+#   docker compose --profile jobs run --rm seed         # create demo users + solves
 #   docker compose down                          # stop (add -v to also delete the volumes)
 #
 # The gateway is the only entry point for the app (http://localhost:8080). Postgres and Redis
@@ -88,8 +89,12 @@ services:
   # ---- microservices (build context = repo root, see docs/BUILDING.md) ------------------------
   auth:
     <<: *service
-    image: cubetype/auth:dev
+    image: cubetype/auth:dev          # same tag scripts/build-local.sh uses (can be `kind load`ed)
     build: { context: ., dockerfile: services/auth/Dockerfile, args: *build-args }
+    environment:
+      <<: *service-env
+      # Requests carrying X-Internal-Token=<this> (the seed job) skip the per-IP rate limits.
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-dev-internal-token-0123456789}
 
   scramble:
     <<: *service
@@ -110,7 +115,7 @@ services:
     <<: *service
     image: cubetype/leaderboard:dev
     build: { context: ., dockerfile: services/leaderboard/Dockerfile, args: *build-args }
-    depends_on:                       # Redis-only service (boards are Redis sorted sets)
+    depends_on:                       # Redis-only service (rebuilds boards from stats over HTTP)
       redis: { condition: service_healthy }
 
   race:
@@ -130,6 +135,8 @@ services:
     image: cubetype/web:dev
     build: { context: ., dockerfile: web/Dockerfile, args: *build-args }
     restart: unless-stopped
+    environment:
+      NODE_NAME: docker-compose       # shown by /_info
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
       interval: 10s
@@ -155,8 +162,8 @@ services:
       retries: 3
 
   # ---- one-off jobs (only with --profile jobs) ---------------------------------------------------
-  # Downloads the WCA public export and loads it into the `wca` schema (staging schema + atomic
-  # swap). Run: docker compose --profile jobs run --rm wca-import
+  # Equivalent of the K8s CronJob wca-import: downloads the WCA public export and loads it into
+  # the `wca` schema (staging schema + atomic swap). Run: docker compose --profile jobs run --rm wca-import
   # Offline/faster variant: unzip an export to ./data/wca/tsv, then add
   #   -v "$PWD/data/wca/tsv:/data:ro" -e WCA_TSV_DIR=/data   to the `run` command.
   wca-import:
@@ -169,6 +176,30 @@ services:
       FORCE: ${FORCE:-0}                         # 1 = re-import even if this export is already loaded
     depends_on:
       postgres: { condition: service_healthy }
+
+  # Equivalent of the K8s Job seed: creates synthetic users + solves through the PUBLIC APIs
+  # (so events flow through solve -> Redis -> stats/leaderboard exactly like real traffic).
+  # It talks to the services directly via AUTH_URL / SOLVE_URL / SCRAMBLE_URL (jobs/seed/README.md).
+  # Run: docker compose --profile jobs run --rm seed      (smaller: SEED_USERS=20 docker compose ...)
+  seed:
+    profiles: ["jobs"]
+    image: cubetype/seed:dev
+    build: { context: ., dockerfile: jobs/seed/Dockerfile, args: *build-args }
+    restart: "no"
+    environment:
+      AUTH_URL: http://auth:8080
+      SOLVE_URL: http://solve:8080
+      SCRAMBLE_URL: http://scramble:8080
+      SEED_USERS: ${SEED_USERS:-150}             # synthetic users (+1 demo account)
+      SEED_AVG_SOLVES: ${SEED_AVG_SOLVES:-650}   # average history per user (~100k solves total)
+      SEED_CONCURRENCY: ${SEED_CONCURRENCY:-6}   # users seeded in parallel
+      SEED_DEMO_USER: demo                       # presentation account
+      SEED_DEMO_PASSWORD: cubetype-demo
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-dev-internal-token-0123456789}   # must match auth's
+    depends_on:
+      auth: { condition: service_healthy }
+      solve: { condition: service_healthy }
+      scramble: { condition: service_healthy }
 
 volumes:
   pgdata:

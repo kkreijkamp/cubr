@@ -6,9 +6,6 @@ import { createSocketServer, registerSocketHandlers } from './socket.js';
 import { RoomStore } from './store.js';
 
 const config = loadConfig('race');
-const redis = createRedis(config.redisUrl); // commands (room state, locks, presence)
-const pub = createRedis(config.redisUrl); // Socket.IO adapter: publishes broadcasts
-const sub = createRedis(config.redisUrl); // Socket.IO adapter: subscriber-mode connection
 
 const server = createServer(config, {
   infoPrefixes: ['/api/race'],
@@ -22,6 +19,19 @@ const server = createServer(config, {
   info: () => ({ sockets: io.engine.clientsCount, ...presence.stats() }),
 });
 const { app } = server;
+
+const redis = createRedis(config.redisUrl, app.log); // commands (room state, locks, presence)
+// Socket.IO adapter connections: one publishes broadcasts, one is in subscriber mode. The adapter
+// never handles the promises of its PUBLISH and (P)SUBSCRIBE calls, so these two connections keep
+// commands queued until Redis is back (maxRetriesPerRequest: null) instead of rejecting them — an
+// unhandled rejection would end the process whenever Redis restarts.
+const pub = redis.duplicate({ maxRetriesPerRequest: null });
+const sub = redis.duplicate({ maxRetriesPerRequest: null });
+for (const conn of [pub, sub]) conn.on('error', () => {}); // the command connection already logs Redis errors
+
+// Last line of defence: a stray rejected promise is logged instead of taking the pod down.
+process.on('unhandledRejection', (err) => app.log.error({ err }, 'unhandled promise rejection'));
+
 const auth = makeAuth(config.jwtSecret, redis);
 app.log.info({ redis: config.redisUrl.replace(/\/\/.*@/, '//***@') }, 'race service starting');
 
@@ -47,15 +57,9 @@ app.addHook('preClose', async () => {
 });
 
 // Register in Redis (and clear leftovers of a previous process with this POD_NAME) before
-// accepting sockets.
-// Retry until Redis is reachable (e.g. Redis pod still starting) instead of crashing.
-for (let delay = 500; ; delay = Math.min(delay * 2, 5000)) {
-  try {
-    await presence.start();
-    break;
-  } catch (err) {
-    app.log.warn({ err: (err as Error).message }, `redis not ready, retrying presence start in ${delay}ms`);
-    await new Promise((r) => setTimeout(r, delay));
-  }
-}
-await start(server, config, [() => redis.quit(), () => pub.quit(), () => sub.quit()]);
+// accepting sockets. This never throws: while Redis is unreachable it logs a warning, readiness
+// stays 503, and the heartbeat and the periodic reconcile catch up once Redis is back.
+await presence.start();
+// The adapter connections are closed without QUIT: while Redis is down a QUIT would wait forever
+// behind their queued commands (whatever they already sent has been written to the socket).
+await start(server, config, [() => redis.quit(), () => pub.disconnect(), () => sub.disconnect()]);

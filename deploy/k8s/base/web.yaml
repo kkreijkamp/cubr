@@ -1,0 +1,140 @@
+# =============================================================================================
+# web: the React SPA served by unprivileged nginx (web/Dockerfile, port 8080). Stateless and
+# tiny, so it gets small requests; HPA 2-6 replicas (hpa.yaml).
+# Objects: Deployment + ClusterIP Service (8080) + PodDisruptionBudget.
+# =============================================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  labels:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: cubetype
+spec:
+  # no `replicas:` -- the HorizontalPodAutoscaler (hpa.yaml) owns the count (min 2). Leaving it out
+  # means `kubectl apply` never resets a scaled-out Deployment back to 2 in the middle of a demo.
+  revisionHistoryLimit: 10              # old ReplicaSets kept for `kubectl rollout undo --to-revision`
+  minReadySeconds: 5                    # a new pod must stay Ready 5 s before the rollout continues
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1                       # start 1 extra new pod at a time...
+      maxUnavailable: 0                 # ...and never drop below the desired number of ready pods
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: web
+        app.kubernetes.io/component: frontend
+        app.kubernetes.io/part-of: cubetype
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101                  # "nginx" user of nginxinc/nginx-unprivileged
+        runAsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: web
+          matchLabelKeys: ["pod-template-hash"]
+      containers:
+        - name: web
+          image: cubetype/web:dev
+          imagePullPolicy: IfNotPresent
+          # APP_VERSION comes from the image (build arg); /_info reports it with the pod name.
+          env:
+            - name: NODE_NAME           # downward API -> shown by /_info on the status page
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          ports:
+            - name: http
+              containerPort: 8080
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          lifecycle:
+            preStop:                    # keep serving while endpoints/load balancers drop this pod
+              exec:
+                command: ["sleep", "10"]
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp                 # nginx pid file + temp buffers (/tmp in the unprivileged image)
+              mountPath: /tmp
+            - name: conf                # the entrypoint renders default.conf.template (envsubst) into here
+              mountPath: /etc/nginx/conf.d
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+        - name: conf
+          emptyDir:
+            sizeLimit: 1Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  labels:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: cubetype
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: web
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: web
+  labels:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/part-of: cubetype
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: web

@@ -16,6 +16,8 @@ RUN cd web && npm run build
 
 # ---- runtime stage: nginx as non-root (uid 101), listening on 8080
 FROM nginxinc/nginx-unprivileged:1.27-alpine
+ARG APP_VERSION=dev
+ENV APP_VERSION=${APP_VERSION} NODE_NAME=local
 COPY web/nginx/default.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /repo/web/dist /usr/share/nginx/html
 EXPOSE 8080

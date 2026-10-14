@@ -57,6 +57,12 @@ re-emit `room:join` on every `connect` event, sending the same `guestId`.
 7. **Rolling updates.** On SIGTERM the pod drops its websockets at the transport level, so clients
    reconnect through the load balancer to another pod. It then finishes the Redis cleanup and
    removes itself from `race:pods` before closing Redis.
+8. **Redis outages.** A pod stays up while Redis is unreachable; readiness reports 503, so the load
+   balancer stops routing new players to it. The adapter's two connections queue their commands
+   until Redis is back instead of failing them (the adapter never handles those promises, so a
+   rejection would end the process). Room changes fail with `UNAVAILABLE` because they need the room
+   lock, and chat is refused. Once Redis answers again, the heartbeat and the reconcile restore
+   this pod's registry entries.
 
 Other keys: `race:rooms` (zset, the public lobby, score = last activity; rooms with nobody connected for 10 min
 and expired rooms are pruned when the lobby is read) and `race:room:<id>:chat` (last 50 messages). All

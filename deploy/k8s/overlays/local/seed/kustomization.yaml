@@ -1,0 +1,7 @@
+# Seed Job with the locally built image (cubetype/seed:dev, `kind load`ed):
+#   kubectl apply -k deploy/k8s/overlays/local/seed
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: cubetype
+resources:
+  - ../../../jobs/seed

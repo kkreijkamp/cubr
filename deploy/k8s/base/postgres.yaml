@@ -1,0 +1,46 @@
+# PostgreSQL 17 managed by the CloudNativePG operator (installed cluster-wide, see
+# deploy/README.md). The operator turns this one object into:
+#   * Pods pg-1, pg-2, ... : 1 primary + streaming replicas, each with its own PVC
+#   * Services pg-rw (primary, used by the apps), pg-ro (replicas), pg-r (any)
+#   * Secret pg-app with the generated password and a ready-made connection string (key "uri")
+#     which every Deployment maps to DATABASE_URL
+#   * automatic failover: if the primary dies, the most up-to-date replica is promoted and
+#     pg-rw is re-pointed within seconds
+#   * two PodDisruptionBudgets, so `kubectl drain` performs a switchover instead of an outage
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pg
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: cubetype
+spec:
+  instances: 2                          # primary + 1 replica
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.11-minimal-trixie   # PostgreSQL 17 (SPEC §2), pinned
+  primaryUpdateStrategy: unsupervised   # operator may restart/switch over the primary on its own during upgrades
+
+  postgresql:
+    parameters:
+      max_connections: "200"            # 5 DB-using services x up to 8 replicas x pool(10), pools are lazy
+      shared_buffers: 128MB
+
+  bootstrap:
+    initdb:
+      database: cubetype                # one database, schema-per-service (SPEC §7)
+      owner: cubetype                   # application role; password generated into Secret pg-app
+
+  storage:
+    size: 5Gi                           # one PVC per instance (default StorageClass)
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 384Mi
+    limits:
+      memory: 768Mi                     # no CPU limit: avoid throttling the database
+
+  affinity:
+    enablePodAntiAffinity: true         # spread instances over different nodes...
+    topologyKey: kubernetes.io/hostname
+    podAntiAffinityType: preferred      # ...but still schedule if there are fewer nodes than instances

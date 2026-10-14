@@ -1,0 +1,13 @@
+# kind: 2 instances (primary + replica, one per worker node) with smaller memory.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pg
+spec:
+  instances: 2
+  resources:
+    requests:
+      cpu: 50m
+      memory: 192Mi
+    limits:
+      memory: 512Mi

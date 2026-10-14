@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import type { FastifyInstance } from 'fastify';
 import {
@@ -39,6 +39,16 @@ const DUMMY_HASH = bcrypt.hash(randomUUID(), BCRYPT_COST);
 
 const pgCode = (err: unknown) => (err as { code?: string }).code;
 
+// Trusted in-cluster callers (the seed job) present INTERNAL_API_TOKEN in X-Internal-Token and
+// skip the per-IP limits below — they legitimately create many accounts from one pod IP.
+// Disabled unless the secret is configured (≥ 16 chars).
+const INTERNAL_TOKEN = Buffer.from(process.env.INTERNAL_API_TOKEN ?? '');
+function isInternalCaller(header: string | string[] | undefined): boolean {
+  if (INTERNAL_TOKEN.length < 16 || typeof header !== 'string') return false;
+  const given = Buffer.from(header);
+  return given.length === INTERNAL_TOKEN.length && timingSafeEqual(given, INTERNAL_TOKEN);
+}
+
 export async function registerAuthRoutes(app: FastifyInstance, { config, pool, redis, auth }: Deps) {
   /** Loads the authenticated user's row or rejects the (stale) token. */
   async function currentUser(userId: string): Promise<UserRow> {
@@ -50,7 +60,7 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
 
   // ---- POST /api/auth/register ----------------------------------------------------------------
   app.post('/api/auth/register', async (req, reply) => {
-    if (!(await allow(redis, `register:${req.ip}`, 20, 3600))) {
+    if (!isInternalCaller(req.headers['x-internal-token']) && !(await allow(redis, `register:${req.ip}`, 20, 3600))) {
       throw rateLimited('Too many registrations from this address, try again later');
     }
     const body = parse(registerSchema, req.body);
@@ -79,7 +89,7 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
 
   // ---- POST /api/auth/login -------------------------------------------------------------------
   app.post('/api/auth/login', async (req) => {
-    if (!(await allow(redis, `login:${req.ip}`, 10, 60))) {
+    if (!isInternalCaller(req.headers['x-internal-token']) && !(await allow(redis, `login:${req.ip}`, 10, 60))) {
       throw rateLimited('Too many login attempts, try again in a minute');
     }
     const body = parse(loginSchema, req.body);

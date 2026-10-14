@@ -4,5 +4,6 @@ web/dist
 .git
 data
 docs
+deploy/k8s
 **/*.log
 **/.DS_Store

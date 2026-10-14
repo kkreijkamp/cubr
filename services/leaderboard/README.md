@@ -1,7 +1,7 @@
 # leaderboard service
 
 Global all-time / weekly / daily and daily-challenge leaderboards kept in Redis sorted sets
-(SPEC §7.6, §8, §9.5). No Postgres: the boards are a derived read model of the domain events.
+(SPEC §7.6, §8, §9.5). No Postgres: the boards are a derived read model, rebuildable from stats.
 Readiness gates on Redis. Fastify on :8080.
 
 | Route | Notes |
@@ -9,7 +9,7 @@ Readiness gates on Redis. Fastify on :8080.
 | `GET /api/leaderboards/:event/:kind?period=all\|weekly\|daily&page=1&size=50[&key=]` | kind ∈ single, ao5, ao12 (weekly/daily: single, ao5). `key` views a past board (`YYYY-MM-DD` / `YYYY-Www`). `me` filled when a valid token is sent |
 | `GET /api/leaderboards/daily-challenge?date=&event=333` | kind `ao5`, period `challenge`; date defaults to today (UTC); event ∈ daily-challenge events |
 | `GET /api/leaderboards/users/:userId/ranks` | every all-time board the user is on: `{event, kind, period:'all', rank, total, valueMs}` |
-| `GET /api/leaderboards/_info` | info + consumer stats, anti-cheat floor source |
+| `GET /api/leaderboards/_info` | info + consumer stats, rebuild status, anti-cheat floor source |
 
 **Events consumed** (group `leaderboard`, consumer = pod name): `pb.updated` → all-time boards (exact
 ZADD, ZREM when null/-1; stale events are dropped via a per-user occurredAt guard in `<board>:ts`);
@@ -28,10 +28,15 @@ Decisions / simplifications:
 - **Anti-cheat:** values strictly below the WCA world record (`GET wca /internal/records`, cached 1 h,
   ao5/ao12 use the WR average; fallback table in `src/floors.ts` when wca is down) are not ranked but
   pushed to `lb:flagged` (LPUSH + LTRIM 1000).
+- **Rebuild:** every 60 s (first check at startup, in the background) if `lb:meta:built` is missing,
+  take `SET lb:rebuild-lock <pod> NX EX 120`, read `GET stats /internal/pbs?kind=` for single/ao5/ao12,
+  pipeline upserts into the all-time boards + `lb:users`, then set `lb:meta:built`. Stats unreachable →
+  exponential backoff up to 30 s; existing boards keep serving meanwhile. Upsert only (does not delete
+  entries stats no longer has).
 
-Env: `PORT`, `REDIS_URL`, `JWT_SECRET`, `WCA_URL`, `POD_NAME`, `NODE_NAME`, `APP_VERSION`, `LOG_LEVEL`.
+Env: `PORT`, `REDIS_URL`, `JWT_SECRET`, `STATS_URL`, `WCA_URL`, `POD_NAME`, `NODE_NAME`, `APP_VERSION`, `LOG_LEVEL`.
 
-Dev against the compose stack's Redis (`docker compose up -d redis`; without a wca instance at
-`WCA_URL` the anti-cheat uses its fallback table):
+Dev against the compose stack's Redis (`docker compose up -d redis`; without stats and wca instances at
+`STATS_URL`/`WCA_URL` the rebuild keeps retrying and the anti-cheat uses its fallback table):
 `PORT=8081 REDIS_URL=redis://localhost:56380 npx tsx services/leaderboard/src/index.ts`
 Tests: `npx vitest run services/leaderboard`.

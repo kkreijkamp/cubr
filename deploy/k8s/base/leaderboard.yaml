@@ -1,0 +1,147 @@
+# =============================================================================================
+# leaderboard: global/weekly/daily leaderboards in Redis sorted sets (/api/leaderboards)
+# Redis-only (no DATABASE_URL); boards are rebuilt from stats if Redis is lost.
+# Objects: Deployment (2 replicas, zero-downtime rolling updates) + ClusterIP Service on port
+# 8080 (keeps SPEC's internal URL http://leaderboard:8080 working) + PodDisruptionBudget.
+# =============================================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: leaderboard
+  labels:
+    app.kubernetes.io/name: leaderboard
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: cubetype
+spec:
+  replicas: 2                           # >= 2 so one pod can die/roll without downtime
+  revisionHistoryLimit: 10              # old ReplicaSets kept for `kubectl rollout undo --to-revision`
+  minReadySeconds: 5                    # a new pod must stay Ready 5 s before the rollout continues
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1                       # start 1 extra new pod at a time...
+      maxUnavailable: 0                 # ...and never drop below the desired number of ready pods
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: leaderboard
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: leaderboard
+        app.kubernetes.io/component: api
+        app.kubernetes.io/part-of: cubetype
+    spec:
+      automountServiceAccountToken: false   # the app never talks to the Kubernetes API
+      terminationGracePeriodSeconds: 30     # preStop 10 s + up to 20 s graceful shutdown (common/start())
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000                 # the "node" user of node:22-alpine (numeric so runAsNonRoot can verify it)
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1                    # replicas spread evenly over nodes -> a node failure takes out at most ~half
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway   # prefer spreading, but never leave a pod Pending because of it
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: leaderboard
+          matchLabelKeys: ["pod-template-hash"]   # spread each ReplicaSet (rollout) separately
+      containers:
+        - name: leaderboard
+          image: cubetype/leaderboard:dev
+          imagePullPolicy: IfNotPresent
+          # APP_VERSION is baked into the image at build time (--build-arg) and deliberately not overridden here.
+          envFrom:
+            - configMapRef:
+                name: cubetype-config   # REDIS_URL, LOG_LEVEL, *_URL service addresses
+          env:
+            - name: JWT_SECRET          # shared HS256 signing key
+              valueFrom:
+                secretKeyRef:
+                  name: cubetype-secrets
+                  key: JWT_SECRET
+            - name: POD_NAME            # downward API -> X-Served-By header / status page
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NODE_NAME           # downward API -> which node served the request
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          ports:
+            - name: http
+              containerPort: 8080
+          startupProbe:                 # allow up to 60 s for the process to start listening
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 2
+            failureThreshold: 30
+          readinessProbe:               # gate traffic on dependencies (Postgres/Redis) -- 503 removes the pod from the Service
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          livenessProbe:                # restart only if the process itself hangs (never checks dependencies)
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          lifecycle:
+            preStop:                    # keep serving for 10 s while endpoints/load balancers drop this pod
+              exec:
+                command: ["sleep", "10"]
+          resources:
+            requests:                   # what the scheduler reserves (and what HPA % is relative to)
+              cpu: 50m
+              memory: 96Mi
+            limits:                     # hard caps: CPU is throttled, memory over the limit = OOMKill
+              cpu: "300m"
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp           # the only writable path (root filesystem is read-only)
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: leaderboard
+  labels:
+    app.kubernetes.io/name: leaderboard
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: cubetype
+spec:
+  type: ClusterIP                       # internal virtual IP; kube-proxy load-balances over ready pods
+  selector:
+    app.kubernetes.io/name: leaderboard
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: leaderboard
+  labels:
+    app.kubernetes.io/name: leaderboard
+    app.kubernetes.io/part-of: cubetype
+spec:
+  minAvailable: 1                       # `kubectl drain` / node upgrades may never evict the last ready pod
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: leaderboard

@@ -1,0 +1,22 @@
+# Base: everything cubetype needs, environment-neutral. Render/apply through an overlay:
+#   kubectl apply -k deploy/k8s/overlays/local   (kind: local images, nginx gateway)
+# Not included (on purpose): the Secret cubetype-secrets (created with kubectl, see
+# deploy/README.md; never committed) and the on-demand Jobs in deploy/k8s/jobs/ (seed, loadgen).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: cubetype                     # put every object below into the cubetype namespace
+resources:
+  - namespace.yaml
+  - config.yaml
+  - postgres.yaml                       # CloudNativePG Cluster "pg" (needs the CNPG operator installed first)
+  - redis.yaml
+  - auth.yaml
+  - scramble.yaml
+  - solve.yaml
+  - stats.yaml
+  - leaderboard.yaml
+  - race.yaml
+  - wca.yaml
+  - web.yaml
+  - hpa.yaml
+  - wca-import-cronjob.yaml

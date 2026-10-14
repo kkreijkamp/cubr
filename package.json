@@ -10,7 +10,7 @@
   ],
   "scripts": {
     "build:svc": "node scripts/build-service.mjs",
-    "build:all": "for d in services/*; do node scripts/build-service.mjs $d || exit 1; done",
+    "build:all": "for d in services/* jobs/seed; do node scripts/build-service.mjs $d || exit 1; done",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
