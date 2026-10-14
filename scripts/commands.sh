@@ -85,7 +85,7 @@ section_2() {
 }
 
 # =============================================================================================
-# 3. Artifact Registry repository
+# 3. Artifact Registry repository + IAM permissions
 # =============================================================================================
 section_3() {
   # Create the Docker repository that will hold our images:
@@ -96,6 +96,53 @@ section_3() {
     --repository-format=docker \
     --location="$REGION" \
     --description="cubetype container images (INFS3208)"
+
+  # Look up the numeric project number (part of the default service-account e-mails).
+  #   --format='value(projectNumber)'  print only that field, no table
+  PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
+
+  # The Compute Engine default service account: GKE nodes run as it (image pulls, logging).
+  COMPUTE_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+
+  # Ask Cloud Build which service account runs our builds (new projects use the Compute
+  # default SA, older ones <number>@cloudbuild.gserviceaccount.com). The value has the form
+  # projects/<p>/serviceAccounts/<email>; ${VAR##*/} strips everything up to the last "/".
+  BUILD_SA="$(gcloud builds get-default-service-account --format='value(serviceAccountEmail)')"
+  BUILD_SA="${BUILD_SA##*/}"
+  echo "nodes: $COMPUTE_SA   builds: $BUILD_SA"
+
+  # Allow the GKE nodes to PULL images from the repository (avoids ImagePullBackOff / 403):
+  #   --location  repository region     --member  who gets the role     --role  read-only access
+  gcloud artifacts repositories add-iam-policy-binding "$REPO" \
+    --location="$REGION" \
+    --member="serviceAccount:$COMPUTE_SA" \
+    --role="roles/artifactregistry.reader"
+
+  # Minimum permissions GKE nodes need for logging/monitoring when the default SA is not an
+  # Editor (common in university organisations): the "Kubernetes Engine Default Node Service
+  # Account" role. --condition=None: unconditional binding.
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="serviceAccount:$COMPUTE_SA" \
+    --role="roles/container.defaultNodeServiceAccount" \
+    --condition=None
+
+  # Allow Cloud Build to PUSH images into the repository (writer = read + push).
+  gcloud artifacts repositories add-iam-policy-binding "$REPO" \
+    --location="$REGION" \
+    --member="serviceAccount:$BUILD_SA" \
+    --role="roles/artifactregistry.writer"
+
+  # Allow Cloud Build to write build logs (cloudbuild.yaml uses logging: CLOUD_LOGGING_ONLY).
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="serviceAccount:$BUILD_SA" \
+    --role="roles/logging.logWriter" \
+    --condition=None
+
+  # Allow Cloud Build to read the uploaded source archive from the <project>_cloudbuild bucket.
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="serviceAccount:$BUILD_SA" \
+    --role="roles/storage.objectViewer" \
+    --condition=None
 
   # (Optional, only for scripts/build-push.sh from the laptop) let `docker push` authenticate
   # to the regional registry host with your gcloud credentials.

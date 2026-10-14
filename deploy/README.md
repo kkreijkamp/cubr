@@ -155,7 +155,7 @@ Run `scripts/commands.sh` section by section (`scripts/commands.sh list` prints 
 | 0 | Variables (`PROJECT_ID=infs3208-a2-koen`, `ZONE=australia-southeast1-a`, `CLUSTER=cubetype`, `REPO=cubetype`, `VERSION=1.0.0`) |
 | 1 | `gcloud auth list`, select `koen@mangotree.info`, set project/region/zone |
 | 2 | Enable container, artifactregistry, cloudbuild and compute APIs |
-| 3 | Artifact Registry repo |
+| 3 | Artifact Registry repo. IAM: nodes get `artifactregistry.reader` and `container.defaultNodeServiceAccount`; the build SA gets `artifactregistry.writer`, `logging.logWriter` and `storage.objectViewer`. |
 | 4 | `gcloud builds submit --config cloudbuild.yaml --substitutions _VERSION=1.0.0,…` (10 images in parallel, native amd64) |
 | 5 | `gcloud container clusters create` (3× e2-standard-2, autoscaling 3–5, 30 GB pd-balanced, regular channel, VPC-native) + `get-credentials` |
 | 6 | Reserve the global static IP `cubetype-ip` |
@@ -172,7 +172,9 @@ To release a new version, change `newTag` in `k8s/overlays/gke/kustomization.yam
 |---|---|
 | Ingress answers **404 / 502** for 5–10 min after deploy | The Google LB is still being programmed and health checks are warming up. Check `kubectl -n cubetype describe ingress cubetype` until the `ingress.kubernetes.io/backends` annotation shows `HEALTHY` everywhere. BackendConfigs probe `/readyz:8080`, so a backend whose Postgres/Redis is down stays unhealthy on purpose. |
 | A single backend permanently `UNHEALTHY` | `kubectl -n cubetype logs deploy/<svc>` and `curl` its `/readyz` via `kubectl port-forward`. BackendConfig changes can take minutes to sync. |
+| **ImagePullBackOff** with 403 on GKE | The node SA can't read Artifact Registry: re-run the `artifactregistry.reader` binding (§3). Check the image path `australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/<svc>:<tag>` exists (`gcloud artifacts docker images list …`). |
 | `exec format error` | arm64 image on amd64 nodes. Build with Cloud Build or `scripts/build-push.sh` (`--platform linux/amd64`). |
+| Cloud Build: permission denied pushing / writing logs | The build SA lacks `artifactregistry.writer` / `logging.logWriter` (§3). New projects build as the Compute default SA. |
 | `failed calling webhook "...cnpg.io"` when applying | The CNPG operator isn't ready yet: `kubectl rollout status deployment/cnpg-controller-manager -n cnpg-system`, then re-apply. On private-node clusters, open TCP 9443 from the control plane. |
 | Pods stuck `CreateContainerConfigError` | The Secret is missing: `cubetype-secrets` (§8) or `pg-app` (created by CNPG once the Cluster exists; pods recover automatically). |
 | wca-import Job fails `curl: (22) … 429` | The WCA export endpoint is rate-limiting your IP. Retry later (`kubectl delete job wca-import-now` then create it again). Locally, use `scripts/kind-wca-import-tsv.sh`. |
