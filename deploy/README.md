@@ -179,4 +179,5 @@ To release a new version, change `newTag` in `k8s/overlays/gke/kustomization.yam
 | Pods stuck `CreateContainerConfigError` | The Secret is missing: `cubetype-secrets` (§8) or `pg-app` (created by CNPG once the Cluster exists; pods recover automatically). |
 | wca-import Job fails `curl: (22) … 429` | The WCA export endpoint is rate-limiting your IP. Retry later (`kubectl delete job wca-import-now` then create it again). Locally, use `scripts/kind-wca-import-tsv.sh`. |
 | HPA `TARGETS <unknown>` | metrics-server missing (kind: see §3) or the container has no CPU request. |
+| WebSocket drops every 30 s on GKE | The race BackendConfig must have `timeoutSec: 3600`. The classic ALB closes WebSockets at the backend timeout. |
 | `kubectl drain` hangs | A PDB is blocking (by design, e.g. only one ready replica). Wait for the replacement pod, or check `kubectl get pdb -n cubetype`. Use `--delete-emptydir-data`. |

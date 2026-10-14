@@ -3,7 +3,8 @@
 #                      readinessProbe -- so pods whose dependencies are down get no traffic
 #   connectionDraining after a pod leaves the backend (rollout, scale-in), in-flight requests
 #                      get up to 30 s to finish (pods also sleep 10 s in preStop)
-#   timeoutSec         max time for a backend response (default 30 s).
+#   timeoutSec         max time for a backend response (default 30 s). race: 3600 s, because
+#                      the classic ALB closes WebSockets (even active ones) when it expires.
 #                      solve: 120 s for large csTimer imports.
 ---
 apiVersion: cloud.google.com/v1
@@ -114,7 +115,7 @@ metadata:
     app.kubernetes.io/name: race
     app.kubernetes.io/part-of: cubetype
 spec:
-  timeoutSec: 30
+  timeoutSec: 3600   # WebSockets (Socket.IO) live up to 1 h; the client reconnects automatically
   connectionDraining:
     drainingTimeoutSec: 30
   healthCheck:
