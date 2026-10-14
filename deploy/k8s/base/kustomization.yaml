@@ -1,4 +1,5 @@
 # Base: everything cubetype needs, environment-neutral. Render/apply through an overlay:
+#   kubectl apply -k deploy/k8s/overlays/gke     (GKE: Artifact Registry images, Ingress)
 #   kubectl apply -k deploy/k8s/overlays/local   (kind: local images, nginx gateway)
 # Not included (on purpose): the Secret cubetype-secrets (created with kubectl, see
 # deploy/README.md; never committed) and the on-demand Jobs in deploy/k8s/jobs/ (seed, loadgen).

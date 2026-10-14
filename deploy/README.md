@@ -3,19 +3,24 @@
 This folder holds everything needed to run cubetype outside a developer's editor:
 
 - a **docker compose** stack for local development;
-- a **kind** (Kubernetes-in-Docker) setup for testing the Kubernetes manifests locally.
+- a **kind** (Kubernetes-in-Docker) setup for testing the Kubernetes manifests locally;
+- **GKE Standard** in `infs3208-a2-koen` / `australia-southeast1-a` for the real deployment.
 
-Both use the same container images and the same routing table.
+All three use the same container images and the same routing table.
 
 | Path | What it is |
 |---|---|
 | `../docker-compose.yml` | Full local stack: Postgres, Redis, 7 services, web and the nginx gateway (+ `jobs` profile) |
 | `gateway/nginx.conf` | Compose gateway that mimics the GKE Ingress routes |
 | `k8s/base/` | Environment-neutral manifests (kustomize): namespace, ConfigMap, CloudNativePG `Cluster`, Redis StatefulSet, 8 Deployments + Services + PDBs, 4 HPAs, wca-import CronJob |
+| `k8s/overlays/gke/` | Artifact Registry images, Ingress, BackendConfigs, NEG annotations, `standard-rwo` storage, 3 Postgres instances |
 | `k8s/overlays/local/` | kind: local `cubetype/<svc>:dev` images, nginx `gateway` (NodePort 30080 → `localhost:8090`) instead of the Ingress |
 | `k8s/jobs/seed`, `k8s/jobs/loadgen` | On-demand Jobs: demo data, HPA load generator. Not part of the base. Apply seed via `overlays/<env>/seed` so the image is rewritten. |
 | `k8s/kind/kind-config.yaml` | kind cluster: 1 control-plane + 2 workers, port mapping 8090 → 30080 |
+| `cloudbuild/single-image.yaml` | Cloud Build for one image (e.g. `web:1.1.0` for the rollout demo) |
+| `../cloudbuild.yaml` | Cloud Build for all 10 images in parallel |
 | `../scripts/build-local.sh` | `docker build` all images as `cubetype/<name>:dev` (`--kind` also loads them into kind) |
+| `../scripts/build-push.sh` | Alternative to Cloud Build: `docker buildx --platform linux/amd64 --push` to Artifact Registry |
 | `../scripts/kind-up.sh` | Repeatable local Kubernetes setup (cluster, CNPG, metrics-server, images, secret, deploy) |
 | `../scripts/kind-wca-import-tsv.sh` | Offline WCA import into kind from an unzipped export (if the WCA API rate-limits you) |
 | `../scripts/smoke.mjs` | End-to-end check through any entry point: `node scripts/smoke.mjs <baseUrl>` |
@@ -24,10 +29,34 @@ Both use the same container images and the same routing table.
 
 ## 1. Architecture of the deployment
 
+```
+                    Internet
+                       │  http://<cubetype-ip>/
+         ┌─────────────▼─────────────┐   GKE Ingress (class gce) = Google external Application LB
+         │  URL map: path prefixes   │   static global IP "cubetype-ip", health checks on /readyz
+         └──┬───┬───┬───┬───┬───┬──┬─┘   container-native LB: traffic goes straight to pod IPs (NEGs)
+            │   │   │   │   │   │  └───────────── default → web (nginx, SPA)          HPA 2–6
+   /api/auth│   │   │   │   │   └─ /api/race, /socket.io → race (WebSockets)        HPA 2–6
+  /api/users│   │   │   │   └──── /api/wca → wca                                    2
+            │   │   │   └──────── /api/leaderboards → leaderboard                   2
+            │   │   └──────────── /api/stats → stats                                2
+            │   └──────────────── /api/sessions, /api/solves → solve                HPA 2–6
+            └──── auth  2         /api/scrambles → scramble (CPU-heavy)             HPA 2–8
+                       │
+     internal (ClusterIP Services, http://<svc>:8080, /internal/* never exposed)
+                       │
+   ┌───────────────────▼───────────────────┐      ┌───────────────────────────────┐
+   │ CloudNativePG Cluster "pg"            │      │ Redis StatefulSet (PVC 1Gi)   │
+   │ pg-1 primary + pg-2, pg-3 replicas    │      │ streams (event bus), cache,   │
+   │ Service pg-rw → primary, auto-failover│      │ leaderboards, race state      │
+   └───────────────────────────────────────┘      └───────────────────────────────┘
+   CronJob wca-import (weekly) · Job seed (on demand) · Job loadgen (HPA demo)
+```
+
 **Why it is built this way**
 
 - **Kubernetes-native building blocks.** Each microservice is a Deployment with a ClusterIP Service. Service discovery is plain DNS (`http://solve:8080`), the same names compose uses.
-- **Zero-downtime rollouts.** Rolling updates use `maxSurge 1` / `maxUnavailable 0` / `minReadySeconds 5`. Readiness gates traffic on dependencies; liveness only checks that the process is alive. A `preStop` sleep of 10 s means pods leave the Service endpoints before they stop.
+- **Zero-downtime rollouts.** Rolling updates use `maxSurge 1` / `maxUnavailable 0` / `minReadySeconds 5`. Readiness gates traffic on dependencies; liveness only checks that the process is alive. A `preStop` sleep of 10 s plus 30 s of LB connection draining means pods leave the load balancer before they stop.
 - **Availability.**
   - Every Deployment has at least 2 replicas.
   - `topologySpreadConstraints` spread replicas over nodes, with `ScheduleAnyway` so spreading never blocks scheduling.
@@ -35,6 +64,7 @@ Both use the same container images and the same routing table.
 - **Scalability.**
   - HPAs act on CPU relative to each pod's request. scramble is the deliberate CPU hotspot.
   - The behavior block is tuned for a live demo: scale up immediately, scale down after 60 s.
+  - The cluster autoscaler (3–5 nodes) adds nodes when HPA pods are Pending.
   - HPA-managed Deployments have **no `spec.replicas`**, so `kubectl apply` never resets a scaled-out service.
 - **Stateful pieces run self-managed on the cluster.** Managed Cloud SQL HA plus Memorystore would add about US$185/month.
   - **CloudNativePG** gives a primary with streaming replicas, automatic failover (`pg-rw` follows the primary), and generated credentials (`pg-app` Secret → `DATABASE_URL`).
@@ -72,7 +102,7 @@ docker compose down          # stop; add -v to also delete the Postgres/Redis vo
 
 ## 3. Local Kubernetes (kind)
 
-This uses the kustomize manifests (`overlays/local`), with an nginx gateway instead of a cloud load balancer. It always uses a **separate kubeconfig file**, so your normal contexts are never touched.
+This uses the same manifests as GKE (`overlays/local`), with an nginx gateway instead of the Google LB. It always uses a **separate kubeconfig file**, so your normal contexts are never touched.
 
 ```bash
 brew install kind                                       # once
@@ -112,3 +142,36 @@ kubectl -n cubetype rollout undo deployment/web
 ```
 
 The HPA demo works the same way: `kubectl apply -k deploy/k8s/jobs/loadgen; kubectl -n cubetype get hpa scramble -w`.
+
+To match GKE's version exactly, create the cluster with `NODE_IMAGE=kindest/node:v1.36.4 scripts/kind-up.sh`.
+
+## 4. GKE deployment
+
+In short (zone `australia-southeast1-a`, Artifact Registry `australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype`):
+
+```bash
+gcloud builds submit --region=australia-southeast1 --config=cloudbuild.yaml --substitutions=_VERSION=1.0.0 .
+gcloud container clusters create cubetype --zone=australia-southeast1-a --machine-type=e2-standard-2 \
+  --num-nodes=3 --enable-autoscaling --min-nodes=3 --max-nodes=5 --enable-ip-alias
+gcloud compute addresses create cubetype-ip --global          # the Ingress refers to it by name
+kubectl apply --server-side -f https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.30/releases/cnpg-1.30.1.yaml
+kubectl create namespace cubetype
+kubectl -n cubetype create secret generic cubetype-secrets \
+  --from-literal=JWT_SECRET="$(openssl rand -hex 32)" --from-literal=INTERNAL_API_TOKEN="$(openssl rand -hex 24)"
+kubectl apply -k deploy/k8s/overlays/gke
+```
+
+To release a new version, change `newTag` in `k8s/overlays/gke/kustomization.yaml` and re-apply.
+
+## 5. Troubleshooting
+
+| Symptom | Cause / fix |
+|---|---|
+| Ingress answers **404 / 502** for 5–10 min after deploy | The Google LB is still being programmed and health checks are warming up. Check `kubectl -n cubetype describe ingress cubetype` until the `ingress.kubernetes.io/backends` annotation shows `HEALTHY` everywhere. BackendConfigs probe `/readyz:8080`, so a backend whose Postgres/Redis is down stays unhealthy on purpose. |
+| A single backend permanently `UNHEALTHY` | `kubectl -n cubetype logs deploy/<svc>` and `curl` its `/readyz` via `kubectl port-forward`. BackendConfig changes can take minutes to sync. |
+| `exec format error` | arm64 image on amd64 nodes. Build with Cloud Build or `scripts/build-push.sh` (`--platform linux/amd64`). |
+| `failed calling webhook "...cnpg.io"` when applying | The CNPG operator isn't ready yet: `kubectl rollout status deployment/cnpg-controller-manager -n cnpg-system`, then re-apply. On private-node clusters, open TCP 9443 from the control plane. |
+| Pods stuck `CreateContainerConfigError` | The Secret is missing: `cubetype-secrets` or `pg-app` (created by CNPG once the Cluster exists; pods recover automatically). |
+| wca-import Job fails `curl: (22) … 429` | The WCA export endpoint is rate-limiting your IP. Retry later (`kubectl delete job wca-import-now` then create it again). Locally, use `scripts/kind-wca-import-tsv.sh`. |
+| HPA `TARGETS <unknown>` | metrics-server missing (kind: see §3) or the container has no CPU request. |
+| `kubectl drain` hangs | A PDB is blocking (by design, e.g. only one ready replica). Wait for the replacement pod, or check `kubectl get pdb -n cubetype`. Use `--delete-emptydir-data`. |

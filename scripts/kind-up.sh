@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================================
 # Local Kubernetes for cubetype: creates (or reuses) a kind cluster and deploys the full stack
-# with the kustomize manifests (deploy/k8s/overlays/local). Idempotent -- safe to re-run.
+# with the same manifests as GKE (deploy/k8s/overlays/local). Idempotent -- safe to re-run.
 #
 #   scripts/kind-up.sh                 # cluster + operators + build/load images + deploy
 #   SKIP_BUILD=1 scripts/kind-up.sh    # images already loaded, just (re)deploy
@@ -11,7 +11,7 @@
 #   KUBECONFIG    kubeconfig file to use/write (default ~/.kube/cubetype-kind.yaml -- a separate
 #                 file, so your normal ~/.kube/config contexts are never touched)
 #   KIND_CLUSTER  cluster name (default cubetype)
-#   NODE_IMAGE    optional kind node image (Kubernetes version), e.g. kindest/node:v1.36.4
+#   NODE_IMAGE    optional kind node image, e.g. kindest/node:v1.36.4 to match GKE's version
 #   SKIP_BUILD=1  don't build/load images
 # =============================================================================================
 set -euo pipefail
@@ -42,7 +42,7 @@ kubectl apply --server-side -f \
 # Wait until the operator (and its validating webhook) is ready to accept Cluster objects.
 kubectl rollout status deployment/cnpg-controller-manager -n cnpg-system --timeout=300s
 
-# 3. metrics-server (kind does not ship it) so HPAs and `kubectl top` work.
+# 3. metrics-server (GKE has it built in; kind does not) so HPAs and `kubectl top` work.
 kubectl apply -f "https://github.com/kubernetes-sigs/metrics-server/releases/download/${METRICS_SERVER_VERSION}/components.yaml" >/dev/null
 # kind's kubelets use self-signed certificates -> add --kubelet-insecure-tls once (JSON patch
 # appends to the container's args; skipped if the flag is already there).

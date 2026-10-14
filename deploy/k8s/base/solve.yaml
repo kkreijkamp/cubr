@@ -50,7 +50,7 @@ spec:
           matchLabelKeys: ["pod-template-hash"]   # spread each ReplicaSet (rollout) separately
       containers:
         - name: solve
-          image: cubetype/solve:dev
+          image: cubetype/solve:dev    # rewritten per overlay (GKE: Artifact Registry :1.0.0)
           imagePullPolicy: IfNotPresent
           # APP_VERSION is baked into the image at build time (--build-arg) and deliberately not overridden here.
           envFrom:

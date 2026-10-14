@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// End-to-end smoke test through the public entry point (the docker compose gateway by default).
-// Walks a real user journey across the microservices and checks the event pipeline:
+// End-to-end smoke test through the public entry point (local gateway, kind gateway or GKE Ingress).
+// Walks a real user journey across every microservice and checks the event pipeline:
 //   node scripts/smoke.mjs http://localhost:8080
+//   node scripts/smoke.mjs http://<INGRESS_IP>
 const BASE = (process.argv[2] ?? process.env.BASE_URL ?? 'http://localhost:8080').replace(/\/$/, '');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let failures = 0;

@@ -1,0 +1,10 @@
+# Seed Job with the Artifact Registry image:  kubectl apply -k deploy/k8s/overlays/gke/seed
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: cubetype
+resources:
+  - ../../../jobs/seed
+images:
+  - name: cubetype/seed
+    newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/seed
+    newTag: "1.0.0"

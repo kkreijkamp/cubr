@@ -21,4 +21,4 @@ Idempotent: re-running logs existing users in and skips users that already have 
 | `SEED_DEMO_USER` / `SEED_DEMO_PASSWORD` | `demo` / `cubetype-demo` | presentation account |
 | `INTERNAL_API_TOKEN` | – | shared secret with auth so the seed job bypasses per-IP rate limits |
 
-Run: `docker compose --profile jobs run --rm seed` (local) or `kubectl apply -k deploy/k8s/overlays/local/seed` (kind).
+Run: `docker compose --profile jobs run --rm seed` (local) or `kubectl apply -k deploy/k8s/overlays/gke/seed` (GKE) / `kubectl apply -k deploy/k8s/overlays/local/seed` (kind).

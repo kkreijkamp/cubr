@@ -1,0 +1,17 @@
+# GKE: 3 PostgreSQL instances (1 primary + 2 streaming replicas, one per e2-standard-2 node)
+# on pd-balanced persistent disks, with a little more memory than the base.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pg
+spec:
+  instances: 3
+  storage:
+    size: 5Gi
+    storageClass: standard-rwo          # GKE CSI pd-balanced, WaitForFirstConsumer
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 1Gi

@@ -51,7 +51,7 @@ spec:
           matchLabelKeys: ["pod-template-hash"]   # spread each ReplicaSet (rollout) separately
       containers:
         - name: scramble
-          image: cubetype/scramble:dev
+          image: cubetype/scramble:dev    # rewritten per overlay (GKE: Artifact Registry :1.0.0)
           imagePullPolicy: IfNotPresent
           # APP_VERSION is baked into the image at build time (--build-arg) and deliberately not overridden here.
           envFrom:

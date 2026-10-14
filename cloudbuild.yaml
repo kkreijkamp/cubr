@@ -1,0 +1,149 @@
+# =============================================================================================
+# Cloud Build: builds all cubetype images on Google's x86-64 build machines (no emulation, no
+# laptop upload of images) and pushes them to Artifact Registry. Submitted from the repo root:
+#   gcloud builds submit --region=australia-southeast1 --config=cloudbuild.yaml \
+#     --substitutions=_VERSION=1.0.0 .
+# The source upload honours .gitignore (node_modules/, dist/ are not uploaded).
+#
+# All build steps start at once (waitFor: ['-']) and run in parallel on the same Docker
+# daemon; identical layers (base image, COPY . ., npm ci) are shared between them.
+# Substitutions ($PROJECT_ID is filled in by Cloud Build automatically):
+#   _VERSION  image tag and APP_VERSION baked into the images (shown by /_info)
+#   _REGION   Artifact Registry region      _REPO  Artifact Registry repository name
+# =============================================================================================
+substitutions:
+  _VERSION: 1.0.0
+  _REGION: australia-southeast1
+  _REPO: cubetype
+
+options:
+  logging: CLOUD_LOGGING_ONLY          # logs go to Cloud Logging (no logs bucket needed)
+  env:
+    - DOCKER_BUILDKIT=1                # Dockerfiles use BuildKit features (cache mounts, $BUILDPLATFORM)
+  # machineType: E2_HIGHCPU_8          # optional: ~3x faster, but outside the free build-minutes tier
+
+timeout: 1800s                         # fail the whole build after 30 min
+
+steps:
+  # ---- auth
+  - id: auth
+    name: gcr.io/cloud-builders/docker
+    waitFor: ['-']                     # start immediately, in parallel with the other steps
+    args:
+      - build
+      - --file=services/auth/Dockerfile
+      - --build-arg=APP_VERSION=${_VERSION}
+      - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/auth:${_VERSION}
+      - .                              # build context = repo root
+
+  # ---- scramble
+  - id: scramble
+    name: gcr.io/cloud-builders/docker
+    waitFor: ['-']                     # start immediately, in parallel with the other steps
+    args:
+      - build
+      - --file=services/scramble/Dockerfile
+      - --build-arg=APP_VERSION=${_VERSION}
+      - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/scramble:${_VERSION}
+      - .                              # build context = repo root
+
+  # ---- solve
+  - id: solve
+    name: gcr.io/cloud-builders/docker
+    waitFor: ['-']                     # start immediately, in parallel with the other steps
+    args:
+      - build
+      - --file=services/solve/Dockerfile
+      - --build-arg=APP_VERSION=${_VERSION}
+      - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/solve:${_VERSION}
+      - .                              # build context = repo root
+
+  # ---- stats
+  - id: stats
+    name: gcr.io/cloud-builders/docker
+    waitFor: ['-']                     # start immediately, in parallel with the other steps
+    args:
+      - build
+      - --file=services/stats/Dockerfile
+      - --build-arg=APP_VERSION=${_VERSION}
+      - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/stats:${_VERSION}
+      - .                              # build context = repo root
+
+  # ---- leaderboard
+  - id: leaderboard
+    name: gcr.io/cloud-builders/docker
+    waitFor: ['-']                     # start immediately, in parallel with the other steps
+    args:
+      - build
+      - --file=services/leaderboard/Dockerfile
+      - --build-arg=APP_VERSION=${_VERSION}
+      - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/leaderboard:${_VERSION}
+      - .                              # build context = repo root
+
+  # ---- race
+  - id: race
+    name: gcr.io/cloud-builders/docker
+    waitFor: ['-']                     # start immediately, in parallel with the other steps
+    args:
+      - build
+      - --file=services/race/Dockerfile
+      - --build-arg=APP_VERSION=${_VERSION}
+      - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/race:${_VERSION}
+      - .                              # build context = repo root
+
+  # ---- wca
+  - id: wca
+    name: gcr.io/cloud-builders/docker
+    waitFor: ['-']                     # start immediately, in parallel with the other steps
+    args:
+      - build
+      - --file=services/wca/Dockerfile
+      - --build-arg=APP_VERSION=${_VERSION}
+      - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/wca:${_VERSION}
+      - .                              # build context = repo root
+
+  # ---- web
+  - id: web
+    name: gcr.io/cloud-builders/docker
+    waitFor: ['-']                     # start immediately, in parallel with the other steps
+    args:
+      - build
+      - --file=web/Dockerfile
+      - --build-arg=APP_VERSION=${_VERSION}
+      - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web:${_VERSION}
+      - .                              # build context = repo root
+
+  # ---- wca-import
+  - id: wca-import
+    name: gcr.io/cloud-builders/docker
+    waitFor: ['-']                     # start immediately, in parallel with the other steps
+    args:
+      - build
+      - --file=jobs/wca-import/Dockerfile
+      - --build-arg=APP_VERSION=${_VERSION}
+      - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/wca-import:${_VERSION}
+      - .                              # build context = repo root
+
+  # ---- seed
+  - id: seed
+    name: gcr.io/cloud-builders/docker
+    waitFor: ['-']                     # start immediately, in parallel with the other steps
+    args:
+      - build
+      - --file=jobs/seed/Dockerfile
+      - --build-arg=APP_VERSION=${_VERSION}
+      - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/seed:${_VERSION}
+      - .                              # build context = repo root
+
+# Pushed to Artifact Registry after all steps succeeded (also listed in the build summary).
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/auth:${_VERSION}
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/scramble:${_VERSION}
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/solve:${_VERSION}
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/stats:${_VERSION}
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/leaderboard:${_VERSION}
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/race:${_VERSION}
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/wca:${_VERSION}
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web:${_VERSION}
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/wca-import:${_VERSION}
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/seed:${_VERSION}

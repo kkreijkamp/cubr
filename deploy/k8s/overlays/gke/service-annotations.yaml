@@ -1,0 +1,65 @@
+# Strategic-merge patches that add GKE Ingress annotations to the base Services.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth
+  annotations:
+    cloud.google.com/neg: '{"ingress": true}'
+    cloud.google.com/backend-config: '{"default": "auth"}'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: scramble
+  annotations:
+    cloud.google.com/neg: '{"ingress": true}'
+    cloud.google.com/backend-config: '{"default": "scramble"}'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: solve
+  annotations:
+    cloud.google.com/neg: '{"ingress": true}'
+    cloud.google.com/backend-config: '{"default": "solve"}'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: stats
+  annotations:
+    cloud.google.com/neg: '{"ingress": true}'
+    cloud.google.com/backend-config: '{"default": "stats"}'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: leaderboard
+  annotations:
+    cloud.google.com/neg: '{"ingress": true}'
+    cloud.google.com/backend-config: '{"default": "leaderboard"}'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: race
+  annotations:
+    cloud.google.com/neg: '{"ingress": true}'
+    cloud.google.com/backend-config: '{"default": "race"}'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wca
+  annotations:
+    cloud.google.com/neg: '{"ingress": true}'
+    cloud.google.com/backend-config: '{"default": "wca"}'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  annotations:
+    cloud.google.com/neg: '{"ingress": true}'
+    cloud.google.com/backend-config: '{"default": "web"}'
