@@ -3,13 +3,19 @@
 This folder holds everything needed to run cubetype outside a developer's editor:
 
 - a **docker compose** stack for local development;
-- **Kubernetes** manifests (kustomize) for the cluster deployment.
+- a **kind** (Kubernetes-in-Docker) setup for testing the Kubernetes manifests locally.
+
+Both use the same container images and the same routing table.
 
 | Path | What it is |
 |---|---|
 | `../docker-compose.yml` | Full local stack: Postgres, Redis, 7 services, web and the nginx gateway (+ `jobs` profile) |
 | `gateway/nginx.conf` | Compose gateway that mimics the GKE Ingress routes |
 | `k8s/base/` | Environment-neutral manifests (kustomize): namespace, ConfigMap, CloudNativePG `Cluster`, Redis StatefulSet, 8 Deployments + Services |
+| `k8s/overlays/local/` | kind: local `cubetype/<svc>:dev` images, nginx `gateway` (NodePort 30080 → `localhost:8090`) instead of the Ingress |
+| `k8s/kind/kind-config.yaml` | kind cluster: 1 control-plane + 2 workers, port mapping 8090 → 30080 |
+| `../scripts/build-local.sh` | `docker build` all images as `cubetype/<name>:dev` (`--kind` also loads them into kind) |
+| `../scripts/kind-up.sh` | Repeatable local Kubernetes setup (cluster, CNPG, images, secret, deploy) |
 | `../scripts/smoke.mjs` | End-to-end check through any entry point: `node scripts/smoke.mjs <baseUrl>` |
 
 ---
@@ -48,14 +54,28 @@ docker compose down          # stop; add -v to also delete the Postgres/Redis vo
 - Offline WCA import from an unzipped export:
   `docker compose --profile jobs run --rm -v "$PWD/data/wca/tsv:/data:ro" -e WCA_TSV_DIR=/data wca-import`
 
-## 3. Kubernetes
+## 3. Local Kubernetes (kind)
 
-The base applies to any cluster that runs the CloudNativePG operator and can pull the images:
+This uses the kustomize manifests (`overlays/local`), with an nginx gateway instead of a cloud load balancer. It always uses a **separate kubeconfig file**, so your normal contexts are never touched.
 
 ```bash
+brew install kind                                       # once
+export KUBECONFIG=~/.kube/cubetype-kind.yaml            # any separate file
+scripts/kind-up.sh                                      # cluster + CNPG 1.30.1 + build/load images + deploy
+open http://localhost:8090                              # gateway NodePort 30080 (kind port mapping)
+node scripts/smoke.mjs http://localhost:8090
+```
+
+What `kind-up.sh` does, step by step (equivalent manual commands):
+
+```bash
+kind create cluster --config deploy/k8s/kind/kind-config.yaml --kubeconfig "$KUBECONFIG"
 kubectl apply --server-side -f https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.30/releases/cnpg-1.30.1.yaml
+kubectl rollout status deployment/cnpg-controller-manager -n cnpg-system
+scripts/build-local.sh --kind                      # docker build + kind load (worker nodes only)
 kubectl create namespace cubetype
-kubectl -n cubetype create secret generic cubetype-secrets --from-literal=JWT_SECRET="$(openssl rand -hex 32)"
-kubectl apply -k deploy/k8s/base
+kubectl -n cubetype create secret generic cubetype-secrets \
+  --from-literal=JWT_SECRET="$(openssl rand -hex 32)"
+kubectl apply -k deploy/k8s/overlays/local
 kubectl -n cubetype wait cluster/pg --for=condition=Ready --timeout=600s
 ```

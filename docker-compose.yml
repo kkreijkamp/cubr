@@ -88,7 +88,7 @@ services:
   # ---- microservices (build context = repo root, see docs/BUILDING.md) ------------------------
   auth:
     <<: *service
-    image: cubetype/auth:dev
+    image: cubetype/auth:dev          # same tag scripts/build-local.sh uses (can be `kind load`ed)
     build: { context: ., dockerfile: services/auth/Dockerfile, args: *build-args }
 
   scramble:

@@ -1,5 +1,5 @@
-# Base: everything cubetype needs, environment-neutral:
-#   kubectl apply -k deploy/k8s/base
+# Base: everything cubetype needs, environment-neutral. Render/apply through an overlay:
+#   kubectl apply -k deploy/k8s/overlays/local   (kind: local images, nginx gateway)
 # Not included (on purpose): the Secret cubetype-secrets (created with kubectl, see
 # deploy/README.md; never committed).
 apiVersion: kustomize.config.k8s.io/v1beta1
