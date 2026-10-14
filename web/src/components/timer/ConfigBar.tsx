@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, Cloud, CloudOff, Eye, HardDrive, Keyboard, Layers, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { Check, ChevronDown, Cloud, CloudOff, Eye, HardDrive, Keyboard, Layers, Merge, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { EVENTS, getEvent } from '@cubetype/cubestats';
 import { Modal } from '../Modal';
 import type { Session } from '../../lib/types';
@@ -19,6 +19,8 @@ interface Props {
   onNewSession: () => void;
   onRenameSession: () => void;
   onDeleteSession: () => void;
+  /** "merge sessions…" (optional so older callers keep working) */
+  onMergeSessions?: () => void;
   inspection: boolean;
   onToggleInspection: () => void;
   manual: boolean;
@@ -76,6 +78,7 @@ export function ConfigBar(p: Props) {
           onNew={p.onNewSession}
           onRename={p.onRenameSession}
           onDelete={p.onDeleteSession}
+          onMerge={p.onMergeSessions}
         />
       </div>
 
@@ -140,9 +143,10 @@ interface MenuProps {
   onNew: () => void;
   onRename: () => void;
   onDelete: () => void;
+  onMerge?: () => void;
 }
 
-function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, onNew, onRename, onDelete }: MenuProps) {
+function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, onNew, onRename, onDelete, onMerge }: MenuProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -217,6 +221,22 @@ function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, 
             </span>
             <span className="tp-menu-label">rename</span>
           </button>
+          {onMerge && (
+            <button
+              role="menuitem"
+              className="tp-menu-item"
+              onClick={act(onMerge)}
+              disabled={!current || sessions.length < 2}
+              aria-label={sessions.length < 2 ? `merge sessions (you only have one ${eventLabel} session)` : undefined}
+              {...noFocus}
+            >
+              <span className="tp-menu-check">
+                <Merge size={14} />
+              </span>
+              <span className="tp-menu-label">merge sessions…</span>
+              {sessions.length < 2 && <span className="tp-menu-hint">needs another {eventLabel} session</span>}
+            </button>
+          )}
           <button role="menuitem" className="tp-menu-item danger" onClick={act(onDelete)} disabled={!current} {...noFocus}>
             <span className="tp-menu-check">
               <Trash2 size={14} />

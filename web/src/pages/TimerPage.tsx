@@ -8,6 +8,7 @@ import {
   Keyboard,
   Layers,
   List,
+  Merge,
   MessageSquare,
   Pencil,
   Plus,
@@ -30,6 +31,7 @@ import { AverageModal } from '../components/timer/AverageModal';
 import { QuickActions } from '../components/timer/QuickActions';
 import { ManualEntry } from '../components/timer/ManualEntry';
 import { ConfirmModal, PromptModal } from '../components/timer/Dialogs';
+import { MergeSessionsModal } from '../components/timer/MergeSessionsModal';
 import { copyText, isTouchDevice, playPbSound } from '../components/timer/feedback';
 import { averageWindow, detectPbs, fmtAvg, fmtSolveShort, statNs } from '../components/timer/statsUtil';
 import { noFocus } from '../components/timer/ConfigBar';
@@ -59,6 +61,7 @@ type ModalState =
   | { kind: 'newSession' }
   | { kind: 'renameSession' }
   | { kind: 'deleteSession' }
+  | { kind: 'mergeSessions' }
   | { kind: 'deleteLast' }
   | { kind: 'comment'; solveId: string }
   | null;
@@ -79,7 +82,7 @@ function isTyping(el: EventTarget | null): boolean {
 export default function TimerPage() {
   const settings = useSettings();
   const st = useSolveState();
-  const { status: authStatus } = useAuth();
+  const { status: authStatus, user } = useAuth();
   const paletteOpen = useStore(paletteStore, (s) => s.open);
 
   const session = st.sessions.find((s) => s.id === st.currentSessionId) ?? null;
@@ -329,6 +332,13 @@ export default function TimerPage() {
         },
         { id: 'timer-new-session', label: 'New session', icon: <Plus />, run: () => setModal({ kind: 'newSession' }) },
         { id: 'timer-rename-session', label: 'Rename session', icon: <Pencil />, run: () => setModal({ kind: 'renameSession' }) },
+        {
+          id: 'timer-merge-sessions',
+          label: 'Merge sessions…',
+          icon: <Merge />,
+          keywords: ['combine', 'join', 'session'],
+          run: () => setModal({ kind: 'mergeSessions' }),
+        },
         { id: 'timer-delete-session', label: 'Delete session', icon: <Trash2 />, run: () => setModal({ kind: 'deleteSession' }) },
         { id: 'timer-new-scramble', label: 'New scramble', icon: <RefreshCw />, keywords: ['next'], run: () => scrRef.current.next() },
         { id: 'timer-custom-scramble', label: 'Enter custom scramble', icon: <Pencil />, keywords: ['edit'], run: () => setEditingScramble(true) },
@@ -409,6 +419,7 @@ export default function TimerPage() {
         onNewSession={() => setModal({ kind: 'newSession' })}
         onRenameSession={() => setModal({ kind: 'renameSession' })}
         onDeleteSession={() => setModal({ kind: 'deleteSession' })}
+        onMergeSessions={() => setModal({ kind: 'mergeSessions' })}
         inspection={settings.inspection}
         onToggleInspection={() => updateSettings({ inspection: !settings.inspection })}
         manual={manual}
@@ -588,6 +599,17 @@ export default function TimerPage() {
           }
           confirmLabel="delete session"
           onConfirm={() => deleteSession(session.id)}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal?.kind === 'mergeSessions' && (
+        <MergeSessionsModal
+          sessions={st.sessions}
+          currentSessionId={st.currentSessionId}
+          event={event}
+          mode={st.mode}
+          userId={st.mode === 'cloud' ? (user?.id ?? null) : null}
+          precision={settings.precision}
           onClose={() => setModal(null)}
         />
       )}

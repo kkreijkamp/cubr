@@ -172,6 +172,15 @@ export const api = {
     solves: (id: string, signal?: AbortSignal) => get<{ solves: Solve[] }>(`/api/sessions/${enc(id)}/solves`, signal),
     import: (payload: ImportPayload) =>
       request<{ imported: { sessions: number; solves: number } }>('POST', '/api/sessions/import', payload, { timeoutMs: 120_000 }),
+    /** Moves every solve of `sourceIds` (1–50, same event, not the target) into `targetId` and
+     *  deletes the sources, atomically. 404 = unknown session, 409 = different event. */
+    merge: (targetId: string, sourceIds: string[]) =>
+      request<{ session: Session; merged: { sessions: number; solves: number } }>(
+        'POST',
+        `/api/sessions/${enc(targetId)}/merge`,
+        { sourceIds },
+        { timeoutMs: 60_000 },
+      ),
   },
   solves: {
     create: (body: NewSolve) => request<{ solve: Solve; rolling: { ao5: number | null; ao12: number | null } }>('POST', '/api/solves', body),
@@ -187,6 +196,18 @@ export const api = {
       get<{ days: ActivityDay[] }>(`/api/stats/users/${enc(userId)}/activity${qs({ from, to })}`, signal),
     pbHistory: (userId: string, event: string, signal?: AbortSignal) =>
       get<{ history: { kind: PbKind; valueMs: number; achievedAt: string }[] }>(`/api/stats/users/${enc(userId)}/pb-history${qs({ event })}`, signal),
+    /** chronological solve series: rows are [unixSeconds, timeMs, effectiveMs | null (DNF), sessionIndex] */
+    solves: (userId: string, event: string, signal?: AbortSignal, opts: { limit?: number } = {}) =>
+      get<{
+        event: string;
+        total: number;
+        truncated: boolean;
+        sessions?: { id: string; name: string | null; solves: number; firstAt: string; lastAt: string }[];
+        solves: [number, number, number | null, number?][];
+      }>(
+        `/api/stats/users/${enc(userId)}/solves${qs({ event, limit: opts.limit })}`,
+        signal,
+      ),
     hourly: (userId: string, event: string, signal?: AbortSignal) =>
       get<{ hours: { hour: number; solves: number; meanMs: number | null }[] }>(`/api/stats/users/${enc(userId)}/hourly${qs({ event })}`, signal),
   },

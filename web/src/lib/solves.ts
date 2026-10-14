@@ -907,6 +907,147 @@ export async function ensureSession(event: string): Promise<Session> {
   return s;
 }
 
+// ================================================================ merging sessions
+
+const MERGE_CHUNK = 50; // the API merges at most 50 sources per request
+const SAME_EVENT_MSG = 'only sessions of the same event can be merged';
+
+/** The session a queued op touches (same rule as storeUtils' coalescing). */
+function opSessionId(op: SyncOp): string {
+  switch (op.kind) {
+    case 'createSession':
+      return op.session.id;
+    case 'renameSession':
+    case 'deleteSession':
+      return op.id;
+    case 'createSolve':
+      return op.solve.sessionId;
+    default:
+      return op.sessionId;
+  }
+}
+
+/**
+ * The solves of a session that are already in memory (chronological), or null if they haven't
+ * been fetched yet (cloud mode only fetches the sessions you open). Do not mutate the result.
+ */
+export function getLoadedSolves(sessionId: string): Solve[] | null {
+  return model.solves.get(sessionId) ?? null;
+}
+
+/** target + sources combined chronologically (re-tagged to the target); null if any isn't loaded. */
+function combinedSolves(targetId: string, sourceIds: string[]): { list: Solve[]; before: number } | null {
+  const before = model.solves.get(targetId);
+  if (!before) return null;
+  const seen = new Set(before.map((s) => s.id));
+  const all = before.slice();
+  for (const id of sourceIds) {
+    const list = model.solves.get(id);
+    if (!list) return null;
+    for (const s of list) {
+      if (seen.has(s.id)) continue;
+      seen.add(s.id);
+      all.push({ ...s, sessionId: targetId });
+    }
+  }
+  return { list: sortChrono(all), before: before.length };
+}
+
+/** Drops merged-away sessions from the model and points everything that referenced them at the target. */
+function dropMergedSessions(targetId: string, drop: Set<string>, targetPatch: Partial<Session>): void {
+  model.sessions = model.sessions.filter((s) => !drop.has(s.id)).map((s) => (s.id === targetId ? { ...s, ...targetPatch } : s));
+  drop.forEach((id) => model.solves.delete(id));
+  const lastByEvent = { ...model.lastByEvent };
+  for (const [ev, id] of Object.entries(lastByEvent)) if (drop.has(id)) lastByEvent[ev] = targetId;
+  model.lastByEvent = lastByEvent;
+  if (model.current && drop.has(model.current)) model.current = targetId;
+}
+
+function mergeErrorMessage(e: unknown): string {
+  if (e instanceof ApiError) {
+    if (e.status === 404) return 'one of these sessions no longer exists (changed on another device?) — your sessions were refreshed, please try again';
+    if (e.status === 409) return SAME_EVENT_MSG;
+    if (e.status === 401) return 'you were signed out — sign in again to merge sessions';
+    if (e.status === 429) return 'too many requests — try again in a moment';
+    if (e.isUnavailable || e.status >= 500) return "couldn't reach the solve service — try again in a moment";
+    return e.message || 'the merge was rejected';
+  }
+  return (e as Error)?.message || 'the merge failed';
+}
+
+/**
+ * Moves every solve of `sourceIds` into `targetId` (kept chronological) and deletes the source
+ * sessions. All sessions must belong to the same event. If the current session is merged away,
+ * the target becomes current. Guest mode: localStorage. Cloud mode: not optimistic — waits for
+ * the retry queue, then POST /api/sessions/:id/merge and reloads.
+ */
+export async function mergeSessions(targetId: string, sourceIds: string[]): Promise<{ sessions: number; solves: number }> {
+  if (!solveStore.get().ready) await whenReady();
+  const target = sessionById(targetId);
+  if (!target) throw new Error("that session doesn't exist anymore");
+  const ids = Array.from(new Set(sourceIds));
+  if (ids.includes(targetId)) throw new Error("a session can't be merged into itself");
+  if (ids.length === 0) throw new Error('pick at least one session to merge');
+  const sources = ids.map((id) => sessionById(id));
+  if (sources.some((s) => !s)) throw new Error("one of these sessions doesn't exist anymore");
+  if (sources.some((s) => s!.event !== target.event)) throw new Error(SAME_EVENT_MSG);
+  return scope?.mode === 'cloud' ? mergeCloud(target, ids) : mergeLocal(target, ids);
+}
+
+function mergeLocal(target: Session, ids: string[]): { sessions: number; solves: number } {
+  const snapshot = { sessions: model.sessions, solves: new Map(model.solves), current: model.current, lastByEvent: model.lastByEvent };
+  const merged = combinedSolves(target.id, ids) ?? { list: [], before: 0 }; // local mode has every list in memory
+  model.solves.set(target.id, merged.list);
+  dropMergedSessions(target.id, new Set(ids), { solveCount: merged.list.length, updatedAt: new Date().toISOString() });
+  localDirty = true;
+  if (!flushLocal()) {
+    // the browser refused the write: put everything back so memory matches what is stored
+    Object.assign(model, snapshot);
+    publish();
+    throw new Error('not enough browser storage to save the merge — export your solves or sign in to sync them');
+  }
+  publish();
+  return { sessions: ids.length, solves: merged.list.length - merged.before };
+}
+
+async function mergeCloud(target: Session, ids: string[]): Promise<{ sessions: number; solves: number }> {
+  const uid = userId();
+  if (!uid) throw new Error('not logged in');
+  const involved = new Set([target.id, ...ids]);
+  const unsynced = () => queue.some((q) => q.userId === uid && involved.has(opSessionId(q.op)));
+  // a merge must never overtake queued writes (a solve sent later would land in a deleted session)
+  if (pendingCount() > 0) await flushQueue(10_000);
+  if (unsynced()) throw new Error("you have unsynced solves — try again when you're back online");
+
+  const g = gen;
+  const total = { sessions: 0, solves: 0 };
+  try {
+    for (let i = 0; i < ids.length; i += MERGE_CHUNK) {
+      const chunk = ids.slice(i, i + MERGE_CHUNK);
+      const r = await api.sessions.merge(target.id, chunk);
+      total.sessions += r.merged.sessions;
+      total.solves += r.merged.solves;
+      if (g !== gen) return total;
+      const drop = new Set(chunk);
+      // completed ops of merged-away sessions must not resurrect them in the read overlay
+      recent = recent.filter((x) => !drop.has(opSessionId(x.op)));
+      // show the result right away when everything is in memory; otherwise re-fetch the target
+      const merged = combinedSolves(target.id, chunk);
+      if (merged) model.solves.set(target.id, merged.list);
+      else model.solves.delete(target.id);
+      dropMergedSessions(target.id, drop, { solveCount: r.session.solveCount, updatedAt: r.session.updatedAt });
+      writeLastSession();
+      publish();
+    }
+  } catch (e) {
+    if (g === gen) void refreshCloud();
+    const msg = mergeErrorMessage(e);
+    throw new Error(total.sessions > 0 ? `merged ${total.sessions} of ${ids.length} sessions, then: ${msg}` : msg);
+  }
+  if (g === gen) await refreshCloud();
+  return total;
+}
+
 /** Import parsed csTimer sessions (cloud: POST /api/sessions/import; local: localStorage). */
 export async function importSessions(sessions: ImportedSession[]): Promise<{ sessions: number; solves: number }> {
   if (!solveStore.get().ready) await whenReady();
