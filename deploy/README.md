@@ -55,6 +55,7 @@ docker compose ps                             # all services report (healthy) vi
 docker compose up -d --scale solve=3          # 3 replicas behind the gateway (round-robin)
 for i in $(seq 9); do curl -sI localhost:8080/api/solves/_info | grep -i x-served-by; done
 docker compose --profile jobs run --rm wca-import       # downloads the WCA export (or see below)
+docker compose --profile jobs run --rm seed             # 150 users + ~100k solves (SEED_USERS=20 for less)
 node scripts/smoke.mjs http://localhost:8080            # end-to-end check
 docker compose down          # stop; add -v to also delete the Postgres/Redis volumes
 ```

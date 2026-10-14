@@ -23,7 +23,7 @@ cd "$(dirname "$0")/.."
 TAG="${TAG:-dev}"
 APP_VERSION="${APP_VERSION:-$TAG}"
 KIND_CLUSTER="${KIND_CLUSTER:-cubetype}"
-ALL_IMAGES="auth scramble solve stats leaderboard race wca web wca-import"
+ALL_IMAGES="auth scramble solve stats leaderboard race wca web wca-import seed"
 
 LOAD_KIND=0
 TARGETS=()
