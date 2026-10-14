@@ -1,0 +1,71 @@
+# =============================================================================================
+# web: the React SPA served by unprivileged nginx (web/Dockerfile, port 8080). Stateless and
+# tiny, so it gets small requests.
+# Objects: Deployment + ClusterIP Service (8080).
+# =============================================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  labels:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: cubetype
+spec:
+  replicas: 2                           # >= 2 so one pod can die/roll without downtime
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: web
+        app.kubernetes.io/component: frontend
+        app.kubernetes.io/part-of: cubetype
+    spec:
+      containers:
+        - name: web
+          image: cubetype/web:dev
+          imagePullPolicy: IfNotPresent
+          # APP_VERSION comes from the image (build arg).
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  labels:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: cubetype
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: web
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
