@@ -85,7 +85,8 @@ console.log('\nsolves → event bus → stats & leaderboard:');
 const sessions = await req('GET', '/api/sessions');
 const session = sessions.data?.sessions?.[0];
 check('default session created', Boolean(session), session?.name);
-const times = [11234, 10456, 12001, 9876, 10987, 11500];
+// Slow on purpose (about a minute each): a smoke run must not top the live leaderboards.
+const times = [61234, 60456, 62001, 59876, 60987, 61500];
 let lastRolling = null;
 for (const t of times) {
   const r = await req('POST', '/api/solves', { id: crypto.randomUUID(), sessionId: session.id, timeMs: t, penalty: 'OK', scramble: sc.data?.scrambles?.[0] ?? "R U R' U'" });
@@ -97,11 +98,11 @@ const userId = me.data?.user?.id;
 await eventually('stats read model updated (single PB)', async () => {
   const s = await req('GET', `/api/stats/users/${userId}/summary`);
   const ev = s.data?.events?.find((e) => e.event === '333');
-  return { ok: ev?.pbs?.single?.valueMs === 9876 && ev?.solves === 6, detail: `single=${ev?.pbs?.single?.valueMs} solves=${ev?.solves}` };
+  return { ok: ev?.pbs?.single?.valueMs === 59876 && ev?.solves === 6, detail: `single=${ev?.pbs?.single?.valueMs} solves=${ev?.solves}` };
 });
 await eventually('leaderboard updated (all-time single)', async () => {
   const lb = await req('GET', '/api/leaderboards/333/single?period=all');
-  return { ok: lb.data?.me?.valueMs === 9876, detail: `rank=${lb.data?.me?.rank} of ${lb.data?.total}` };
+  return { ok: lb.data?.me?.valueMs === 59876, detail: `rank=${lb.data?.me?.rank} of ${lb.data?.total}` };
 });
 await eventually('daily leaderboard updated', async () => {
   const lb = await req('GET', '/api/leaderboards/333/single?period=daily');
@@ -115,7 +116,7 @@ if (meta.status === 503) {
   console.log(`  – skipped: ${meta.data?.error?.message ?? 'WCA data not loaded'} (run the wca-import job first)`);
 } else {
   check('wca meta', meta.status === 200, meta.status === 200 ? `export ${meta.data.exportDate}, persons=${meta.data.counts?.persons}` : `status ${meta.status}`);
-  const rank = await req('GET', '/api/wca/rank?event=333&kind=single&value=9876&country=AU');
+  const rank = await req('GET', '/api/wca/rank?event=333&kind=single&value=59876&country=AU');
   check('where would I rank?', rank.status === 200, rank.status === 200 ? `world #${rank.data.world.rank} of ${rank.data.world.total} (${rank.data.world.percentile}%) · ${rank.ms} ms` : `status ${rank.status} ${rank.data?.error?.message ?? ''}`);
 }
 
