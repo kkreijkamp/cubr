@@ -16,11 +16,21 @@ describe('anti-cheat floors', () => {
     expect(floorFor('333', 'ao12', recs)).toBe(3900);
   });
   it('falls back to the hard-coded table', () => {
-    expect(floorFor('333', 'single', null)).toBe(3000);
-    expect(floorFor('333', 'ao5', null)).toBe(3500);
-    expect(floorFor('pyram', 'single', { pyram: { single: null, average: 1500 } })).toBe(700);
+    expect(floorFor('333', 'single', null)).toBe(1800);
+    expect(floorFor('333', 'ao5', null)).toBe(2600);
+    expect(floorFor('pyram', 'single', { pyram: { single: null, average: 1500 } })).toBe(520);
     expect(floorFor('333fm', 'single', null)).toBeNull();
     expect(Object.keys(FALLBACK_FLOORS)).toHaveLength(15);
+  });
+  it('keeps the fallback table below the WCA records', () => {
+    // records (ms) in the WCA export of 2026-10-15
+    const records: Record<string, [number, number]> = {
+      '222': [390, 860], '333': [2510, 3510], '444': [15180, 18560], '555': [29490, 33190], '666': [57690, 61760],
+    };
+    for (const [event, [single, average]] of Object.entries(records)) {
+      expect(FALLBACK_FLOORS[event].single).toBeLessThan(single);
+      expect(FALLBACK_FLOORS[event].average).toBeLessThan(average);
+    }
   });
   it('is strict: equal to the floor passes', () => {
     expect(isBelowFloor(2999, 3000)).toBe(true);
@@ -49,8 +59,8 @@ describe('anti-cheat floors', () => {
       calls++;
       throw new Error('ECONNREFUSED');
     });
-    expect(await down.floor('333', 'single')).toBe(3000);
-    expect(await down.floor('222', 'ao5')).toBe(800);
+    expect(await down.floor('333', 'single')).toBe(1800);
+    expect(await down.floor('222', 'ao5')).toBe(640);
     expect(calls).toBe(2); // second call within the retry window doesn't refetch
     expect(down.source).toBe('fallback');
   });

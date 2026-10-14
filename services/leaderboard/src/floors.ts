@@ -6,7 +6,7 @@ import type { Kind } from './keys.js';
 // Anti-cheat floors: nobody beats the WCA world record on a phone timer. Values strictly below
 // the WR for that event/kind are rejected (and logged to lb:flagged) instead of being ranked.
 // WRs come from wca-service (GET /internal/records, cached 1 h); if it is unavailable we use a
-// hard-coded table slightly below the real records.
+// hard-coded table well below the real records.
 // ---------------------------------------------------------------------------------------------
 
 export interface Floor {
@@ -14,23 +14,24 @@ export interface Floor {
   average: number;
 }
 
-/** Fallback floors in ms (a little under the WCA records, so legit times are never rejected). */
+/** Fallback floors in ms, about a quarter below the WCA records (export of 2026-10-15): they only
+ *  catch clearly impossible times, and a new world record won't fall below them any time soon. */
 export const FALLBACK_FLOORS: Record<string, Floor> = {
-  '333': { single: 3000, average: 3500 },
-  '222': { single: 400, average: 800 },
-  '444': { single: 15000, average: 18000 },
-  '555': { single: 30000, average: 35000 },
-  '666': { single: 60000, average: 65000 },
-  '777': { single: 90000, average: 100000 },
-  '333oh': { single: 5500, average: 8000 },
-  '333bf': { single: 11000, average: 14000 },
-  pyram: { single: 700, average: 1000 },
-  skewb: { single: 800, average: 1300 },
-  clock: { single: 1500, average: 2000 },
-  minx: { single: 23000, average: 26000 },
-  sq1: { single: 3000, average: 4500 },
-  '444bf': { single: 50000, average: 60000 },
-  '555bf': { single: 120000, average: 140000 },
+  '333': { single: 1800, average: 2600 },
+  '222': { single: 290, average: 640 },
+  '444': { single: 11300, average: 13900 },
+  '555': { single: 22100, average: 24800 },
+  '666': { single: 43200, average: 46300 },
+  '777': { single: 67500, average: 75000 },
+  '333oh': { single: 4100, average: 6000 },
+  '333bf': { single: 8200, average: 10500 },
+  pyram: { single: 520, average: 750 },
+  skewb: { single: 600, average: 970 },
+  clock: { single: 1100, average: 1500 },
+  minx: { single: 17200, average: 19500 },
+  sq1: { single: 2200, average: 3300 },
+  '444bf': { single: 37500, average: 45000 },
+  '555bf': { single: 90000, average: 105000 },
 };
 
 export type WcaRecords = Record<string, { single: number | null; average: number | null }>;

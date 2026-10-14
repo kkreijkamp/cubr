@@ -441,7 +441,7 @@ bucketed by the UTC day / ISO week of `createdAt`; later edits and deletes don't
 Daily-challenge board from `daily.completed`. Display info (username, country, avatar URL) from `user.*` events and usernames in payloads.
 Board writes are small Lua scripts (score and achievedAt change atomically); all-time writes drop `pb.updated` events older than the last one applied for that user.
 Rank = position + 1 (equal values don't share a rank). 333fm has no boards (results are move counts).
-Anti-cheat: ignore values below the WCA world record for that event/kind (fetch `GET wca /internal/records`, cache 1 h, fallback hard-coded floors e.g. 333 single 3000 ms) — store rejected entries in `lb:flagged`.
+Anti-cheat: ignore values below the WCA world record for that event/kind (fetch `GET wca /internal/records`, cache 1 h, fallback hard-coded floors about a quarter below the records, e.g. 333 single 1800 ms) — store rejected entries in `lb:flagged`.
 Rebuild: a background loop checks for `lb:meta:built` every 60 s; when it is missing (Redis lost its
 data), one replica acquires `SET lb:rebuild-lock NX EX 120`, rebuilds the all-time boards from
 `GET stats /internal/pbs`, then sets `lb:meta:built`.
