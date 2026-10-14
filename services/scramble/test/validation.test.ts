@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HttpError, parse } from '@cubetype/common';
+import { loadScrambleSettings } from '../src/settings.js';
 import { resolveDailyDate, scrambleQuerySchema } from '../src/validation.js';
 
 const query = (q: Record<string, string>) => parse(scrambleQuerySchema, q);
@@ -73,5 +74,26 @@ describe('resolveDailyDate', () => {
   it('handles leap days', () => {
     expect(resolveDailyDate('2028-02-29', new Date('2028-03-10T12:00:00Z'))).toBe('2028-02-29');
     expect400(() => resolveDailyDate('2027-02-29', new Date('2027-03-10T12:00:00Z')), /valid calendar date/);
+  });
+});
+
+describe('loadScrambleSettings', () => {
+  it('has sensible defaults', () => {
+    expect(loadScrambleSettings({})).toEqual({
+      workers: 1,
+      timeoutMs: 15_000,
+      maxQueue: 250,
+      refillIntervalMs: 2_000,
+      refillBatch: 5,
+      refillBudgetMs: 300,
+      refillEnabled: true,
+    });
+  });
+
+  it('clamps and parses overrides', () => {
+    const s = loadScrambleSettings({ SCRAMBLE_WORKERS: '99', SCRAMBLE_TIMEOUT_MS: 'x', SCRAMBLE_REFILL: 'off' });
+    expect(s.workers).toBe(16);
+    expect(s.timeoutMs).toBe(15_000);
+    expect(s.refillEnabled).toBe(false);
   });
 });

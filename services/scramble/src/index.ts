@@ -1,20 +1,18 @@
 import { createPool, createRedis, createServer, loadConfig, migrate, start } from '@cubetype/common';
-import { createInProcessBackend } from './backends.js';
+import { createBackend } from './backends.js';
 import { DailyChallenges } from './daily.js';
 import { ScrambleGenerator } from './generator.js';
 import { migrations } from './migrations.js';
 import { ScramblePool } from './pool.js';
 import { startRefiller, type Refiller } from './refill.js';
 import { registerRoutes } from './routes/index.js';
+import { loadScrambleSettings } from './settings.js';
 import { errorMessage, sleep } from './util.js';
 import { newWarmupState, warmUp } from './warmup.js';
 
 const config = loadConfig('scramble');
+const settings = loadScrambleSettings();
 const warmup = newWarmupState();
-/** A scramble may take 15 s from being queued (→ 503); above 250 queued scrambles requests are shed. */
-const GENERATOR = { timeoutMs: 15_000, maxQueue: 250 };
-/** Every ~2 s top up the emptiest pool with ≤ 5 scrambles, spending ≤ 300 ms of search time per cycle. */
-const REFILL = { intervalMs: 2_000, batch: 5, budgetMs: 300 };
 let migrated = false;
 let stopping = false;
 let refiller: Refiller | null = null;
@@ -39,7 +37,7 @@ const server = createServer(config, {
       warmup,
       generator: generator.stats(),
       pool: { available: scramblePool.available(), ...((await scramblePool.cachedSizes()) ?? { sizes: null }) },
-      refill: refiller?.stats() ?? { enabled: true, started: false },
+      refill: refiller?.stats() ?? { enabled: settings.refillEnabled, started: false },
       daily: { migrated },
       memory: { rssMB: Math.round(mem.rss / 1048576), heapUsedMB: Math.round(mem.heapUsed / 1048576) },
     };
@@ -49,11 +47,11 @@ const { app } = server;
 const pg = createPool(config.databaseUrl, { max: 5, log: app.log });
 const redis = createRedis(config.redisUrl, app.log);
 
-const backend = await createInProcessBackend();
-const generator = new ScrambleGenerator(backend, GENERATOR);
+const backend = await createBackend(settings.workers, app.log);
+const generator = new ScrambleGenerator(backend, { timeoutMs: settings.timeoutMs, maxQueue: settings.maxQueue });
 const scramblePool = new ScramblePool(redis);
 const daily = new DailyChallenges({ pool: pg, generator, isMigrated: () => migrated, log: app.log });
-app.log.info({ ...GENERATOR, backend: backend.kind }, 'scramble generator configured');
+app.log.info({ ...settings, backend: backend.kind }, 'scramble generator configured');
 
 await registerRoutes(app, { generator, pool: scramblePool, daily });
 
@@ -88,7 +86,10 @@ void (async () => {
 
 await warmUp(generator, warmup, app.log);
 
-if (!stopping) {
-  refiller = startRefiller({ pool: scramblePool, generator, log: app.log }, REFILL);
+if (settings.refillEnabled && !stopping) {
+  refiller = startRefiller(
+    { pool: scramblePool, generator, log: app.log },
+    { intervalMs: settings.refillIntervalMs, batch: settings.refillBatch, budgetMs: settings.refillBudgetMs },
+  );
   app.log.info('scramble pool refill loop started');
 }

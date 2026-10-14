@@ -11,7 +11,7 @@ export const WARMUP_EVENTS = ['333', '222', '444', 'sq1', '333fm', 'pyram', 'ske
 export interface WarmupState {
   done: boolean;
   totalMs: number | null;
-  /** ms per event */
+  /** ms per event (from worker 0) */
   timings: Record<string, number>;
   failures: string[];
 }
@@ -21,28 +21,32 @@ export function newWarmupState(): WarmupState {
 }
 
 /**
- * Generates one scramble per WARMUP_EVENTS event, sequentially, so the first real request does
- * not pay the table-initialisation cost. Readiness stays 503 until this finishes. If every event
- * fails (cubing.js broken), it retries instead of reporting ready.
+ * Generates one scramble per WARMUP_EVENTS event, sequentially, on every backend slot so the
+ * first real request does not pay the table-initialisation cost. Readiness stays 503 until this
+ * finishes. If every event fails (cubing.js broken), it retries instead of reporting ready.
  */
 export async function warmUp(generator: ScrambleGenerator, state: WarmupState, log: FastifyBaseLogger): Promise<void> {
   for (let attempt = 1; ; attempt++) {
     const started = performance.now();
     state.failures = [];
     let succeeded = 0;
-    for (const event of WARMUP_EVENTS) {
-      const t0 = performance.now();
-      try {
-        await generator.generate(event);
-        const ms = Math.round(performance.now() - t0);
-        succeeded++;
-        state.timings[event] = ms;
-        log.info({ event, ms }, 'warm-up scramble generated');
-      } catch (err) {
-        state.failures.push(`${event}: ${errorMessage(err)}`);
-        log.error({ event, err: errorMessage(err) }, 'warm-up scramble failed');
-      }
-    }
+    await Promise.all(
+      Array.from({ length: generator.size }, async (_, slot) => {
+        for (const event of WARMUP_EVENTS) {
+          const t0 = performance.now();
+          try {
+            await generator.generate(event, 'request', slot);
+            const ms = Math.round(performance.now() - t0);
+            succeeded++;
+            if (slot === 0) state.timings[event] = ms;
+            log.info({ event, ms, slot }, 'warm-up scramble generated');
+          } catch (err) {
+            state.failures.push(`${event}: ${errorMessage(err)}`);
+            log.error({ event, slot, err: errorMessage(err) }, 'warm-up scramble failed');
+          }
+        }
+      }),
+    );
     state.totalMs = Math.round(performance.now() - started);
     if (succeeded > 0) {
       state.done = true;
