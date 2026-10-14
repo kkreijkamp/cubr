@@ -1,6 +1,7 @@
 import { useMemo, type ReactNode } from 'react';
 import { EVENT_IDS } from '@cubetype/cubestats';
-import { HourlyChart, PbHistoryChart } from './Charts';
+import { HourlyChart } from './Charts';
+import { SolveHistoryChart } from './HistoryChart';
 import { ActivityHeatmap } from './Heatmap';
 import { PbCards } from './PbCards';
 import { ProfileHeader } from './ProfileHeader';
@@ -47,10 +48,8 @@ export function ProfileView({ user, own, onEdit, children }: Props) {
       <ActivityHeatmap userId={user.id} joinedAt={user.createdAt} />
       {!noSolves && (
         <>
-          <div className="pv-charts">
-            <PbHistoryChart key={`pb-${user.id}-${defaultEvent}`} userId={user.id} events={events} defaultEvent={defaultEvent} precision={precision} />
-            <HourlyChart key={`hr-${user.id}-${defaultEvent}`} userId={user.id} events={events} defaultEvent={defaultEvent} precision={precision} />
-          </div>
+          <SolveHistoryChart key={`hist-${user.id}-${defaultEvent}`} userId={user.id} events={events} defaultEvent={defaultEvent} precision={precision} />
+          <HourlyChart key={`hr-${user.id}-${defaultEvent}`} userId={user.id} events={events} defaultEvent={defaultEvent} precision={precision} />
           <WcaComparison summary={summary} wcaId={user.wcaId} country={user.country} own={own} onEdit={onEdit} precision={precision} />
         </>
       )}

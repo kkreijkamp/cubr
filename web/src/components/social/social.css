@@ -488,6 +488,31 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1.5rem;
 }
+.pv-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.1rem 0.25rem;
+  margin-top: 0.6rem;
+}
+.pv-legend .btn-text {
+  font-size: 0.75rem;
+  padding: 0.3em 0.55em;
+  color: var(--sub-color);
+}
+.pv-legend .btn-text[aria-pressed='true'] {
+  color: var(--text-color);
+}
+.pv-legend .btn-text[aria-pressed='false'] svg {
+  opacity: 0.35;
+}
+.pv-legend .btn-text:hover {
+  color: var(--text-color);
+}
+.pv-legend svg {
+  width: 1.4rem;
+  height: 0.6rem;
+}
 .pv-insight {
   margin-top: 0.6rem;
   color: var(--sub-color);
@@ -942,4 +967,19 @@ table.im-table label {
   .ep-two {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* ---------------------------------------------------------------- solve history chart */
+.pv-seg {
+  display: inline-flex;
+  background: var(--bg-color);
+  border-radius: var(--roundness);
+  padding: 0 0.25rem;
+}
+.pv-seg .btn-text {
+  font-size: 0.75rem;
+  padding: 0.4em 0.5em;
+}
+.pv-history .pv-title .sub {
+  font-size: 0.8rem;
 }
