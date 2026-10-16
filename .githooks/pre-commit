@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Every commit is a release with its own version: bump the patch version in every deploy file
+# (scripts/bump-version.sh) unless this commit already carries a new one. The post-commit hook
+# then tags the commit. Enabled once per clone with:  git config core.hooksPath .githooks
+exec "$(git rev-parse --show-toplevel)/scripts/bump-version.sh" --pre-commit

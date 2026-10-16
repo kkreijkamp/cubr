@@ -49,7 +49,7 @@ spec:
           matchLabelKeys: ["pod-template-hash"]
       containers:
         - name: web
-          image: cubetype/web:dev       # rewritten per overlay (GKE: Artifact Registry :1.0.0)
+          image: cubetype/web:dev       # rewritten per overlay (GKE: Artifact Registry, tag set in overlays/gke)
           imagePullPolicy: IfNotPresent
           # APP_VERSION comes from the image (build arg); /_info reports it with the pod name.
           env:

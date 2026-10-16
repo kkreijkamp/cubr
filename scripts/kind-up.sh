@@ -34,6 +34,10 @@ if ! kind get clusters | grep -qx "$KIND_CLUSTER"; then
     --kubeconfig "$KUBECONFIG" \
     ${NODE_IMAGE:+--image "$NODE_IMAGE"} \
     --wait 120s
+else
+  # Reusing the cluster: (re)write its credentials to $KUBECONFIG, which may be missing (e.g. the
+  # cluster was created with another KUBECONFIG). Only this file is written.
+  kind export kubeconfig --name "$KIND_CLUSTER" --kubeconfig "$KUBECONFIG"
 fi
 
 # 2. CloudNativePG operator (server-side apply: the CRDs are too big for client-side apply).
@@ -65,7 +69,14 @@ kubectl -n "$NS" get secret cubetype-secrets >/dev/null 2>&1 || \
     --from-literal=INTERNAL_API_TOKEN="$(openssl rand -hex 24)"
 
 # 6. Deploy the local overlay and wait for PostgreSQL, Redis and every Deployment.
+# Every local build is tagged :dev, so freshly loaded images leave the pod templates unchanged
+# and running pods would keep the previous build: restart the Deployments that already existed
+# (rollout restart = a rolling update to new pods with the same template).
+existing="$(kubectl -n "$NS" get deployments -o name 2>/dev/null || true)"
 kubectl apply -k deploy/k8s/overlays/local
+if [ "${SKIP_BUILD:-0}" != "1" ] && [ -n "$existing" ]; then
+  kubectl -n "$NS" rollout restart deployment
+fi
 kubectl -n "$NS" wait cluster/pg --for=condition=Ready --timeout=600s
 kubectl -n "$NS" rollout status statefulset/redis --timeout=300s
 for d in auth scramble solve stats leaderboard race wca web gateway; do

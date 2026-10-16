@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Tag the new commit vX.Y.Z with the version it carries (annotated). Tags are never moved or
+# reused: if the tag already exists, it stays where it is.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+v="$(scripts/bump-version.sh --current)"
+if git rev-parse -q --verify "refs/tags/v$v" >/dev/null; then
+  echo "post-commit: v$v is already tagged on another commit, not moved" >&2
+else
+  git tag -a "v$v" -m "v$v: $(git log -1 --format=%s)"
+  echo "post-commit: tagged v$v"
+fi

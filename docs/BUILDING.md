@@ -169,6 +169,25 @@ The images, routes and manifests are listed per service, so a new service touche
 `kubectl kustomize deploy/k8s/overlays/<local|gke>` must render, and `scripts/kind-up.sh` gives a
 local cluster to try it on (`deploy/README.md` has the details).
 
+## Versioning
+
+Every commit is a release with its own version, so a deploy always pulls new images.
+
+- `.githooks/pre-commit` runs `scripts/bump-version.sh`, which bumps the patch version in every
+  file that names it:
+  - the image tags in the GKE overlays
+  - `VERSION` in `scripts/commands.sh`
+  - the defaults in `cloudbuild.yaml` and `scripts/build-push.sh`
+  - the table in `deploy/README.md`
+- `.githooks/post-commit` then tags the commit `vX.Y.Z`.
+- A new version is always above the highest tag. Tags are never moved or reused: images are
+  pulled `IfNotPresent`, so new code pushed under an existing tag would never roll out.
+- For a minor or major release, run `scripts/bump-version.sh minor` (or `major`) before
+  committing. The hook keeps a version that is already above the highest tag.
+- Once per clone, run `git config core.hooksPath .githooks` and
+  `git config push.followTags true`. The second makes `git push` push the tags too.
+- CI fails if the files name different versions, or if a pushed `vX.Y.Z` tag doesn't match them.
+
 ## Definition of done for a service
 1. `npm run typecheck` passes.
 2. `node scripts/build-service.mjs services/<name>` succeeds and the bundle starts.

@@ -63,6 +63,16 @@ jobs:
             echo "kubectl kustomize $dir"
             kubectl kustomize "$dir" > /dev/null
           done
+      - name: One release version in every deploy file
+        # Every file that names the version must name the same one, and a vX.Y.Z tag must be that
+        # version: images are pulled IfNotPresent, so new code pushed under an old tag would never
+        # roll out (scripts/bump-version.sh keeps the files in step).
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            bash scripts/bump-version.sh --check "$GITHUB_REF_NAME"
+          else
+            bash scripts/bump-version.sh --check
+          fi
 
   image:
     # scramble is the one image that ships an npm package next to its bundle (cubing.js),
