@@ -32,9 +32,9 @@ REGION="australia-southeast1"           # Sydney: Artifact Registry + Cloud Buil
 ZONE="australia-southeast1-a"           # zonal cluster = free GKE management fee (free tier)
 CLUSTER="cubetype"                      # GKE cluster name
 REPO="cubetype"                         # Artifact Registry Docker repository name
-VERSION="1.0.12"                         # release being deployed (image tag + APP_VERSION)
+VERSION="1.0.13"                         # release being deployed (image tag + APP_VERSION)
 NS="cubetype"                           # Kubernetes namespace of the app
-REGISTRY="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO"   # full image prefix, e.g. $REGISTRY/web:1.0.12
+REGISTRY="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO"   # full image prefix, e.g. $REGISTRY/web:1.0.13
 CNPG_VERSION="1.30.1"                   # CloudNativePG (PostgreSQL operator) release
 DEPLOYMENTS="auth scramble solve stats leaderboard race wca web"
 
@@ -304,12 +304,14 @@ section_9() {
 
   # Wait for the load balancer in two bounded loops instead of `get ingress -w`: Ctrl+C on a
   # watch would stop this whole script, so the smoke test below would never run.
-  # 1) Up to 10 min until the Ingress has its address (the static IP, once Google has created
-  #    the load balancer's forwarding rule). Checked every 10 s.
+  # 1) Up to 25 min until the Ingress has its address (the static IP, once Google has created
+  #    the load balancer's forwarding rule). Checked every 10 s. On a first deploy Google sets
+  #    up the 8 backend services one after another (~90 s each) before the forwarding rule:
+  #    the address appeared after ~17 min on this project.
   waited=0
   until [ -n "$(ingress_ip)" ]; do
-    if [ "$waited" -ge 600 ]; then
-      echo "no Ingress address after 10 min: see kubectl -n $NS describe ingress cubetype" >&2
+    if [ "$waited" -ge 1500 ]; then
+      echo "no Ingress address after 25 min: see kubectl -n $NS describe ingress cubetype" >&2
       return 1
     fi
     sleep 10; waited=$((waited + 10))
