@@ -169,6 +169,7 @@ The HPA demo works the same way: `kubectl apply -k deploy/k8s/jobs/loadgen; kube
 - HPA scaled scramble 2 → 4 → 8 within about 40 s of loadgen.
 - PDBs present.
 - Rolling update, a broken tag (ErrImagePull contained by `maxUnavailable: 0`), `rollout undo` and `--to-revision=1` all ran with **70/70 HTTP 200** during the whole sequence.
+- Reliability probes compared during §13. Killing a solve pod: both the sessions probe and a leaderboard probe stayed at 200. Deleting the PostgreSQL primary: the sessions probe showed 2 × 500 in half a second, while the leaderboard probe stayed at 200 (it never touches PostgreSQL). Restarting Redis: the leaderboard probe failed 3 times, while the sessions probe stayed at 200.
 - Deleting the PostgreSQL primary promoted the replica after **12.7 s**. An authenticated `GET /api/sessions` loop (every 0.5 s, through solve to `pg-rw`) failed for about 1.5 s (4 of 45 requests). With CNPG's default `smartShutdownTimeout` of 180 s, the same test took 186 s.
 
 To match GKE's version exactly, create the cluster with `NODE_IMAGE=kindest/node:v1.36.4 scripts/kind-up.sh`.
@@ -179,11 +180,11 @@ Run `scripts/commands.sh` section by section (`scripts/commands.sh list` prints 
 
 | § | Step |
 |---|---|
-| 0 | Variables (`PROJECT_ID=infs3208-a2-koen`, `ZONE=australia-southeast1-a`, `CLUSTER=cubetype`, `REPO=cubetype`, `VERSION=1.0.4`) |
+| 0 | Variables (`PROJECT_ID=infs3208-a2-koen`, `ZONE=australia-southeast1-a`, `CLUSTER=cubetype`, `REPO=cubetype`, `VERSION=1.0.5`) |
 | 1 | `gcloud auth list`, select `koen@mangotree.info`, set project/region/zone |
 | 2 | Enable container, artifactregistry, cloudbuild and compute APIs |
 | 3 | Artifact Registry repo. IAM: nodes get `artifactregistry.reader` and `container.defaultNodeServiceAccount`; the build SA gets `artifactregistry.writer`, `logging.logWriter` and `storage.objectViewer`. |
-| 4 | `gcloud builds submit --config cloudbuild.yaml --substitutions _VERSION=1.0.4,…` (10 images in parallel, native amd64) |
+| 4 | `gcloud builds submit --config cloudbuild.yaml --substitutions _VERSION=1.0.5,…` (10 images in parallel, native amd64) |
 | 5 | `gcloud container clusters create` (3× e2-standard-2, autoscaling 3–5, 30 GB pd-balanced, regular channel, VPC-native) + `get-credentials` |
 | 6 | Reserve the global static IP `cubetype-ip` |
 | 7 | Install CloudNativePG 1.30.1 (server-side apply) and wait for the operator |
@@ -218,14 +219,22 @@ To release a new version permanently, change `newTag` in `k8s/overlays/gke/kusto
 - Cluster is up and seeded (§9, §10).
 - Open `http://<IP>/status` in the browser. The in-app cluster view polls every service's `_info`.
 - Terminal 1: `export NS=cubetype`, with the `scripts/commands.sh` sections ready to paste.
-- Terminal 2: the curl status loop from §13: `while true; do curl -s -o /dev/null -w '%{http_code} ' http://<IP>/api/leaderboards/333/single; sleep 0.5; done`
+- Terminal 2: the probe loop from §13. It polls the demo user's sessions, so every request goes through the gateway, a solve pod and the PostgreSQL primary. (A leaderboard route is served from Redis alone and would print `200` whatever solve or PostgreSQL do.)
+  ```bash
+  IP=<IP>
+  # Log in as the seeded demo user; -d sends the credentials as JSON, jq -r .token prints the raw token.
+  TOKEN=$(curl -s -X POST http://$IP/api/auth/login -H 'content-type: application/json' -d '{"login":"demo","password":"cubetype-demo"}' | jq -r .token)
+  # Print one status code every 0.5 s: -m 2 gives up after 2 s (prints 000), -o /dev/null discards
+  # the body, -w prints only the status code, -H sends the token.
+  while true; do curl -s -m 2 -o /dev/null -w '%{http_code} ' -H "authorization: Bearer $TOKEN" http://$IP/api/sessions; sleep 0.5; done
+  ```
 
 | Time | Show | Commands |
 |---|---|---|
 | 0:00–0:30 | **Microservices + orchestration** | `kubectl -n cubetype get deploy,svc,hpa,pdb`, then `kubectl -n cubetype get pods -o wide`: 8 services × 2 replicas spread over 3 nodes, the CNPG cluster and Redis |
 | 0:30–1:15 | **Load balancing** | §12 curl loop: `X-Served-By` alternates between pods. The `/status` page shows requests hitting different replicas and nodes. |
 | 1:15–2:15 | **Scalability** | Start `kubectl apply -k deploy/k8s/jobs/loadgen`, then `kubectl -n cubetype get hpa scramble -w`: CPU climbs past 60 % and replicas go 2 → 8 within about 1 min. Pods appear on `/status`. Mention the cluster autoscaler (3–5 nodes). |
-| 2:15–3:15 | **Reliability** | Delete a solve pod (§13.1); the curl loop in terminal 2 keeps printing `200`. Delete the Postgres primary (§13.3) and watch `kubectl -n cubetype get pods -l cnpg.io/cluster=pg -L cnpg.io/instanceRole -w` promote a replica within seconds. Optional if time allows: `kubectl drain` a node. |
+| 2:15–3:15 | **Reliability** | Delete a solve pod (§13.1); the probe in terminal 2 keeps printing `200`. Delete the Postgres primary (§13.3) and watch `kubectl -n cubetype get pods -l cnpg.io/cluster=pg -L cnpg.io/instanceRole -w` promote a replica in about 15 s. Say beforehand that the probe will show a few `500`s for about a second while that happens, then `200` again. Optional if time allows: `kubectl drain` a node. |
 | 3:15–4:00 | **Rollout + rollback** | `kubectl -n cubetype set image deployment/web web=$REGISTRY/web:1.1.0`, then `rollout status`; `/status` flips versions pod by pod. Then `set image …:9.9.9-broken` (ErrImagePull, old pods keep serving), `rollout history`, `rollout undo --to-revision=1`. |
 
 Tips:

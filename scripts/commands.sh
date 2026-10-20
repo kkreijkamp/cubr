@@ -31,9 +31,9 @@ REGION="australia-southeast1"           # Sydney: Artifact Registry + Cloud Buil
 ZONE="australia-southeast1-a"           # zonal cluster = free GKE management fee (free tier)
 CLUSTER="cubetype"                      # GKE cluster name
 REPO="cubetype"                         # Artifact Registry Docker repository name
-VERSION="1.0.4"                         # release being deployed (image tag + APP_VERSION)
+VERSION="1.0.5"                         # release being deployed (image tag + APP_VERSION)
 NS="cubetype"                           # Kubernetes namespace of the app
-REGISTRY="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO"   # full image prefix, e.g. $REGISTRY/web:1.0.4
+REGISTRY="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO"   # full image prefix, e.g. $REGISTRY/web:1.0.5
 CNPG_VERSION="1.30.1"                   # CloudNativePG (PostgreSQL operator) release
 DEPLOYMENTS="auth scramble solve stats leaderboard race wca web"
 
@@ -432,10 +432,20 @@ section_12() {
 # 13. DEMO: reliability (self-healing, node failure, database failover)
 # =============================================================================================
 section_13() {
-  # In a SECOND terminal keep probing the API (prints HTTP status codes; 200 = OK) to show
-  # that users see no errors during the following failures:
-  #   -w '%{http_code} '  print only the status code    sleep 0.5  two requests per second
-  # while true; do curl -s -o /dev/null -w '%{http_code} ' "http://$(ingress_ip)/api/leaderboards/333/single"; sleep 0.5; done
+  # In a SECOND terminal keep probing the API during the failures below (prints HTTP status
+  # codes; 200 = OK). The probe reads the demo user's sessions, so every request goes through
+  # the gateway, a solve pod and the PostgreSQL primary (pg-rw): the parts killed here. A
+  # leaderboard route would prove nothing: it is served from Redis alone, so it prints 200
+  # whatever solve or PostgreSQL do. Expected: no errors in 1) and 4), a few 500s for about a
+  # second in 3) while the replica is promoted (kind: 2 of 60 requests).
+  # First log in as the seeded demo user (section 10) and keep its token:
+  #   -X POST -d  send the credentials as JSON    jq -r .token  print the raw token
+  # IP="$(ingress_ip)"
+  # TOKEN="$(curl -s -X POST "http://$IP/api/auth/login" -H 'content-type: application/json' -d '{"login":"demo","password":"cubetype-demo"}' | jq -r .token)"
+  # Then probe twice a second:
+  #   -m 2  give up after 2 s (prints 000)    -o /dev/null  discard the body
+  #   -w '%{http_code} '  print only the status code    -H authorization  send the token
+  # while true; do curl -s -m 2 -o /dev/null -w '%{http_code} ' -H "authorization: Bearer $TOKEN" "http://$IP/api/sessions"; sleep 0.5; done
 
   # --- 1) pod failure / self-healing ---
   # Pick one solve pod (jsonpath .items[0] = first pod of the list).
@@ -479,13 +489,16 @@ section_13() {
   kubectl -n "$NS" delete pod "$PRIMARY" --wait=false
 
   # Watch a replica being promoted to primary within seconds and the old pod rejoining as a
-  # replica (Ctrl+C). Writes fail for a few seconds, reads/cached pages keep working.
+  # replica (Ctrl+C). Requests that need the primary fail for about a second in between (the
+  # probe prints a few 500s); leaderboards and the web app keep working.
   kubectl -n "$NS" get pods -l cnpg.io/cluster=pg -L cnpg.io/instanceRole -w || true
 
   # Cluster summary: the PRIMARY column now names a different instance.
   kubectl -n "$NS" get cluster pg
 
   # --- 4) Redis restart: data survives on its PersistentVolume ---
+  # The probe keeps printing 200: solve serves without Redis (its events wait in the outbox).
+  # Leaderboards and race need Redis and fail for a few seconds until it is back.
   kubectl -n "$NS" delete pod redis-0
   kubectl -n "$NS" rollout status statefulset/redis --timeout=120s
 }
