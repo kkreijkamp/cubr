@@ -32,9 +32,9 @@ REGION="australia-southeast1"           # Sydney: Artifact Registry + Cloud Buil
 ZONE="australia-southeast1-a"           # zonal cluster = free GKE management fee (free tier)
 CLUSTER="cubetype"                      # GKE cluster name
 REPO="cubetype"                         # Artifact Registry Docker repository name
-VERSION="1.0.10"                         # release being deployed (image tag + APP_VERSION)
+VERSION="1.0.11"                         # release being deployed (image tag + APP_VERSION)
 NS="cubetype"                           # Kubernetes namespace of the app
-REGISTRY="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO"   # full image prefix, e.g. $REGISTRY/web:1.0.10
+REGISTRY="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO"   # full image prefix, e.g. $REGISTRY/web:1.0.11
 CNPG_VERSION="1.30.1"                   # CloudNativePG (PostgreSQL operator) release
 DEPLOYMENTS="auth scramble solve stats leaderboard race wca web"
 
@@ -580,7 +580,9 @@ section_14() {
   kubectl -n "$NS" rollout history deployment/web
 
   # NOTE: `kubectl apply -k deploy/k8s/overlays/gke` resets images to the tag in the overlay's
-  # kustomization.yaml -- for a permanent release change newTag there and apply again.
+  # kustomization.yaml. For a permanent release, commit (the pre-commit hook bumps the version in
+  # every deploy file, see docs/BUILDING.md), build it with section 4, then apply it with
+  # section 9. Don't edit newTag by hand.
 }
 
 # =============================================================================================
