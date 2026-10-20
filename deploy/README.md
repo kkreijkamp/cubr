@@ -180,11 +180,11 @@ Run `scripts/commands.sh` section by section (`scripts/commands.sh list` prints 
 
 | § | Step |
 |---|---|
-| 0 | Variables (`PROJECT_ID=infs3208-a2-koen`, `ZONE=australia-southeast1-a`, `CLUSTER=cubetype`, `REPO=cubetype`, `VERSION=1.0.7`) |
+| 0 | Variables (`PROJECT_ID=infs3208-a2-koen`, `ZONE=australia-southeast1-a`, `CLUSTER=cubetype`, `REPO=cubetype`, `VERSION=1.0.8`) |
 | 1 | `gcloud auth list`, select `koen@mangotree.info`, set project/region/zone |
 | 2 | Enable container, artifactregistry, cloudbuild and compute APIs |
 | 3 | Artifact Registry repo. IAM: nodes get `artifactregistry.reader` and `container.defaultNodeServiceAccount`; the build SA gets `artifactregistry.writer`, `logging.logWriter` and `storage.objectViewer`. |
-| 4 | `gcloud builds submit --config cloudbuild.yaml --substitutions _VERSION=1.0.7,…` (10 images in parallel, native amd64) |
+| 4 | `gcloud builds submit --config cloudbuild.yaml --substitutions _VERSION=1.0.8,…` (10 images in parallel, native amd64) |
 | 5 | `gcloud container clusters create` (3× e2-standard-2, autoscaling 3–5, 30 GB pd-balanced, regular channel, VPC-native) + `get-credentials` |
 | 6 | Reserve the global static IP `cubetype-ip` |
 | 7 | Install CloudNativePG 1.30.1 (server-side apply) and wait for the operator |
@@ -192,7 +192,7 @@ Run `scripts/commands.sh` section by section (`scripts/commands.sh list` prints 
 | 9 | `kubectl apply -k deploy/k8s/overlays/gke`, wait for pg/redis/rollouts, watch the Ingress get its IP, smoke test |
 | 10 | `kubectl create job --from=cronjob/wca-import wca-import-now`, seed Job |
 | 11–14 | Demos: scalability, load balancing, reliability, rolling update / rollback |
-| 15 | Cost control: scale the pool to 0 / delete the namespace, cluster, IP and repo |
+| 15 | Cost control: pause (hibernate PostgreSQL, switch the autoscaler off, pool to 0) and resume / delete the namespace, cluster, IP and repo |
 
 To release a new version permanently, change `newTag` in `k8s/overlays/gke/kustomization.yaml` and re-apply. `kubectl set image` is for the demo; a later `kubectl apply -k` reverts to the overlay's tag.
 

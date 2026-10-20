@@ -31,9 +31,9 @@ REGION="australia-southeast1"           # Sydney: Artifact Registry + Cloud Buil
 ZONE="australia-southeast1-a"           # zonal cluster = free GKE management fee (free tier)
 CLUSTER="cubetype"                      # GKE cluster name
 REPO="cubetype"                         # Artifact Registry Docker repository name
-VERSION="1.0.7"                         # release being deployed (image tag + APP_VERSION)
+VERSION="1.0.8"                         # release being deployed (image tag + APP_VERSION)
 NS="cubetype"                           # Kubernetes namespace of the app
-REGISTRY="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO"   # full image prefix, e.g. $REGISTRY/web:1.0.7
+REGISTRY="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO"   # full image prefix, e.g. $REGISTRY/web:1.0.8
 CNPG_VERSION="1.30.1"                   # CloudNativePG (PostgreSQL operator) release
 DEPLOYMENTS="auth scramble solve stats leaderboard race wca web"
 
@@ -564,19 +564,43 @@ section_14() {
 # =============================================================================================
 section_15() {
   # --- pause (keep everything, pay only for disks / LB / registry, ~US$21/month) ---
-  # Allow the autoscaler to go down to 0 nodes (otherwise it restores the minimum of 3).
-  #   --node-pool  the pool created with the cluster    --min-nodes/--max-nodes new bounds
-  gcloud container clusters update "$CLUSTER" --zone="$ZONE" --node-pool=default-pool \
-    --enable-autoscaling --min-nodes=0 --max-nodes=5
+  # 1) Stop PostgreSQL cleanly first: with the hibernation annotation CloudNativePG shuts every
+  #    instance down and deletes its pods, but keeps the PVCs (the data).
+  #   --overwrite  replace the annotation if it is already set
+  kubectl -n "$NS" annotate cluster pg cnpg.io/hibernation=on --overwrite
 
-  # Remove all nodes (VMs stop being billed; pods become Pending). --quiet: no prompt.
+  # Wait until the PostgreSQL pods are gone (kind: 14 s).
+  #   --for=delete  until the pods no longer exist    -l  the cluster's pods    --timeout  give up after 5 min
+  kubectl -n "$NS" wait --for=delete pod -l cnpg.io/cluster=pg --timeout=300s
+
+  # 2) Switch the cluster autoscaler off. Left on, it sees the Pending pods after the resize
+  #    below and adds nodes back, and billing quietly resumes.
+  #   --node-pool  the pool created with the cluster    --no-enable-autoscaling  autoscaler off
+  gcloud container clusters update "$CLUSTER" --zone="$ZONE" --node-pool=default-pool \
+    --no-enable-autoscaling
+
+  # 3) Remove all nodes (VMs stop being billed; pods become Pending). --quiet: no prompt.
   gcloud container clusters resize "$CLUSTER" --zone="$ZONE" --node-pool=default-pool \
     --num-nodes=0 --quiet
 
-  # --- resume ---
-  # Back to 3 nodes; pods (and PostgreSQL, from its persistent disks) start again.
+  # A few minutes later, check that it stayed at zero: this must list no VMs.
+  #   --filter  only the cluster's node VMs (names start with gke-<cluster>-)
+  gcloud compute instances list --filter="name~^gke-$CLUSTER-"
+
+  # --- resume (at least a day before the demo; new nodes take a few minutes) ---
+  # 1) Back to 3 nodes. --num-nodes: nodes in the pool.
   # gcloud container clusters resize "$CLUSTER" --zone="$ZONE" --node-pool=default-pool --num-nodes=3 --quiet
+  # 2) Cluster autoscaler on again, with the bounds from section 5.
+  #   --enable-autoscaling  autoscaler on    --min-nodes/--max-nodes  its bounds
   # gcloud container clusters update "$CLUSTER" --zone="$ZONE" --node-pool=default-pool --enable-autoscaling --min-nodes=3 --max-nodes=5
+  # 3) Wake PostgreSQL: CloudNativePG recreates the instances from their PVCs.
+  # kubectl -n "$NS" annotate cluster pg cnpg.io/hibernation=off --overwrite
+  # 4) Wait until all 3 instances are ready. Not on the Ready condition: right after waking it
+  #    still shows the state from before the pause, so `--for=condition=Ready` returns at once.
+  #   --for=jsonpath=...=3  until 3 instances report ready    --timeout  give up after 15 min
+  # kubectl -n "$NS" wait cluster/pg --for=jsonpath='{.status.readyInstances}'=3 --timeout=900s
+  # 5) Every Deployment should be READY 2/2 again; then run the smoke test from section 9.
+  # kubectl -n "$NS" get deploy
 
   # --- delete everything (end of the project) ---
   # 1) Delete the app namespace first: removes the Ingress (-> Google deletes the load
