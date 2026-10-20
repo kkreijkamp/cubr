@@ -31,7 +31,7 @@ interface Layout {
   browser: Box;
   lb: Box;
   lbSub: string;
-  https: Pt;
+  protocol: Pt;
   cluster: Box;
   clusterLabel: string;
   services: Record<ServiceId, Box>;
@@ -74,8 +74,8 @@ function wideLayout(): Layout {
     sub: 11,
     browser: { x: 390, y: 8, w: 220, h: 58 },
     lb: { x: 250, y: 108, w: 500, h: 52 },
-    lbSub: 'https · /api/* → services · /socket.io → race',
-    https: [510, 92],
+    lbSub: 'http · /api/* → services · /socket.io → race',
+    protocol: [510, 92],
     cluster: { x: 16, y: 190, w: 968, h: 460 },
     clusterLabel: 'gke cluster · namespace cubetype',
     services,
@@ -176,7 +176,7 @@ function tallLayout(): Layout {
     browser: { x: 90, y: 8, w: 180, h: 54 },
     lb: { x: 24, y: 100, w: 312, h: 52 },
     lbSub: 'gke ingress · path routing',
-    https: [190, 86],
+    protocol: [190, 86],
     cluster: { x: 8, y: 176, w: 344, h: 796 },
     clusterLabel: 'gke cluster · ns cubetype',
     services,
@@ -308,7 +308,7 @@ function Diagram({ L }: { L: Layout }) {
     <svg className="arch-svg" viewBox={`0 0 ${L.w} ${L.h}`} role="img" aria-labelledby={`${uid}-t ${uid}-d`}>
       <title id={`${uid}-t`}>cubetype architecture</title>
       <desc id={`${uid}-d`}>
-        The browser talks HTTPS and WebSockets to a Google Cloud load balancer (GKE Ingress), which routes to the web frontend and seven microservices
+        The browser talks HTTP and WebSockets to a Google Cloud load balancer (GKE Ingress), which routes to the web frontend and seven microservices
         (auth, scramble, wca, solve, stats, leaderboard, race) running as replicated deployments on GKE. Services store data in PostgreSQL (CloudNativePG
         primary and replica) and Redis. The solve service publishes solve events to a Redis stream, consumed by the stats and leaderboard services.
       </desc>
@@ -341,8 +341,8 @@ function Diagram({ L }: { L: Layout }) {
           <circle key={i} cx={x} cy={y} r={2.5} />
         ))}
       </g>
-      <text className="arch-sub" x={L.https[0]} y={L.https[1]} fontSize={L.sub}>
-        https · wss
+      <text className="arch-sub" x={L.protocol[0]} y={L.protocol[1]} fontSize={L.sub}>
+        http · ws
       </text>
 
       {/* browser */}
