@@ -50,7 +50,7 @@ describe('fallback scrambles', () => {
     for (let k = 0; k < 200; k++) {
       const scr = square1Scramble(12, rng);
       expect(scr).toMatch(/^(\(-?\d, -?\d\) \/ ?)+$/);
-      // independent re-simulation: corners occupy two 30° slots
+      // independent re-simulation: corners occupy two 30-degree slots
       const p = [1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0];
       const twists = Array.from(scr.matchAll(/\((-?\d+), (-?\d+)\)/g)).map((m) => [Number(m[1]), Number(m[2])]);
       expect(twists).toHaveLength(12);

@@ -39,7 +39,7 @@ FORCE="${FORCE:-0}"
 KEEP_ZIP="${KEEP_ZIP:-0}"
 : "${DATABASE_URL:?DATABASE_URL must be set, e.g. postgres://cubetype:cubetype@postgres:5432/cubetype}"
 
-export PGCLIENTENCODING=UTF8            # the export is UTF-8 (names like "Yiheng Wang (王艺衡)")
+export PGCLIENTENCODING=UTF8            # the export is UTF-8 (e.g. names written in Chinese characters)
 export PGAPPNAME=wca-import
 export PGOPTIONS="${PGOPTIONS:-} -c client_min_messages=warning"   # hide NOTICEs, keep warnings
 

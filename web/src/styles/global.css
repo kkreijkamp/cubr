@@ -1,4 +1,4 @@
-/* cubetype global styles — Monkeytype-inspired design system.
+/* cubetype global styles - Monkeytype-inspired design system.
    Only the 10 theme tokens below are used for colour, so every theme "just works". */
 
 :root {
@@ -669,7 +669,7 @@ table.table .secondary {
 }
 
 /* ---------------------------------------------------------------- tooltips (balloon-style, CSS only)
-   usage: <button data-tip="Delete solve" data-tip-pos="down">…</button> */
+   usage: <button data-tip="Delete solve" data-tip-pos="down">...</button> */
 [data-tip] {
   position: relative;
 }

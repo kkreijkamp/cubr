@@ -19,7 +19,7 @@ import {
 } from '../src/keys.js';
 
 describe('key builders', () => {
-  it('match the SPEC §7.6 keyspace', () => {
+  it('match the SPEC section 7.6 keyspace', () => {
     expect(allTimeKey('333', 'single')).toBe('lb:333:single:all');
     expect(dailyKey('333oh', 'ao5', '2026-10-14')).toBe('lb:333oh:ao5:d:2026-10-14');
     expect(weeklyKey('pyram', 'single', '2026-W42')).toBe('lb:pyram:single:w:2026-W42');

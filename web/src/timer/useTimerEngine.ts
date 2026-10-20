@@ -1,9 +1,4 @@
 // The speedcubing timer state machine (keyboard + touch), modelled on csTimer with WCA rules.
-//
-//   idle ──press──▶ holding ──(holdMs)──▶ ready ──release──▶ running ──any key──▶ stopped ──release──▶ idle
-//                      └──release early──▶ idle
-//   with inspection: idle ──press+release──▶ inspecting ──press──▶ holding ▶ ready ▶ running …
-//   inspection penalty when the solve starts: ≥ 15 s → +2, ≥ 17 s → DNF (WCA A4d1/A4d2)
 //   Esc: cancels holding/ready/inspection; while running it stops the solve as a DNF.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Penalty } from '@cubetype/cubestats';
@@ -28,7 +23,7 @@ export interface TimerState {
 }
 
 export interface TimerEngineOptions {
-  /** disable when a modal is open, the page is inactive, a race round isn't running, … */
+  /** disable when a modal is open, the page is inactive, a race round isn't running, ... */
   enabled: boolean;
   inspection: boolean;
   holdMs: number;
@@ -182,7 +177,7 @@ export function useTimerEngine(opts: TimerEngineOptions) {
         return;
       }
       if (s.phase === 'ready') {
-        // solve starts now — the 8/12 s inspection calls must not go off during the solve
+        // solve starts now - the 8/12 s inspection calls must not go off during the solve
         clearAlerts();
         document.activeElement instanceof HTMLElement && document.activeElement.blur();
         publish({ phase: 'running', startedAt: t });
@@ -220,7 +215,7 @@ export function useTimerEngine(opts: TimerEngineOptions) {
     }
   }, [publish]);
 
-  /** Input is accepted when enabled — and always for a solve in progress, so closing the gate
+  /** Input is accepted when enabled - and always for a solve in progress, so closing the gate
    *  mid-solve (round ended, modal opened) can never trap a running timer. */
   const gateOpen = () => optsRef.current.enabled || st.current.phase === 'running' || st.current.phase === 'stopped';
 

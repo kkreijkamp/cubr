@@ -20,7 +20,7 @@ let rebuild: ReturnType<typeof startRebuildLoop> | null = null;
 
 const server = createServer(config, {
   infoPrefixes: ['/api/leaderboards'],
-  // All leaderboard data lives in Redis → without it the service cannot serve anything.
+  // All leaderboard data lives in Redis -> without it the service cannot serve anything.
   checks: { redis: () => redis.ping() },
   info: () => ({
     consumer: consumer?.stats() ?? null,

@@ -1,7 +1,7 @@
 import type { Penalty } from '@cubetype/cubestats';
 
 // The one place where database rows (snake_case, Date objects) become the API shapes of
-// docs/SPEC.md §9 (camelCase, ISO-8601 strings).
+// docs/SPEC.md section 9 (camelCase, ISO-8601 strings).
 
 export interface SessionRow {
   id: string;
@@ -9,7 +9,7 @@ export interface SessionRow {
   event: string;
   created_at: Date;
   updated_at: Date;
-  /** count(*) — the common pg type parser turns int8 into a JS number */
+  /** count(*) - the common pg type parser turns int8 into a JS number */
   solve_count?: number | null;
 }
 

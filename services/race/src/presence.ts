@@ -17,7 +17,7 @@ const isNotFound = (err: unknown) => err instanceof HttpError && err.code === 'N
  *   so when a pod dies without cleaning up (OOM kill, node failure, `kubectl delete --force`)
  *   its players flip to connected:false automatically.
  * - Janitor: every 5 s one pod (Redis lock `race:janitor`) deletes the registry entries of dead
- *   pods and re-broadcasts the affected rooms — which also hands the host role to a connected
+ *   pods and re-broadcasts the affected rooms - which also hands the host role to a connected
  *   player.
  * - Reconcile: every 60 s (and after a Redis restart) each pod rewrites its own registry entries
  *   from the sockets it actually holds, so any drift (e.g. a disconnect that happened while Redis
@@ -56,11 +56,11 @@ export class PodPresence {
   async stop(): Promise<void> {
     for (const t of this.timers) clearInterval(t);
     this.timers = [];
-    // Redis unreachable: don't wait for retries that cannot succeed — the heartbeat simply goes
+    // Redis unreachable: don't wait for retries that cannot succeed - the heartbeat simply goes
     // stale and another pod's janitor cleans up after us.
     if (this.redis.status !== 'ready') return;
     try {
-      // Everything cleaned up → forget this pod. Otherwise leave the room set for the janitor.
+      // Everything cleaned up -> forget this pod. Otherwise leave the room set for the janitor.
       if (this.store.local.size === 0) await this.redis.del(keys.podRooms(this.pod));
       await this.redis.zrem(keys.pods, this.pod);
     } catch {
@@ -71,7 +71,7 @@ export class PodPresence {
   private async heartbeat(): Promise<void> {
     try {
       const added = Number(await this.redis.zadd(keys.pods, Date.now(), this.pod));
-      // Missing from race:pods although we registered before → Redis lost its data or other
+      // Missing from race:pods although we registered before -> Redis lost its data or other
       // pods declared us dead during a network blip: re-register our sockets right away.
       if (added === 1 && this.registered) {
         this.log.warn('pod heartbeat was missing from Redis, re-registering local sockets');

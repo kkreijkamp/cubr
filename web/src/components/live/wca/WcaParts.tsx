@@ -32,11 +32,11 @@ export function WcaError({ error, onRetry, what = 'WCA data' }: { error: Error; 
           )
         }
       >
-        WCA data is being imported — try again in a minute.
+        WCA data is being imported - try again in a minute.
       </Notice>
     );
   }
-  if (kind === 'unavailable') return <ErrorState error={new Error(`the wca service is unavailable right now — couldn't load ${what}`)} onRetry={onRetry} />;
+  if (kind === 'unavailable') return <ErrorState error={new Error(`the wca service is unavailable right now - couldn't load ${what}`)} onRetry={onRetry} />;
   return <ErrorState error={error} onRetry={onRetry} />;
 }
 
@@ -149,7 +149,7 @@ export function RankCalculator({ params, onChange, onPerson }: { params: RankPar
             ))}
           </select>
         </div>
-        {invalid && <div className="small error">{fmc ? 'enter a number of moves (1–100' + (kind === 'average' ? ', up to 2 decimals)' : ')') : 'enter a time like 12.34, 1:05.21 or 1234'}</div>}
+        {invalid && <div className="small error">{fmc ? 'enter a number of moves (1-100' + (kind === 'average' ? ', up to 2 decimals)' : ')') : 'enter a time like 12.34, 1:05.21 or 1234'}</div>}
       </div>
 
       {importing ? (
@@ -167,7 +167,7 @@ export function RankCalculator({ params, onChange, onPerson }: { params: RankPar
       ) : rank.error ? (
         <WcaError error={rank.error} onRetry={rank.reload} what="your rank" />
       ) : !r ? (
-        <Loading label="ranking…" />
+        <Loading label="ranking..." />
       ) : (
         <div className={`wca-rank${rank.loading ? ' refreshing' : ''}`}>
           <div className="wca-rank-main">
@@ -187,7 +187,7 @@ export function RankCalculator({ params, onChange, onPerson }: { params: RankPar
                     <Flag iso2={r.country.countryIso2} /> #{formatNumber(r.country.rank)} in {(r.country as { countryName?: string }).countryName ?? countryName(r.country.countryIso2) ?? r.country.countryId}
                     <span className="sub">
                       {' '}
-                      · faster than {formatPercent(r.country.percentile)} of {formatNumber(r.country.total)}
+                      - faster than {formatPercent(r.country.percentile)} of {formatNumber(r.country.total)}
                     </span>
                   </div>
                 )}
@@ -219,7 +219,7 @@ export function RankCalculator({ params, onChange, onPerson }: { params: RankPar
         <section className="card wca-dist" aria-labelledby="dist-title">
           <div className="live-section-title">
             <h3 className="h3" id="dist-title">
-              {ev?.name ?? event} {kind === 'average' ? (fmc ? 'mean' : 'average') : 'single'} · all competitors
+              {ev?.name ?? event} {kind === 'average' ? (fmc ? 'mean' : 'average') : 'single'} - all competitors
             </h3>
             <span className="meta">{dist.data ? `${formatNumber(dist.data.total)} people` : dist.loading ? <Spinner size={12} /> : ''}</span>
           </div>
@@ -297,9 +297,9 @@ export function RecordsTable({ onPerson }: { onPerson: (id: string) => void }) {
                 <span className="ev-short">{getEvent(r.event)?.short ?? r.event}</span>
                 <span className="secondary"> {r.eventName}</span>
               </td>
-              <td className="main-val">{r.single ? formatWcaValue(r.single.value, r.event, 'single') : '–'}</td>
+              <td className="main-val">{r.single ? formatWcaValue(r.single.value, r.event, 'single') : '-'}</td>
               <td className="left holder">{r.single ? <Holder v={r.single} /> : ''}</td>
-              <td className="main-val">{r.average ? formatWcaValue(r.average.value, r.event, 'average') : '–'}</td>
+              <td className="main-val">{r.average ? formatWcaValue(r.average.value, r.event, 'average') : '-'}</td>
               <td className="left holder">{r.average ? <Holder v={r.average} /> : ''}</td>
             </tr>
           ))}
@@ -334,7 +334,7 @@ export function PeopleSearch({ initialQuery, onQuery, onPerson }: { initialQuery
       ) : !persons ? (
         <Loading />
       ) : persons.length === 0 ? (
-        <div className="empty">nobody found for “{dq}”.</div>
+        <div className="empty">nobody found for "{dq}".</div>
       ) : (
         <div className="table-wrap">
           <table className="table">
@@ -404,7 +404,7 @@ export function PersonCard({ wcaId, onBack }: { wcaId: string; onBack: () => voi
         <div className="who">
           <div className="name">{person.name}</div>
           <div className="sub small">
-            <Flag iso2={person.countryIso2} /> {countryName(person.countryIso2) || person.countryId} · {person.wcaId}
+            <Flag iso2={person.countryIso2} /> {countryName(person.countryIso2) || person.countryId} - {person.wcaId}
           </div>
         </div>
         <a className="btn small" href={`https://www.worldcubeassociation.org/persons/${encodeURIComponent(person.wcaId)}`} target="_blank" rel="noreferrer">

@@ -94,12 +94,12 @@ export function ScrambleBar({ scramble, onNext, onPrev, hasPrev, onCustom, editi
         </div>
       ) : (
         <div className="tp-scramble tp-scramble-loading">
-          generating scramble…
+          generating scramble...
         </div>
       )}
       <div className="tp-scramble-actions">
         {hasPrev && (
-          <button className="btn-text" onClick={onPrev} aria-label="previous scramble" data-tip="previous scramble (alt+←)" {...noFocus}>
+          <button className="btn-text" onClick={onPrev} aria-label="previous scramble" data-tip="previous scramble (alt+<-)" {...noFocus}>
             <ChevronLeft size={16} />
           </button>
         )}
@@ -113,7 +113,7 @@ export function ScrambleBar({ scramble, onNext, onPrev, hasPrev, onCustom, editi
           <Pencil size={16} />
         </button>
         {scramble?.offline && (
-          <span className="tp-scramble-hint" data-tip="the scramble service is unreachable — using random-move scrambles">
+          <span className="tp-scramble-hint" data-tip="the scramble service is unreachable - using random-move scrambles">
             <WifiOff size={12} /> offline scramble
           </span>
         )}

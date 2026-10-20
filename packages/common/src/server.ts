@@ -59,7 +59,7 @@ export function createServer(config: BaseConfig, opts: ServerOptions): Server {
     },
     bodyLimit: opts.bodyLimit ?? 1024 * 1024,
     // Number of reverse-proxy hops whose X-Forwarded-For we trust when deriving req.ip (used for
-    // rate limiting). Local gateway: 1. GKE Ingress (client → Google Front End → pod): 2.
+    // rate limiting). Local gateway: 1. GKE Ingress (client -> Google Front End -> pod): 2.
     // Trusting every hop would let clients spoof their IP via X-Forwarded-For.
     trustProxy: (_address: string, hop: number) => hop < TRUST_PROXY_HOPS,
   });

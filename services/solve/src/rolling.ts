@@ -21,7 +21,7 @@ export function rollingFromSolves(solves: SolveLike[]): Rolling {
   };
 }
 
-/** Daily challenge ao5: exactly 5 attempts ordered by index → ao5 + per-attempt effective times. */
+/** Daily challenge ao5: exactly 5 attempts ordered by index -> ao5 + per-attempt effective times. */
 export function dailyResult(solves: SolveLike[]): { ao5: number | null; times: number[] } {
   const times = solves.map(effectiveMs);
   return {
@@ -53,7 +53,7 @@ export function dailyOverview<S extends { event: string }>(
   return events;
 }
 
-/** Event payload value for one solve: effective ms, or null for a DNF (SPEC §8 `effectiveMs`). */
+/** Event payload value for one solve: effective ms, or null for a DNF (SPEC section 8 `effectiveMs`). */
 export function effectiveOrNull(s: SolveLike): number | null {
   const v = effectiveMs(s);
   return Number.isFinite(v) ? v : null;

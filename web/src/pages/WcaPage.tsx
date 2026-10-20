@@ -30,8 +30,8 @@ function Citation() {
       <a href="https://www.worldcubeassociation.org/results" target="_blank" rel="noreferrer">
         worldcubeassociation.org/results
       </a>{' '}
-      as of {meta.data?.exportDate ? formatDate(meta.data.exportDate) : meta.error ? 'the last import' : '…'}.
-      {meta.data?.counts?.persons ? ` ${meta.data.counts.persons.toLocaleString('en-US')} competitors · ${(meta.data.counts.competitions ?? 0).toLocaleString('en-US')} competitions.` : ''}
+      as of {meta.data?.exportDate ? formatDate(meta.data.exportDate) : meta.error ? 'the last import' : '...'}.
+      {meta.data?.counts?.persons ? ` ${meta.data.counts.persons.toLocaleString('en-US')} competitors - ${(meta.data.counts.competitions ?? 0).toLocaleString('en-US')} competitions.` : ''}
     </p>
   );
 }
@@ -97,7 +97,7 @@ export default function WcaPage() {
           <h1 className="h2">
             <Globe /> wca rankings
           </h1>
-          <div className="subtitle">official World Cube Association results — see how your times compare with every competitor.</div>
+          <div className="subtitle">official World Cube Association results - see how your times compare with every competitor.</div>
         </div>
         <Segmented label="section" value={tab} onChange={setTab} options={TABS} />
       </div>

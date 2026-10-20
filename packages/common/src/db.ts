@@ -2,11 +2,11 @@ import pg from 'pg';
 import type { QueryConfig, QueryResult, QueryResultRow } from 'pg';
 import type { FastifyBaseLogger } from 'fastify';
 
-// int8 (bigint / bigserial / count(*)) → JS number. Our bigints (total ms, ids) stay < 2^53.
+// int8 (bigint / bigserial / count(*)) -> JS number. Our bigints (total ms, ids) stay < 2^53.
 pg.types.setTypeParser(20, (v: string) => Number.parseInt(v, 10));
-// numeric → number (used by avg()/percentile results)
+// numeric -> number (used by avg()/percentile results)
 pg.types.setTypeParser(1700, (v: string) => Number.parseFloat(v));
-// date → keep the 'YYYY-MM-DD' string (the default parser builds a local-midnight Date → tz bugs)
+// date -> keep the 'YYYY-MM-DD' string (the default parser builds a local-midnight Date -> tz bugs)
 pg.types.setTypeParser(1082, (v: string) => v);
 
 export type Pool = pg.Pool;
@@ -132,7 +132,7 @@ export async function withTx<T>(pool: pg.Pool, fn: (client: pg.PoolClient) => Pr
     return result;
   } catch (err) {
     await client.query('rollback').catch((e: Error) => {
-      broken = e; // connection is unusable → destroy it instead of returning it to the pool
+      broken = e; // connection is unusable -> destroy it instead of returning it to the pool
     });
     throw err;
   } finally {

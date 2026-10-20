@@ -8,23 +8,23 @@ rank?" estimator, result distributions for charts, and person lookup.
 > Association, published at https://worldcubeassociation.org/results as of October 14, 2026.
 > (`GET /api/wca/meta` returns this citation with the date of the loaded export; show it wherever WCA data is displayed.)
 
-## Routes (SPEC §9.7)
+## Routes (SPEC section 9.7)
 | Route | Notes |
 |---|---|
 | `GET /api/wca/meta` | export date/version, `counts`, plus `tables` (exact row count per table), `sizeBytes`, `citation` |
 | `GET /api/wca/records` | WR single/average per event with holder (`holders[]` lists ties) |
 | `GET /api/wca/rank?event=333&kind=single&value=12000&country=AU` | world/country rank, percentile, 3+3 neighbours |
-| `GET /api/wca/distribution?event=333&kind=single&buckets=50` | p10…p99, `min` (= WR), histogram `buckets`, `below`/`above` |
-| `GET /api/wca/persons?q=feliks&limit=20` | name substring (trigram index) or exact WCA id; `limit` ≤ 50 |
+| `GET /api/wca/distribution?event=333&kind=single&buckets=50` | p10...p99, `min` (= WR), histogram `buckets`, `below`/`above` |
+| `GET /api/wca/persons?q=feliks&limit=20` | name substring (trigram index) or exact WCA id; `limit` <= 50 |
 | `GET /api/wca/persons/:wcaId` | person + PBs with world/continent/country rank for every event |
 | `GET /api/wca/countries` | `{countries:[{id, iso2, name, continentId, continentName, persons}]}` |
 | `GET /api/wca/_info` | standard info + `dataLoaded` and the loaded export's date/row counts |
 | `GET /internal/records` | `{records:{[event]:{single, average}}}` for leaderboard anti-cheat (not public; requires `X-Internal-Token` when `INTERNAL_API_TOKEN` is set) |
 
-**Units.** WCA centiseconds × 10 → `value` in **ms** for timed events; 333fm in **moves**
-(`unit: "moves"`; averages are stored ×100 in the export and divided here, e.g. `24.67`).
+**Units.** WCA centiseconds x 10 -> `value` in **ms** for timed events; 333fm in **moves**
+(`unit: "moves"`; averages are stored x100 in the export and divided here, e.g. `24.67`).
 The `value` query parameter of `/rank` uses the same units (integer ms, or moves for 333fm).
-Only the 16 cubetype events are served (333mbf and retired events → 404).
+Only the 16 cubetype events are served (333mbf and retired events -> 404).
 
 **Response details.** Every object with `countryId` also has `countryIso2` (for flag emojis);
 neighbours carry `personName` as well as `name`; rank, distribution, records and person PBs carry
@@ -45,7 +45,7 @@ gives `country: null`. Histogram buckets are equal-width `[from, to)` between ~p
   distribution, countries, persons; TTL 1 h, searches 10 min). The dataset version in the key means a
   new import is picked up within 10 s without flushing anything. Cached routes send `X-Cache: HIT|MISS`.
   Redis is a soft dependency: if it is down, every request is answered from Postgres.
-- Errors: zod validation → 400, unknown event/person → 404, malformed WCA id → 400.
+- Errors: zod validation -> 400, unknown event/person -> 404, malformed WCA id -> 400.
 
 ## Measured latency (local compose stack, bundled service, `curl -w %{time_total}`)
 | Route | cold (cache miss) | warm p50 |
@@ -59,12 +59,12 @@ gives `country: null`. Histogram buckets are equal-width `[from, to)` between ~p
 | `/persons/2009ZEMD01` | 3 ms | 1 ms |
 | `/countries` | 24 ms | 2 ms |
 
-World rank = two counts on the `(event_id, best)` index (index-only scan, 2–6 ms); country rank = hash join of
-`persons(country_id)` with that event's ranks (≈ 19 ms for the USA). With Redis stopped every route still answers
+World rank = two counts on the `(event_id, best)` index (index-only scan, 2-6 ms); country rank = hash join of
+`persons(country_id)` with that event's ranks (~19 ms for the USA). With Redis stopped every route still answers
 (from Postgres). Before the import (empty DB) all data routes return 503 while `/readyz` stays 200.
 
 ## Env
-Standard (`PORT`, `DATABASE_URL`, `REDIS_URL`, `INTERNAL_API_TOKEN`, `LOG_LEVEL`, …). No service-specific variables.
+Standard (`PORT`, `DATABASE_URL`, `REDIS_URL`, `INTERNAL_API_TOKEN`, `LOG_LEVEL`, ...). No service-specific variables.
 
 ## Local run
 ```

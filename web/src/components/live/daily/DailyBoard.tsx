@@ -60,7 +60,7 @@ export function DailyBoard({
       ) : !data ? (
         <Loading />
       ) : entries.length === 0 ? (
-        <div className="empty">no completed ao5 yet ¯\_(ツ)_/¯</div>
+        <div className="empty">no completed ao5 yet {'\u00af\\_(\u30c4)_/\u00af'}</div>
       ) : (
         <>
           <table className="table daily-table">
@@ -85,7 +85,7 @@ export function DailyBoard({
               {me && !meVisible && (
                 <>
                   <tr className="gap" aria-hidden="true">
-                    <td colSpan={3}>⋯</td>
+                    <td colSpan={3}>...</td>
                   </tr>
                   <tr className="me">
                     <td className="center">{me.rank}</td>

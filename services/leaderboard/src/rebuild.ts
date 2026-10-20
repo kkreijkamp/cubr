@@ -16,9 +16,9 @@ import {
 // ---------------------------------------------------------------------------------------------
 // Boards are a derived read model: if Redis loses its data, all-time boards are rebuilt from the
 // source of truth (stats-service PBs). Runs in the background (never blocks listen):
-//   every 60 s: if lb:meta:built is missing → take lb:rebuild-lock (SET NX EX 120, so only one
-//   replica rebuilds) → GET stats /internal/pbs per kind → pipelined upserts → SET lb:meta:built.
-// If stats is unreachable we retry with exponential backoff (1 s … 30 s); the boards keep serving
+//   every 60 s: if lb:meta:built is missing -> take lb:rebuild-lock (SET NX EX 120, so only one
+//   replica rebuilds) -> GET stats /internal/pbs per kind -> pipelined upserts -> SET lb:meta:built.
+// If stats is unreachable we retry with exponential backoff (1 s ... 30 s); the boards keep serving
 // whatever they already contain in the meantime.
 // ---------------------------------------------------------------------------------------------
 
@@ -181,7 +181,7 @@ export function startRebuildLoop(deps: RebuildDeps) {
 
     status.state = 'rebuilding';
     const t0 = Date.now();
-    log.info('lb:meta:built missing → rebuilding all-time boards from stats');
+    log.info('lb:meta:built missing -> rebuilding all-time boards from stats');
     try {
       const r = await rebuildOnce(deps);
       const at = new Date().toISOString();

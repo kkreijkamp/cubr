@@ -1,6 +1,6 @@
 import type { Migration } from '@cubetype/common';
 
-// Schema `solve` exactly as in docs/SPEC.md §7.2. `migrate()` creates the schema itself and
+// Schema `solve` exactly as in docs/SPEC.md section 7.2. `migrate()` creates the schema itself and
 // tracks applied ids in solve.schema_migrations (advisory-locked, safe with many replicas).
 export const migrations: Migration[] = [
   {

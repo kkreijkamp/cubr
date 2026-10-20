@@ -5,7 +5,7 @@ export const isFmc = (event: string) => event === '333fm';
 
 /** WCA API values: ms for timed events, moves for 333fm (averages may be fractional). */
 export function formatWcaValue(v: number | null | undefined, event: string, kind: 'single' | 'average'): string {
-  if (v === null || v === undefined || Number.isNaN(v)) return '–';
+  if (v === null || v === undefined || Number.isNaN(v)) return '-';
   if (v < 0) return 'DNF';
   if (isFmc(event)) return kind === 'average' ? v.toFixed(2) : String(Math.round(v));
   return formatTime(v, 2);
@@ -21,7 +21,7 @@ export function shortAxisValue(v: number, event: string, kind: 'single' | 'avera
   return `${m}:${String(Math.round(s % 60)).padStart(2, '0')}`;
 }
 
-/** user input → API value (ms, or moves for FMC); null when invalid */
+/** user input -> API value (ms, or moves for FMC); null when invalid */
 export function parseWcaInput(input: string, event: string, kind: 'single' | 'average'): number | null {
   const s = input.trim();
   if (!s) return null;

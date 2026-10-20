@@ -31,10 +31,10 @@ async function req(method, path, body) {
 }
 
 function check(name, cond, detail = '') {
-  if (cond) console.log(`  ✓ ${name}${detail ? ` — ${detail}` : ''}`);
+  if (cond) console.log(`  ok ${name}${detail ? ` - ${detail}` : ''}`);
   else {
     failures++;
-    console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`);
+    console.log(`  FAIL ${name}${detail ? ` - ${detail}` : ''}`);
   }
 }
 
@@ -53,7 +53,7 @@ async function eventually(name, fn, timeoutMs = 15_000) {
   check(name, false, last?.detail ?? 'timed out');
 }
 
-console.log(`cubetype smoke test → ${BASE}\n`);
+console.log(`cubetype smoke test -> ${BASE}\n`);
 
 console.log('health / info (every service answers through the entry point):');
 for (const p of ['/_info', '/api/auth/_info', '/api/scrambles/_info', '/api/solves/_info', '/api/stats/_info', '/api/leaderboards/_info', '/api/race/_info', '/api/wca/_info']) {
@@ -81,7 +81,7 @@ check('3x3 scrambles', sc.status === 200 && sc.data?.scrambles?.length === 3, `s
 const daily = await req('GET', '/api/scrambles/daily');
 check('daily challenge scrambles', daily.status === 200 && Array.isArray(daily.data?.events?.['333']), daily.data?.date);
 
-console.log('\nsolves → event bus → stats & leaderboard:');
+console.log('\nsolves -> event bus -> stats & leaderboard:');
 const sessions = await req('GET', '/api/sessions');
 const session = sessions.data?.sessions?.[0];
 check('default session created', Boolean(session), session?.name);
@@ -113,11 +113,11 @@ console.log('\nwca dataset:');
 const meta = await req('GET', '/api/wca/meta');
 if (meta.status === 503) {
   // a fresh stack has no WCA data until the import job ran (docker compose --profile jobs run --rm wca-import)
-  console.log(`  – skipped: ${meta.data?.error?.message ?? 'WCA data not loaded'} (run the wca-import job first)`);
+  console.log(`  - skipped: ${meta.data?.error?.message ?? 'WCA data not loaded'} (run the wca-import job first)`);
 } else {
   check('wca meta', meta.status === 200, meta.status === 200 ? `export ${meta.data.exportDate}, persons=${meta.data.counts?.persons}` : `status ${meta.status}`);
   const rank = await req('GET', '/api/wca/rank?event=333&kind=single&value=59876&country=AU');
-  check('where would I rank?', rank.status === 200, rank.status === 200 ? `world #${rank.data.world.rank} of ${rank.data.world.total} (${rank.data.world.percentile}%) · ${rank.ms} ms` : `status ${rank.status} ${rank.data?.error?.message ?? ''}`);
+  check('where would I rank?', rank.status === 200, rank.status === 200 ? `world #${rank.data.world.rank} of ${rank.data.world.total} (${rank.data.world.percentile}%) - ${rank.ms} ms` : `status ${rank.status} ${rank.data?.error?.message ?? ''}`);
 }
 
 console.log('\nrace:');
@@ -132,7 +132,7 @@ await Promise.all(Array.from({ length: 20 }, async () => {
   const r = await req('GET', '/api/scrambles/_info');
   pods.set(r.data?.pod, (pods.get(r.data?.pod) ?? 0) + 1);
 }));
-check('requests spread over ≥ 1 pod', pods.size >= 1, [...pods].map(([p, n]) => `${p}:${n}`).join(' '));
+check('requests spread over >= 1 pod', pods.size >= 1, [...pods].map(([p, n]) => `${p}:${n}`).join(' '));
 
 console.log('\ncleanup:');
 const sessDel = await req('DELETE', `/api/sessions/${session.id}`);
@@ -142,5 +142,5 @@ check('logout', out.status === 204);
 const after = await req('GET', '/api/auth/me');
 check('token revoked after logout', after.status === 401);
 
-console.log(failures ? `\n${failures} check(s) FAILED` : '\nall checks passed ✓');
+console.log(failures ? `\n${failures} check(s) FAILED` : '\nall checks passed');
 process.exit(failures ? 1 : 0);

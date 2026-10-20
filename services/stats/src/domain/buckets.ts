@@ -28,9 +28,9 @@ export function validTz(tz: unknown): string | null {
 const SLOT_MS = 15 * 60 * 1000;
 
 /**
- * Returns a (date → {day, hour}) function for one timezone. Every UTC offset in use is a multiple
+ * Returns a (date -> {day, hour}) function for one timezone. Every UTC offset in use is a multiple
  * of 15 minutes, so all instants inside the same 15-minute UTC slot share the same local day and
- * hour: results are memoised per slot, which makes bucketing 20k solves ~50× cheaper than calling
+ * hour: results are memoised per slot, which makes bucketing 20k solves ~50x cheaper than calling
  * dayKey/hourIn (each builds an Intl formatter) for every solve.
  */
 export function makeBucketer(tz: string): (date: Date) => { day: string; hour: number } {

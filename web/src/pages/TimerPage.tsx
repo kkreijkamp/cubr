@@ -171,7 +171,7 @@ export default function TimerPage() {
     const pbs = detectPbs(prev.stats, stats);
     const newest = solves[solves.length - 1];
     if (!pbs.length || !newest) return;
-    const text = pbs.map((p) => `${p.kind} ${p.kind === 'single' ? formatTime(p.value, settings.precision) : fmtAvg(p.value, settings.precision)}`).join(' · ');
+    const text = pbs.map((p) => `${p.kind} ${p.kind === 'single' ? formatTime(p.value, settings.precision) : fmtAvg(p.value, settings.precision)}`).join(' - ');
     toast.pb(`new pb! ${text}`);
     setPbSolveId(newest.id);
     setPbKey((k) => k + 1);
@@ -306,13 +306,13 @@ export default function TimerPage() {
       const cmds: Command[] = [
         {
           id: 'timer-event',
-          label: 'Event…',
+          label: 'Event...',
           icon: <TimerIcon />,
           keywords: ['puzzle', 'cube'],
           children: () =>
             EVENTS.map((e) => ({
               id: `timer-event-${e.id}`,
-              label: `${e.short.toLowerCase()} — ${e.name}`,
+              label: `${e.short.toLowerCase()} - ${e.name}`,
               keywords: [e.id],
               active: e.id === event,
               run: () => changeEvent(e.id),
@@ -320,7 +320,7 @@ export default function TimerPage() {
         },
         {
           id: 'timer-session',
-          label: 'Session…',
+          label: 'Session...',
           icon: <Layers />,
           children: () =>
             eventSessions.map((s) => ({
@@ -334,7 +334,7 @@ export default function TimerPage() {
         { id: 'timer-rename-session', label: 'Rename session', icon: <Pencil />, run: () => setModal({ kind: 'renameSession' }) },
         {
           id: 'timer-merge-sessions',
-          label: 'Merge sessions…',
+          label: 'Merge sessions...',
           icon: <Merge />,
           keywords: ['combine', 'join', 'session'],
           run: () => setModal({ kind: 'mergeSessions' }),
@@ -348,7 +348,7 @@ export default function TimerPage() {
         cmds.push(
           {
             id: 'timer-penalty',
-            label: 'Penalty last solve…',
+            label: 'Penalty last solve...',
             icon: <TimerIcon />,
             keywords: ['dnf', '+2', 'ok'],
             children: () =>
@@ -454,7 +454,7 @@ export default function TimerPage() {
         {solves.length === 0 && !manual && st.ready ? (
           <div className="tp-hint">
             {touch ? (
-              'hold the timer, release to start · tap anywhere to stop'
+              'hold the timer, release to start - tap anywhere to stop'
             ) : settings.inspection && eventInfo.inspection ? (
               <>
                 press <kbd>space</kbd> to start inspection
@@ -522,8 +522,8 @@ export default function TimerPage() {
       )}
 
       <div className="keytips tp-keytips fade-on-focus">
-        <kbd>space</kbd> start / stop · <kbd>tab</kbd> new scramble · <kbd>alt</kbd>+<kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd> ok / +2 / dnf ·{' '}
-        <kbd>alt</kbd>+<kbd>⌫</kbd> delete last · <kbd>esc</kbd> command line
+        <kbd>space</kbd> start / stop - <kbd>tab</kbd> new scramble - <kbd>alt</kbd>+<kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd> ok / +2 / dnf -{' '}
+        <kbd>alt</kbd>+<kbd>backspace</kbd> delete last - <kbd>esc</kbd> command line
       </div>
       {guest && (
         <div className="tp-guest fade-on-focus">
@@ -567,7 +567,7 @@ export default function TimerPage() {
       {modal?.kind === 'newSession' && (
         <PromptModal
           title="new session"
-          label={`name · ${eventInfo.short.toLowerCase()}`}
+          label={`name - ${eventInfo.short.toLowerCase()}`}
           initial={suggestSessionName(event)}
           confirmLabel="create"
           onSubmit={async (name) => {
@@ -631,7 +631,7 @@ export default function TimerPage() {
           title="comment"
           label={`solve ${solves.findIndex((s) => s.id === modal.solveId) + 1}`}
           initial={solves.find((s) => s.id === modal.solveId)?.comment ?? ''}
-          placeholder="pll skip, lockup on f2l, …"
+          placeholder="pll skip, lockup on f2l, ..."
           maxLength={500}
           onSubmit={(c) => setComment(modal.solveId, c || null)}
           onClose={() => setModal(null)}

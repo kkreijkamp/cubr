@@ -1,20 +1,20 @@
 # solve service
 
 The core write path of cubetype: sessions and solves CRUD, csTimer bulk import/export, daily-challenge
-attempts, and the **transactional outbox** that feeds the Redis event bus. Owns the Postgres schema `solve` (SPEC §7.2),
+attempts, and the **transactional outbox** that feeds the Redis event bus. Owns the Postgres schema `solve` (SPEC section 7.2),
 migrated at startup. Port 8080.
 
 ## Routes (all `/api/*` require `Authorization: Bearer <jwt>`)
 | Route | Notes |
 |---|---|
-| `GET /api/sessions` | creates a default `3x3`/`333` session on first call (per-user advisory lock → exactly one) |
-| `POST /api/sessions` `{id?, name, event}` | 201; same id again for this user → 200 existing; id owned by someone else → 409 |
+| `GET /api/sessions` | creates a default `3x3`/`333` session on first call (per-user advisory lock -> exactly one) |
+| `POST /api/sessions` `{id?, name, event}` | 201; same id again for this user -> 200 existing; id owned by someone else -> 409 |
 | `PATCH /api/sessions/:id` `{name}` / `DELETE /api/sessions/:id` | rename emits `session.renamed`; delete cascades solves, emits `session.deleted` |
-| `POST /api/sessions/:id/merge` `{sourceIds}` | moves every solve of 1–50 source sessions into `:id` and deletes the sources in **one transaction**; only sessions of the same event (409 otherwise); emits `sessions.merged` |
+| `POST /api/sessions/:id/merge` `{sourceIds}` | moves every solve of 1-50 source sessions into `:id` and deletes the sources in **one transaction**; only sessions of the same event (409 otherwise); emits `sessions.merged` |
 | `GET /api/sessions/:id/solves` | ascending; capped at the **latest** 50 000 (`truncated: true` when cut) |
-| `POST /api/solves` | idempotent on `id` (`ON CONFLICT DO NOTHING`): retry → 200, no second event; id of another user → 409. Returns `{solve, rolling:{ao5,ao12}}` |
+| `POST /api/solves` | idempotent on `id` (`ON CONFLICT DO NOTHING`): retry -> 200, no second event; id of another user -> 409. Returns `{solve, rolling:{ao5,ao12}}` |
 | `PATCH /api/solves/:id` `{penalty?, comment?}` / `DELETE /api/solves/:id` | emit `solve.updated` / `solve.deleted`; a changed solve is returned with the session's `rolling` |
-| `POST /api/sessions/import` | ≤ 100 000 solves, body ≤ 25 MB; one transaction, `unnest()` batches of 2000, one `solves.imported` event. 100k solves ≈ 1.3 s locally |
+| `POST /api/sessions/import` | <= 100 000 solves, body <= 25 MB; one transaction, `unnest()` batches of 2000, one `solves.imported` event. 100k solves take ~1.3 s locally |
 | `GET /api/solves/export` | `{exportedAt, sessions:[Session & {solves}]}` |
 | `GET /api/solves/daily?date=` | the user's daily solves per event + the official ao5 (from the recorded attempts) |
 | `GET /api/solves/_info`, `/api/sessions/_info` | info incl. `outbox: {backlog, published, lastPublishedAt, lastError, healthy}` |
@@ -35,8 +35,8 @@ Published rows older than 1 day are deleted every 10 min.
 Session names travel with the events (`solve.created.sessionName`; `session.renamed {userId, username, sessionId, event,
 name}`), so read models can label sessions without calling this service; `GET /internal/users/:userId/sessions` backfills
 names for sessions they only learned about through a bulk import. A merge locks all involved session rows in id order
-(concurrent merges can't deadlock), and `sessions.merged` makes stats recompute the event's PBs — interleaving two sessions
-changes the within-session ao5/ao12 windows — which the leaderboard follows via `pb.updated`.
+(concurrent merges can't deadlock), and `sessions.merged` makes stats recompute the event's PBs - interleaving two sessions
+changes the within-session ao5/ao12 windows - which the leaderboard follows via `pb.updated`.
 
 **Why Redis is not a readiness dependency:** with the outbox, a Redis outage only delays events. Solves keep being
 accepted (rows wait in `solve.outbox`; the relay pings Redis first, backs off up to 5 s, and drains the backlog once
@@ -44,10 +44,10 @@ Redis returns, which shows up as `outbox.backlog` in `_info`). Readiness gates o
 at-least-once: consumers dedupe on `eventId`.
 
 ## Daily challenge
-`POST /api/solves` with `daily: {date, index 0..4}` → `source: 'daily'`. Session event must be a daily event
+`POST /api/solves` with `daily: {date, index 0..4}` -> `source: 'daily'`. Session event must be a daily event
 (`333 222 444 pyram skewb`); date must be UTC yesterday/today/tomorrow (i.e. "today" somewhere on Earth). Each attempt is
 also recorded in `solve.daily_attempts` exactly as submitted (one row per index, migration `002_daily_attempts`): an index
-that was attempted before → 409 `daily attempt already recorded`, even if its solve has been deleted since, so a known
+that was attempted before -> 409 `daily attempt already recorded`, even if its solve has been deleted since, so a known
 scramble can't be redone. When all 5 attempts exist, `daily.completed` (ao5 + times, computed from the attempts) is queued
 in the same transaction (advisory lock per user/date/event prevents a race). Deleting or re-penalising a daily solve later
 changes neither that result nor the ao5 reported by `GET /api/solves/daily`.
@@ -56,19 +56,19 @@ changes neither that result nor the ao5 reported by `GET /api/solves/daily`.
 - `id` and `scramble`/`penalty` on `POST /api/solves` are optional (server generates the id; defaults `''`/`OK`). `source` may be
   `timer|manual|race|daily|import|seed`.
 - `createdAt` more than 5 min in the future (a device clock running fast) is clamped to the server time instead of
-  rejecting the solve; unparseable timestamps → 400. The import clamps such timestamps the same way per solve.
+  rejecting the solve; unparseable timestamps -> 400. The import clamps such timestamps the same way per solve.
 - `rolling` is computed inside the transaction while the session row is locked (`FOR NO KEY UPDATE`), so concurrent
   solves in one session each see all earlier ones. ao5/ao12 use the WCA trimming rules from `@cubetype/cubestats`
   (ms, `-1` = DNF, `null` = not enough solves).
 - No-op PATCHes (same values) emit nothing.
 - Empty bodies sent with `Content-Type: application/json` (for example a DELETE from a fetch wrapper) are accepted.
 - The relay, the readiness check and the backlog count use short client-side Postgres query timeouts (`queryWithTimeout` /
-  `pingPostgres` from `@cubetype/common`, 1.5–10 s) on top of the pool's defaults: a connection to a DB that vanished without a TCP reset (dead pod IP during a
-  failover, or a frozen VM) must not stall the relay, and frequent probes must not pile up pool clients — a timed-out
+  `pingPostgres` from `@cubetype/common`, 1.5-10 s) on top of the pool's defaults: a connection to a DB that vanished without a TCP reset (dead pod IP during a
+  failover, or a frozen VM) must not stall the relay, and frequent probes must not pile up pool clients - a timed-out
   client is released with its error, so the pool drops it.
 
 ## Env / run
-Standard vars (SPEC §4): `PORT DATABASE_URL REDIS_URL JWT_SECRET INTERNAL_API_TOKEN APP_VERSION POD_NAME NODE_NAME LOG_LEVEL`.
+Standard vars (SPEC section 4): `PORT DATABASE_URL REDIS_URL JWT_SECRET INTERNAL_API_TOKEN APP_VERSION POD_NAME NODE_NAME LOG_LEVEL`.
 `INTERNAL_API_TOKEN` is the shared secret callers of `/internal/*` send as `X-Internal-Token`; while it is unset (local
 development) the internal routes accept any call and log one warning at startup.
 ```

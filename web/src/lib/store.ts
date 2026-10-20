@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 
 /** Minimal external store (no dependency). Selectors must return stable values (primitives or
- *  existing object references) — never build a new object inside a selector. */
+ *  existing object references) - never build a new object inside a selector. */
 export interface Store<T> {
   get(): T;
   set(next: T | ((prev: T) => T)): void;

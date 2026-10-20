@@ -42,7 +42,7 @@ export function parseTimerFile(input: Uint8Array | string): TimerImport {
     format = 'DCTimer (SQLite backup)';
     raw = dcTimerSqlite(input);
   } else {
-    const text = typeof input === 'string' ? input.replace(/^﻿/, '') : decodeText(input);
+    const text = typeof input === 'string' ? input.replace(/^\uFEFF/, '') : decodeText(input);
     [format, raw] = detect(text);
   }
   const { sessions, skipped } = finishImport(raw);
@@ -56,7 +56,7 @@ export function parseTimerFile(input: Uint8Array | string): TimerImport {
 function decodeText(bytes: Uint8Array): string {
   if (bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder('utf-16le').decode(bytes.subarray(2));
   if (bytes[0] === 0xfe && bytes[1] === 0xff) return new TextDecoder('utf-16be').decode(bytes.subarray(2));
-  return new TextDecoder('utf-8').decode(bytes).replace(/^﻿/, '');
+  return new TextDecoder('utf-8').decode(bytes).replace(/^\uFEFF/, '');
 }
 
 const unsupported = (): never => {
@@ -129,7 +129,7 @@ export function readDelimited(text: string, delim: string): string[][] {
   return rows;
 }
 
-/** "12.34", "1:23.45", "1:02:03.4", "DNF", "DNF(12.34)", "14.34+" → ms and penalty (null if unreadable). */
+/** "12.34", "1:23.45", "1:02:03.4", "DNF", "DNF(12.34)", "14.34+" -> ms and penalty (null if unreadable). */
 export function parseTimeString(s: string): { ms: number; penalty: Penalty } | null {
   let t = s.trim();
   let penalty: Penalty = 'OK';
@@ -149,7 +149,7 @@ export function parseTimeString(s: string): { ms: number; penalty: Penalty } | n
   return { ms: Math.round(((h * 60 + m) * 60 + sec) * 1000), penalty };
 }
 
-/** "YYYY-MM-DD hh:mm[:ss]" in local time → epoch ms (null if unreadable), like csTimer. */
+/** "YYYY-MM-DD hh:mm[:ss]" in local time -> epoch ms (null if unreadable), like csTimer. */
 export function parseLocalDateTime(s: string | SqlValue | undefined): number | null {
   if (typeof s !== 'string') return null;
   const m = /^\s*(\d+)-(\d+)-(\d+)\s+(\d+):(\d+)(?::(\d+))?\s*$/.exec(s);
@@ -199,7 +199,7 @@ function cubetype(sessions: unknown[]): RawSession[] {
 
 // ---------------------------------------------------------------- csTimer session CSV ("export to CSV" in a session's stats)
 
-// No.;Time;Comment;Scramble;Date;P.1[;P.2…] — Time is shown with the penalty ("14.34+", "DNF(12.34)"),
+// No.;Time;Comment;Scramble;Date;P.1[;P.2...] - Time is shown with the penalty ("14.34+", "DNF(12.34)"),
 // the P.n phase columns hold the raw time (P.1 = the only phase, or the last one of a multi-phase solve).
 function csTimerCsv(text: string): RawSession[] {
   const solves: RawSolve[] = [];

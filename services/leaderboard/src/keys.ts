@@ -2,16 +2,16 @@ import { dayKey, isoWeekKey } from '@cubetype/common';
 import { isEventId } from '@cubetype/cubestats';
 
 // ---------------------------------------------------------------------------------------------
-// Redis key builders and period / paging math (pure, unit-tested). Keyspace: docs/SPEC.md §7.6.
+// Redis key builders and period / paging math (pure, unit-tested). Keyspace: docs/SPEC.md section 7.6.
 //
 //   lb:<event>:<kind>:all            zset  all-time board (score = ms, member = userId)
 //   lb:<event>:<kind>:w:<YYYY-Www>   zset  weekly board   (TTL 15 d)
 //   lb:<event>:<kind>:d:<YYYY-MM-DD> zset  daily board    (TTL 3 d)
 //   lb:dc:<YYYY-MM-DD>:<event>       zset  daily-challenge ao5 board
-//   <board>:at                       hash  userId → achievedAt (ISO) for the score on <board>
-//   <board>:ts                       hash  userId → occurredAt (epoch ms) of the last applied
+//   <board>:at                       hash  userId -> achievedAt (ISO) for the score on <board>
+//   <board>:ts                       hash  userId -> occurredAt (epoch ms) of the last applied
 //                                          pb.updated (all-time boards only; drops stale events)
-//   lb:users                         hash  userId → JSON {username, country, avatarUrl}
+//   lb:users                         hash  userId -> JSON {username, country, avatarUrl}
 //   lb:flagged                       list  rejected (anti-cheat) entries, newest first, capped
 //   lb:meta:built / lb:rebuild-lock  string
 // ---------------------------------------------------------------------------------------------
@@ -88,7 +88,7 @@ export function isValidWeek(s: string): boolean {
   return w >= 1 && w <= isoWeeksInYear(Number(m[1]));
 }
 
-/** 1-based page → inclusive ZRANGE indexes. */
+/** 1-based page -> inclusive ZRANGE indexes. */
 export function pageRange(page: number, size: number): { start: number; stop: number } {
   const start = (page - 1) * size;
   return { start, stop: start + size - 1 };

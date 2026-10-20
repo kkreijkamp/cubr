@@ -131,7 +131,7 @@ function useNow(intervalMs: number): number {
 function shortDay(key: string, index: number): string {
   if (index === 0) return 'today';
   if (index === 1) return 'yesterday';
-  // "Mon 12 Oct 2026" → "mon 12 oct"
+  // "Mon 12 Oct 2026" -> "mon 12 oct"
   return formatDayKey(key).split(' ').slice(0, 3).join(' ').toLowerCase();
 }
 
@@ -162,7 +162,7 @@ function Subtitle({ sel, periodKey }: { sel: Selection; periodKey: string | unde
     return (
       <div className="lb-subtitle">
         <span data-tip={tz}>
-          {formatDayKey(start).toLowerCase()} – {formatDayKey(end).toLowerCase()}
+          {formatDayKey(start).toLowerCase()} - {formatDayKey(end).toLowerCase()}
         </span>
         <span className="lb-pipe" aria-hidden="true" />
         <span>resets in {formatDuration(msUntilReset('weekly'))}</span>
@@ -217,8 +217,8 @@ function MeCard({ board, sel, precision, onJump }: { board: Leaderboard | undefi
     const how =
       sel.period === 'challenge'
         ? sel.date === utcDateKey()
-          ? 'finish all 5 scrambles of today’s challenge to get ranked.'
-          : 'you did not finish this day’s challenge.'
+          ? "finish all 5 scrambles of today's challenge to get ranked."
+          : "you did not finish this day's challenge."
         : sel.period === 'all'
           ? `set a ${eventLabel(sel.event)} ${sel.kind} on the timer to get ranked.`
           : `solve some ${eventLabel(sel.event)} ${sel.period === 'daily' ? 'today' : 'this week'} to get ranked.`;
@@ -242,7 +242,7 @@ function MeCard({ board, sel, precision, onJump }: { board: Leaderboard | undefi
           <Avatar user={user} size={20} />
           {user.username}
         </span>
-        <span className="sub">{me.rank === 1 ? 'goat — nobody is faster' : `you · top ${formatPercent(top)} of ${formatNumber(board.total)}`}</span>
+        <span className="sub">{me.rank === 1 ? 'goat - nobody is faster' : `you - top ${formatPercent(top)} of ${formatNumber(board.total)}`}</span>
       </div>
       <div className="lb-me-value">{formatTime(me.valueMs, precision)}</div>
       <button className="btn small lb-me-jump" onClick={onJump} data-tip="jump to my page">
@@ -285,7 +285,7 @@ function GoToPageModal({ pages, current, onGo, onClose }: { pages: number; curre
           </button>
         </div>
         <span className="sub small">
-          {pages === 1 ? 'there is only one page' : `1 – ${formatNumber(pages)}`}
+          {pages === 1 ? 'there is only one page' : `1 - ${formatNumber(pages)}`}
         </span>
       </form>
     </Modal>
@@ -364,7 +364,7 @@ export default function LeaderboardsPage() {
     }
   }, [board.loading]);
 
-  // ← / → flip pages
+  // <- / -> flip pages
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || isTyping(e.target)) return;
@@ -384,13 +384,13 @@ export default function LeaderboardsPage() {
       const cmds: Command[] = [
         {
           id: 'lb-period',
-          label: 'Leaderboard period…',
+          label: 'Leaderboard period...',
           icon: <Crown />,
           children: () => PERIODS.map((p) => ({ id: `lb-period-${p.id}`, label: p.label, active: sel.period === p.id, run: () => update({ period: p.id }) })),
         },
         {
           id: 'lb-event',
-          label: 'Leaderboard event…',
+          label: 'Leaderboard event...',
           icon: <Crown />,
           children: () =>
             BOARD_EVENTS.filter((e) => sel.period !== 'challenge' || DAILY_EVENTS.includes(e.id)).map((e) => ({
@@ -403,7 +403,7 @@ export default function LeaderboardsPage() {
         },
         {
           id: 'lb-kind',
-          label: 'Leaderboard type…',
+          label: 'Leaderboard type...',
           icon: <Crown />,
           keywords: ['single', 'average'],
           children: () => kindsFor(sel.period).map((k) => ({ id: `lb-kind-${k}`, label: k, active: sel.kind === k, run: () => update({ kind: k }) })),
@@ -478,7 +478,7 @@ export default function LeaderboardsPage() {
           <Loading />
         ) : total === 0 || data.entries.length === 0 ? (
           <div className="lb-empty">
-            <div className="shrug">no entries yet ¯\_(ツ)_/¯</div>
+            <div className="shrug">no entries yet {'\u00af\\_(\u30c4)_/\u00af'}</div>
             <div className="small">
               {sel.period === 'challenge' ? (
                 sel.date === utcDateKey() ? (
@@ -490,7 +490,7 @@ export default function LeaderboardsPage() {
                 )
               ) : (
                 <>
-                  be the first to set a {eventLabel(sel.event)} {sel.kind} — <Link to="/">open the timer</Link>
+                  be the first to set a {eventLabel(sel.event)} {sel.kind} - <Link to="/">open the timer</Link>
                 </>
               )}
             </div>
@@ -499,7 +499,7 @@ export default function LeaderboardsPage() {
           <>
             <div className="lb-toolbar">
               <span className="lb-count">
-                {formatNumber(from)}–{formatNumber(to)} of {formatNumber(total)} {total === 1 ? 'cuber' : 'cubers'}
+                {formatNumber(from)}-{formatNumber(to)} of {formatNumber(total)} {total === 1 ? 'cuber' : 'cubers'}
                 {board.loading && <Spinner size={14} />}
               </span>
               <nav className="lb-pager" aria-label="pagination">
@@ -509,13 +509,13 @@ export default function LeaderboardsPage() {
                 <button className="btn" onClick={jumpToMe} disabled={!myPage} data-tip="jump to my page" aria-label="jump to my page">
                   <User />
                 </button>
-                <button className="btn" onClick={() => goPage(sel.page - 1)} disabled={sel.page === 1} data-tip="previous page ←" aria-label="previous page">
+                <button className="btn" onClick={() => goPage(sel.page - 1)} disabled={sel.page === 1} data-tip="previous page <-" aria-label="previous page">
                   <ChevronLeft />
                 </button>
                 <button className="btn" onClick={() => setGotoOpen(true)} data-tip="go to page" aria-label={`page ${sel.page} of ${pages}, go to page`}>
                   {sel.page} / {pages}
                 </button>
-                <button className="btn" onClick={() => goPage(sel.page + 1)} disabled={sel.page >= pages} data-tip="next page →" aria-label="next page">
+                <button className="btn" onClick={() => goPage(sel.page + 1)} disabled={sel.page >= pages} data-tip="next page ->" aria-label="next page">
                   <ChevronRight />
                 </button>
               </nav>
@@ -564,7 +564,7 @@ export default function LeaderboardsPage() {
                 </tbody>
               </table>
             </div>
-            {board.error && <div className="error small center">{friendlyError(board.error, 'the leaderboard service')} — showing the last loaded page.</div>}
+            {board.error && <div className="error small center">{friendlyError(board.error, 'the leaderboard service')} - showing the last loaded page.</div>}
           </>
         )}
       </section>

@@ -26,7 +26,7 @@ type PB = { valueMs: number; solveId: string | null; achievedAt: string };
 
 const iso = (d: Date | null) => (d ? d.toISOString() : null);
 
-/** The owner's bucketing timezone (days were stored in it) — "today" for streaks / activity. */
+/** The owner's bucketing timezone (days were stored in it) - "today" for streaks / activity. */
 async function userTz(pool: Pool, userId: string): Promise<string> {
   const { rows } = await pool.query<{ tz: string }>('SELECT tz FROM stats.user_totals WHERE user_id = $1', [userId]);
   return rows[0]?.tz ?? 'UTC';

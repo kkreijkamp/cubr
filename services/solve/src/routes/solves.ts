@@ -20,7 +20,7 @@ function mapPgError(err: unknown): never {
 
 /**
  * Records the official attempt of a daily solve (one per user/date/event/index, kept as submitted).
- * An index that was used before stays used even if its solve was deleted since → 409, so a known
+ * An index that was used before stays used even if its solve was deleted since -> 409, so a known
  * scramble can't be redone; only the same solve id (a retry) may hold it again. Returns true for a
  * new attempt.
  */
@@ -99,7 +99,7 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
       );
 
       if (!ins.rows[0]) {
-        // Retry of an existing id: same user → 200 with the stored solve (no new event).
+        // Retry of an existing id: same user -> 200 with the stored solve (no new event).
         const existing = await client.query<SolveRow>(`SELECT ${SOLVE_COLUMNS} FROM solve.solves WHERE id = $1`, [id]);
         const row = existing.rows[0];
         if (!row || row.user_id !== user.id) throw conflict('solve id already in use');

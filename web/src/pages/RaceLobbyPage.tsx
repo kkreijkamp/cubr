@@ -60,7 +60,7 @@ function RoomsTable({ onJoin }: { onJoin: (id: string) => void }) {
       ) : !rooms ? (
         <Loading />
       ) : rooms.length === 0 ? (
-        <div className="empty">no public rooms right now — create one and invite a friend.</div>
+        <div className="empty">no public rooms right now - create one and invite a friend.</div>
       ) : (
         <div className="table-wrap">
           <table className="table">
@@ -124,7 +124,7 @@ export default function RaceLobbyPage() {
       navigate(`/race/${res.room.id}`);
     } catch (e) {
       const err = e as ApiError;
-      setCreateError(err.isUnavailable ? 'the race service is unavailable — try again in a moment' : err.message);
+      setCreateError(err.isUnavailable ? 'the race service is unavailable - try again in a moment' : err.message);
       setCreating(false);
     }
   };
@@ -156,7 +156,7 @@ export default function RaceLobbyPage() {
             <Swords /> race
           </h1>
           <div className="subtitle">
-            real-time races with friends — same scramble, live status, results per round. rooms live in redis and websockets are spread across all
+            real-time races with friends - same scramble, live status, results per round. rooms live in redis and websockets are spread across all
             race pods.
           </div>
         </div>
@@ -214,14 +214,14 @@ export default function RaceLobbyPage() {
                 <select id="room-event" value={event} onChange={(e) => setEvent(e.target.value)}>
                   {EVENTS.map((ev) => (
                     <option key={ev.id} value={ev.id}>
-                      {ev.short} — {ev.name}
+                      {ev.short} - {ev.name}
                     </option>
                   ))}
                 </select>
               </div>
               <label className="live-checkbox">
                 <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />
-                private — only people with the link can join
+                private - only people with the link can join
               </label>
               {createError && <div className="small error">{createError}</div>}
               <button className="btn primary block" type="submit" disabled={creating}>

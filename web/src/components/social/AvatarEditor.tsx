@@ -24,7 +24,7 @@ const EXT_RE = /\.(png|jpe?g|webp|gif)$/i;
 const MAX_FILE_BYTES = 15 * 1024 * 1024;
 /** server limit for the encoded picture */
 const MAX_UPLOAD_BYTES = 300 * 1024;
-/** exported picture: OUT × OUT px */
+/** exported picture: OUT x OUT px */
 const OUT = 256;
 const MAX_ZOOM = 4;
 const PREVIEWS = [64, 36, 20];
@@ -35,7 +35,7 @@ interface Source {
   w: number;
   h: number;
 }
-/** zoom ∈ [1, MAX_ZOOM] relative to "cover"; (cx, cy) = image pixel under the viewport centre */
+/** zoom in [1, MAX_ZOOM] relative to "cover"; (cx, cy) = image pixel under the viewport centre */
 interface View {
   zoom: number;
   cx: number;
@@ -70,13 +70,13 @@ function makeCanvas(size: number): HTMLCanvasElement {
 const toBlob = (canvas: HTMLCanvasElement, type: string, quality: number) =>
   new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality));
 
-/** Render the crop to OUT×OUT and encode it: webp, or jpeg where webp encoding isn't supported (Safari). */
+/** Render the crop to OUTxOUT and encode it: webp, or jpeg where webp encoding isn't supported (Safari). */
 async function renderAvatar(img: CanvasImageSource, src: Pick<Source, 'w' | 'h'>, view: View): Promise<Blob> {
   let side = Math.min(src.w, src.h) / view.zoom;
   let sx = view.cx - side / 2;
   let sy = view.cy - side / 2;
   let from: CanvasImageSource = img;
-  // halve big photos step by step — a single huge downscale aliases in some browsers
+  // halve big photos step by step - a single huge downscale aliases in some browsers
   while (side > OUT * 2) {
     const next = Math.ceil(side / 2);
     const step = makeCanvas(next);
@@ -106,19 +106,19 @@ async function renderAvatar(img: CanvasImageSource, src: Pick<Source, 'w' | 'h'>
     blob = await toBlob(flat, 'image/jpeg', 0.88);
     if (blob && blob.size > MAX_UPLOAD_BYTES) blob = await toBlob(flat, 'image/jpeg', 0.7);
   }
-  if (!blob) throw new Error('your browser could not process that image — try another one');
+  if (!blob) throw new Error('your browser could not process that image - try another one');
   return blob;
 }
 
 function avatarError(err: unknown): string {
   if (err instanceof ApiError) {
-    if (err.status === 400) return 'the server could not read that image — try another file';
-    if (err.status === 413) return 'that picture is too large to upload — try another image';
-    if (err.status === 415) return 'that image format is not supported — try a png or jpg';
-    if (err.status === 429) return 'you have changed your picture a lot recently — try again in a little while';
-    if (err.status === 401) return 'your session expired — please log in again';
+    if (err.status === 400) return 'the server could not read that image - try another file';
+    if (err.status === 413) return 'that picture is too large to upload - try another image';
+    if (err.status === 415) return 'that image format is not supported - try a png or jpg';
+    if (err.status === 429) return 'you have changed your picture a lot recently - try again in a little while';
+    if (err.status === 401) return 'your session expired - please log in again';
     if (err.status === 404 || err.status === 405) return 'profile pictures are not available on this server yet';
-    if (err.status === 0) return 'could not reach the server — check your connection';
+    if (err.status === 0) return 'could not reach the server - check your connection';
   }
   return friendlyError(err, 'the auth service');
 }
@@ -133,8 +133,8 @@ interface Props {
 }
 
 /**
- * Pick (button / drag & drop) → crop (drag, pinch, wheel, slider, keyboard) → 256×256 webp →
- * PUT /api/auth/me/avatar → auth.setUser. Also removes the current picture. No dependencies.
+ * Pick (button / drag & drop) -> crop (drag, pinch, wheel, slider, keyboard) -> 256x256 webp ->
+ * PUT /api/auth/me/avatar -> auth.setUser. Also removes the current picture. No dependencies.
  */
 export function AvatarEditor({ onDone, onCancel }: Props) {
   const { user, setUser } = useAuth();
@@ -227,11 +227,11 @@ export function AvatarEditor({ onDone, onCancel }: Props) {
     setError(null);
     const typeOk = ACCEPT.includes(file.type) || (!file.type && EXT_RE.test(file.name));
     if (!typeOk) {
-      setError(`“${file.name}” is not a png, jpg, webp or gif image`);
+      setError(`"${file.name}" is not a png, jpg, webp or gif image`);
       return;
     }
     if (file.size > MAX_FILE_BYTES) {
-      setError(`that image is ${formatMb(file.size)} — please pick one under 15 mb`);
+      setError(`that image is ${formatMb(file.size)} - please pick one under 15 mb`);
       return;
     }
     const id = ++loadId.current;
@@ -241,7 +241,7 @@ export function AvatarEditor({ onDone, onCancel }: Props) {
     img.onload = () => {
       if (id !== loadId.current || !img.naturalWidth || !img.naturalHeight) {
         URL.revokeObjectURL(url);
-        if (id === loadId.current) setError('could not read that image — the file may be damaged');
+        if (id === loadId.current) setError('could not read that image - the file may be damaged');
         return;
       }
       const src: Source = { url, img, w: img.naturalWidth, h: img.naturalHeight };
@@ -252,7 +252,7 @@ export function AvatarEditor({ onDone, onCancel }: Props) {
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      if (id === loadId.current) setError('could not read that image — the file may be damaged');
+      if (id === loadId.current) setError('could not read that image - the file may be damaged');
     };
     img.src = url;
   };
@@ -453,7 +453,7 @@ export function AvatarEditor({ onDone, onCancel }: Props) {
               </button>
               <span className="ae-drop-or">{dragging ? 'drop it!' : 'or drop an image here'}</span>
             </div>
-            <span className="ae-hint">png, jpg, webp or gif · up&nbsp;to&nbsp;15&nbsp;mb</span>
+            <span className="ae-hint">png, jpg, webp or gif - up&nbsp;to&nbsp;15&nbsp;mb</span>
             {hasAvatar && (
               <button
                 type="button"
@@ -526,10 +526,10 @@ export function AvatarEditor({ onDone, onCancel }: Props) {
                   <ZoomIn />
                 </button>
               </div>
-              <div className="ae-hint ae-hint-pointer">drag to move · scroll to zoom</div>
-              <div className="ae-hint ae-hint-touch">drag to move · pinch to zoom</div>
+              <div className="ae-hint ae-hint-pointer">drag to move - scroll to zoom</div>
+              <div className="ae-hint ae-hint-touch">drag to move - pinch to zoom</div>
               <div className="ae-hint ae-keys">
-                <kbd>←↑↓→</kbd>
+                <kbd>arrow keys</kbd>
                 <span>move</span>
                 <kbd>+</kbd>
                 <kbd>-</kbd>
@@ -558,7 +558,7 @@ export function AvatarEditor({ onDone, onCancel }: Props) {
               cancel
             </button>
             <button type="button" className={`btn primary${busy === 'save' ? ' ae-saving' : ''}`} onClick={save} disabled={busy !== null} aria-busy={busy === 'save'}>
-              {busy === 'save' && <Spinner size={16} />} {busy === 'save' ? 'saving…' : 'save picture'}
+              {busy === 'save' && <Spinner size={16} />} {busy === 'save' ? 'saving...' : 'save picture'}
             </button>
           </div>
         </>

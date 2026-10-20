@@ -21,7 +21,7 @@ const SUFFIXES = ['', "'", '2'] as const;
 const AXIS: Record<string, number> = { U: 0, D: 0, L: 1, R: 1, F: 2, B: 2 };
 
 /**
- * NxN random-move scramble. A move is (face, width): width 1 = "R", 2 = "Rw", k ≥ 3 = "kRw".
+ * NxN random-move scramble. A move is (face, width): width 1 = "R", 2 = "Rw", k >= 3 = "kRw".
  * Rules: never the same (face, width) twice in a row, never three consecutive moves on one axis.
  */
 export function nxnScramble(size: number, length: number, rng: Rng = cryptoRng, faces = ['U', 'D', 'L', 'R', 'F', 'B']): string {
@@ -82,7 +82,7 @@ export function megaminxScramble(rng: Rng = cryptoRng): string {
   return lines.join(' ');
 }
 
-/** Clock: WCA notation — pin settings are uniformly random, so this is effectively random-state. */
+/** Clock: WCA notation - pin settings are uniformly random, so this is effectively random-state. */
 export function clockScramble(rng: Rng = cryptoRng): string {
   const turn = (name: string) => {
     const amount = rng(12) - 5; // -5..6
@@ -96,9 +96,9 @@ export function clockScramble(rng: Rng = cryptoRng): string {
 
 /**
  * Square-1 layer model used to only emit twists after which a slash ("/") is physically possible.
- * Each layer has 12 slots of 30°; an edge fills 1 slot, a corner 2. A slash is possible when no
+ * Each layer has 12 slots of 30 degrees; an edge fills 1 slot, a corner 2. A slash is possible when no
  * piece straddles the cut (between slots 11|0 and 5|6) on either layer. Solved cube shape:
- * top = corner,corner,edge,…  bottom = edge,corner,corner,…  which matches WCA notation where
+ * top = corner,corner,edge,...  bottom = edge,corner,corner,...  which matches WCA notation where
  * "(1,0) /" and "(0,-1) /" are legal first moves.
  */
 export function sq1SolvedLayers(): { top: number[]; bottom: number[] } {
@@ -115,7 +115,7 @@ export function sq1Apply(state: { top: number[]; bottom: number[] }, u: number, 
   const top = rotate(state.top, u);
   const bottom = rotate(state.bottom, d);
   if (!canSlash(top) || !canSlash(bottom)) return null;
-  // The slash turns the right half 180° about the horizontal axis perpendicular to the cut:
+  // The slash turns the right half 180 degrees about the horizontal axis perpendicular to the cut:
   // top slot i lands in bottom slot i (bottom slots are counted clockwise as seen from below)
   // and vice versa. Verified against cubing.js random-state scrambles.
   const newTop = [...bottom.slice(0, 6), ...top.slice(6)];

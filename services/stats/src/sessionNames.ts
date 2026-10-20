@@ -7,7 +7,7 @@ const BATCH_USERS = 25;
 
 /**
  * Self-healing read model for session display names. New solves carry their session's name in
- * solve.created, but solves that arrive through a bulk import (or predate this feature) don't —
+ * solve.created, but solves that arrive through a bulk import (or predate this feature) don't -
  * so every 20 s one replica (advisory lock) finds users whose ledger references sessions without a
  * name and copies that user's session list from solve-service. Sessions solve-service doesn't know
  * are stored with name '' so they aren't fetched again (the UI shows a generic label).

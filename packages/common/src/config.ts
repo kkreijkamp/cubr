@@ -30,7 +30,7 @@ function env(name: string, fallback: string): string {
   return v === undefined || v === '' ? fallback : v;
 }
 
-/** Reads the environment variables shared by every service (see docs/SPEC.md §4). */
+/** Reads the environment variables shared by every service (see docs/SPEC.md section 4). */
 export function loadConfig(serviceName: string): BaseConfig {
   return {
     port: Number(env('PORT', '8080')),

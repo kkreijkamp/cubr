@@ -78,7 +78,7 @@ export function startRound(room: StoredRoom, by: string, expectedN: number, scra
   room.status = 'running';
 }
 
-/** Live status (inspecting/solving/…). Returns false when nothing changed (no broadcast needed). */
+/** Live status (inspecting/solving/...). Returns false when nothing changed (no broadcast needed). */
 export function setStatus(room: StoredRoom, playerId: string, status: PlayerStatus): boolean {
   const p = requirePlayer(room, playerId);
   if (status !== 'idle' && !room.round) throw badRequest('No round in progress');

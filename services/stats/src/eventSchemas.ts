@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-/** Event payload schemas (SPEC §8). Lenient: unknown extra fields are ignored. */
+/** Event payload schemas (SPEC section 8). Lenient: unknown extra fields are ignored. */
 const uuid = z.string().uuid();
 const penalty = z.enum(['OK', '+2', 'DNF']);
 const event = z.string().min(1).max(20);

@@ -73,7 +73,7 @@ export function PlayersCard({ room, playerId, precision }: { room: LiveRoomState
                       </div>
                       <div className="status">
                         {status}
-                        {pods.length > 0 && <span title={`websocket served by ${pods.join(', ')}`}> · pod {pods.map(shortPod).join(', ')}</span>}
+                        {pods.length > 0 && <span title={`websocket served by ${pods.join(', ')}`}> - pod {pods.map(shortPod).join(', ')}</span>}
                       </div>
                     </div>
                   </div>
@@ -96,7 +96,7 @@ function cellText(r: { timeMs: number; penalty: Penalty } | undefined, precision
   return formatTime(effectiveMs(r), precision) + (r.penalty === '+2' ? '+' : '');
 }
 
-/** Rounds × players; the best time of each round in main colour. Newest round on top. */
+/** Rounds x players; the best time of each round in main colour. Newest round on top. */
 export function ResultsGrid({ room, playerId, precision }: { room: LiveRoomState; playerId: string | null; precision: Precision }) {
   const rounds = Object.keys(room.results ?? {})
     .map(Number)
@@ -104,7 +104,7 @@ export function ResultsGrid({ room, playerId, precision }: { room: LiveRoomState
     .sort((a, b) => b - a);
   const order = (room.standings ?? []).map((s) => s.playerId).filter((id) => room.players.some((p) => p.id === id));
   for (const p of room.players) if (!order.includes(p.id)) order.push(p.id);
-  // players who left still have results? (server removes them) — show only current players
+  // players who left still have results? (server removes them) - show only current players
   const players = order.map((id) => room.players.find((p) => p.id === id)!);
   if (rounds.length === 0) return null;
   return (
@@ -141,10 +141,10 @@ export function ResultsGrid({ room, playerId, precision }: { room: LiveRoomState
                     const r = row[p.id];
                     const isBest = r && Number.isFinite(best) && effectiveMs(r) === best;
                     let pendingLabel = '';
-                    if (!r && current) pendingLabel = !p.connected ? 'offline' : p.status === 'inspecting' ? 'inspecting' : p.status === 'solving' ? 'solving…' : '·';
+                    if (!r && current) pendingLabel = !p.connected ? 'offline' : p.status === 'inspecting' ? 'inspecting' : p.status === 'solving' ? 'solving...' : '-';
                     return (
                       <td key={p.id} className={`${isBest ? 'best' : ''}${r?.penalty === 'DNF' ? ' dnf' : ''}${!r ? ' pending' : ''}`}>
-                        {r ? cellText(r, precision) : pendingLabel || '–'}
+                        {r ? cellText(r, precision) : pendingLabel || '-'}
                       </td>
                     );
                   })}
@@ -163,7 +163,7 @@ const hhmm = (iso: string) => {
   return Number.isNaN(d.getTime()) ? '' : `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
 
-/** Room chat (≤ 200 chars) with local system lines for joins / rounds. */
+/** Room chat (<= 200 chars) with local system lines for joins / rounds. */
 export function RaceChat({
   chat,
   playerId,
@@ -215,7 +215,7 @@ export function RaceChat({
         }}
         aria-live="polite"
       >
-        {chat.length === 0 && <li className="chat-empty">no messages yet — say hi</li>}
+        {chat.length === 0 && <li className="chat-empty">no messages yet - say hi</li>}
         {chat.map((m, i) =>
           m.system ? (
             <li key={`${m.at}-${i}`} className="sys">
@@ -240,7 +240,7 @@ export function RaceChat({
         <input
           value={text}
           onChange={(e) => setText(e.target.value.slice(0, 200))}
-          placeholder={disabled ? 'reconnecting…' : 'message'}
+          placeholder={disabled ? 'reconnecting...' : 'message'}
           maxLength={200}
           disabled={disabled}
           aria-label="chat message"

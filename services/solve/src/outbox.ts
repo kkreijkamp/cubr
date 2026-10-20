@@ -2,12 +2,12 @@ import type { FastifyBaseLogger } from 'fastify';
 import { publishEvent, queryWithTimeout, type Pool, type PoolClient, type Redis } from '@cubetype/common';
 
 /**
- * Transactional outbox (docs/SPEC.md §7.2, §9.3).
+ * Transactional outbox (docs/SPEC.md section 7.2, section 9.3).
  *
  * Route handlers call `enqueue(client, type, payload)` inside the SAME transaction that writes
  * the solve, so an event exists if and only if the write committed. A background relay in every
  * replica then moves unpublished rows to the Redis stream. If Redis is down, solves still
- * succeed; events pile up in the table and are delivered once Redis is back (at-least-once —
+ * succeed; events pile up in the table and are delivered once Redis is back (at-least-once -
  * consumers dedupe on `eventId` = `solve-<outboxId>`).
  */
 
@@ -127,8 +127,8 @@ export function startOutboxRelay(opts: RelayOptions): Relay {
       }
       return rows.length;
     } catch (err) {
-      // Redis failure → the connection is fine: roll back and return it to the pool.
-      // Postgres timeout → the connection may be wedged: release(err) makes the pool drop it.
+      // Redis failure -> the connection is fine: roll back and return it to the pool.
+      // Postgres timeout -> the connection may be wedged: release(err) makes the pool drop it.
       let connOk = true;
       await q(client, 'ROLLBACK', [], 2000).catch(() => {
         connOk = false;

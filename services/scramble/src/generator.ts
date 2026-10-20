@@ -63,7 +63,7 @@ export class ScrambleGenerator {
     return this.backend.size - this.idle.length;
   }
 
-  /** True while user requests are queued/running (or finished < graceMs ago) → refill backs off. */
+  /** True while user requests are queued/running (or finished < graceMs ago) -> refill backs off. */
   isBusy(graceMs = 1000): boolean {
     return this.queues.request.length > 0 || this.activeRequests > 0 || Date.now() - this.lastRequestDoneAt < graceMs;
   }

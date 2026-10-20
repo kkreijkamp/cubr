@@ -57,7 +57,7 @@ function PaletteInner({ initial }: { initial: string | null }) {
   const listRef = useRef<HTMLDivElement>(null);
   const centerNext = useRef(false);
 
-  // open directly on a sub-list (e.g. footer theme button → "Theme…")
+  // open directly on a sub-list (e.g. footer theme button -> "Theme...")
   useEffect(() => {
     if (!initial) return;
     const cmd = all.find((c) => c.id === initial);
@@ -82,7 +82,7 @@ function PaletteInner({ initial }: { initial: string | null }) {
         if (matches(c, query)) flat.push({ cmd: c, label: c.label });
         if (c.children) {
           for (const child of c.children()) {
-            const label = `${c.label.replace(/…$/, '')} > ${child.label}`;
+            const label = `${c.label.replace(/\.\.\.$/, '')} > ${child.label}`;
             if (matches({ ...child, label, keywords: [...(child.keywords ?? []), ...(c.keywords ?? [])] }, query)) flat.push({ cmd: child, label });
           }
         }
@@ -155,7 +155,7 @@ function PaletteInner({ initial }: { initial: string | null }) {
     }
   };
 
-  const placeholder = stack.length ? stack[stack.length - 1].title : 'Search commands, themes, settings…';
+  const placeholder = stack.length ? stack[stack.length - 1].title : 'Search commands, themes, settings...';
 
   return createPortal(
     <div

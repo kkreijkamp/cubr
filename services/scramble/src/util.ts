@@ -11,7 +11,7 @@ export function withTimeout<T>(promise: Promise<T>, ms: number, onTimeout: () =>
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
-/** Logs a warning at most once per `intervalMs` (per key) — keeps outage logs readable. */
+/** Logs a warning at most once per `intervalMs` (per key) - keeps outage logs readable. */
 export function throttledWarn(log: FastifyBaseLogger, intervalMs = 10_000) {
   const last = new Map<string, number>();
   return (key: string, obj: Record<string, unknown>, msg: string) => {

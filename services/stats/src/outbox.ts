@@ -13,10 +13,10 @@ export interface PbRelay {
 }
 
 /**
- * Relays stats.pb_outbox → Redis stream `cubetype:events` as `pb.updated`.
+ * Relays stats.pb_outbox -> Redis stream `cubetype:events` as `pb.updated`.
  * Only one replica relays at a time (transaction-scoped advisory lock), which keeps events in
  * order. Rows are deleted only after XADD succeeded, so a crash or Redis outage can cause a
- * re-publish (same eventId — consumers are idempotent) but never a lost event.
+ * re-publish (same eventId - consumers are idempotent) but never a lost event.
  */
 export function createPbRelay(pool: Pool, redis: Redis, log: FastifyBaseLogger, intervalMs = 1000): PbRelay {
   let busy = false;

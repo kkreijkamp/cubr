@@ -7,8 +7,8 @@ function roundKeys(results: Results): string[] {
 }
 
 /**
- * Standings for the listed players (SPEC §9.6):
- * - wins: rounds where the player had the best effective time. Ties → every tied player gets a
+ * Standings for the listed players (SPEC section 9.6):
+ * - wins: rounds where the player had the best effective time. Ties -> every tied player gets a
  *   win; DNFs never win (a round where everybody DNF'd has no winner).
  * - solves: number of results the player submitted.
  * - meanMs: mean of the player's non-DNF effective times (null if none).

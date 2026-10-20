@@ -1,5 +1,5 @@
 # nginx config for the cubetype web container (rendered by envsubst at container start).
-# Serves the React SPA; API traffic never reaches this container — the Ingress (cloud) or the
+# Serves the React SPA; API traffic never reaches this container - the Ingress (cloud) or the
 # gateway (local) routes /api/* and /socket.io to the backend services.
 server {
   listen 8080;
@@ -24,7 +24,7 @@ server {
     return 200 '{"status":"ready"}';
   }
 
-  # which pod/version served this request — used by the in-app cluster status page
+  # which pod/version served this request - used by the in-app cluster status page
   location = /_info {
     access_log off;
     default_type application/json;

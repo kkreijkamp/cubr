@@ -30,33 +30,33 @@ const REFRESH_MS = 15_000;
 
 const FEATURES = [
   { icon: Timer, t: 'a timer that gets out of the way', d: 'space to start, hold-to-ready, wca inspection with 8 s / 12 s alerts, +2 and dnf, focus mode while solving.' },
-  { icon: BarChart3, t: 'csTimer-grade stats', d: 'mo3, ao5 … ao1000 with wca trimming, session bests, trend and histogram charts.' },
+  { icon: BarChart3, t: 'csTimer-grade stats', d: 'mo3, ao5 ... ao1000 with wca trimming, session bests, trend and histogram charts.' },
   { icon: Upload, t: 'sessions & import', d: 'unlimited sessions for all 16 wca events, import from csTimer and every timer it reads, json and csTimer export.' },
   { icon: CalendarCheck, t: 'daily challenge', d: 'five shared scrambles a day for everyone, ranked by ao5 on a global board.' },
-  { icon: Swords, t: 'live races', d: 'real-time multiplayer rooms over websockets — share a link and race any event.' },
+  { icon: Swords, t: 'live races', d: 'real-time multiplayer rooms over websockets - share a link and race any event.' },
   { icon: Crown, t: 'leaderboards', d: 'all-time, weekly and daily boards for every event, single, ao5 and ao12.' },
   { icon: Globe, t: 'wca comparison', d: 'see where your personal bests would rank among every official wca competitor.' },
-  { icon: Palette, t: 'themes & command line', d: `${THEMES.length} themes — monkeytype classics plus cube-inspired originals — with live preview. press esc and type — everything is a command.` },
+  { icon: Palette, t: 'themes & command line', d: `${THEMES.length} themes - monkeytype classics plus cube-inspired originals - with live preview. press esc and type - everything is a command.` },
   { icon: WifiOff, t: 'offline first', d: 'guest mode works with no backend at all; sign in to sync solves to the cloud.' },
 ];
 
 const STACK: [string, string][] = [
-  ['frontend', 'react 18 · typescript · vite · chart.js · cubing.js'],
-  ['services', 'node.js 22 · fastify 5 · zod · socket.io + redis adapter'],
-  ['data', 'postgresql 17 (cloudnativepg) · redis 7 streams'],
-  ['platform', 'google kubernetes engine · ingress · hpa · kustomize · artifact registry'],
-  ['patterns', 'transactional outbox · event-driven read models · consumer groups · cache-aside'],
+  ['frontend', 'react 18 - typescript - vite - chart.js - cubing.js'],
+  ['services', 'node.js 22 - fastify 5 - zod - socket.io + redis adapter'],
+  ['data', 'postgresql 17 (cloudnativepg) - redis 7 streams'],
+  ['platform', 'google kubernetes engine - ingress - hpa - kustomize - artifact registry'],
+  ['patterns', 'transactional outbox - event-driven read models - consumer groups - cache-aside'],
 ];
 
 const KEYS: [string[], string][] = [
   [['esc'], 'command line (or ctrl + k)'],
-  [['space'], 'hold, release to start · press to stop'],
+  [['space'], 'hold, release to start - press to stop'],
   [['tab'], 'new scramble'],
   [['alt', '1'], 'mark the last solve ok'],
   [['alt', '2'], 'add a +2 to the last solve'],
   [['alt', '3'], 'mark the last solve dnf'],
   [['alt', 'backspace'], 'delete the last solve'],
-  [['←', '→'], 'flip leaderboard pages'],
+  [['<-', '->'], 'flip leaderboard pages'],
 ];
 
 function Counter({ label, value, decimals = 0, hint }: { label: string; value: number | null; decimals?: number; hint?: string }) {
@@ -95,7 +95,7 @@ function GlobalCounters() {
       </div>
       {stats.error && !d && (
         <div className="ab-counters-note" style={{ marginTop: '1rem' }}>
-          {friendlyError(stats.error, 'the stats service')} — the counters come back on their own.{' '}
+          {friendlyError(stats.error, 'the stats service')} - the counters come back on their own.{' '}
           <button className="btn-text" onClick={reload}>
             retry
           </button>
@@ -150,7 +150,7 @@ export default function AboutPage() {
           <CubeLogo /> cubetype
         </h1>
         <p className="ab-lead">
-          a minimal, keyboard-first speedcubing timer — <span className="text">csTimer</span>&apos;s depth with <span className="text">monkeytype</span>
+          a minimal, keyboard-first speedcubing timer - <span className="text">csTimer</span>&apos;s depth with <span className="text">monkeytype</span>
           &apos;s polish, running as cloud-native microservices on kubernetes.
         </p>
       </section>
@@ -179,17 +179,17 @@ export default function AboutPage() {
         <p className="ab-p">
           the web app and seven microservices run as replicated deployments on google kubernetes engine behind a single cloud load balancer. services
           that keep relational data own a postgres schema; leaderboards and race rooms live in redis. they talk to each other over http or through a
-          redis event stream — so a slow or crashed service only degrades its own feature. <span className="sub">try it: the timer keeps working with every backend down.</span>
+          redis event stream - so a slow or crashed service only degrades its own feature. <span className="sub">try it: the timer keeps working with every backend down.</span>
         </p>
         <ArchitectureDiagram />
         <div className="arch-legend">
           <span>
-            <FlowSwatch /> request path (ingress → services → data)
+            <FlowSwatch /> request path (ingress -&gt; services -&gt; data)
           </span>
           <span>
             <FlowSwatch main /> event flow over redis streams
           </span>
-          <span>stacked boxes = 2+ replicas · hpa = horizontal pod autoscaler</span>
+          <span>stacked boxes = 2+ replicas - hpa = horizontal pod autoscaler</span>
         </div>
         <div className="arch-steps">
           <div>
@@ -201,7 +201,7 @@ export default function AboutPage() {
             models.
           </div>
           <div>
-            <span className="text">leaderboard-service</span> consumes the same events and updates redis sorted sets — boards can be rebuilt from stats
+            <span className="text">leaderboard-service</span> consumes the same events and updates redis sorted sets - boards can be rebuilt from stats
             at any time.
           </div>
         </div>
@@ -231,7 +231,7 @@ export default function AboutPage() {
                 <span className="k">
                   {keys.map((k, i) => (
                     <span key={k} style={{ display: 'contents' }}>
-                      {i > 0 && (keys[0] === '←' ? ' ' : ' + ')}
+                      {i > 0 && (keys[0] === '<-' ? ' ' : ' + ')}
                       <kbd>{k}</kbd>
                     </span>
                   ))}
@@ -252,19 +252,19 @@ export default function AboutPage() {
             <a href="https://cstimer.net" target="_blank" rel="noreferrer noopener">
               csTimer
             </a>
-            <span className="d">by cs0x7f — the timer behaviour, statistics and export format cubers rely on.</span>
+            <span className="d">by cs0x7f - the timer behaviour, statistics and export format cubers rely on.</span>
           </div>
           <div className="ab-credit">
             <a href="https://monkeytype.com" target="_blank" rel="noreferrer noopener">
               monkeytype
             </a>
-            <span className="d">by miodec — the design language, themes and command line this app borrows.</span>
+            <span className="d">by miodec - the design language, themes and command line this app borrows.</span>
           </div>
           <div className="ab-credit">
             <a href="https://js.cubing.net/cubing/" target="_blank" rel="noreferrer noopener">
               cubing.js
             </a>
-            <span className="d">by lucas garron &amp; tom rokicki — random-state scrambles and puzzle previews.</span>
+            <span className="d">by lucas garron &amp; tom rokicki - random-state scrambles and puzzle previews.</span>
           </div>
           <div className="ab-credit">
             <a href="https://www.worldcubeassociation.org" target="_blank" rel="noreferrer noopener">

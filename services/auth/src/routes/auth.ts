@@ -42,8 +42,8 @@ const DUMMY_HASH = bcrypt.hash(randomUUID(), BCRYPT_COST);
 const pgCode = (err: unknown) => (err as { code?: string }).code;
 
 // Trusted in-cluster callers (the seed job) present INTERNAL_API_TOKEN in X-Internal-Token and
-// skip the per-IP limits below — they legitimately create many accounts from one pod IP.
-// Disabled unless the secret is configured (≥ 16 chars).
+// skip the per-IP limits below - they legitimately create many accounts from one pod IP.
+// Disabled unless the secret is configured (>= 16 chars).
 function isInternalCaller(token: string, header: string | string[] | undefined): boolean {
   return token.length >= 16 && internalTokenMatches(token, header);
 }

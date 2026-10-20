@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { Redis } from 'ioredis';
 import type { FastifyBaseLogger } from 'fastify';
 
-/** The single domain-event stream (see docs/SPEC.md §8). */
+/** The single domain-event stream (see docs/SPEC.md section 8). */
 export const EVENT_STREAM = 'cubetype:events';
 export const DLQ_STREAM = 'cubetype:events:dlq';
 const MAXLEN = 200_000;

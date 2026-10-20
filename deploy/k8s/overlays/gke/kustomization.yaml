@@ -17,35 +17,35 @@ resources:
 # bumps it (scripts/bump-version.sh, run by .githooks/pre-commit) and is tagged vX.Y.Z, so don't
 # edit them by hand and never reuse one: images are pulled IfNotPresent, so nodes would keep
 # running the old image under a reused tag.
-# For the rollout demo use `kubectl set image` instead (scripts/commands.sh §14).
+# For the rollout demo use `kubectl set image` instead (scripts/commands.sh section 14).
 images:
   - name: cubetype/auth
     newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/auth
-    newTag: "1.0.15"
+    newTag: "1.0.16"
   - name: cubetype/scramble
     newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/scramble
-    newTag: "1.0.15"
+    newTag: "1.0.16"
   - name: cubetype/solve
     newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/solve
-    newTag: "1.0.15"
+    newTag: "1.0.16"
   - name: cubetype/stats
     newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/stats
-    newTag: "1.0.15"
+    newTag: "1.0.16"
   - name: cubetype/leaderboard
     newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/leaderboard
-    newTag: "1.0.15"
+    newTag: "1.0.16"
   - name: cubetype/race
     newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/race
-    newTag: "1.0.15"
+    newTag: "1.0.16"
   - name: cubetype/wca
     newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/wca
-    newTag: "1.0.15"
+    newTag: "1.0.16"
   - name: cubetype/web
     newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/web
-    newTag: "1.0.15"
+    newTag: "1.0.16"
   - name: cubetype/wca-import
     newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/wca-import
-    newTag: "1.0.15"
+    newTag: "1.0.16"
 
 patches:
   # Behind the Google load balancer X-Forwarded-For is "<client-ip>, <lb-ip>" -> trust 2 hops.

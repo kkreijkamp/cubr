@@ -130,7 +130,7 @@ export function ProfileHeader({ user, summary, own, onEdit }: Props) {
             <span className="label">bio</span>
             {own ? (
               <span className="value muted">
-                tell people about yourself — add a bio, your country and your wca id.{' '}
+                tell people about yourself - add a bio, your country and your wca id.{' '}
                 {onEdit && (
                   <button className="btn-text small" style={{ padding: 0, color: 'var(--main-color)' }} onClick={onEdit}>
                     edit profile

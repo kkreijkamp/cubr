@@ -17,7 +17,7 @@ function ThemeBubbles({ name }: { name: string }) {
 function options<K extends keyof S>(key: K, label: string, values: { value: S[K]; label: string }[], current: S[K]): Command {
   return {
     id: `setting-${String(key)}`,
-    label: `${label}…`,
+    label: `${label}...`,
     icon: <Settings />,
     keywords: ['setting'],
     children: () =>
@@ -52,7 +52,7 @@ export function GlobalCommands() {
       ];
       const theme: Command = {
         id: 'theme',
-        label: 'Theme…',
+        label: 'Theme...',
         icon: <Palette />,
         keywords: ['color', 'colour'],
         children: () => [
@@ -77,7 +77,7 @@ export function GlobalCommands() {
       };
       const font: Command = {
         id: 'font',
-        label: 'Font…',
+        label: 'Font...',
         icon: <Type />,
         children: () => FONTS.map((f) => ({ id: `font-${f.name}`, label: f.name, active: settings.font === f.name, run: () => updateSettings({ font: f.name }) })),
       };

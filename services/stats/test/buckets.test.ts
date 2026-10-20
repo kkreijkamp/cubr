@@ -43,7 +43,7 @@ describe('makeBucketer (15-minute memo)', () => {
         expect(bucket(d)).toEqual({ day: dayKey(d, tz), hour: hourIn(d, tz) });
       }
     }
-  }, 30_000); // ~2,500 Intl comparisons — can exceed the 5 s default on a busy machine
+  }, 30_000); // ~2,500 Intl comparisons - can exceed the 5 s default on a busy machine
 });
 
 describe('validTz', () => {

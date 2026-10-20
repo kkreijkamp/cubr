@@ -39,7 +39,7 @@ describe('ClusterMonitor', () => {
 
   it('reports a network failure as unreachable', async () => {
     vi.useFakeTimers();
-    const svc = await run(() => Promise.reject(new ApiError(0, 'NETWORK', 'Network error — is the server reachable?')), 100);
+    const svc = await run(() => Promise.reject(new ApiError(0, 'NETWORK', 'Network error - is the server reachable?')), 100);
     expect(svc.status).toBe('down');
     expect(svc.error).toBe('unreachable');
   });

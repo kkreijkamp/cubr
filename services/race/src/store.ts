@@ -7,7 +7,7 @@ import type { ChatMessage, Presence, RoomState, StoredRoom } from './types.js';
 /**
  * Redis keyspace (everything prefixed `race:`; no pod keeps authoritative state in memory):
  *   race:room:<id>         string  JSON StoredRoom                          EX 2 h, refreshed on change
- *   race:room:<id>:conns   hash    "<pod>|<playerId>" → open sockets         EX 2 h
+ *   race:room:<id>:conns   hash    "<pod>|<playerId>" -> open sockets        EX 2 h
  *   race:room:<id>:chat    list    last 50 chat messages (JSON)              EX 2 h
  *   race:lock:<id>         string  per-room mutex token                      PX 2 s
  *   race:rooms             zset    public lobby, score = last activity (ms)
@@ -62,7 +62,7 @@ export interface ConnChange {
 
 export type Broadcast = (roomId: string, state: RoomState) => void;
 
-/** Builds playerId → [pods] from the conns hash, counting only sockets on live pods. */
+/** Builds playerId -> [pods] from the conns hash, counting only sockets on live pods. */
 export function presenceFrom(conns: Record<string, string>, livePods: Set<string>): Presence {
   const presence: Presence = new Map();
   for (const [field, raw] of Object.entries(conns)) {
@@ -79,7 +79,7 @@ export function presenceFrom(conns: Record<string, string>, livePods: Set<string
 
 export class RoomStore {
   /**
-   * roomId → playerId → number of sockets on THIS pod. It is only changed while holding the
+   * roomId -> playerId -> number of sockets on THIS pod. It is only changed while holding the
    * room lock (or after a failed write for a socket that is already gone), so a resync, which
    * also runs under the lock, always writes a consistent snapshot.
    */
@@ -159,9 +159,9 @@ export class RoomStore {
   }
 
   /**
-   * The single write path for room state: lock → load room + connection registry → apply the
-   * connection change and `fn` → enforce invariants (host transfer, round completion) → save
-   * everything in one MULTI (refreshing the 2 h TTL on all room keys) → broadcast `room:state`
+   * The single write path for room state: lock -> load room + connection registry -> apply the
+   * connection change and `fn` -> enforce invariants (host transfer, round completion) -> save
+   * everything in one MULTI (refreshing the 2 h TTL on all room keys) -> broadcast `room:state`
    * to the Socket.IO room, which the Redis adapter fans out to sockets on every pod.
    * Nothing is written or broadcast when the state did not actually change.
    */

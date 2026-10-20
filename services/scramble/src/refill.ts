@@ -18,7 +18,7 @@ export interface Refiller {
 /**
  * Background loop running in every replica: roughly every `intervalMs` it picks the emptiest
  * Redis pool and generates up to `batch` scrambles (within `budgetMs`) for it at low priority. It
- * stands down while user requests are being served, so it soaks up idle CPU only — and it never
+ * stands down while user requests are being served, so it soaks up idle CPU only - and it never
  * affects correctness: an empty pool just means requests generate on the fly.
  */
 export function startRefiller(
@@ -31,7 +31,7 @@ export function startRefiller(
   let wake: (() => void) | null = null;
   const stats = { cycles: 0, pausedCycles: 0, pushed: 0, lastEvent: null as string | null, lastError: null as string | null };
 
-  // ±25 % jitter so replicas started together do not refill in lock-step.
+  // +/-25 % jitter so replicas started together do not refill in lock-step.
   const nap = () =>
     new Promise<void>((resolve) => {
       const timer = setTimeout(resolve, opts.intervalMs * (0.75 + Math.random() * 0.5));
@@ -57,7 +57,7 @@ export function startRefiller(
     for (let i = 0; i < n && running && !generator.isBusy(); i++) {
       batch.push(await generator.generate(pick.event, 'refill'));
       await yieldToEventLoop();
-      // a 4x4x4 batch of 5 would be ~0.75 s of CPU every 2 s — enough to skew the HPA's CPU metric
+      // a 4x4x4 batch of 5 would be ~0.75 s of CPU every 2 s - enough to skew the HPA's CPU metric
       if (performance.now() - started > opts.budgetMs) break;
     }
     if (batch.length > 0) {

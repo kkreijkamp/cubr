@@ -115,7 +115,7 @@ export function clockScramble(rng: Rng = Math.random): string {
 
 /**
  * Square-1 random-move scramble with shape tracking (same model as csTimer): each layer has 12
- * 30° slots; `p[i] = 1` marks the first half of a corner, so a slice through slot i|i+1 is illegal.
+ * 30-degree slots; `p[i] = 1` marks the first half of a corner, so a slice through slot i|i+1 is illegal.
  * A twist (x, y) is legal only if, afterwards, both layers can be cut at slots 5|6 and 11|0.
  */
 export function square1Scramble(slices = 12, rng: Rng = Math.random): string {
@@ -149,7 +149,7 @@ export function square1Scramble(slices = 12, rng: Rng = Math.random): string {
     }
     slash();
   }
-  // same layout as the scramble service (cubing.js): "(1, 0) / (-1, 3) / … /"
+  // same layout as the scramble service (cubing.js): "(1, 0) / (-1, 3) / ... /"
   return `${parts.join(' / ')} /`;
 }
 

@@ -1,6 +1,6 @@
 const DAY_MS = 86_400_000;
 
-/** 'YYYY-MM-DD' → whole days since 1970-01-01 (calendar arithmetic, no timezone involved). */
+/** 'YYYY-MM-DD' -> whole days since 1970-01-01 (calendar arithmetic, no timezone involved). */
 export function dayNumber(day: string): number {
   const [y, m, d] = day.split('-').map(Number);
   return Math.round(Date.UTC(y, m - 1, d) / DAY_MS);
@@ -24,8 +24,8 @@ export interface Streaks {
 
 /**
  * Streaks over the set of active days (each 'YYYY-MM-DD', bucketed in the user's timezone).
- * currentStreak = run of consecutive days ending today or yesterday (a day "ahead" of `today` —
- * possible when the days were bucketed in a timezone east of the one `today` was computed in —
+ * currentStreak = run of consecutive days ending today or yesterday (a day "ahead" of `today` -
+ * possible when the days were bucketed in a timezone east of the one `today` was computed in -
  * also counts as today). longestStreak = longest run anywhere.
  */
 export function computeStreaks(days: Iterable<string>, today: string): Streaks {

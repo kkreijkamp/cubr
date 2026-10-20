@@ -1,4 +1,4 @@
-// Cluster status — the live Kubernetes demo page. Polls every microservice's `_info` endpoint once
+// Cluster status - the live Kubernetes demo page. Polls every microservice's `_info` endpoint once
 // a second and visualises load balancing (pods answering), scaling (new pods), self-healing (pods
 // replaced, outages + recovery) and rolling updates (versions changing colour).
 import { useEffect, useMemo, useState } from 'react';
@@ -106,13 +106,13 @@ export default function StatusPage() {
             <Activity /> cluster status
           </h1>
           <div className="subtitle">
-            live view of the kubernetes deployment — every number below comes from a real request to a service's <code>_info</code> endpoint.
+            live view of the kubernetes deployment - every number below comes from a real request to a service's <code>_info</code> endpoint.
           </div>
         </div>
         <div className="tools">
           <span className={`live-indicator${state.running ? ' on' : ''}`}>
             <Dot state={state.running ? 'up' : 'pending'} pulse={state.running} />
-            {state.running ? 'live · 1s' : state.pausedReason === 'hidden' ? 'paused (tab hidden)' : 'paused'}
+            {state.running ? 'live - 1s' : state.pausedReason === 'hidden' ? 'paused (tab hidden)' : 'paused'}
           </span>
           <button className="btn small" onClick={() => setUserPaused((p) => !p)} aria-label={userPaused ? 'resume polling' : 'pause polling'}>
             {userPaused ? <Play /> : <Pause />} {userPaused ? 'resume' : 'pause'}
@@ -134,14 +134,14 @@ export default function StatusPage() {
           </span>
           <span className="hint">
             {pending
-              ? `checking ${pending}…`
+              ? `checking ${pending}...`
               : allHealthy
                 ? 'all services healthy'
-                : [down && `${down} down`, degraded && `${degraded} degraded`].filter(Boolean).join(' · ')}
+                : [down && `${down} down`, degraded && `${degraded} degraded`].filter(Boolean).join(' - ')}
           </span>
         </div>
         <div className="stat">
-          <span className="label">pods seen · 30s</span>
+          <span className="label">pods seen - 30s</span>
           <span className="value">{livePods.length}</span>
           <span className="hint">
             on {nodes.size} node{nodes.size === 1 ? '' : 's'}
@@ -150,7 +150,7 @@ export default function StatusPage() {
         <div className="stat">
           <span className="label">median latency</span>
           <span className="value text">
-            {lat !== null ? Math.round(lat) : '–'}
+            {lat !== null ? Math.round(lat) : '-'}
             <small>ms</small>
           </span>
           <span className="hint" title="one request per live pod per service, every second">
@@ -160,7 +160,7 @@ export default function StatusPage() {
         <div className="stat versions">
           <span className="label">versions in flight</span>
           <div className="legend">
-            {legend.length === 0 && <span className="sub">–</span>}
+            {legend.length === 0 && <span className="sub">-</span>}
             {legend.map((l) => (
               <span key={l.version} className={`legend-item ${l.cls}`} title={l.services.join(', ')}>
                 <span className="vsq" aria-hidden="true" />
@@ -176,7 +176,7 @@ export default function StatusPage() {
             {rolling.length > 0
               ? rolling.map((s) => (
                   <span key={s.name} className="rolling">
-                    {s.name}: {s.versions.map(vlabel).join(' → ')} rolling…
+                    {s.name}: {s.versions.map(vlabel).join(' -> ')} rolling...
                   </span>
                 ))
               : legend.length === 1

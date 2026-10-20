@@ -25,7 +25,7 @@ const server = createServer(config, {
       if (!warmup.done) throw new Error('warming up');
     },
   },
-  // Redis (pool → falls back to direct generation) and Postgres (daily challenge only → 503 on
+  // Redis (pool -> falls back to direct generation) and Postgres (daily challenge only -> 503 on
   // /daily) both degrade gracefully, so neither gates readiness.
   softChecks: {
     redis: () => redis.ping(),

@@ -1,6 +1,6 @@
 import { compareVersions, type ServiceView } from './monitor';
 
-/** Number of distinct version colours (vc0…vc4 in status.css, derived from theme tokens). */
+/** Number of distinct version colours (vc0...vc4 in status.css, derived from theme tokens). */
 const PALETTE_SIZE = 5;
 
 export interface VersionLegendItem {
@@ -12,7 +12,7 @@ export interface VersionLegendItem {
 
 /**
  * Assigns each version seen anywhere in the cluster a colour class: the newest version gets the
- * theme's main colour (so a rollout "lights up"), older ones text / error-extra / … colours.
+ * theme's main colour (so a rollout "lights up"), older ones text / error-extra / ... colours.
  */
 export function versionColors(services: ServiceView[]): { cls: (v: string) => string; legend: VersionLegendItem[] } {
   const byVersion = new Map<string, { services: Set<string>; pods: number }>();

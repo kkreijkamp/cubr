@@ -1,9 +1,9 @@
-// Race client — wraps socket.io-client for the race service (docs/SPEC.md §9.6).
+// Race client - wraps socket.io-client for the race service (docs/SPEC.md section 9.6).
 //
-// - websocket transport only (no long-polling → the load balancer needs no sticky sessions);
+// - websocket transport only (no long-polling -> the load balancer needs no sticky sessions);
 // - handshake auth {token, name, guestId} is re-read on every (re)connect;
 // - every (re)connect re-joins the room, so a race pod being killed / drained during a rolling
-//   update is invisible apart from the "connected via pod …" label changing;
+//   update is invisible apart from the "connected via pod ..." label changing;
 // - ack-based calls become promises with timeouts; calls are rejected (never buffered) while
 //   disconnected so nothing is replayed twice after a reconnect.
 import { useEffect, useState } from 'react';
@@ -26,7 +26,7 @@ export interface LiveRound {
   /** extra field: "scramble-service" | "fallback" */
   scrambleSource?: string;
 }
-/** SPEC RoomState plus the extra fields the race service sends (rev, isPrivate, pods…). */
+/** SPEC RoomState plus the extra fields the race service sends (rev, isPrivate, pods...). */
 export interface LiveRoomState extends Omit<RoomState, 'players' | 'round' | 'hostId'> {
   hostId: string | null;
   players: LivePlayer[];
@@ -39,7 +39,7 @@ export interface ChatMessage {
   name: string;
   text: string;
   at: string;
-  /** generated locally (joins, leaves, rounds) — not sent by the server */
+  /** generated locally (joins, leaves, rounds) - not sent by the server */
   system?: boolean;
 }
 
@@ -191,7 +191,7 @@ export class RaceConnection {
     socket.on('disconnect', (reason) => {
       if (this.destroyed) return;
       this.patch({ connection: 'reconnecting', lastError: reason === 'io server disconnect' ? 'disconnected by server' : 'connection lost' });
-      // the client does not auto-reconnect after a server-side disconnect — do it ourselves
+      // the client does not auto-reconnect after a server-side disconnect - do it ourselves
       if (reason === 'io server disconnect') setTimeout(() => !this.destroyed && socket.connect(), 1000);
     });
     socket.on('connect_error', (err) => {
@@ -278,7 +278,7 @@ export class RaceConnection {
   /** Emits with an ack and a timeout. Rejects immediately while disconnected (no buffering). */
   private async call<T>(event: string, payload: unknown, timeoutMs = CALL_TIMEOUT_MS): Promise<T> {
     const socket = this.socket;
-    if (!socket || !socket.connected) throw new RaceError('OFFLINE', 'Not connected — reconnecting…');
+    if (!socket || !socket.connected) throw new RaceError('OFFLINE', 'Not connected - reconnecting...');
     let res: Ack;
     try {
       res = (await socket.timeout(timeoutMs).emitWithAck(event, payload)) as Ack;

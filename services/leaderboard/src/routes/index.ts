@@ -53,14 +53,14 @@ export async function registerRoutes(app: FastifyInstance, { redis, auth }: Deps
     return { event: q.event, kind: 'ao5', period: 'challenge', periodKey: date, total: board.total, page: q.page, size: q.size, entries: board.entries, me: board.me };
   });
 
-  // GET /api/leaderboards/users/:userId/ranks → positions on every all-time board
+  // GET /api/leaderboards/users/:userId/ranks -> positions on every all-time board
   app.get<{ Params: { userId: string } }>('/api/leaderboards/users/:userId/ranks', async (req) => {
     const { userId } = req.params;
     if (!UUID_RE.test(userId)) throw badRequest('userId: expected a UUID');
     return { ranks: await readUserRanks(redis, userId.toLowerCase()) };
   });
 
-  // GET /api/leaderboards/:event/:kind?period=all|weekly|daily&page=1&size=50[&key=…]
+  // GET /api/leaderboards/:event/:kind?period=all|weekly|daily&page=1&size=50[&key=...]
   app.get<{ Params: { event: string; kind: string } }>(
     '/api/leaderboards/:event/:kind',
     { preHandler: auth.optionalAuth },

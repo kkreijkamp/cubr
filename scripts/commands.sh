@@ -17,8 +17,7 @@
 #   copy-pasting. The other sections run unattended (section 9 waits in bounded loops).
 #
 # PREREQUISITES on the laptop: gcloud CLI, kubectl, openssl, curl, jq (optional: hey).
-# Local alternatives (no cloud): docker compose (docker-compose.yml) and kind
-# (scripts/kind-up.sh) -- see deploy/README.md.
+# Local alternative (no cloud): docker compose (docker-compose.yml) -- see deploy/README.md.
 # =============================================================================================
 set -euo pipefail                       # stop on the first error / unset variable / failed pipe stage
 cd "$(dirname "$0")/.."                 # all relative paths below are relative to the repo root
@@ -32,9 +31,9 @@ REGION="australia-southeast1"           # Sydney: Artifact Registry + Cloud Buil
 ZONE="australia-southeast1-a"           # zonal cluster = free GKE management fee (free tier)
 CLUSTER="cubetype"                      # GKE cluster name
 REPO="cubetype"                         # Artifact Registry Docker repository name
-VERSION="1.0.15"                         # release being deployed (image tag + APP_VERSION)
+VERSION="1.0.16"                         # release being deployed (image tag + APP_VERSION)
 NS="cubetype"                           # Kubernetes namespace of the app
-REGISTRY="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO"   # full image prefix, e.g. $REGISTRY/web:1.0.15
+REGISTRY="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO"   # full image prefix, e.g. $REGISTRY/web:1.0.16
 CNPG_VERSION="1.30.1"                   # CloudNativePG (PostgreSQL operator) release
 DEPLOYMENTS="auth scramble solve stats leaderboard race wca web"
 
@@ -583,7 +582,7 @@ section_14() {
 
   # NOTE: `kubectl apply -k deploy/k8s/overlays/gke` resets images to the tag in the overlay's
   # kustomization.yaml. For a permanent release, commit (the pre-commit hook bumps the version in
-  # every deploy file, see docs/BUILDING.md), build it with section 4, then apply it with
+  # every deploy file, see scripts/bump-version.sh), build it with section 4, then apply it with
   # section 9. Don't edit newTag by hand.
 }
 

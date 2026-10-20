@@ -57,8 +57,8 @@ function rangeLabel(r: Range | undefined): string | null {
   const b = formatDate(r.last);
   if (a === '-' || b === '-') return null;
   if (a === b) return a;
-  // "03 Mar – 14 Oct 2026" when both ends are in the same year
-  return a.slice(-4) === b.slice(-4) ? `${a.slice(0, -5)} – ${b}` : `${a} – ${b}`;
+  // "03 Mar - 14 Oct 2026" when both ends are in the same year
+  return a.slice(-4) === b.slice(-4) ? `${a.slice(0, -5)} - ${b}` : `${a} - ${b}`;
 }
 
 /**
@@ -90,7 +90,7 @@ export function MergeSessionsModal({ sessions, currentSessionId, event, mode, us
   const allChosen = candidates.length > 0 && chosen.length === candidates.length;
 
   // cloud: date ranges (and, for small histories, the solves) of every session of the event come
-  // from the stats read model in one request — never needed in guest mode, where all is in memory
+  // from the stats read model in one request - never needed in guest mode, where all is in memory
   useEffect(() => {
     if (mode !== 'cloud' || !userId || eventSessions.length < 2) return;
     const ctrl = new AbortController();
@@ -116,7 +116,7 @@ export function MergeSessionsModal({ sessions, currentSessionId, event, mode, us
     return () => ctrl.abort();
   }, [mode, userId, event, eventSessions.length]);
 
-  /** solves of a session for the preview — null when unknown or obviously stale */
+  /** solves of a session for the preview - null when unknown or obviously stale */
   const entriesFor = useMemo(() => {
     const cache = new Map<string, Entry[] | null>();
     return (s: Session): Entry[] | null => {
@@ -129,7 +129,7 @@ export function MergeSessionsModal({ sessions, currentSessionId, event, mode, us
     };
   }, [series]);
 
-  // "first – last solve" per session: from memory when loaded, else from the stats read model
+  // "first - last solve" per session: from memory when loaded, else from the stats read model
   const ranges = useMemo(() => {
     const out = new Map<string, string | null>();
     for (const s of eventSessions) {
@@ -199,7 +199,7 @@ export function MergeSessionsModal({ sessions, currentSessionId, event, mode, us
     try {
       const r = await mergeSessions(target.id, chosen.map((s) => s.id));
       onClose();
-      toast.success(`merged ${plural(r.sessions, 'session')} · ${plural(r.solves, 'solve')}`);
+      toast.success(`merged ${plural(r.sessions, 'session')} - ${plural(r.solves, 'solve')}`);
     } catch (err) {
       setError((err as Error).message || 'the merge failed');
       setFrozen(null);
@@ -257,8 +257,8 @@ export function MergeSessionsModal({ sessions, currentSessionId, event, mode, us
             <div className="merge-target-text">
               <div className="merge-target-name">{target.name}</div>
               <div className="merge-target-meta">
-                {eventLabel} · {plural(target.solveCount, 'solve')}
-                {targetRange ? ` · ${targetRange}` : ''}
+                {eventLabel} - {plural(target.solveCount, 'solve')}
+                {targetRange ? ` - ${targetRange}` : ''}
               </div>
             </div>
             <button ref={changeRef} type="button" className="btn-text small" onClick={() => setPicking((p) => !p)} aria-expanded={picking} disabled={busy}>
@@ -335,7 +335,7 @@ export function MergeSessionsModal({ sessions, currentSessionId, event, mode, us
             </>
           ) : (
             <>
-              merge <b>{plural(chosen.length, 'session')}</b> · <b>{plural(chosenSolves, 'solve')}</b> into <b>{target.name}</b>
+              merge <b>{plural(chosen.length, 'session')}</b> - <b>{plural(chosenSolves, 'solve')}</b> into <b>{target.name}</b>
             </>
           )}
         </div>
@@ -350,13 +350,13 @@ export function MergeSessionsModal({ sessions, currentSessionId, event, mode, us
 
         <div className="dialog-actions">
           <span className="keytips merge-keytips">
-            <kbd>space</kbd> select · <kbd>enter</kbd> merge
+            <kbd>space</kbd> select - <kbd>enter</kbd> merge
           </span>
           <button type="button" className="btn" onClick={close} disabled={busy}>
             cancel
           </button>
           <button type="submit" className="btn primary" disabled={busy || chosen.length === 0}>
-            {busy ? <Spinner size={16} /> : <Merge size={16} />} {busy ? 'merging…' : 'merge'}
+            {busy ? <Spinner size={16} /> : <Merge size={16} />} {busy ? 'merging...' : 'merge'}
           </button>
         </div>
       </form>

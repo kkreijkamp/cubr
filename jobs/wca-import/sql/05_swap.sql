@@ -1,7 +1,7 @@
 -- =============================================================================
 -- Step 5: zero-downtime swap. Renaming schemas is a catalog-only operation, and doing all of
 -- it in ONE transaction means concurrent readers (the wca service) see either the complete
--- old dataset or the complete new one — never an empty or half-loaded schema. Queries that
+-- old dataset or the complete new one - never an empty or half-loaded schema. Queries that
 -- are already running finish on the old tables (DROP waits for their locks).
 -- =============================================================================
 SET lock_timeout = '60s';   -- give up (and keep the old data) rather than queue forever

@@ -267,7 +267,7 @@ export function coalesce(queue: QueuedOp[], next: QueuedOp, inflightOpId: string
   return [...queue, next];
 }
 
-/** Exponential backoff with ±25 % jitter: 1 s, 2 s, 4 s … capped at 60 s. */
+/** Exponential backoff with +/-25 % jitter: 1 s, 2 s, 4 s ... capped at 60 s. */
 export function backoffDelay(attempt: number, rand: () => number = Math.random): number {
   const base = Math.min(60_000, 1000 * 2 ** Math.max(0, Math.min(attempt, 16)));
   return Math.round(base * (0.75 + rand() * 0.5));
@@ -331,7 +331,7 @@ type ImportSession = ImportPayload['sessions'][number];
 /**
  * Packs sessions into request bodies of at most `max` solves. A session is never split across
  * requests (the import endpoint creates one server session per entry) unless it alone exceeds the
- * server's hard limit, in which case it is split into "name (2)", "name (3)" … parts.
+ * server's hard limit, in which case it is split into "name (2)", "name (3)" ... parts.
  */
 export function planImportChunks(sessions: ImportSession[], max = 20_000, hardMax = 100_000): ImportPayload[] {
   const parts: ImportSession[] = [];

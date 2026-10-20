@@ -7,7 +7,7 @@ export function dayKey(date: Date, tz = 'UTC'): string {
   }
 }
 
-/** Hour of day 0–23 of `date` in timezone `tz`. */
+/** Hour of day 0-23 of `date` in timezone `tz`. */
 export function hourIn(date: Date, tz = 'UTC'): number {
   try {
     const h = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', hourCycle: 'h23' }).format(date);
@@ -21,7 +21,7 @@ export function hourIn(date: Date, tz = 'UTC'): number {
 export function isoWeekKey(date: Date, tz = 'UTC'): string {
   const [y, m, d] = dayKey(date, tz).split('-').map(Number);
   const t = new Date(Date.UTC(y, m - 1, d));
-  const dayNum = t.getUTCDay() || 7; // Monday = 1 … Sunday = 7
+  const dayNum = t.getUTCDay() || 7; // Monday = 1 ... Sunday = 7
   t.setUTCDate(t.getUTCDate() + 4 - dayNum); // Thursday of the same ISO week decides the year
   const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
   const week = Math.ceil(((t.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);

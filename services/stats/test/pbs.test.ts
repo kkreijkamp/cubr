@@ -28,16 +28,16 @@ describe('computePbs', () => {
     const list = [solve(S1, 0, 9000, 'DNF'), solve(S1, 1, 9500, '+2'), solve(S1, 2, 11000)];
     const pbs = computePbs(list);
     expect(pbs.single).toEqual({ valueMs: 11000, solveId: list[2].id, achievedAt: list[2].createdAt });
-    expect(pbs.mo3).toBeUndefined(); // the only mo3 contains a DNF → DNF → not a PB
+    expect(pbs.mo3).toBeUndefined(); // the only mo3 contains a DNF -> DNF -> not a PB
     expect(pbs.ao5).toBeUndefined();
   });
 
   it('mo3 / ao5 come from the best window within one session; achievedAt = window end', () => {
     const list = [10000, 12000, 8000, 9000, 10000, 15000].map((t, i) => solve(S1, i, t));
     const pbs = computePbs(list);
-    // mo3 windows: 10000,9667,9000,9667,11667 → 9000 ending at index 4
+    // mo3 windows: 10000,9667,9000,9667,11667 -> 9000 ending at index 4
     expect(pbs.mo3).toEqual({ valueMs: 9000, solveId: list[4].id, achievedAt: list[4].createdAt });
-    // ao5 windows: [10,12,8,9,10] → mean(9,10,10)=9667 ; [12,8,9,10,15] → mean(9,10,12)=10333
+    // ao5 windows: [10,12,8,9,10] -> mean(9,10,10)=9667 ; [12,8,9,10,15] -> mean(9,10,12)=10333
     expect(pbs.ao5?.valueMs).toBe(9667);
     expect(pbs.ao5?.solveId).toBe(list[4].id);
     expect(pbs.ao12).toBeUndefined();

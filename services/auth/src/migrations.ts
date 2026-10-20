@@ -1,6 +1,6 @@
 import type { Migration } from '@cubetype/common';
 
-/** auth schema (docs/SPEC.md §7.1). Applied by migrate() at startup; statements are idempotent. */
+/** auth schema (docs/SPEC.md section 7.1). Applied by migrate() at startup; statements are idempotent. */
 export const migrations: Migration[] = [
   {
     id: '001_init',
@@ -29,8 +29,8 @@ export const migrations: Migration[] = [
   {
     id: '002_avatars',
     sql: `
-      -- profile pictures: small pre-resized images (≈ 20–40 KB) stored next to the account;
-      -- users.avatar_version (a content hash) makes every picture URL unique → cacheable forever
+      -- profile pictures: small pre-resized images (~20-40 KB) stored next to the account;
+      -- users.avatar_version (a content hash) makes every picture URL unique -> cacheable forever
       ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS avatar_version text;
       CREATE TABLE IF NOT EXISTS auth.avatars (
         user_id      uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,

@@ -15,7 +15,7 @@ function allowEmptyJsonBodies(app: FastifyInstance): void {
   const defaultJson = app.getDefaultJsonParser('error', 'error');
   app.removeContentTypeParser('application/json');
   app.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
-    const text = typeof body === 'string' ? body : body.toString('utf8'); // parseAs 'string' → always a string
+    const text = typeof body === 'string' ? body : body.toString('utf8'); // parseAs 'string' -> always a string
     if (text.length === 0) return done(null, undefined);
     defaultJson(req, text, done);
   });

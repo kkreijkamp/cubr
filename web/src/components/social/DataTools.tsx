@@ -26,7 +26,7 @@ function dateRange(s: ImportedSession): string {
   if (times.length === 0) return '-';
   const a = formatDate(new Date(Math.min(...times)).toISOString());
   const b = formatDate(new Date(Math.max(...times)).toISOString());
-  return a === b ? a : `${a} – ${b}`;
+  return a === b ? a : `${a} - ${b}`;
 }
 
 function ImportPreview({ fileName, parsed, onClose }: { fileName: string; parsed: TimerImport; onClose: () => void }) {
@@ -50,7 +50,7 @@ function ImportPreview({ fileName, parsed, onClose }: { fileName: string; parsed
     setBusy(true);
     try {
       const res = await importSessions(chosen);
-      toast.success(`imported ${plural(res.sessions, 'session')} · ${plural(res.solves, 'solve')}`, { title: `${format} import`, durationMs: 5000 });
+      toast.success(`imported ${plural(res.sessions, 'session')} - ${plural(res.solves, 'solve')}`, { title: `${format} import`, durationMs: 5000 });
       onClose();
     } catch (err) {
       toast.error(friendlyError(err, 'the solve service'), { title: 'import failed' });
@@ -109,7 +109,7 @@ function ImportPreview({ fileName, parsed, onClose }: { fileName: string; parsed
           </tbody>
         </table>
       </div>
-      {tooMany && <div className="error small">one import can hold at most {formatNumber(MAX_SOLVES)} solves — untick a few sessions.</div>}
+      {tooMany && <div className="error small">one import can hold at most {formatNumber(MAX_SOLVES)} solves - untick a few sessions.</div>}
       {skippedNotes(skipped).map((note) => (
         <div key={note} className="sub small">
           {note}
@@ -166,7 +166,7 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
       const solves = data.sessions.reduce((a, s) => a + s.solves.length, 0);
       if (format === 'json') downloadFile(`cubetype-export-${localDateKey()}.json`, JSON.stringify(data, null, solves > 20_000 ? undefined : 2));
       else downloadFile(csTimerFileName(), toCsTimerExport(data.sessions), 'text/plain');
-      toast.success(`exported ${plural(data.sessions.length, 'session')} · ${plural(solves, 'solve')}`);
+      toast.success(`exported ${plural(data.sessions.length, 'session')} - ${plural(solves, 'solve')}`);
     } catch (err) {
       toast.error(friendlyError(err, 'the solve service'), { title: 'export failed' });
     } finally {
@@ -184,7 +184,7 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
     'account',
     () => [
       { id: 'account-edit', label: 'Edit profile', icon: <Pencil />, run: onEdit },
-      { id: 'account-import', label: 'Import solves…', icon: <FileUp />, keywords: ['cstimer', 'twisty', 'cubedesk', 'block keeper', 'upload', 'restore'], run: pickFile },
+      { id: 'account-import', label: 'Import solves...', icon: <FileUp />, keywords: ['cstimer', 'twisty', 'cubedesk', 'block keeper', 'upload', 'restore'], run: pickFile },
       { id: 'account-export', label: 'Export data (json)', icon: <Download />, keywords: ['backup', 'download'], run: () => void doExport('json') },
       { id: 'account-export-cstimer', label: 'Export for csTimer', icon: <Download />, keywords: ['cstimer', 'backup', 'download'], run: () => void doExport('cstimer') },
     ],
@@ -205,7 +205,7 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
               <FileUp /> import solves
             </div>
             <div className="d">
-              a cubetype export, or any file csTimer can import: csTimer (<span className="text">export → export to file</span>), Twisty Timer, Cubic Timer,
+              a cubetype export, or any file csTimer can import: csTimer (<span className="text">export -&gt; export to file</span>), Twisty Timer, Cubic Timer,
               Block Keeper, CubeDesk, DCTimer, mateus Cubetimer or GAN CubeStation. you will see a preview before anything is imported.
             </div>
           </div>
@@ -223,7 +223,7 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
             </div>
             <div className="d">
               every session and solve. json re-imports here or on another cubetype server; the csTimer file goes into csTimer with{' '}
-              <span className="text">export → import session(s) from other timers</span>, which adds sessions without replacing yours.
+              <span className="text">export -&gt; import session(s) from other timers</span>, which adds sessions without replacing yours.
             </div>
           </div>
           <div className="ac-actions">
@@ -241,7 +241,7 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
               <UserCog /> account
             </div>
             <div className="d">
-              signed in as <span className="text">{user.username}</span> · {user.email}
+              signed in as <span className="text">{user.username}</span> - {user.email}
             </div>
           </div>
           <div className="ac-actions">

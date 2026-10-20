@@ -41,7 +41,7 @@ const FLOOD_MAX_EVENTS = 60;
 export function createSocketServer(httpServer: HttpServer, pub: Redis, sub: Redis): RaceServer {
   const io: RaceServer = new Server(httpServer, {
     path: '/socket.io',
-    transports: ['websocket'], // no long-polling → no sticky sessions needed behind the LB
+    transports: ['websocket'], // no long-polling -> no sticky sessions needed behind the LB
     cors: { origin: true, credentials: true },
     serveClient: false, // the SPA bundles socket.io-client (keeps our esbuild bundle self-contained)
     maxHttpBufferSize: 16 * 1024, // all our messages are tiny
@@ -104,7 +104,7 @@ export function registerSocketHandlers(deps: SocketDeps) {
   }
 
   /**
-   * Registers a client→server event: zod-validates the payload, runs the handler in order and
+   * Registers a client->server event: zod-validates the payload, runs the handler in order and
    * always answers the ack with {ok:true,...} or {ok:false,error,code}. Never throws.
    */
   function on<S extends z.ZodTypeAny>(
@@ -161,7 +161,7 @@ export function registerSocketHandlers(deps: SocketDeps) {
     }
   }
 
-  // Handshake: resolve who this is (JWT user or guest). Never rejects — guests are welcome.
+  // Handshake: resolve who this is (JWT user or guest). Never rejects - guests are welcome.
   io.use((socket, next) => {
     resolveIdentity(socket.handshake.auth, deps.jwtSecret, redis)
       .then((identity) => {
@@ -261,7 +261,7 @@ export function registerSocketHandlers(deps: SocketDeps) {
   return {
     /**
      * Graceful shutdown: drop every websocket on this pod at the transport level (clients see
-     * "transport close" and auto-reconnect — through the load balancer, to another pod), then
+     * "transport close" and auto-reconnect - through the load balancer, to another pod), then
      * wait for the resulting registry cleanups so other players see the move promptly.
      */
     async drain(timeoutMs = 5000): Promise<void> {

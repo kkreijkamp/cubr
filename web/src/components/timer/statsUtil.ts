@@ -2,7 +2,7 @@
 import { effectiveMs, formatSolve, formatTime, trimFor, type Precision, type SessionStats } from '@cubetype/cubestats';
 import type { Solve } from '../../lib/types';
 
-/** "mo3" → 3, "ao12" → 12, anything else → null */
+/** "mo3" -> 3, "ao12" -> 12, anything else -> null */
 export function parseAvgKey(key: string): number | null {
   const m = /^(ao|mo)(\d{1,5})$/.exec(key);
   if (!m) return null;
@@ -44,7 +44,7 @@ export function fmtSolveLong(s: Pick<Solve, 'timeMs' | 'penalty'>, precision: Pr
   return formatSolve(s.timeMs, s.penalty, precision);
 }
 
-/** Axis tick label: 12.5 → "12.5", 75 s → "1:15". */
+/** Axis tick label: 12.5 -> "12.5", 75 s -> "1:15". */
 export function shortTime(ms: number): string {
   if (!Number.isFinite(ms)) return '';
   const s = ms / 1000;
@@ -82,7 +82,7 @@ export function averageWindow(all: Solve[], end: number, n: number, value: numbe
 
 /** csTimer-style plain-text report (copied to the clipboard from the average modal). */
 export function averageReport(label: string, w: AverageWindow, precision: Precision): string {
-  const lines = [`cubetype · ${new Date().toISOString().slice(0, 10)}`, `${label}: ${fmtAvg(w.value, precision)}`, '', 'Time List:'];
+  const lines = [`cubetype - ${new Date().toISOString().slice(0, 10)}`, `${label}: ${fmtAvg(w.value, precision)}`, '', 'Time List:'];
   w.solves.forEach((s, i) => {
     const t = fmtSolveShort(s, precision);
     lines.push(`${i + 1}. ${w.trimmed.has(i) ? `(${t})` : t}   ${s.scramble.replace(/\n/g, ' ')}`);
@@ -129,7 +129,7 @@ export interface Bucket {
 
 const NICE_STEPS = [10, 20, 50, 100, 200, 250, 500, 1000, 2000, 5000, 10_000, 15_000, 30_000, 60_000, 120_000, 300_000, 600_000];
 
-/** Histogram of finite times; range clipped to the 1st–99th percentile, outliers go to the edges. */
+/** Histogram of finite times; range clipped to the 1st-99th percentile, outliers go to the edges. */
 export function histogram(times: number[], targetBuckets = 24): Bucket[] {
   const xs = times.filter((t) => Number.isFinite(t)).sort((a, b) => a - b);
   if (xs.length === 0) return [];

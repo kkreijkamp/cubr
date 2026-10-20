@@ -1,7 +1,7 @@
 // Cluster monitor for the status page. Polls every service's `_info` endpoint once a second and
 // turns the responses into what Kubernetes is doing: which pods answer (load balancing), new pods
 // (scale-out / self-healing), pods that stop answering (deletions, scale-in), version changes
-// (rolling updates) and service outages — plus a human-readable event log.
+// (rolling updates) and service outages - plus a human-readable event log.
 import { api, ApiError, SERVICE_INFO_PATHS } from '../../../lib/api';
 import { createStore, type Store } from '../../../lib/store';
 import type { ServiceInfo } from '../../../lib/types';
@@ -75,7 +75,7 @@ export interface PodView {
   hits: number;
   firstSeen: number;
   lastSeen: number;
-  /** appeared after warm-up within the last few seconds → glow */
+  /** appeared after warm-up within the last few seconds -> glow */
   fresh: boolean;
   stale: boolean;
 }
@@ -92,7 +92,7 @@ export interface ServiceView {
   lastOkAt: number | null;
   downSince: number | null;
   pods: PodView[];
-  /** versions answering within the window, oldest → newest */
+  /** versions answering within the window, oldest -> newest */
   versions: string[];
   checks: number;
   failures: number;
@@ -135,7 +135,7 @@ export function compareVersions(a: string, b: string): number {
   return a.localeCompare(b);
 }
 
-/** "1.2.0" → "v1.2.0"; non-semver builds ("dev", git shas) stay as they are */
+/** "1.2.0" -> "v1.2.0"; non-semver builds ("dev", git shas) stay as they are */
 export const vlabel = (v: string) => (/^\d/.test(v) ? `v${v}` : v);
 
 const str = (v: unknown, fallback: string) => (typeof v === 'string' && v.trim() ? v : fallback);
@@ -151,7 +151,7 @@ function describeError(e: unknown): { message: string; status: number | null } {
 }
 
 export function shortPod(pod: string): string {
-  // "solve-7d9f8c6b5-x2k4q" → "x2k4q"; docker hostnames (12 hex chars) stay as-is
+  // "solve-7d9f8c6b5-x2k4q" -> "x2k4q"; docker hostnames (12 hex chars) stay as-is
   const parts = pod.split('-');
   return parts.length >= 3 ? parts[parts.length - 1] : pod;
 }
@@ -202,12 +202,12 @@ export class ClusterMonitor {
     this.store = createStore<MonitorState>(this.buildState(Date.now()));
   }
 
-  /** Starts polling (safe to call again after dispose — React StrictMode remounts). */
+  /** Starts polling (safe to call again after dispose - React StrictMode remounts). */
   start(): void {
     this.disposed = false;
     if (!this.started) {
       this.started = true;
-      this.addLog('sub', `monitoring ${this.rts.length} services · polling every ${POLL_MS / 1000}s`, null);
+      this.addLog('sub', `monitoring ${this.rts.length} services - polling every ${POLL_MS / 1000}s`, null);
       this.warmUntil = Date.now() + WARMUP_MS;
     }
     this.applyRunning();
@@ -290,7 +290,7 @@ export class ClusterMonitor {
 
   /**
    * One probe batch per service per tick: as many parallel requests as the service has live pods
-   * (capped), so every pod gets ~1 hit/s — new pods show up within a second or two and a pod
+   * (capped), so every pod gets ~1 hit/s - new pods show up within a second or two and a pod
    * that stops answering can be flagged quickly without false alarms.
    */
   private async poll(rt: Runtime): Promise<void> {
@@ -352,7 +352,7 @@ export class ClusterMonitor {
     const meta = this.pods.get(key);
     if (!meta) {
       this.pods.set(key, { service: rt.name, pod, node, version, firstSeen: now, lastSeen: now, initial: !warm, stale: false });
-      if (warm) this.addLog('new', `${rt.name}: new pod ${pod} · ${vlabel(version)} · node ${node}`, rt.name);
+      if (warm) this.addLog('new', `${rt.name}: new pod ${pod} - ${vlabel(version)} - node ${node}`, rt.name);
     } else {
       if (meta.stale) {
         meta.stale = false;
@@ -369,7 +369,7 @@ export class ClusterMonitor {
       if (others.length) {
         const older = others.sort(compareVersions).map(vlabel).join(', ');
         const verb = compareVersions(version, others[others.length - 1]) > 0 ? 'rolling update' : 'rollback';
-        this.addLog('new', `${rt.name}: ${vlabel(version)} appeared next to ${older} — ${verb} in progress`, rt.name);
+        this.addLog('new', `${rt.name}: ${vlabel(version)} appeared next to ${older} - ${verb} in progress`, rt.name);
       }
     }
     rt.versions.set(version, now);
@@ -377,7 +377,7 @@ export class ClusterMonitor {
 
   /**
    * Up vs degraded from the whole probe batch (any pod reporting a dependency down = degraded).
-   * Recovery from down is immediate; up ↔ degraded must persist for two batches, so one pod's
+   * Recovery from down is immediate; up <-> degraded must persist for two batches, so one pod's
    * slow health check doesn't make the card (and the event log) flap.
    */
   private updateStatus(rt: Runtime, infos: ServiceInfo[]): void {
@@ -392,13 +392,13 @@ export class ClusterMonitor {
     if (prev === 'down' || prev === 'pending') {
       if (prev === 'down' && rt.downSince !== null) this.addLog('good', `${rt.name} recovered after ${((now - rt.downSince) / 1000).toFixed(1)}s`, rt.name);
       else if (prev === 'pending' && now >= this.warmUntil) this.addLog('good', `${rt.name} is up`, rt.name);
-      if (next === 'degraded') this.addLog('warn', `${rt.name} degraded — ${[...downDeps].join(', ')} down`, rt.name);
+      if (next === 'degraded') this.addLog('warn', `${rt.name} degraded - ${[...downDeps].join(', ')} down`, rt.name);
       rt.status = next;
       rt.statusStreak = 0;
     } else if (next !== prev) {
       rt.statusStreak++;
       if (rt.statusStreak >= 2) {
-        if (next === 'degraded') this.addLog('warn', `${rt.name} degraded — ${[...downDeps].join(', ')} down`, rt.name);
+        if (next === 'degraded') this.addLog('warn', `${rt.name} degraded - ${[...downDeps].join(', ')} down`, rt.name);
         else this.addLog('good', `${rt.name}: all dependencies ok again`, rt.name);
         rt.status = next;
         rt.statusStreak = 0;
@@ -423,7 +423,7 @@ export class ClusterMonitor {
       rt.status = 'down';
       rt.downSince = rt.lastOkAt && wasKnown ? Math.max(rt.lastOkAt, now - 2 * POLL_MS) : now;
       // during warm-up, initial outages are summarised in one line instead
-      if (wasKnown || now >= this.warmUntil) this.addLog('bad', `${rt.name} is DOWN — ${status ? `${status} ` : ''}${message}`, rt.name);
+      if (wasKnown || now >= this.warmUntil) this.addLog('bad', `${rt.name} is DOWN - ${status ? `${status} ` : ''}${message}`, rt.name);
     }
   }
 
@@ -437,7 +437,7 @@ export class ClusterMonitor {
         this.addLog('sub', `discovered ${this.pods.size} pod${this.pods.size === 1 ? '' : 's'} across ${services.size} service${services.size === 1 ? '' : 's'} on ${nodes.size} node${nodes.size === 1 ? '' : 's'}`, null);
       }
       const down = this.rts.filter((r) => r.status === 'down').map((r) => r.name);
-      if (down.length === this.rts.length) this.addLog('bad', 'no service is reachable — is the cluster (or the local gateway) up?', null);
+      if (down.length === this.rts.length) this.addLog('bad', 'no service is reachable - is the cluster (or the local gateway) up?', null);
       else if (down.length) this.addLog('bad', `${down.length} service${down.length === 1 ? '' : 's'} down: ${down.join(', ')}`, null);
     }
     for (const rt of this.rts) {
@@ -462,7 +462,7 @@ export class ClusterMonitor {
           rt.versions.delete(v);
           const remaining = [...rt.versions.keys()];
           if (remaining.length === 1 && rt.status !== 'down') {
-            this.addLog('good', `${rt.name}: rollout complete — all pods on ${vlabel(remaining[0])}`, rt.name);
+            this.addLog('good', `${rt.name}: rollout complete - all pods on ${vlabel(remaining[0])}`, rt.name);
           }
         }
       }

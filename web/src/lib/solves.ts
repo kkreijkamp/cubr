@@ -1,18 +1,18 @@
-// Solve store — the single source of truth for sessions & solves in the browser.
+// Solve store - the single source of truth for sessions & solves in the browser.
 //
 // CONTRACT (other pages rely on these exports):
 //  - Guest mode ("local"): everything persists in localStorage; works with no backend at all.
 //  - Logged-in mode ("cloud"): data lives in solve-service. Writes are optimistic (UI updates
-//    immediately) and queued; failed requests (network / 5xx) are retried with backoff — solve
-//    and session ids are generated client-side, so retries are idempotent. 4xx → revert + toast.
+//    immediately) and queued; failed requests (network / 5xx) are retried with backoff - solve
+//    and session ids are generated client-side, so retries are idempotent. 4xx -> revert + toast.
 //  - Switches automatically on login/logout (onAuthChange from ./auth).
 //
 // Implementation notes
 //  - Local data: `cubetype.local.v1` (compact tuples, see timer/storeUtils.ts), written debounced
 //    and flushed on pagehide. Corrupt data is backed up to `cubetype.local.v1.corrupt`, never lost.
 //  - Cloud writes go through a persistent FIFO queue (`cubetype.queue.v1`) processed one op at a
-//    time; unsent edits are coalesced into their create. Network/5xx/429 → exponential backoff
-//    (1 s … 60 s, retried immediately on `online`). Server reads are overlaid with queued ops so
+//    time; unsent edits are coalesced into their create. Network/5xx/429 -> exponential backoff
+//    (1 s ... 60 s, retried immediately on `online`). Server reads are overlaid with queued ops so
 //    optimistic changes survive reloads. The current session is cached (`cubetype.cloudcache.v1`)
 //    so a logged-in user can keep timing while solve-service is down.
 import { getEvent, isEventId, type ImportedSession, type Penalty } from '@cubetype/cubestats';
@@ -208,7 +208,7 @@ function flushLocal(): boolean {
     }
     return true;
   } catch {
-    storageError = 'browser storage is full — export your solves or sign in to sync them';
+    storageError = 'browser storage is full - export your solves or sign in to sync them';
     if (!quotaWarned) toast.error('Browser storage is full: new solves may not be saved. Export your data or sign in to sync to the cloud.');
     quotaWarned = true;
     publish();
@@ -283,7 +283,7 @@ function writeLastSession(): void {
 // ================================================================ retry queue
 
 let queue: QueuedOp[] = browser ? decodeQueue(loadJson<unknown>(QUEUE_KEY, [])) : [];
-/** ops completed in the last minute — re-applied on reads to cover read-after-write races */
+/** ops completed in the last minute - re-applied on reads to cover read-after-write races */
 let recent: { op: SyncOp; at: number }[] = [];
 let inflight: string | null = null;
 let pumping = false;
@@ -421,7 +421,7 @@ async function pump(): Promise<void> {
           scheduleRetry();
           break;
         }
-        // permanent rejection (validation, conflict …): drop it and re-sync to revert
+        // permanent rejection (validation, conflict ...): drop it and re-sync to revert
         queue = queue.filter((q) => q.opId !== head.opId);
         saveQueue();
         settle(head.opId, e as Error);
@@ -475,7 +475,7 @@ function defaultEvent(): string {
   return isEventId(ev) ? ev : '333';
 }
 
-/** Default name for a new session of `event`: "3x3", then "3x3 2", "3x3 3" … */
+/** Default name for a new session of `event`: "3x3", then "3x3 2", "3x3 3" ... */
 export function suggestSessionName(event: string): string {
   const base = getEvent(event)?.short ?? event;
   const taken = new Set(solveStore.get().sessions.map((s) => s.name.toLowerCase()));
@@ -664,7 +664,7 @@ if (browser) {
   const u = getCurrentUser();
   if (u) handleAuth(u);
   else if (!getToken()) handleAuth(null);
-  // else: a token exists and the auth check is in flight — AuthProvider will call us
+  // else: a token exists and the auth check is in flight - AuthProvider will call us
 
   window.addEventListener('pagehide', () => {
     flushLocal();
@@ -723,7 +723,7 @@ function patchSession(id: string, patch: Partial<Session>): void {
 
 function validName(name: string): string {
   const n = name.trim();
-  if (n.length < 1 || n.length > 40) throw new Error('Session names must be 1–40 characters');
+  if (n.length < 1 || n.length > 40) throw new Error('Session names must be 1-40 characters');
   return n;
 }
 
@@ -965,11 +965,11 @@ function dropMergedSessions(targetId: string, drop: Set<string>, targetPatch: Pa
 
 function mergeErrorMessage(e: unknown): string {
   if (e instanceof ApiError) {
-    if (e.status === 404) return 'one of these sessions no longer exists (changed on another device?) — your sessions were refreshed, please try again';
+    if (e.status === 404) return 'one of these sessions no longer exists (changed on another device?) - your sessions were refreshed, please try again';
     if (e.status === 409) return SAME_EVENT_MSG;
-    if (e.status === 401) return 'you were signed out — sign in again to merge sessions';
-    if (e.status === 429) return 'too many requests — try again in a moment';
-    if (e.isUnavailable || e.status >= 500) return "couldn't reach the solve service — try again in a moment";
+    if (e.status === 401) return 'you were signed out - sign in again to merge sessions';
+    if (e.status === 429) return 'too many requests - try again in a moment';
+    if (e.isUnavailable || e.status >= 500) return "couldn't reach the solve service - try again in a moment";
     return e.message || 'the merge was rejected';
   }
   return (e as Error)?.message || 'the merge failed';
@@ -978,7 +978,7 @@ function mergeErrorMessage(e: unknown): string {
 /**
  * Moves every solve of `sourceIds` into `targetId` (kept chronological) and deletes the source
  * sessions. All sessions must belong to the same event. If the current session is merged away,
- * the target becomes current. Guest mode: localStorage. Cloud mode: not optimistic — waits for
+ * the target becomes current. Guest mode: localStorage. Cloud mode: not optimistic - waits for
  * the retry queue, then POST /api/sessions/:id/merge and reloads.
  */
 export async function mergeSessions(targetId: string, sourceIds: string[]): Promise<{ sessions: number; solves: number }> {
@@ -1004,7 +1004,7 @@ function mergeLocal(target: Session, ids: string[]): { sessions: number; solves:
     // the browser refused the write: put everything back so memory matches what is stored
     Object.assign(model, snapshot);
     publish();
-    throw new Error('not enough browser storage to save the merge — export your solves or sign in to sync them');
+    throw new Error('not enough browser storage to save the merge - export your solves or sign in to sync them');
   }
   publish();
   return { sessions: ids.length, solves: merged.list.length - merged.before };
@@ -1017,7 +1017,7 @@ async function mergeCloud(target: Session, ids: string[]): Promise<{ sessions: n
   const unsynced = () => queue.some((q) => q.userId === uid && involved.has(opSessionId(q.op)));
   // a merge must never overtake queued writes (a solve sent later would land in a deleted session)
   if (pendingCount() > 0) await flushQueue(10_000);
-  if (unsynced()) throw new Error("you have unsynced solves — try again when you're back online");
+  if (unsynced()) throw new Error("you have unsynced solves - try again when you're back online");
 
   const g = gen;
   const total = { sessions: 0, solves: 0 };

@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# cubetype seed job — bundled to one file like the services; runs once and exits.
+# cubetype seed job - bundled to one file like the services; runs once and exits.
 FROM --platform=$BUILDPLATFORM node:22-alpine AS build
 WORKDIR /repo
 COPY . .

@@ -13,7 +13,7 @@ import { Loading, Spinner } from '../Spinner';
 
 /**
  * Monkeytype-style history chart: every solve as a point, with toggleable overlays for the PB
- * progression and rolling averages (ao5 … ao1000). Averages are computed over the user's whole
+ * progression and rolling averages (ao5 ... ao1000). Averages are computed over the user's whole
  * chronological solve history with the shared WCA rules (@cubetype/cubestats), so a window that
  * starts mid-history still shows correct averages from its first point.
  */
@@ -41,7 +41,7 @@ const INK_VAR: Record<Ink, string> = { main: 'var(--main-color)', text: 'var(--t
 type Range = 'all' | '1000' | '100';
 type XMode = 'solves' | 'date';
 
-/** '#rrggbb' + alpha → '#rrggbbaa' (canvas can't use color-mix). */
+/** '#rrggbb' + alpha -> '#rrggbbaa' (canvas can't use color-mix). */
 function withAlpha(color: string, alpha: number): string {
   if (/^#[0-9a-f]{6}$/i.test(color)) return color + Math.round(alpha * 255).toString(16).padStart(2, '0');
   return color;
@@ -109,7 +109,7 @@ interface Prepared {
   eff: number[]; // effective time, Infinity = DNF
   isPb: boolean[]; // solve set a new single PB
   pb: number[]; // running best single (Infinity before the first finish)
-  avgs: Record<string, (number | null)[]>; // ao5 … ao1000 (null = not enough solves, Infinity = DNF)
+  avgs: Record<string, (number | null)[]>; // ao5 ... ao1000 (null = not enough solves, Infinity = DNF)
 }
 
 function prepare(rows: [number, number, number | null, number?][]): Prepared {
@@ -144,7 +144,7 @@ export function SolveHistoryChart({ userId, events, defaultEvent, precision }: {
   const sessions = series.data?.sessions ?? [];
 
   // Filtering by session happens client-side (instant switching); averages and the pb line are
-  // then computed within that session only — the way cubers read session stats.
+  // then computed within that session only - the way cubers read session stats.
   const prep = useMemo(() => {
     if (!series.data) return null;
     const rows = session < 0 ? series.data.solves : series.data.solves.filter((r) => r[3] === session);
@@ -294,13 +294,13 @@ export function SolveHistoryChart({ userId, events, defaultEvent, precision }: {
             callbacks: {
               title: (items) => {
                 const i = (items[0]?.raw as { i?: number } | undefined)?.i;
-                return i === undefined ? '' : `solve #${formatNumber(i + 1)} · ${formatDateTime(new Date(prep.t[i]).toISOString())}`;
+                return i === undefined ? '' : `solve #${formatNumber(i + 1)} - ${formatDateTime(new Date(prep.t[i]).toISOString())}`;
               },
               label: (item) => {
                 const i = (item.raw as { i: number }).i;
                 if (!Number.isFinite(prep.eff[i])) return `DNF (${formatTime(prep.raw[i], precision)})`;
                 const plus2 = prep.eff[i] !== prep.raw[i];
-                return `${formatTime(prep.eff[i], precision)}${plus2 ? '+' : ''}${prep.isPb[i] ? '  · new pb' : ''}`;
+                return `${formatTime(prep.eff[i], precision)}${plus2 ? '+' : ''}${prep.isPb[i] ? '  - new pb' : ''}`;
               },
               footer: (items) => {
                 const i = (items[0]?.raw as { i?: number } | undefined)?.i;
@@ -374,7 +374,7 @@ export function SolveHistoryChart({ userId, events, defaultEvent, precision }: {
           <History /> solve history
           {series.data && (
             <span className="sub">
-              · {session >= 0 && prep ? `${formatNumber(prep.n)} of ` : ''}
+              - {session >= 0 && prep ? `${formatNumber(prep.n)} of ` : ''}
               {formatNumber(series.data.total)} solves
             </span>
           )}
@@ -408,7 +408,7 @@ export function SolveHistoryChart({ userId, events, defaultEvent, precision }: {
               <option value={-1}>all sessions</option>
               {sessions.map((s, i) => (
                 <option key={s.id} value={i}>
-                  {s.name ?? `session ${i + 1}`} · {formatNumber(s.solves)}
+                  {s.name ?? `session ${i + 1}`} - {formatNumber(s.solves)}
                 </option>
               ))}
             </select>
@@ -454,13 +454,13 @@ export function SolveHistoryChart({ userId, events, defaultEvent, precision }: {
           <div className="pv-insight">
             {view && view.best !== null && (
               <>
-                best {formatTime(view.best, precision)} · mean {view.mean !== null ? formatTime(view.mean, precision) : '-'}
-                {view.dnfs > 0 && ` · ${view.dnfs} dnf`}
-                {insight && ` · ${insight}`}
-                {view.hidden > 0 && ` · ${view.hidden} slow outlier${view.hidden === 1 ? '' : 's'} above ${formatTime(view.hi, 2)} not shown`}
+                best {formatTime(view.best, precision)} - mean {view.mean !== null ? formatTime(view.mean, precision) : '-'}
+                {view.dnfs > 0 && ` - ${view.dnfs} dnf`}
+                {insight && ` - ${insight}`}
+                {view.hidden > 0 && ` - ${view.hidden} slow outlier${view.hidden === 1 ? '' : 's'} above ${formatTime(view.hi, 2)} not shown`}
               </>
             )}
-            {series.data?.truncated && ` · showing your latest ${formatNumber(series.data.solves.length)} solves`}
+            {series.data?.truncated && ` - showing your latest ${formatNumber(series.data.solves.length)} solves`}
           </div>
         </>
       )}

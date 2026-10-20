@@ -120,7 +120,7 @@ describe('assertDailyAllowed', () => {
 });
 
 describe('mergeSessionsBody', () => {
-  it('accepts 1–50 unique uuids and lower-cases them', () => {
+  it('accepts 1-50 unique uuids and lower-cases them', () => {
     expect(parse(mergeSessionsBody, { sourceIds: [SID.toUpperCase()] })).toEqual({ sourceIds: [SID] });
   });
   it('rejects empty, duplicate, non-uuid and oversized lists', () => {

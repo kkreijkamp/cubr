@@ -10,7 +10,7 @@ import { Spinner } from '../Spinner';
 
 /**
  * Monkeytype's activity buckets: take the non-zero day counts, trim the top and bottom 10 %,
- * average the rest (m) → thresholds [floor(m/2), round(m), round(1.5m)]; above → level 4.
+ * average the rest (m) -> thresholds [floor(m/2), round(m), round(1.5m)]; above -> level 4.
  */
 export function activityBuckets(counts: number[]): [number, number, number] {
   const filtered = counts.filter((c) => c > 0).sort((a, b) => a - b);
@@ -47,7 +47,7 @@ interface Cell {
 
 function buildCalendar(from: string, to: string, today: string, days: ActivityDay[]) {
   const counts = new Map(days.map((d) => [d.date, d.solves]));
-  const startDow = new Date(keyToUtc(from)).getUTCDay(); // 0 = Sunday (rows run sun → sat)
+  const startDow = new Date(keyToUtc(from)).getUTCDay(); // 0 = Sunday (rows run sun -> sat)
   const first = addDaysKey(from, -startDow);
   const last = to < today ? to : today;
   const weeks = Math.ceil((dayDiff(first, to) + 1) / 7);
@@ -65,7 +65,7 @@ function buildCalendar(from: string, to: string, today: string, days: ActivityDa
   const buckets = activityBuckets(inRange);
   for (const c of cells) if (c.count !== null) c.level = activityLevel(c.count, buckets);
 
-  // month labels under the first week containing the 1st of each month (≥ 3 weeks apart)
+  // month labels under the first week containing the 1st of each month (>= 3 weeks apart)
   const months: { week: number; label: string }[] = [];
   for (let w = 0; w < weeks; w++) {
     for (let d = 0; d < 7; d++) {
@@ -131,7 +131,7 @@ export function ActivityHeatmap({ userId, joinedAt }: { userId: string; joinedAt
               'activity'
             ) : (
               <>
-                <span className="text">{activity.data ? plural(model.total, 'solve') : '…'}</span> {label}
+                <span className="text">{activity.data ? plural(model.total, 'solve') : '...'}</span> {label}
               </>
             )}
           </span>

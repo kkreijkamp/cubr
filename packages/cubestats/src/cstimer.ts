@@ -7,11 +7,11 @@ import { escapeHtml, finishImport, unescapeHtml, type ImportedSession, type RawS
  * solve = [[penalty, rawMs, ...phaseEnds], scramble, comment, startUnixSeconds, optionalMoves]
  *   penalty: 0 = OK, 2000 = +2, -1 = DNF (raw time is kept even for DNF)
  * sessionData = JSON string: { "1": { "name": "...", "opt": { "scrType": "444wca" }, "rank": 1 }, ... }
- *   (empty opt → 3x3; names are HTML-escaped). Older files store a session or `properties` as a
+ *   (empty opt -> 3x3; names are HTML-escaped). Older files store a session or `properties` as a
  *   JSON string, and an older sessionData entry has `scr` instead of `opt.scrType`.
  */
 
-/** csTimer scramble type → WCA event id. */
+/** csTimer scramble type -> WCA event id. */
 export const CSTIMER_SCRTYPE_TO_EVENT: Record<string, string> = {
   '333': '333',
   '222so': '222',

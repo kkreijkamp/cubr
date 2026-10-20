@@ -1,4 +1,4 @@
-/* Cluster status page — dense, monospace, theme tokens only. */
+/* Cluster status page - dense, monospace, theme tokens only. */
 
 .status-page code {
   font-family: inherit;
@@ -6,7 +6,7 @@
   color: var(--text-color);
 }
 
-/* version colours, derived from the theme: newest = main, then text, error-extra, … */
+/* version colours, derived from the theme: newest = main, then text, error-extra, ... */
 .vc0 {
   --vc: var(--main-color);
 }

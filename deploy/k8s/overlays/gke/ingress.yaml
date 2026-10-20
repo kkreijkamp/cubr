@@ -1,6 +1,6 @@
 # =============================================================================================
 # GKE Ingress -> Google Cloud external Application Load Balancer (classic), one public IP.
-# Routes by path prefix (docs/SPEC.md §3); everything that matches no rule goes to the SPA
+# Routes by path prefix (docs/SPEC.md section 3); everything that matches no rule goes to the SPA
 # (defaultBackend web). /internal/* has no rule, so it is never routed to a service.
 # pathType Prefix: "/api/auth" matches /api/auth and /api/auth/... (not /api/authx).
 # No path rewriting: services receive the full original path.
@@ -16,7 +16,7 @@ metadata:
     app.kubernetes.io/part-of: cubetype
   annotations:
     kubernetes.io/ingress.class: "gce"                          # GKE's built-in external ALB controller
-    kubernetes.io/ingress.global-static-ip-name: "cubetype-ip"  # reserved in scripts/commands.sh §6
+    kubernetes.io/ingress.global-static-ip-name: "cubetype-ip"  # reserved in scripts/commands.sh section 6
 spec:
   defaultBackend:
     service:

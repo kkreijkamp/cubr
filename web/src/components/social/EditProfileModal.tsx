@@ -22,8 +22,8 @@ function Counter({ n, max }: { n: number; max: number }) {
   );
 }
 
-/** Edit the profile picture (uploads on its own) plus display name, bio, country and WCA id →
- *  PATCH /api/auth/me → auth.setUser. */
+/** Edit the profile picture (uploads on its own) plus display name, bio, country and WCA id ->
+ *  PATCH /api/auth/me -> auth.setUser. */
 export function EditProfileModal({ user, onClose }: { user: PrivateUser; onClose: () => void }) {
   const { setUser } = useAuth();
   const [displayName, setDisplayName] = useState(user.displayName ?? '');
@@ -40,7 +40,7 @@ export function EditProfileModal({ user, onClose }: { user: PrivateUser; onClose
   }, []);
 
   const wca = wcaId.trim().toUpperCase();
-  const wcaError = wca && !WCA_ID_RE.test(wca) ? 'format: 4 digits, 4 letters, 2 digits — e.g. 2015ABCD01' : null;
+  const wcaError = wca && !WCA_ID_RE.test(wca) ? 'format: 4 digits, 4 letters, 2 digits - e.g. 2015ABCD01' : null;
   const nameError = displayName.trim().length > MAX_NAME ? `at most ${MAX_NAME} characters` : null;
   const bioError = bio.trim().length > MAX_BIO ? `at most ${MAX_BIO} characters` : null;
   const invalid = Boolean(wcaError || nameError || bioError);
@@ -111,7 +111,7 @@ export function EditProfileModal({ user, onClose }: { user: PrivateUser; onClose
           <textarea
             id="ep-bio"
             value={bio}
-            placeholder="main: gan 12 · cfop, learning zbll · sub-10 goal"
+            placeholder="main: gan 12 - cfop, learning zbll - sub-10 goal"
             maxLength={MAX_BIO + 20}
             rows={3}
             onChange={(e) => setBio(e.target.value)}

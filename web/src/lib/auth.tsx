@@ -66,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!currentUser) return;
       setToken(null);
       applyUser(null);
-      toast.notice('Your session expired — please log in again.');
+      toast.notice('Your session expired - please log in again.');
     });
     if (!getToken()) {
       applyUser(null);

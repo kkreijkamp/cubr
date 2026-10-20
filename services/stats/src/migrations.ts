@@ -2,7 +2,7 @@ import type { Migration } from '@cubetype/common';
 
 export const migrations: Migration[] = [
   {
-    // Exactly the read model from docs/SPEC.md §7.3.
+    // Exactly the read model from docs/SPEC.md section 7.3.
     id: '001_init',
     sql: `
 CREATE TABLE stats.user_totals (

@@ -19,7 +19,7 @@ interface Props {
   onNewSession: () => void;
   onRenameSession: () => void;
   onDeleteSession: () => void;
-  /** "merge sessions…" (optional so older callers keep working) */
+  /** "merge sessions..." (optional so older callers keep working) */
   onMergeSessions?: () => void;
   inspection: boolean;
   onToggleInspection: () => void;
@@ -186,7 +186,7 @@ function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, 
         {...noFocus}
       >
         <Layers size={14} />
-        <span className="tp-session-name">{current?.name ?? '…'}</span>
+        <span className="tp-session-name">{current?.name ?? '...'}</span>
         <ChevronDown size={14} className="tp-chevron" />
       </button>
       {open && (
@@ -233,7 +233,7 @@ function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, 
               <span className="tp-menu-check">
                 <Merge size={14} />
               </span>
-              <span className="tp-menu-label">merge sessions…</span>
+              <span className="tp-menu-label">merge sessions...</span>
               {sessions.length < 2 && <span className="tp-menu-hint">needs another {eventLabel} session</span>}
             </button>
           )}
@@ -258,12 +258,12 @@ function SyncStatus({ mode, pending, syncError }: { mode: 'local' | 'cloud'; pen
     if (pending > 0) {
       icon = syncError ? <CloudOff size={14} /> : <RefreshCw size={14} className="tp-spin" />;
       label = `${pending} unsynced`;
-      tip = syncError ? `${syncError} — retrying automatically` : 'syncing…';
+      tip = syncError ? `${syncError} - retrying automatically` : 'syncing...';
       cls = syncError ? ' warn' : '';
     } else if (syncError) {
       icon = <CloudOff size={14} />;
       label = 'offline';
-      tip = `${syncError} — showing cached solves`;
+      tip = `${syncError} - showing cached solves`;
       cls = ' warn';
     } else {
       icon = <Cloud size={14} />;

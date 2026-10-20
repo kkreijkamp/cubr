@@ -6,7 +6,7 @@ import type { PbKind } from '../../lib/types';
 
 export const PB_KINDS: PbKind[] = ['single', 'mo3', 'ao5', 'ao12', 'ao50', 'ao100'];
 
-/** Short event label ("3x3", "OH"…), lowercase like the rest of the UI. */
+/** Short event label ("3x3", "OH"...), lowercase like the rest of the UI. */
 export function eventLabel(id: string): string {
   return (getEvent(id)?.short ?? id).toLowerCase();
 }
@@ -22,7 +22,7 @@ export function isWcaComparable(event: string): boolean {
   return event !== '333fm' && getEvent(event) !== undefined;
 }
 
-/** Only allow same-origin relative redirects ("/x", never "//evil.com" or "https://…"). */
+/** Only allow same-origin relative redirects ("/x", never "//evil.com" or "https://..."). */
 export function safeNext(next: string | null | undefined, fallback = '/account'): string {
   if (!next || !next.startsWith('/') || next.startsWith('//') || next.startsWith('/\\')) return fallback;
   if (next.startsWith('/login')) return fallback;
@@ -44,7 +44,7 @@ export function friendlyError(err: unknown, what: string): string {
   // programming errors (TypeError etc.) are not meant for users
   if (err instanceof TypeError || err instanceof ReferenceError) {
     console.error(err);
-    return 'something went wrong — please try again';
+    return 'something went wrong - please try again';
   }
   return (err as Error)?.message || 'something went wrong';
 }
@@ -84,16 +84,16 @@ export function addDaysKey(key: string, days: number): string {
   return utcKey(new Date(Date.UTC(y, m - 1, d + days)));
 }
 
-/** "s" suffix helper: plural(3, 'solve') → "3 solves". */
+/** "s" suffix helper: plural(3, 'solve') -> "3 solves". */
 export function plural(n: number, word: string, pluralWord = `${word}s`): string {
   return `${n.toLocaleString('en-US')} ${n === 1 ? word : pluralWord}`;
 }
 
-/** "3 multi-blind solves left out …" lines for an import preview. */
+/** "3 multi-blind solves left out ..." lines for an import preview. */
 export function skippedNotes(skipped: ImportSkipped): string[] {
   const notes: string[] = [];
   if (skipped.multiBlind) notes.push(`${plural(skipped.multiBlind, 'multi-blind solve')} left out: cubetype has no multi-blind event.`);
-  if (skipped.invalid) notes.push(`${plural(skipped.invalid, 'solve')} without a valid time (1 ms – 24 h) left out.`);
+  if (skipped.invalid) notes.push(`${plural(skipped.invalid, 'solve')} without a valid time (1 ms - 24 h) left out.`);
   return notes;
 }
 

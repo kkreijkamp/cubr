@@ -51,7 +51,7 @@ export async function sessionRolling(db: Db, sessionId: string): Promise<Rolling
   return rollingFromSolves(rows.reverse().map((r) => ({ timeMs: r.time_ms, penalty: r.penalty })));
 }
 
-/** `solve.created` / `solve.updated` payload (SPEC §8). */
+/** `solve.created` / `solve.updated` payload (SPEC section 8). */
 export function solveEventPayload(user: AuthUser, row: SolveRow, tz: string, rolling: Rolling): Record<string, unknown> {
   return {
     userId: user.id,
@@ -70,7 +70,7 @@ export function solveEventPayload(user: AuthUser, row: SolveRow, tz: string, rol
   };
 }
 
-/** `solve.deleted` payload (SPEC §8). */
+/** `solve.deleted` payload (SPEC section 8). */
 export function solveDeletedPayload(user: AuthUser, row: SolveRow, tz: string): Record<string, unknown> {
   return {
     userId: user.id,

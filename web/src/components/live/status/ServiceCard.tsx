@@ -7,7 +7,7 @@ const STANDARD_KEYS = new Set(['service', 'version', 'pod', 'node', 'startedAt',
 
 const humanKey = (k: string) => k.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
 
-/** A few service-specific numbers from `_info` (race sockets, solve outbox backlog, …). */
+/** A few service-specific numbers from `_info` (race sockets, solve outbox backlog, ...). */
 function extras(info: Record<string, unknown> | null): { label: string; value: string }[] {
   if (!info) return [];
   const out: { label: string; value: string }[] = [];
@@ -36,7 +36,7 @@ function latencyClass(ms: number | null): string {
   return '';
 }
 
-/** "solve-7d9f8c6b5-x2k4q" → ["solve-", "7d9f8c6b5-", "x2k4q"] (deployment, replicaset hash, pod id) */
+/** "solve-7d9f8c6b5-x2k4q" -> ["solve-", "7d9f8c6b5-", "x2k4q"] (deployment, replicaset hash, pod id) */
 export function podParts(pod: string, service: string): { prefix: string; hash: string; id: string } {
   const rest = pod.startsWith(`${service}-`) ? pod.slice(service.length + 1) : pod;
   const prefix = rest === pod ? '' : `${service}-`;
@@ -53,7 +53,7 @@ export function shortNode(node: string): string {
 function PodRow({ p, max, serving, vc }: { p: PodView; max: number; serving: boolean; vc: string }) {
   const { hash, id } = podParts(p.pod, p.service);
   const ago = Math.max(0, Math.round((Date.now() - p.lastSeen) / 1000));
-  const tip = `${p.pod}\n${vlabel(p.version)} · node ${p.node}\n${p.hits} hit${p.hits === 1 ? '' : 's'} in 30s · last ${ago}s ago`;
+  const tip = `${p.pod}\n${vlabel(p.version)} - node ${p.node}\n${p.hits} hit${p.hits === 1 ? '' : 's'} in 30s - last ${ago}s ago`;
   return (
     <li className={`pod-row ${vc}${p.fresh ? ' fresh' : ''}${p.stale ? ' stale' : ''}${serving ? ' serving' : ''}`} title={tip}>
       <span className="vsq" aria-hidden="true" />
@@ -77,12 +77,12 @@ function ServiceCardImpl({ s, vc, now }: { s: ServiceView; vc: (v: string) => st
   const version = typeof info?.version === 'string' ? info.version : null;
   const down = s.status === 'down';
   const deps = info?.deps && typeof info.deps === 'object' ? Object.entries(info.deps) : [];
-  const uptime = typeof info?.uptimeSec === 'number' ? formatDuration(info.uptimeSec * 1000) : '–';
-  const node = typeof info?.node === 'string' ? info.node : '–';
+  const uptime = typeof info?.uptimeSec === 'number' ? formatDuration(info.uptimeSec * 1000) : '-';
+  const node = typeof info?.node === 'string' ? info.node : '-';
   const max = Math.max(1, ...s.pods.map((p) => p.hits));
   const ex = extras(info as Record<string, unknown> | null);
   const podsLive = s.pods.filter((p) => !p.stale).length;
-  const statusLabel = { pending: 'checking…', up: 'healthy', degraded: 'degraded', down: 'down' }[s.status];
+  const statusLabel = { pending: 'checking...', up: 'healthy', degraded: 'degraded', down: 'down' }[s.status];
 
   return (
     <article className={`svc-card ${s.status}`} aria-label={`${s.name} ${statusLabel}`}>
@@ -91,7 +91,7 @@ function ServiceCardImpl({ s, vc, now }: { s: ServiceView; vc: (v: string) => st
         <span className="svc-name">{s.name}</span>
         {version && <span className={`ver-chip ${vc(version)}`}>{vlabel(version)}</span>}
         <span className={`svc-lat ${latencyClass(s.latency)}`} title="latency of the last _info request">
-          {s.latency !== null ? `${Math.round(s.latency)}ms` : down ? 'no reply' : '…'}
+          {s.latency !== null ? `${Math.round(s.latency)}ms` : down ? 'no reply' : '...'}
         </span>
       </header>
 
@@ -100,12 +100,12 @@ function ServiceCardImpl({ s, vc, now }: { s: ServiceView; vc: (v: string) => st
       {down ? (
         <div className="svc-down">
           <div className="reason">
-            {s.httpStatus ? `${s.httpStatus} · ` : ''}
+            {s.httpStatus ? `${s.httpStatus} - ` : ''}
             {s.error ?? 'unreachable'}
           </div>
           <div className="sub">
             {s.downSince !== null && <>down for {formatDuration(Math.max(0, now - s.downSince))}</>}
-            {s.lastOkAt !== null ? ` · last ok ${new Date(s.lastOkAt).toLocaleTimeString()}` : ' · never reached'}
+            {s.lastOkAt !== null ? ` - last ok ${new Date(s.lastOkAt).toLocaleTimeString()}` : ' - never reached'}
           </div>
         </div>
       ) : (
@@ -122,7 +122,7 @@ function ServiceCardImpl({ s, vc, now }: { s: ServiceView; vc: (v: string) => st
             <dt>deps</dt>
             <dd className="deps">
               {deps.length === 0 ? (
-                <span className="sub">{s.name === 'web' ? 'static · nginx' : '–'}</span>
+                <span className="sub">{s.name === 'web' ? 'static - nginx' : '-'}</span>
               ) : (
                 deps.map(([k, v]) => (
                   <span key={k} className={`dep ${v === 'ok' ? 'ok' : 'bad'}`}>
@@ -137,11 +137,11 @@ function ServiceCardImpl({ s, vc, now }: { s: ServiceView; vc: (v: string) => st
 
       <div className="svc-pods">
         <div className="svc-pods-title">
-          <span>pods · last 30s</span>
+          <span>pods - last 30s</span>
           <span className="count">{podsLive}</span>
         </div>
         {s.pods.length === 0 ? (
-          <div className="svc-pods-empty">{s.status === 'pending' ? 'waiting for the first reply…' : 'no pod answered'}</div>
+          <div className="svc-pods-empty">{s.status === 'pending' ? 'waiting for the first reply...' : 'no pod answered'}</div>
         ) : (
           <ul>
             {s.pods.map((p) => (

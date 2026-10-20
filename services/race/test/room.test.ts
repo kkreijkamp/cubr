@@ -34,7 +34,7 @@ describe('room rules', () => {
     normalize(r, new Set(['guest-aaaaaa', 'guest-bbbbbb', 'guest-cccccc'])); // a is back: b stays host
     expect(r.hostId).toBe('guest-bbbbbb');
 
-    normalize(r, new Set()); // nobody connected → keep the old host
+    normalize(r, new Set()); // nobody connected -> keep the old host
     expect(r.hostId).toBe('guest-bbbbbb');
 
     removePlayer(r, 'guest-bbbbbb');
@@ -131,7 +131,7 @@ describe('room rules', () => {
   });
 });
 
-describe('presence → RoomState', () => {
+describe('presence -> RoomState', () => {
   it('counts only sockets on live pods and lists the pods per player', () => {
     const presence = presenceFrom(
       { 'race-a|guest-aaaaaa': '1', 'race-b|guest-aaaaaa': '2', 'race-b|guest-bbbbbb': '1', 'race-dead|guest-cccccc': '1', 'race-a|guest-dddddd': '0' },

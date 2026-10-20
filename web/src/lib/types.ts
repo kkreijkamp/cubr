@@ -1,4 +1,4 @@
-// API types — mirror docs/SPEC.md §9 exactly.
+// API types - mirror docs/SPEC.md section 9 exactly.
 import type { Penalty } from '@cubetype/cubestats';
 
 export type { Penalty };
@@ -11,7 +11,7 @@ export interface PublicUser {
   country: string | null;
   wcaId: string | null;
   createdAt: string;
-  /** same-origin, immutable URL of the profile picture (`/api/users/<id>/avatar?v=…`); null = none.
+  /** same-origin, immutable URL of the profile picture (`/api/users/<id>/avatar?v=...`); null = none.
    *  Optional because older API responses don't include it. */
   avatarUrl?: string | null;
 }
@@ -140,7 +140,7 @@ export interface RoomState {
   id: string;
   name: string;
   event: string;
-  /** monotonically increasing revision — ignore states older than the last one seen */
+  /** monotonically increasing revision - ignore states older than the last one seen */
   rev?: number;
   isPrivate?: boolean;
   hostId: string | null;

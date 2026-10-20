@@ -31,7 +31,7 @@ export interface ImportPlan {
   events: string[];
 }
 
-/** Assigns ids to every imported session and solve (pure — no I/O). */
+/** Assigns ids to every imported session and solve (pure - no I/O). */
 export function planImport(body: ImportBody, newId: () => string = randomUUID): ImportPlan {
   const sessions: ImportPlan['sessions'] = [];
   const rows: ImportRow[] = [];
@@ -56,7 +56,7 @@ export function planImport(body: ImportBody, newId: () => string = randomUUID): 
   return { sessions, rows, events: [...events] };
 }
 
-/** Column-oriented arrays for `unnest()` — one array per column, same order as the SQL below. */
+/** Column-oriented arrays for `unnest()` - one array per column, same order as the SQL below. */
 export function toColumns(rows: ImportRow[]) {
   const n = rows.length;
   const cols = {
@@ -94,7 +94,7 @@ SELECT t.id, $1::uuid, t.session_id, t.event, t.time_ms, t.penalty, t.scramble, 
 /** Writes the plan inside the caller's transaction. Returns the number of solves inserted. */
 export async function writeImport(client: PoolClient, userId: string, plan: ImportPlan, chunkSize = IMPORT_CHUNK_SIZE): Promise<number> {
   if (plan.sessions.length) {
-    // created_at offset by 1 µs per session keeps the file's session order in GET /api/sessions.
+    // created_at offset by 1 us per session keeps the file's session order in GET /api/sessions.
     await client.query(
       `INSERT INTO solve.sessions (id, user_id, name, event, created_at, updated_at)
        SELECT t.id, $1::uuid, t.name, t.event, now() + (t.ord - 1) * interval '1 microsecond', now()

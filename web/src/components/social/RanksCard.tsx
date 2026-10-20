@@ -17,7 +17,7 @@ function byEventThenKind(a: UserRank, b: UserRank): number {
   return EVENT_IDS.indexOf(a.event) - EVENT_IDS.indexOf(b.event) || KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind);
 }
 
-/** "all-time leaderboards: 3x3 single #12 · top 2.1%" (api.leaderboards.userRanks). */
+/** "all-time leaderboards: 3x3 single #12 - top 2.1%" (api.leaderboards.userRanks). */
 export function RanksCard({ userId, own, precision }: { userId: string; own: boolean; precision: 2 | 3 }) {
   const ranks = useAsync((signal) => api.leaderboards.userRanks(userId, signal), [userId]);
   const [expanded, setExpanded] = useState(false);
@@ -40,7 +40,7 @@ export function RanksCard({ userId, own, precision }: { userId: string; own: boo
         <Loading />
       ) : list.length === 0 ? (
         <WidgetEmpty compact>
-          {own ? 'not ranked yet — set a single or an ao5 on the timer to appear on the leaderboards.' : 'not ranked on any leaderboard yet.'}
+          {own ? 'not ranked yet - set a single or an ao5 on the timer to appear on the leaderboards.' : 'not ranked on any leaderboard yet.'}
         </WidgetEmpty>
       ) : (
         <>
@@ -62,7 +62,7 @@ export function RanksCard({ userId, own, precision }: { userId: string; own: boo
                     {r.rank === 1 && <Crown />}#{formatNumber(r.rank)}
                   </span>
                   <span className="h">
-                    {formatTime(r.valueMs, precision)} · top {formatPercent(top)}
+                    {formatTime(r.valueMs, precision)} - top {formatPercent(top)}
                   </span>
                 </Link>
               );

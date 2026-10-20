@@ -8,7 +8,7 @@ import { useAuth } from '../lib/auth';
 import { toast } from '../lib/toast';
 import '../components/social/login.css';
 
-// Mirrors the auth-service limits in docs/SPEC.md §5.
+// Mirrors the auth-service limits in docs/SPEC.md section 5.
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -229,7 +229,7 @@ function LoginForm() {
   const identityRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
 
-  // keyboard-first: focus the login field on desktop (not on touch devices — it would pop the keyboard)
+  // keyboard-first: focus the login field on desktop (not on touch devices - it would pop the keyboard)
   useEffect(() => {
     if (window.matchMedia?.('(pointer: fine)').matches) identityRef.current?.focus();
   }, []);

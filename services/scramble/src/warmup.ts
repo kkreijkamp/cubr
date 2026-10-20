@@ -3,7 +3,7 @@ import type { ScrambleGenerator } from './generator.js';
 import { errorMessage, sleep } from './util.js';
 
 /**
- * Events whose first scramble is slow because cubing.js builds search tables (4x4x4 ~1–3 s,
+ * Events whose first scramble is slow because cubing.js builds search tables (4x4x4 ~1-3 s,
  * 333fm/sq1 up to ~2 s). The other events reuse these tables or are random-move scramblers.
  */
 export const WARMUP_EVENTS = ['333', '222', '444', 'sq1', '333fm', 'pyram', 'skewb', 'clock', 'minx'];

@@ -1,11 +1,11 @@
-// cubetype seed job — creates realistic synthetic cubers through the PUBLIC APIs, so the whole
-// pipeline (solve → outbox → Redis Stream → stats / leaderboard) is exercised exactly like real
+// cubetype seed job creates realistic synthetic cubers through the PUBLIC APIs, so the whole
+// pipeline (solve -> outbox -> Redis Stream -> stats / leaderboard) is exercised exactly like real
 // traffic. Runs as a Kubernetes Job (deploy/k8s) or `docker compose --profile jobs run seed`.
 //
 //   1. register (or log in to) N deterministic users + a demo account
 //   2. bulk-import a year of practice history per user   (POST /api/sessions/import)
-//   3. post a few "live" solves for today, one by one       (POST /api/solves → daily/weekly boards)
-//   4. let some users complete today's daily challenge      (5 × POST /api/solves with `daily`)
+//   3. post a few "live" solves for today, one by one       (POST /api/solves -> daily/weekly boards)
+//   4. let some users complete today's daily challenge      (5 x POST /api/solves with `daily`)
 //
 // Idempotent: users that already exist are logged in and skipped if they already have history.
 import { createHash, randomUUID } from 'node:crypto';
@@ -37,7 +37,7 @@ function mulberry32(a: number) {
 }
 let rand = mulberry32(SEED);
 const pick = <T>(xs: T[]): T => xs[Math.floor(rand() * xs.length)];
-/** standard normal via Box–Muller */
+/** standard normal via Box-Muller */
 function gauss(): number {
   const u = Math.max(rand(), 1e-12);
   const v = rand();
@@ -50,7 +50,7 @@ const NOUN = ['cuber', 'twister', 'fox', 'otter', 'corner', 'edge', 'ollie', 'pl
 const COUNTRIES = ['AU', 'AU', 'AU', 'AU', 'NZ', 'US', 'US', 'GB', 'CA', 'DE', 'FR', 'NL', 'CN', 'JP', 'KR', 'IN', 'BR', 'PL', 'SE', 'SG', 'MY', 'PH', 'ID', 'ES'];
 const BIOS = ['cfop main, learning zbll', 'roux gang', 'sub-20 grind', 'oh enjoyer', 'just here for the daily', 'pyra is my comfort event', 'trying to get sub-10 this year', null, null, null];
 
-/** event → time multiplier relative to the user's 3x3 average, and how likely a user practises it */
+/** event -> time multiplier relative to the user's 3x3 average, and how likely a user practises it */
 const EVENT_PROFILE: Record<string, { mult: number; p: number; dnf: number }> = {
   '333': { mult: 1, p: 1, dnf: 0.012 },
   '222': { mult: 0.33, p: 0.55, dnf: 0.015 },
@@ -215,7 +215,7 @@ async function waitFor(url: string, name: string): Promise<void> {
     } catch {
       /* not up yet */
     }
-    if (i % 10 === 0) console.log(`waiting for ${name}…`);
+    if (i % 10 === 0) console.log(`waiting for ${name}...`);
     await new Promise((r) => setTimeout(r, 2000));
   }
   throw new Error(`${name} did not become ready`);
@@ -271,7 +271,7 @@ function makeUsers(): SeedUser[] {
     password: DEMO_PASSWORD,
     country: 'AU',
     displayName: 'Demo Cuber',
-    bio: 'the account used in the cubetype demo — sub-13 3x3, learning 4x4 parity',
+    bio: 'the account used in the cubetype demo - sub-13 3x3, learning 4x4 parity',
     base333: 12_600,
     solves: 2600,
     events: ['333', '222', '444', '333oh', 'pyram', 'skewb'],
@@ -287,7 +287,7 @@ interface ImportSolve {
   createdAt: string;
 }
 
-/** A year of practice: sessions of 5–40 solves on active days, steadily improving. */
+/** A year of practice: sessions of 5-40 solves on active days, steadily improving. */
 function historyFor(u: SeedUser, event: string, count: number, endMs: number): ImportSolve[] {
   const prof = EVENT_PROFILE[event];
   const target = u.base333 * prof.mult; // average today
@@ -323,7 +323,7 @@ async function login(u: SeedUser): Promise<{ token: string; created: boolean } |
   if (reg.status === 409 || reg.status === 429) {
     const res = await call<{ token: string }>('POST', `${AUTH_URL}/api/auth/login`, { login: u.username, password: u.password });
     if (res.status === 200) return { token: res.data.token, created: false };
-    console.warn(`  ! cannot log in as ${u.username} (${res.status}) — skipping`);
+    console.warn(`  ! cannot log in as ${u.username} (${res.status}) - skipping`);
     return null;
   }
   console.warn(`  ! register ${u.username} failed (${reg.status}) ${JSON.stringify(reg.data)}`);
@@ -332,14 +332,16 @@ async function login(u: SeedUser): Promise<{ token: string; created: boolean } |
 
 async function seedUser(u: SeedUser, idx: number, daily: Record<string, string[]> | null, today: string): Promise<number> {
   const auth = await login(u);
+  
   if (!auth) return 0;
+  
   const { token } = auth;
   let avatar = false;
+  
   try {
     avatar = await ensureAvatar(u, token);
-  } catch {
-    /* pictures are cosmetic — never fail the seed for them */
-  }
+  } catch {}
+
   const sessions = await call<{ sessions: { id: string; event: string; solveCount: number }[] }>('GET', `${SOLVE_URL}/api/sessions`, undefined, token);
   const existing = sessions.data?.sessions ?? [];
   const already = existing.reduce((a, s) => a + s.solveCount, 0);
@@ -361,7 +363,7 @@ async function seedUser(u: SeedUser, idx: number, daily: Record<string, string[]
     imported = res.data?.imported?.solves ?? 0;
   }
 
-  // 2) a handful of live solves today → solve.created events → daily & weekly leaderboards
+  // 2) a handful of live solves today -> solve.created events -> daily & weekly leaderboards
   const fresh = await call<{ sessions: { id: string; event: string; solveCount: number }[] }>('GET', `${SOLVE_URL}/api/sessions`, undefined, token);
   const all = fresh.data?.sessions ?? [];
   // The first GET /api/sessions auto-created an empty default "3x3" session; drop empty ones so the
@@ -388,7 +390,7 @@ async function seedUser(u: SeedUser, idx: number, daily: Record<string, string[]
     }
   }
 
-  // 3) today's daily challenge for ~40 % of users (5 attempts → daily.completed → challenge board)
+  // 3) today's daily challenge for ~40 % of users (5 attempts -> daily.completed -> challenge board)
   if (daily && (rand() < 0.4 || u.username === DEMO_USER)) {
     for (const event of ['333', '222', 'pyram']) {
       const session = busiest(event);
@@ -416,7 +418,7 @@ async function seedUser(u: SeedUser, idx: number, daily: Record<string, string[]
 async function main() {
   const t0 = Date.now();
   console.log(`cubetype seed: ${USERS} users (+ demo), ~${AVG_SOLVES} solves each, concurrency ${CONCURRENCY}`);
-  if (!INTERNAL_TOKEN) console.warn('INTERNAL_API_TOKEN not set — auth rate limits will cap how many users can be created');
+  if (!INTERNAL_TOKEN) console.warn('INTERNAL_API_TOKEN not set - auth rate limits will cap how many users can be created');
   await waitFor(`${AUTH_URL}/readyz`, 'auth');
   await waitFor(`${SOLVE_URL}/readyz`, 'solve');
 
@@ -426,7 +428,7 @@ async function main() {
     const res = await call<{ events: Record<string, string[]> }>('GET', `${SCRAMBLE_URL}/api/scrambles/daily?date=${today}`);
     if (res.status === 200) daily = res.data.events;
   } catch {
-    console.warn('scramble service unavailable — skipping daily challenge entries');
+    console.warn('scramble service unavailable - skipping daily challenge entries');
   }
 
   const users = makeUsers();
@@ -436,7 +438,7 @@ async function main() {
     while (next < users.length) {
       const i = next++;
       try {
-        // await first: `total += await …` reads total before the await, so the workers would
+        // await first: `total += await ...` reads total before the await, so the workers would
         // overwrite each other's counts
         const written = await seedUser(users[i], i, daily, today);
         total += written;
@@ -447,7 +449,7 @@ async function main() {
   }
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));
   console.log(`done: ${users.length} users, ${total} solves written in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
-  console.log(`demo login → username "${DEMO_USER}" / password "${DEMO_PASSWORD}"`);
+  console.log(`demo login -> username "${DEMO_USER}" / password "${DEMO_PASSWORD}"`);
 }
 
 main().catch((err) => {

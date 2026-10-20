@@ -1,7 +1,7 @@
 import { newEventId, type PoolClient } from '@cubetype/common';
 import type { PbKind } from './domain/pbs.js';
 
-/** Payload of a pb.updated event (SPEC §8). */
+/** Payload of a pb.updated event (SPEC section 8). */
 export interface PbChange {
   userId: string;
   username: string;

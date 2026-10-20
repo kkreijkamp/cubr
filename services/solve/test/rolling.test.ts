@@ -13,13 +13,13 @@ describe('rollingFromSolves', () => {
   });
 
   it('computes ao5 (drop best and worst) once 5 solves exist', () => {
-    // 10, 11, 12, 13, 20 → mean(11, 12, 13) = 12
+    // 10, 11, 12, 13, 20 -> mean(11, 12, 13) = 12
     const r = rollingFromSolves([ok(10_000), ok(11_000), ok(12_000), ok(13_000), ok(20_000)]);
     expect(r).toEqual({ ao5: 12_000, ao12: null });
   });
 
   it('applies +2 and treats one DNF as the trimmed worst', () => {
-    // 10, 11+2=13, 12, DNF, 9 → drop 9 and DNF → mean(10, 13, 12) = 11667
+    // 10, 11+2=13, 12, DNF, 9 -> drop 9 and DNF -> mean(10, 13, 12) = 11667
     const r = rollingFromSolves([ok(10_000), plus2(11_000), ok(12_000), dnf(), ok(9_000)]);
     expect(r.ao5).toBe(11_667);
   });
@@ -31,18 +31,18 @@ describe('rollingFromSolves', () => {
   it('uses only the latest 5/12 solves for ao5/ao12', () => {
     const solves = [dnf(), dnf(), dnf(), ...Array.from({ length: 12 }, (_, i) => ok(10_000 + i * 100))];
     const r = rollingFromSolves(solves);
-    // last 5 = 10700..11100 → mean(10800, 10900, 11000) = 10900
+    // last 5 = 10700..11100 -> mean(10800, 10900, 11000) = 10900
     expect(r.ao5).toBe(10_900);
-    // last 12 = 10000..11100 → drop 10000 & 11100 → mean(10100..11000) = 10550
+    // last 12 = 10000..11100 -> drop 10000 & 11100 -> mean(10100..11000) = 10550
     expect(r.ao12).toBe(10_550);
   });
 });
 
 describe('dailyResult', () => {
-  it('computes the ao5 and API-encoded times (DNF → -1)', () => {
+  it('computes the ao5 and API-encoded times (DNF -> -1)', () => {
     const r = dailyResult([ok(10_000), plus2(9_000), dnf(), ok(12_000), ok(8_000)]);
     expect(r.times).toEqual([10_000, 11_000, -1, 12_000, 8_000]);
-    expect(r.ao5).toBe(11_000); // drop 8000 & DNF → mean(10000, 11000, 12000)
+    expect(r.ao5).toBe(11_000); // drop 8000 & DNF -> mean(10000, 11000, 12000)
   });
 
   it('is null until all 5 attempts exist', () => {

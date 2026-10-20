@@ -49,7 +49,7 @@ describe('computeStandings', () => {
     expect(byId.a.wins).toBe(0);
     expect(byId.b.wins).toBe(1);
     expect(byId.a.solves).toBe(2);
-    expect(byId.a.meanMs).toBeNull(); // only DNFs → no mean
+    expect(byId.a.meanMs).toBeNull(); // only DNFs -> no mean
     expect(byId.b.meanMs).toBe(20_000); // DNFs excluded from the mean
   });
 
@@ -76,7 +76,7 @@ describe('computeStandings', () => {
     };
     expect(computeStandings([players[0]], results)[0].ao5).toBeNull();
     results['5'] = { a: { timeMs: 8_000, penalty: 'OK' } };
-    // chronological order 2,3,4,5,10 → 50, 6, 7, 8, 5 → drop 5 and 50 → (6+7+8)/3
+    // chronological order 2,3,4,5,10 -> 50, 6, 7, 8, 5 -> drop 5 and 50 -> (6+7+8)/3
     expect(computeStandings([players[0]], results)[0].ao5).toBe(7_000);
   });
 

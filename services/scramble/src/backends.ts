@@ -5,7 +5,7 @@ import { errorMessage, withTimeout } from './util.js';
 
 /**
  * Something that can run scramble searches. `size` = how many can run in parallel; the
- * generator queue (generator.ts) hands each search to a free `slot` (0 … size-1).
+ * generator queue (generator.ts) hands each search to a free `slot` (0 ... size-1).
  */
 export interface ScrambleBackend {
   readonly kind: 'in-process' | 'worker-pool';
@@ -21,7 +21,7 @@ const SEARCH_DEBUG = { logPerf: false, scramblePrefetchLevel: 'none' } as const;
 /**
  * Default backend: cubing.js in the main thread. cubing.js itself runs every search on ONE
  * internal worker thread, so the HTTP event loop stays responsive while the CPU work happens
- * off-thread — but searches are effectively sequential (size = 1).
+ * off-thread - but searches are effectively sequential (size = 1).
  */
 export async function createInProcessBackend(): Promise<ScrambleBackend> {
   // Dynamic import: cubing is an *external* of the esbuild bundle (it spawns its own worker
@@ -45,7 +45,7 @@ export async function createInProcessBackend(): Promise<ScrambleBackend> {
 }
 
 // Code for each pool thread (evaluated as CommonJS, so no extra file has to survive bundling).
-// It imports cubing.js by absolute URL — each thread gets its own cubing instance + search worker.
+// It imports cubing.js by absolute URL - each thread gets its own cubing instance + search worker.
 const WORKER_SOURCE = `
 const { parentPort, workerData } = require('node:worker_threads');
 (async () => {
@@ -130,7 +130,7 @@ class PoolThread {
     } catch (err) {
       if (err instanceof GenerationTimeoutError) {
         // A stuck search can only be stopped by killing its thread; start a fresh one
-        // (its first search re-initialises cubing.js tables, ~1–3 s for 4x4x4).
+        // (its first search re-initialises cubing.js tables, ~1-3 s for 4x4x4).
         this.log.warn({ thread: this.index, event }, 'scramble search timed out, restarting worker');
         this.pending = null;
         const old = this.worker;

@@ -11,7 +11,7 @@ export interface SolveLike {
 
 export const DNF = Number.POSITIVE_INFINITY;
 
-/** Time including penalty; DNF → Infinity. */
+/** Time including penalty; DNF -> Infinity. */
 export function effectiveMs(s: SolveLike): number {
   if (s.penalty === 'DNF') return DNF;
   return s.penalty === '+2' ? s.timeMs + 2000 : s.timeMs;
@@ -23,7 +23,7 @@ export function isDnf(v: number | null | undefined): boolean {
 
 /**
  * How many best AND worst results are trimmed from an average of `n` (csTimer default:
- * ceil(5%) each side): ao5–ao20 → 1, ao25 → 2, ao50 → 3, ao100 → 5, ao1000 → 50.
+ * ceil(5%) each side): ao5-ao20 -> 1, ao25 -> 2, ao50 -> 3, ao100 -> 5, ao1000 -> 50.
  * mo3 (a mean) trims nothing.
  */
 export function trimFor(n: number): number {
@@ -51,7 +51,7 @@ function countFinite(xs: number[]): number {
   return c;
 }
 
-/** Mean of the last 3 (any DNF → DNF). */
+/** Mean of the last 3 (any DNF -> DNF). */
 export function meanOf(times: number[]): number {
   if (times.length === 0) return DNF;
   if (times.some((t) => !Number.isFinite(t))) return DNF;
@@ -87,7 +87,7 @@ function removeSorted(arr: number[], v: number): void {
 
 /**
  * Rolling average of n over a chronological list of effective times.
- * out[i] = average of times[i-n+1..i], or null when i < n-1. O(N·n) worst case via a sorted window.
+ * out[i] = average of times[i-n+1..i], or null when i < n-1. O(N*n) worst case via a sorted window.
  */
 export function rollingAverage(times: number[], n: number): (number | null)[] {
   const out: (number | null)[] = new Array(times.length).fill(null);
@@ -158,7 +158,7 @@ export interface SessionStats {
   worst: number | null;
   mean: number | null;
   sd: number | null;
-  averages: Record<string, StatLine>; // keys: mo3, ao5, ao12, ao50, ao100, ao1000 …
+  averages: Record<string, StatLine>; // keys: mo3, ao5, ao12, ao50, ao100, ao1000 ...
 }
 
 export const DEFAULT_AVERAGES = [3, 5, 12, 50, 100, 1000];

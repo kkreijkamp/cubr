@@ -30,11 +30,11 @@ export function AverageModal({ label, window: w, precision, onOpenSolve, onClose
         </div>
         <div className="tp-avg-meta">
           <span>
-            solves {w.start + 1}–{w.start + w.solves.length}
+            solves {w.start + 1}-{w.start + w.solves.length}
           </span>
           {from && to && (
             <span>
-              {formatDateTime(from.createdAt)} → {formatDateTime(to.createdAt)}
+              {formatDateTime(from.createdAt)} -&gt; {formatDateTime(to.createdAt)}
             </span>
           )}
           <button className="btn small" onClick={copy}>

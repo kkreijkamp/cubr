@@ -92,7 +92,7 @@ const mmss = (ms: number) => {
 
 /**
  * Drives the scramble HorizontalPodAutoscaler: M workers each request fresh (un-pooled) random-state
- * 4x4 scrambles back-to-back — CPU-heavy work — for 30/60/120 s.
+ * 4x4 scrambles back-to-back - CPU-heavy work - for 30/60/120 s.
  */
 export function CpuBurst({ onLog }: { onLog: (text: string, service: string) => void }) {
   const [concurrency, setConcurrency] = useStoredState<number>('cubetype.status.burstC', 8);
@@ -112,7 +112,7 @@ export function CpuBurst({ onLog }: { onLog: (text: string, service: string) => 
     setView(toView(s, Date.now()));
     const secs = (s.stoppedAt - s.startedAt) / 1000;
     onLog(
-      `cpu burst ${reason === 'done' ? 'finished' : 'stopped'}: ${s.ok} scramble requests in ${secs.toFixed(0)}s (${(s.ok / Math.max(1, secs)).toFixed(1)}/s) · ${s.errors} errors · served by ${s.pods.size} pod${s.pods.size === 1 ? '' : 's'}`,
+      `cpu burst ${reason === 'done' ? 'finished' : 'stopped'}: ${s.ok} scramble requests in ${secs.toFixed(0)}s (${(s.ok / Math.max(1, secs)).toFixed(1)}/s) - ${s.errors} errors - served by ${s.pods.size} pod${s.pods.size === 1 ? '' : 's'}`,
       'scramble',
     );
   };
@@ -213,7 +213,7 @@ export function CpuBurst({ onLog }: { onLog: (text: string, service: string) => 
       </div>
       <p className="panel-desc">
         workers request fresh random-state 4x4 scrambles back-to-back (<code>fresh=1</code> skips the pool: pure CPU). the scramble
-        autoscaler should add pods within a minute — they show up here and in the scramble card.
+        autoscaler should add pods within a minute - they show up here and in the scramble card.
       </p>
       <div className="panel-controls">
         <label className="burst-slider">
@@ -264,8 +264,8 @@ export function CpuBurst({ onLog }: { onLog: (text: string, service: string) => 
             <div className="stat">
               <span className="label">p50 / p95</span>
               <span className="value text">
-                {view.p50 !== null ? `${Math.round(view.p50)}` : '–'}
-                <small>/{view.p95 !== null ? `${Math.round(view.p95)}` : '–'} ms</small>
+                {view.p50 !== null ? `${Math.round(view.p50)}` : '-'}
+                <small>/{view.p95 !== null ? `${Math.round(view.p95)}` : '-'} ms</small>
               </span>
             </div>
           </div>

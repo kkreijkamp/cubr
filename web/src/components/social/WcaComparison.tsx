@@ -73,12 +73,12 @@ function rowsFromSummary(summary: StatsSummary): Row[] {
 function RankLine({ event, kind, value, country }: { event: string; kind: WcaKind; value: number; country: string | null }) {
   const r = useAsync(() => getRank(event, kind, value, country), [event, kind, value, country]);
   if (r.error) return <span className="r" title={friendlyError(r.error, 'the wca service')}>rank unavailable</span>;
-  if (!r.data) return <span className="r">…</span>;
+  if (!r.data) return <span className="r">...</span>;
   const w = r.data.world;
   return (
     <span className="r">
       <span>#{formatNumber(w.rank)}</span>
-      <span className="sep"> · </span>
+      <span className="sep"> - </span>
       <span>top {topPercent(w)}</span>
     </span>
   );
@@ -148,7 +148,7 @@ function DistributionChart({ dist, value, official, precision }: ChartProps) {
   // markers: lines first, then labels on top (so a line never cuts through the other label)
   const markers = [
     ...(official !== null ? [{ v: official, row: 1, cls: 'official', text: `official ${formatTime(official, precision)}` }] : []),
-    { v: value, row: 0, cls: 'you', text: `you ${formatTime(value, precision)}${value > x1 ? ' →' : value < x0 ? ' ←' : ''}` },
+    { v: value, row: 0, cls: 'you', text: `you ${formatTime(value, precision)}${value > x1 ? ' ->' : value < x0 ? ' <-' : ''}` },
   ].map((m) => {
     const x = Math.min(Math.max(sx(m.v), pad.l + 1), width - pad.r - 1);
     const labelW = m.text.length * 6.7 + 14;
@@ -210,7 +210,7 @@ function DistributionChart({ dist, value, official, precision }: ChartProps) {
           role="tooltip"
           style={{ left: Math.min(Math.max(sx((hb.from + hb.to) / 2), 90), width - 90), top: sy(hb.count) }}
         >
-          {fmt(hb.from)} – {fmt(hb.to)} · {formatNumber(hb.count)} cubers
+          {fmt(hb.from)} - {fmt(hb.to)}: {formatNumber(hb.count)} cubers
         </div>
       )}
     </div>
@@ -265,7 +265,7 @@ function DistributionCard({
           <span className="big">#{formatNumber(rank.data.world.rank)}</span>
           <span className="wc-headline-meta">
             <span>
-              in the world · faster than <span className="text">{formatPercent(rank.data.world.percentile)}</span> of{' '}
+              in the world - faster than <span className="text">{formatPercent(rank.data.world.percentile)}</span> of{' '}
               {formatNumber(rank.data.world.total)}
             </span>
             {rank.data.country && (
@@ -315,7 +315,7 @@ interface Props {
   precision: 2 | 3;
 }
 
-/** "Where would my PBs rank at a WCA competition?" — rank/percentile per PB + distribution. */
+/** "Where would my PBs rank at a WCA competition?" - rank/percentile per PB + distribution. */
 export function WcaComparison({ summary, wcaId, country, own, onEdit, precision }: Props) {
   const meta = useAsync((signal) => api.wca.meta(signal), []);
   const person = useAsync((signal) => (wcaId ? api.wca.person(wcaId, signal) : Promise.resolve(null)), [wcaId]);
@@ -337,12 +337,12 @@ export function WcaComparison({ summary, wcaId, country, own, onEdit, precision 
   if (summary.error && !summary.data) body = <WidgetError error={summary.error} what="the stats service" onRetry={summary.reload} />;
   else if (!summary.data) body = <Loading />;
   else if (rows.length === 0)
-    body = <WidgetEmpty icon={<Medal size={16} />}>no personal bests in wca events yet — {own ? 'go set some!' : 'check back later.'}</WidgetEmpty>;
+    body = <WidgetEmpty icon={<Medal size={16} />}>no personal bests in wca events yet - {own ? 'go set some!' : 'check back later.'}</WidgetEmpty>;
   else if (meta.error && isWcaNotLoaded(meta.error))
     body = (
       <div className="pv-widget-msg">
         <Hourglass size={16} />
-        <span>wca data is being imported — try again in a minute.</span>
+        <span>wca data is being imported - try again in a minute.</span>
         <button className="btn-text" onClick={meta.reload}>
           retry
         </button>
@@ -446,9 +446,9 @@ export function WcaComparison({ summary, wcaId, country, own, onEdit, precision 
                 </Link>
               </>
             ) : person.error ? (
-              isWcaNotLoaded(person.error) ? null : `couldn’t load wca id ${wcaId}`
+              isWcaNotLoaded(person.error) ? null : `couldn't load wca id ${wcaId}`
             ) : person.loading ? (
-              'loading official results…'
+              'loading official results...'
             ) : null
           ) : own && onEdit ? (
             <button className="btn-text small" style={{ padding: 0, color: 'var(--main-color)' }} onClick={onEdit}>

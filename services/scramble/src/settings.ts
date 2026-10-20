@@ -3,7 +3,7 @@ export interface ScrambleSettings {
   /** Parallel scramble searches per pod. 1 = cubing.js' own single search worker (default);
    *  >1 = a worker_threads pool, each thread running its own cubing.js instance (~100 MB each). */
   workers: number;
-  /** Max time a scramble may take, measured from when it was queued → 503 afterwards. */
+  /** Max time a scramble may take, measured from when it was queued -> 503 afterwards. */
   timeoutMs: number;
   /** Max queued scrambles before requests are shed with 503 (protects latency under overload). */
   maxQueue: number;

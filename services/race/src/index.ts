@@ -23,7 +23,7 @@ const { app } = server;
 const redis = createRedis(config.redisUrl, app.log); // commands (room state, locks, presence)
 // Socket.IO adapter connections: one publishes broadcasts, one is in subscriber mode. The adapter
 // never handles the promises of its PUBLISH and (P)SUBSCRIBE calls, so these two connections keep
-// commands queued until Redis is back (maxRetriesPerRequest: null) instead of rejecting them — an
+// commands queued until Redis is back (maxRetriesPerRequest: null) instead of rejecting them - an
 // unhandled rejection would end the process whenever Redis restarts.
 const pub = redis.duplicate({ maxRetriesPerRequest: null });
 const sub = redis.duplicate({ maxRetriesPerRequest: null });
@@ -49,7 +49,7 @@ const sockets = registerSocketHandlers({
 });
 registerRoutes(app, { store, redis, auth });
 
-// Shutdown order: preClose runs before Fastify closes the HTTP server — drop our websockets
+// Shutdown order: preClose runs before Fastify closes the HTTP server - drop our websockets
 // (clients reconnect to another pod) and finish their Redis cleanup while Redis is still open.
 app.addHook('preClose', async () => {
   await sockets.drain();

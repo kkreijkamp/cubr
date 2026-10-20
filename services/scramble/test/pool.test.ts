@@ -10,7 +10,7 @@ describe('POOL_TARGETS', () => {
     expect(POOL_TARGETS['333mbf']).toBeUndefined();
   });
 
-  it('matches SPEC §9.2', () => {
+  it('matches SPEC section 9.2', () => {
     for (const e of ['333', '222', 'pyram', 'skewb']) expect(POOL_TARGETS[e]).toBe(200);
     for (const e of ['444', 'sq1', 'clock', 'minx', '333oh', '333bf', '333fm']) expect(POOL_TARGETS[e]).toBe(50);
     for (const e of ['555', '666', '777', '444bf', '555bf']) expect(POOL_TARGETS[e]).toBe(20);

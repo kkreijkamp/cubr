@@ -8,7 +8,7 @@ export class GenerationTimeoutError extends Error {
   }
 }
 
-/** Too many scrambles are already queued — shed load instead of building an unbounded backlog. */
+/** Too many scrambles are already queued - shed load instead of building an unbounded backlog. */
 export class QueueFullError extends Error {
   constructor(message = 'scramble queue is full') {
     super(message);
@@ -16,7 +16,7 @@ export class QueueFullError extends Error {
   }
 }
 
-/** Maps generator failures to the API error envelope (timeouts / overload → 503 UNAVAILABLE). */
+/** Maps generator failures to the API error envelope (timeouts / overload -> 503 UNAVAILABLE). */
 export function toHttpError(err: unknown): unknown {
   if (err instanceof HttpError) return err;
   if (err instanceof GenerationTimeoutError) return unavailable('Scramble generation timed out, please retry');

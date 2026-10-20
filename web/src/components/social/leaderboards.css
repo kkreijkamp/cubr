@@ -1,4 +1,4 @@
-/* leaderboards page — Monkeytype layout: sidebar of button groups + title / rank card / table */
+/* leaderboards page - Monkeytype layout: sidebar of button groups + title / rank card / table */
 .lb {
   display: grid;
   grid-template-columns: 15rem minmax(0, 1fr);

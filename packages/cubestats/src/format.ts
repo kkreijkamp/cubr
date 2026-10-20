@@ -5,7 +5,7 @@ export type Precision = 2 | 3;
 /**
  * Formats milliseconds the way cubers expect: 9.87, 1:02.34, 1:02:03.45.
  * Values are truncated (not rounded) to the precision, like WCA singles.
- * Infinity / -1 → "DNF", null/undefined → "-".
+ * Infinity / -1 -> "DNF", null/undefined -> "-".
  */
 export function formatTime(ms: number | null | undefined, precision: Precision = 2): string {
   if (ms === null || ms === undefined || Number.isNaN(ms)) return '-';
@@ -43,8 +43,8 @@ export function formatDuration(ms: number): string {
 
 /**
  * Parses manual time entry. Accepts "12.34", "1:02.34", "1:02:03.4", and csTimer-style digit
- * strings where the last two digits are centiseconds ("1234" → 12.34 s, "10234" → 1:02.34).
- * Returns ms, or null if unparseable. "DNF" → Infinity.
+ * strings where the last two digits are centiseconds ("1234" -> 12.34 s, "10234" -> 1:02.34).
+ * Returns ms, or null if unparseable. "DNF" -> Infinity.
  */
 export function parseTimeInput(input: string): number | null {
   const s = input.trim().toUpperCase();

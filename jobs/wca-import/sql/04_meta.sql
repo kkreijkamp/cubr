@@ -1,5 +1,5 @@
 -- =============================================================================
--- Step 4: wca_staging.meta — which export is loaded, when, and how big it is.
+-- Step 4: wca_staging.meta - which export is loaded, when, and how big it is.
 -- The psql variables are passed by import.sh (-v export_date=... etc.); :'name' inserts them
 -- as properly quoted SQL literals, so nothing from the downloaded metadata is executed.
 -- =============================================================================

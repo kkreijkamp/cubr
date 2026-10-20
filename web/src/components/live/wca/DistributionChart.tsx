@@ -6,7 +6,7 @@ import { formatWcaValue, shortAxisValue } from './wcaFormat';
 
 interface Props {
   dist: WcaDistribution & { unit?: string; p99?: number | null; below?: number; above?: number };
-  /** your value (ms or moves) — draws the marker */
+  /** your value (ms or moves) - draws the marker */
   value: number | null;
   markerLabel?: string;
   height?: number;
@@ -17,7 +17,7 @@ function withAlpha(color: string, alpha: number): string {
   return color;
 }
 
-/** fractional x position (0…1 of the plot width) of `v` across the bucket list */
+/** fractional x position (0...1 of the plot width) of `v` across the bucket list */
 function position(buckets: { from: number; to: number }[], v: number): { frac: number; clipped: 'left' | 'right' | null } {
   const n = buckets.length;
   if (v < buckets[0].from) return { frac: 0, clipped: 'left' };
@@ -63,7 +63,7 @@ export function DistributionChart({ dist, value, markerLabel = 'you', height = 2
           ctx.setLineDash([]);
           ctx.fillStyle = color;
           ctx.font = `12px ${c.font}`;
-          const text = clipped === 'right' ? `${label} →` : clipped === 'left' ? `← ${label}` : label;
+          const text = clipped === 'right' ? `${label} ->` : clipped === 'left' ? `<- ${label}` : label;
           const w = ctx.measureText(text).width;
           const tx = Math.min(Math.max(px - w / 2, area.left), area.right - w);
           ctx.textBaseline = 'top';
@@ -105,7 +105,7 @@ export function DistributionChart({ dist, value, markerLabel = 'you', height = 2
             callbacks: {
               title: (items) => {
                 const b = buckets[items[0].dataIndex];
-                return `${formatWcaValue(b.from, event, kind)} – ${formatWcaValue(b.to, event, kind)}`;
+                return `${formatWcaValue(b.from, event, kind)} - ${formatWcaValue(b.to, event, kind)}`;
               },
               label: (item) => `${Number(item.raw).toLocaleString('en-US')} competitors`,
             },

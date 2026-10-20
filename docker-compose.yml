@@ -15,7 +15,7 @@
 # and 56380 (redis-cli -p 56380). The same ports let you run one service on the host:
 #   DATABASE_URL=postgres://cubetype:cubetype@localhost:55433/cubetype \
 #   REDIS_URL=redis://localhost:56380 npm run dev -w services/auth
-# Environment variables follow docs/SPEC.md §4.
+# Environment variables follow docs/SPEC.md section 4.
 # =============================================================================================
 
 name: cubetype                       # compose project name -> containers cubetype-<svc>-<n>
@@ -90,10 +90,10 @@ services:
       timeout: 3s
       retries: 20
 
-  # ---- microservices (build context = repo root, see docs/BUILDING.md) ------------------------
+  # ---- microservices (build context = repo root: every image also needs packages/) ------------
   auth:
     <<: *service
-    image: cubetype/auth:dev          # same tag scripts/build-local.sh uses (can be `kind load`ed)
+    image: cubetype/auth:dev          # local tag, built by `docker compose up --build`
     build: { context: ., dockerfile: services/auth/Dockerfile, args: *build-args }
 
   scramble:

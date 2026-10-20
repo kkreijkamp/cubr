@@ -20,7 +20,7 @@ export function currentUser(req: FastifyRequest): AuthUser {
   return { ...user, id: user.id.toLowerCase() };
 }
 
-/** IANA timezone from the `X-Timezone` header (SPEC §5), copied into events as `tz`. */
+/** IANA timezone from the `X-Timezone` header (SPEC section 5), copied into events as `tz`. */
 export function tzFrom(req: FastifyRequest): string {
   const raw = req.headers['x-timezone'];
   const tz = Array.isArray(raw) ? raw[0] : raw;

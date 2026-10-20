@@ -22,7 +22,7 @@ export function EventLog({ log }: { log: LogEntry[] }) {
         </button>
       </div>
       {rows.length === 0 ? (
-        <div className="panel-empty">nothing happened yet — scale a deployment or delete a pod and watch this list.</div>
+        <div className="panel-empty">nothing happened yet - scale a deployment or delete a pod and watch this list.</div>
       ) : (
         <ol className="event-log" aria-live="polite">
           {rows.map((e) => (

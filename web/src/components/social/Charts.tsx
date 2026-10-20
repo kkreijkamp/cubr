@@ -104,7 +104,7 @@ export function HourlyChart({ userId, events, defaultEvent, precision }: { userI
             callbacks: {
               title: (items) => {
                 const h = items[0]?.dataIndex ?? 0;
-                return `${hh(h)} – ${String(h).padStart(2, '0')}:59`;
+                return `${hh(h)} - ${String(h).padStart(2, '0')}:59`;
               },
               label: (item) => {
                 const h = hours[item.dataIndex];
@@ -168,7 +168,7 @@ export function HourlyChart({ userId, events, defaultEvent, precision }: { userI
               {insight.fastest && (
                 <>
                   {' '}
-                  · fastest around <b>{hh(insight.fastest.hour)}</b> (mean {formatTime(insight.fastest.meanMs!, precision)})
+                  - fastest around <b>{hh(insight.fastest.hour)}</b> (mean {formatTime(insight.fastest.meanMs!, precision)})
                 </>
               )}
             </div>

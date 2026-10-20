@@ -15,7 +15,7 @@ async function isRevoked(redis: Redis, jti: string): Promise<boolean> {
 }
 
 /**
- * Socket handshake `auth: {token?, name?, guestId?}` → who is playing.
+ * Socket handshake `auth: {token?, name?, guestId?}` -> who is playing.
  * - valid, non-revoked JWT: playerId = userId, name = username
  * - otherwise a guest: playerId = the client's stored guestId if well-formed (so a refresh or a
  *   reconnect to a different pod keeps the same identity), else a fresh `guest-<random>`;
@@ -30,7 +30,7 @@ export async function resolveIdentity(auth: unknown, jwtSecret: string, redis: R
         return { playerId: user.id, name: user.username, userId: user.id, guest: false };
       }
     } catch {
-      // invalid/expired token → continue as guest
+      // invalid/expired token -> continue as guest
     }
   }
   const guestId = sanitizeGuestId(a.guestId) ?? generateGuestId();

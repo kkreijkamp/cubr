@@ -47,7 +47,7 @@ describe('sanitizeText / sanitizeName', () => {
   });
 
   it('caps length in code points without splitting emoji', () => {
-    expect(sanitizeText('🧊'.repeat(30), 20)).toBe('🧊'.repeat(20));
+    expect(sanitizeText('\u{1F9CA}'.repeat(30), 20)).toBe('\u{1F9CA}'.repeat(20));
     expect(Array.from(sanitizeText('x'.repeat(300), 200))).toHaveLength(200);
   });
 
@@ -60,7 +60,7 @@ describe('sanitizeText / sanitizeName', () => {
     expect(sanitizeName('a'.repeat(50), 'x')).toBe('a'.repeat(20));
   });
 
-  it('keeps html as plain text (escaping is the renderer’s job)', () => {
+  it("keeps html as plain text (escaping is the renderer's job)", () => {
     expect(sanitizeName('<b>hi</b>', 'x')).toBe('<b>hi</b>');
   });
 

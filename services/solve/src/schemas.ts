@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { badRequest } from '@cubetype/common';
 import { isEventId, DAILY_EVENTS } from '@cubetype/cubestats';
 
-// Request validation (docs/SPEC.md §5 limits, §9.3 bodies). Route handlers call
+// Request validation (docs/SPEC.md section 5 limits, section 9.3 bodies). Route handlers call
 // `parse(schema, req.body ?? {})` from common, which turns failures into 400 BAD_REQUEST.
 
 export const MAX_TIME_MS = 86_400_000;
@@ -34,7 +34,7 @@ export const createSessionBody = z.object({
 
 export const patchSessionBody = z.object({ name: sessionName });
 
-/** POST /api/sessions/:id/merge — the sessions whose solves move into :id (then deleted). */
+/** POST /api/sessions/:id/merge - the sessions whose solves move into :id (then deleted). */
 export const mergeSessionsBody = z.object({
   sourceIds: z
     .array(uuid.transform((s) => s.toLowerCase()))
@@ -117,7 +117,7 @@ export function resolveCreatedAt(createdAt: string | undefined, now = Date.now()
 
 /**
  * Daily-challenge attempts are only accepted for a day that is currently "today" somewhere on
- * Earth (UTC-12 … UTC+14): UTC yesterday, today or tomorrow. Older/future days are rejected so
+ * Earth (UTC-12 ... UTC+14): UTC yesterday, today or tomorrow. Older/future days are rejected so
  * the challenge board stays honest.
  */
 export function assertDailyAllowed(date: string, event: string, now = Date.now()): void {

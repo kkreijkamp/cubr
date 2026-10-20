@@ -1,5 +1,5 @@
 # =============================================================================================
-# Load generator for the HPA demo (scripts/commands.sh §11).
+# Load generator for the HPA demo (scripts/commands.sh section 11).
 # Runs fortio (an HTTP load tester) inside the cluster against the scramble Service with
 # fresh=1, which bypasses the Redis scramble pool and forces CPU-heavy cubing.js generation.
 # Change the three env values below to tune the demo:

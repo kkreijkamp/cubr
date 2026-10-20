@@ -15,7 +15,7 @@ export interface DailyResponse {
 /**
  * Daily challenge: 5 scrambles per DAILY_EVENTS event, generated once and persisted so every user
  * (and every replica) sees the same set. The first request of a day generates missing rows and
- * inserts them with ON CONFLICT DO NOTHING, then re-reads — if two replicas race, the first insert
+ * inserts them with ON CONFLICT DO NOTHING, then re-reads - if two replicas race, the first insert
  * wins and both return the winner's scrambles.
  */
 export class DailyChallenges {

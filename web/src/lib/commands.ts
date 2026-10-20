@@ -13,7 +13,7 @@ export interface Command {
   active?: boolean;
   /** run on Enter/click; return false to keep the palette open */
   run?: () => void | boolean;
-  /** opens a nested list instead of running (e.g. "Theme…") */
+  /** opens a nested list instead of running (e.g. "Theme...") */
   children?: () => Command[];
   /** called while the row is highlighted (live theme preview); undone when the palette closes */
   preview?: () => void;

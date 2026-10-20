@@ -98,7 +98,7 @@ function set<K extends keyof Settings>(key: K) {
 
 const SHORTCUTS: [ReactNode, string][] = [
   [<kbd key="s">space</kbd>, 'hold to get ready, release to start, any key stops'],
-  [<kbd key="e">esc</kbd>, 'cancel inspection · stop as DNF while running · command line when idle'],
+  [<kbd key="e">esc</kbd>, 'cancel inspection - stop as DNF while running - command line when idle'],
   [
     <>
       <kbd>ctrl</kbd>+<kbd>k</kbd>
@@ -108,7 +108,7 @@ const SHORTCUTS: [ReactNode, string][] = [
   [<kbd key="t">tab</kbd>, 'next scramble'],
   [
     <>
-      <kbd>alt</kbd>+<kbd>←</kbd> / <kbd>→</kbd>
+      <kbd>alt</kbd>+<kbd>left</kbd> / <kbd>right</kbd>
     </>,
     'previous / next scramble',
   ],
@@ -120,7 +120,7 @@ const SHORTCUTS: [ReactNode, string][] = [
   ],
   [
     <>
-      <kbd>alt</kbd>+<kbd>⌫</kbd> or <kbd>alt</kbd>+<kbd>z</kbd>
+      <kbd>alt</kbd>+<kbd>backspace</kbd> or <kbd>alt</kbd>+<kbd>z</kbd>
     </>,
     'delete the latest solve',
   ],
@@ -132,7 +132,7 @@ const SHORTCUTS: [ReactNode, string][] = [
   ],
   [
     <>
-      <kbd>alt</kbd>+<kbd>↑</kbd> / <kbd>↓</kbd>
+      <kbd>alt</kbd>+<kbd>up</kbd> / <kbd>down</kbd>
     </>,
     'previous / next session of this event',
   ],
@@ -150,7 +150,7 @@ const SHORTCUTS: [ReactNode, string][] = [
   ],
   [
     <>
-      <kbd>←</kbd> / <kbd>→</kbd>
+      <kbd>left</kbd> / <kbd>right</kbd>
     </>,
     'browse solves in the solve window',
   ],
@@ -205,7 +205,7 @@ export default function SettingsPage() {
             onChange={set('timerUpdate')}
           />
         </SettingRow>
-        <SettingRow icon={<Hash size={16} />} title="precision" description="Decimal places for times and averages. Singles are truncated, averages rounded — like the WCA.">
+        <SettingRow icon={<Hash size={16} />} title="precision" description="Decimal places for times and averages. Singles are truncated, averages rounded like the WCA.">
           <Options
             value={s.precision}
             options={[
@@ -482,7 +482,7 @@ function ThemeGrid({ current }: { current: string }) {
         </span>
       </div>
       {shown.length === 0 ? (
-        <div className="st-theme-empty">no themes match “{query}”</div>
+        <div className="st-theme-empty">no themes match "{query}"</div>
       ) : (
         <div className="st-themes" onMouseLeave={restore} role="radiogroup" aria-label="theme">
           {shown.map((t) => (
@@ -587,7 +587,7 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
         title="import solves"
         description={
           <>
-            A cubetype export, or any file csTimer can import: csTimer (<span className="text">export → export to file</span>), Twisty Timer, Cubic Timer,
+            A cubetype export, or any file csTimer can import: csTimer (<span className="text">export -&gt; export to file</span>), Twisty Timer, Cubic Timer,
             Block Keeper, CubeDesk, DCTimer, mateus Cubetimer or GAN CubeStation. Each session becomes a cubetype session{' '}
             {loggedIn ? 'in your account' : 'in this browser'}.
           </>
@@ -604,7 +604,7 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
               <div className="small">
                 <span className="text">{parsed.file}</span> ({parsed.format})
                 <br />
-                <span className="main">{formatNumber(summary?.solves ?? 0)} solves</span> · {parsed.sessions.length} session{parsed.sessions.length === 1 ? '' : 's'} ·{' '}
+                <span className="main">{formatNumber(summary?.solves ?? 0)} solves</span> - {parsed.sessions.length} session{parsed.sessions.length === 1 ? '' : 's'} -{' '}
                 {summary?.events.join(', ')}
                 {skippedNotes(parsed.skipped).map((note) => (
                   <span key={note}>
@@ -618,7 +618,7 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
                   cancel
                 </button>
                 <button className="btn primary" onClick={doImport} disabled={busy !== null}>
-                  {busy === 'import' ? 'importing…' : 'import'}
+                  {busy === 'import' ? 'importing...' : 'import'}
                 </button>
               </div>
             </div>
@@ -632,16 +632,16 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
         description={
           <>
             Every session and solve. JSON re-imports here or on another cubetype server; the csTimer file goes into csTimer with{' '}
-            <span className="text">export → import session(s) from other timers</span>, which adds sessions without replacing yours.
+            <span className="text">export -&gt; import session(s) from other timers</span>, which adds sessions without replacing yours.
           </>
         }
       >
         <div className="row">
           <button className="btn" onClick={() => void doExport('json')} disabled={busy !== null}>
-            <Download size={16} /> {busy === 'export' ? 'exporting…' : 'export json'}
+            <Download size={16} /> {busy === 'export' ? 'exporting...' : 'export json'}
           </button>
           <button className="btn" onClick={() => void doExport('cstimer')} disabled={busy !== null}>
-            <Download size={16} /> {busy === 'export-cstimer' ? 'exporting…' : 'export for csTimer'}
+            <Download size={16} /> {busy === 'export-cstimer' ? 'exporting...' : 'export for csTimer'}
           </button>
         </div>
       </SettingRow>

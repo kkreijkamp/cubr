@@ -39,12 +39,12 @@ export function QuickActions({ last, onPenalty, onComment, onDelete }: Props) {
         onClick={onComment}
         disabled={!last}
         aria-label="comment on the latest solve"
-        data-tip={last?.comment ? `“${last.comment.slice(0, 40)}${last.comment.length > 40 ? '…' : ''}”` : 'comment (alt+c)'}
+        data-tip={last?.comment ? `"${last.comment.slice(0, 40)}${last.comment.length > 40 ? '...' : ''}"` : 'comment (alt+c)'}
         {...noFocus}
       >
         <MessageSquare size={16} />
       </button>
-      <button className="btn-text danger" onClick={onDelete} disabled={!last} aria-label="delete the latest solve" data-tip="delete (alt+⌫)" {...noFocus}>
+      <button className="btn-text danger" onClick={onDelete} disabled={!last} aria-label="delete the latest solve" data-tip="delete (alt+backspace)" {...noFocus}>
         <Trash2 size={16} />
       </button>
     </div>

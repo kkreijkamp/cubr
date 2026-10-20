@@ -2,7 +2,7 @@
   "name": "cubetype",
   "private": true,
   "type": "module",
-  "description": "cubetype — a cloud-native speedcubing timer (csTimer x Monkeytype) on Kubernetes",
+  "description": "cubetype - a cloud-native speedcubing timer on Kubernetes",
   "workspaces": [
     "packages/*",
     "services/*",

@@ -83,8 +83,8 @@ async function submitDaily(event: string, date: string, index: number, r: TimerR
       await addSolve({ ...body, sessionId: session.id });
       return;
     } catch (e) {
-      if (e instanceof ApiError) throw e; // a real server answer — don't double-submit
-      // store not ready / not implemented → direct API below
+      if (e instanceof ApiError) throw e; // a real server answer - don't double-submit
+      // store not ready / not implemented -> direct API below
     }
   }
   await api.solves.create({ id: uuid(), sessionId: await directSessionId(event), ...body });
@@ -167,7 +167,7 @@ export default function DailyPage() {
         })
         .catch((e: Error) => {
           if (e instanceof ApiError && e.status === 409) {
-            // already submitted (e.g. from another tab) — the server copy wins
+            // already submitted (e.g. from another tab) - the server copy wins
             progress.reload();
             setLocal((m) => ({ ...m, [k]: (m[k] ?? []).filter((x) => x.index !== a.index) }));
             toast.notice(`attempt ${a.index + 1} was already submitted`);
@@ -219,7 +219,7 @@ export default function DailyPage() {
     () => [
       {
         id: 'daily-event',
-        label: 'Daily challenge event…',
+        label: 'Daily challenge event...',
         icon: <CalendarDays />,
         children: () => DAILY_EVENTS.map((id) => ({ id: `daily-event-${id}`, label: getEvent(id)?.name ?? id, active: id === event, run: () => setEvent(id) })),
       },
@@ -250,7 +250,7 @@ export default function DailyPage() {
           <h1 className="h2">
             <CalendarDays /> daily challenge
           </h1>
-          <div className="subtitle">5 scrambles · the same for everyone · ranked by ao5 · resets at 00:00 UTC</div>
+          <div className="subtitle">5 scrambles - the same for everyone - ranked by ao5 - resets at 00:00 UTC</div>
         </div>
         <div className="daily-countdown" title={`next challenge at ${new Date(nextMidnight).toLocaleString()}`}>
           <span className="label">next challenge in</span>
@@ -272,7 +272,7 @@ export default function DailyPage() {
             </Link>
           }
         >
-          practice mode — sign in to submit your times to today's leaderboard.
+          practice mode - sign in to submit your times to today's leaderboard.
         </Notice>
       )}
 
@@ -280,7 +280,7 @@ export default function DailyPage() {
         <div className="daily-main">
           {!isToday && (
             <div className="daily-past sub small fade-on-focus">
-              viewing {date} (UTC) — past challenges are closed, leaderboard only.
+              viewing {date} (UTC) - past challenges are closed, leaderboard only.
             </div>
           )}
 
@@ -302,7 +302,7 @@ export default function DailyPage() {
                     ) : current ? (
                       'now'
                     ) : (
-                      '–'
+                      '-'
                     )}
                   </span>
                   <span className="s">
@@ -320,17 +320,17 @@ export default function DailyPage() {
           </ol>
 
           {authed && progress.error && (
-            <ErrorState error={new Error(`couldn't load your progress (${progress.error.message}) — retry before solving`)} onRetry={progress.reload} />
+            <ErrorState error={new Error(`couldn't load your progress (${progress.error.message}) - retry before solving`)} onRetry={progress.reload} />
           )}
 
           {scrError ? (
             <ErrorState
-              error={new Error(unavailable ? 'the scramble service is unavailable — the daily challenge needs its official scrambles' : scr.error!.message)}
+              error={new Error(unavailable ? 'the scramble service is unavailable - the daily challenge needs its official scrambles' : scr.error!.message)}
               onRetry={scr.reload}
             />
           ) : !scrambles ? (
             scr.loading ? (
-              <Loading label="loading scrambles…" />
+              <Loading label="loading scrambles..." />
             ) : (
               <div className="empty">no daily scrambles for {ev.name} on this day.</div>
             )
@@ -353,7 +353,7 @@ export default function DailyPage() {
                   <div className="stat">
                     <span className="label">rank {isToday ? 'today' : ''}</span>
                     <span className={`value ${me ? '' : 'text small-value'}`}>
-                      {me ? `#${me.rank}` : !attempts.every((a) => a.state === 'saved') ? 'saving…' : ranking ? 'ranking…' : 'unranked'}
+                      {me ? `#${me.rank}` : !attempts.every((a) => a.state === 'saved') ? 'saving...' : ranking ? 'ranking...' : 'unranked'}
                     </span>
                     {me && <span className="hint">of {me.total.toLocaleString('en-US')}</span>}
                     {!me && !ranking && attempts.every((a) => a.state === 'saved') && <span className="hint">not on the board (yet)</span>}
@@ -396,7 +396,7 @@ export default function DailyPage() {
                     hold <kbd>space</kbd>, release to start
                   </>
                 )}{' '}
-                · <kbd>esc</kbd> while solving = DNF · one try per scramble
+                - <kbd>esc</kbd> while solving = DNF - one try per scramble
               </div>
               {settings.scramblePreview !== 'off' && scramble && (
                 <div className="daily-preview fade-on-focus">

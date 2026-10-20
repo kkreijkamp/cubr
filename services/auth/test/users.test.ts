@@ -91,7 +91,7 @@ describe('settingsSchema / jsonBytes', () => {
   });
   it('measures UTF-8 bytes of the JSON', () => {
     expect(jsonBytes({ a: 1 })).toBe(7);
-    expect(jsonBytes({ a: 'é' })).toBe(10);
+    expect(jsonBytes({ a: '\u00e9' })).toBe(10);
   });
 });
 
@@ -122,7 +122,7 @@ describe('row mapping', () => {
     expect(u.country).toBeNull();
     expect(u.createdAt).toBe('2026-01-02T03:04:05.000Z');
   });
-  it('builds user event payloads per SPEC §8', () => {
+  it('builds user event payloads per SPEC section 8', () => {
     expect(userEventData(toPublicUser(row))).toEqual({
       userId: row.id,
       username: 'Felix_Z',

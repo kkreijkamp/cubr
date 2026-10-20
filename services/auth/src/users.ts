@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 // ---------------------------------------------------------------------------------------------
-// Pure domain helpers for the auth service: request schemas, row → API mapping, small parsers.
+// Pure domain helpers for the auth service: request schemas, row -> API mapping, small parsers.
 // Everything here is side-effect free so it can be unit-tested without Postgres/Redis.
 // ---------------------------------------------------------------------------------------------
 
@@ -12,11 +12,11 @@ export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f
 
 /** Max serialized size of PUT /api/auth/me/settings `settings` (bytes of JSON). */
 export const SETTINGS_MAX_BYTES = 16 * 1024;
-/** Max ids accepted by GET /api/users?ids=… */
+/** Max ids accepted by GET /api/users?ids=... */
 export const MAX_IDS = 100;
 
 export const registerSchema = z.object({
-  username: z.string().trim().regex(USERNAME_RE, 'must be 3–20 characters: letters, digits or _'),
+  username: z.string().trim().regex(USERNAME_RE, 'must be 3-20 characters: letters, digits or _'),
   email: z.string().trim().max(254).email(),
   password: z.string().min(8).max(128),
 });
@@ -157,7 +157,7 @@ export function conflictMessage(constraint: string | undefined): string {
   return 'Username or email already in use';
 }
 
-/** Payload of user.registered / user.updated events (SPEC §8, besides eventId/occurredAt). */
+/** Payload of user.registered / user.updated events (SPEC section 8, besides eventId/occurredAt). */
 export function userEventData(user: PublicUser) {
   return {
     userId: user.id,
@@ -172,7 +172,7 @@ export function userEventData(user: PublicUser) {
 
 // ---- profile pictures --------------------------------------------------------------------------
 // The browser crops and resizes to a small square image before uploading; the server never decodes
-// images (no native image libraries) — it only checks the declared type against the file's magic
+// images (no native image libraries) - it only checks the declared type against the file's magic
 // bytes and enforces a size cap, then serves the bytes back with a fixed, safe Content-Type.
 
 export const AVATAR_MAX_BYTES = 300 * 1024;
@@ -187,7 +187,7 @@ export function sniffImageType(buf: Buffer): AvatarType | null {
   return null;
 }
 
-/** 'image/webp; charset=x' → 'image/webp' */
+/** 'image/webp; charset=x' -> 'image/webp' */
 export function baseContentType(header: string | undefined): string {
   return (header ?? '').split(';')[0].trim().toLowerCase();
 }

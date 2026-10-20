@@ -32,7 +32,7 @@ function percentile(xs: number[], p: number): number | null {
 }
 
 /**
- * Fires N parallel requests at one service's `_info` and charts which pod answered each one —
+ * Fires N parallel requests at one service's `_info` and charts which pod answered each one -
  * the Kubernetes Service / Ingress spreading traffic over the replicas.
  */
 export function LoadBalanceTest({ vc, onLog }: { vc: (v: string) => string; onLog: (text: string, service: string) => void }) {
@@ -84,7 +84,7 @@ export function LoadBalanceTest({ vc, onLog }: { vc: (v: string) => string; onLo
     setResult({ ...acc, pods: acc.pods.map((p) => ({ ...p })) });
     const dist = [...acc.pods].sort((a, b) => b.count - a.count).map((p) => p.count).join('/');
     onLog(
-      `load test: ${n} requests → ${acc.pods.length} pod${acc.pods.length === 1 ? '' : 's'}${acc.pods.length ? ` (${dist})` : ''}${acc.errors ? ` · ${acc.errors} errors` : ''}`,
+      `load test: ${n} requests -> ${acc.pods.length} pod${acc.pods.length === 1 ? '' : 's'}${acc.pods.length ? ` (${dist})` : ''}${acc.errors ? ` - ${acc.errors} errors` : ''}`,
       target.name,
     );
   };
@@ -100,7 +100,7 @@ export function LoadBalanceTest({ vc, onLog }: { vc: (v: string) => string; onLo
         <h3 className="h3" id="lb-title">
           <Network /> load balancing test
         </h3>
-        <span className="meta">parallel GET …/_info</span>
+        <span className="meta">parallel GET .../_info</span>
       </div>
       <p className="panel-desc">
         fires N requests at once and counts which pod answered each one (from <code>_info.pod</code> / <code>X-Served-By</code>).
@@ -108,15 +108,15 @@ export function LoadBalanceTest({ vc, onLog }: { vc: (v: string) => string; onLo
       <div className="panel-controls">
         <Segmented label="service" value={service} onChange={setService} options={SERVICE_INFO_PATHS.map((s) => ({ value: s.name, label: s.name }))} />
         <div className="row wrap" style={{ gap: '0.5rem' }}>
-          <Segmented label="requests" value={n} onChange={setN} options={SIZES.map((v) => ({ value: v, label: `${v}×` }))} />
+          <Segmented label="requests" value={n} onChange={setN} options={SIZES.map((v) => ({ value: v, label: `${v}x` }))} />
           <button className="btn primary" onClick={() => void run()} disabled={running}>
-            <Play /> {running ? 'firing…' : 'fire'}
+            <Play /> {running ? 'firing...' : 'fire'}
           </button>
         </div>
       </div>
 
       {!result ? (
-        <div className="panel-empty">pick a service and fire — with 2+ replicas the bars should come out roughly even.</div>
+        <div className="panel-empty">pick a service and fire - with 2+ replicas the bars should come out roughly even.</div>
       ) : (
         <div className="lb-result">
           <div className="lb-summary mono-nums">
@@ -130,10 +130,10 @@ export function LoadBalanceTest({ vc, onLog }: { vc: (v: string) => string; onLo
               <b>{result.errors}</b> errors
             </span>
             <span>
-              p50 <b>{p50 !== null ? `${Math.round(p50)}ms` : '–'}</b>
+              p50 <b>{p50 !== null ? `${Math.round(p50)}ms` : '-'}</b>
             </span>
             <span>
-              total <b>{result.durationMs !== null ? `${Math.round(result.durationMs)}ms` : '…'}</b>
+              total <b>{result.durationMs !== null ? `${Math.round(result.durationMs)}ms` : '...'}</b>
             </span>
           </div>
           <ul className="lb-bars">
@@ -141,7 +141,7 @@ export function LoadBalanceTest({ vc, onLog }: { vc: (v: string) => string; onLo
               const { hash, id } = podParts(p.pod, result.service);
               const share = ideal ? (p.count / ideal) * 100 : 0;
               return (
-                <li key={p.pod} className={vc(p.version)} title={`${p.pod} · ${vlabel(p.version)}`}>
+                <li key={p.pod} className={vc(p.version)} title={`${p.pod} - ${vlabel(p.version)}`}>
                   <span className="vsq" aria-hidden="true" />
                   <span className="pod-name">
                     <span className="hash">{hash}</span>
@@ -169,11 +169,11 @@ export function LoadBalanceTest({ vc, onLog }: { vc: (v: string) => string; onLo
           </ul>
           {result.durationMs !== null && pods.length > 1 && (
             <div className="panel-foot">
-              ideal {(ideal / pods.length).toFixed(1)} per pod · spread {Math.min(...pods.map((p) => p.count))}–{Math.max(...pods.map((p) => p.count))}
+              ideal {(ideal / pods.length).toFixed(1)} per pod - spread {Math.min(...pods.map((p) => p.count))}-{Math.max(...pods.map((p) => p.count))}
             </div>
           )}
           {result.durationMs !== null && pods.length === 1 && result.errors === 0 && (
-            <div className="panel-foot">only one pod answered — is the deployment scaled to 1 replica?</div>
+            <div className="panel-foot">only one pod answered - is the deployment scaled to 1 replica?</div>
           )}
         </div>
       )}

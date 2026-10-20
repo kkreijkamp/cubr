@@ -41,7 +41,7 @@ export function sanitizeText(raw: string, maxChars: number): string {
   return Array.from(cleaned).slice(0, maxChars).join('').trim();
 }
 
-/** Guest nickname: 1–20 visible characters, otherwise `fallback`. */
+/** Guest nickname: 1-20 visible characters, otherwise `fallback`. */
 export function sanitizeName(raw: unknown, fallback: string): string {
   if (typeof raw !== 'string') return fallback;
   const name = sanitizeText(raw, 20);

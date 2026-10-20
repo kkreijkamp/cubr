@@ -9,7 +9,7 @@ export interface AvatarUser {
 
 interface Props {
   user: AvatarUser;
-  /** diameter in px (18 for tables/nav … 96 for the profile header) */
+  /** diameter in px (18 for tables/nav ... 96 for the profile header) */
   size?: number;
   className?: string;
 }

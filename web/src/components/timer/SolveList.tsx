@@ -36,7 +36,7 @@ export const SolveList = memo(function SolveList({ solves, ao5, ao12, bestIndex,
     return () => ro.disconnect();
   }, [n > 0]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // new solve → jump back to the top (the newest row)
+  // new solve -> jump back to the top (the newest row)
   const prevN = useRef(n);
   useEffect(() => {
     if (n > prevN.current && scrollRef.current) {

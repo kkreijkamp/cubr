@@ -26,7 +26,7 @@ function Cell({ value, onClick, best, label }: { value: string; onClick?: () => 
   );
 }
 
-/** current / best table for single + the configured averages, plus count / mean / σ. */
+/** current / best table for single + the configured averages, plus count / mean / standard deviation. */
 export const StatsPanel = memo(function StatsPanel({ stats, ns, solves, precision, onOpenAverage, onOpenSolve }: Props) {
   const last = solves.length ? solves[solves.length - 1] : null;
   const sigma = stats.sd === null ? '-' : (stats.sd / 1000).toFixed(2);
@@ -84,7 +84,7 @@ export const StatsPanel = memo(function StatsPanel({ stats, ns, solves, precisio
           <div className="value text">{fmtAvg(stats.mean, precision)}</div>
         </div>
         <div className="stat">
-          <div className="label">σ</div>
+          <div className="label">{'\u03c3'}</div>
           <div className="value text">{sigma}</div>
         </div>
       </div>

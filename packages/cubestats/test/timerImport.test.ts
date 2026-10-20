@@ -135,7 +135,7 @@ describe('other timers (csTimer "import from other timers" formats)', () => {
   it('DCTimer SQLite backup (multi-page b-tree, overflow pages, both result layouts)', () => {
     const r = parseTimerFile(new Uint8Array(readFileSync(new URL('./fixtures/dctimer-backup.db', import.meta.url))));
     expect(r.format).toBe('DCTimer (SQLite backup)');
-    expect(r.sessions.map((s) => [s.name, s.solves.length])).toEqual([['main', 45], ['café 三阶', 17]]);
+    expect(r.sessions.map((s) => [s.name, s.solves.length])).toEqual([['main', 45], ['caf\u00e9 \u4e09\u9636', 17]]);
     const all = r.sessions.flatMap((s) => s.solves);
     expect(all.filter((x) => x.penalty === 'DNF')).toHaveLength(6);
     expect(all.filter((x) => x.penalty === '+2')).toHaveLength(6);
@@ -223,12 +223,12 @@ describe('limits and errors', () => {
   });
 
   it('decodes UTF-8 with a BOM and UTF-16 text', () => {
-    const csv = 'Puzzle,Category,Time(millis),Date(millis),Scramble,Penalty,Comment\n333;Café;1000;1;R;0;';
-    expect(parseTimerFile(new Uint8Array([0xef, 0xbb, 0xbf, ...new TextEncoder().encode(csv)])).sessions[0].name).toBe('333-Café');
+    const csv = 'Puzzle,Category,Time(millis),Date(millis),Scramble,Penalty,Comment\n333;Caf\u00e9;1000;1;R;0;';
+    expect(parseTimerFile(new Uint8Array([0xef, 0xbb, 0xbf, ...new TextEncoder().encode(csv)])).sessions[0].name).toBe('333-Caf\u00e9');
     const utf16 = new Uint8Array(2 + csv.length * 2);
     utf16.set([0xff, 0xfe]);
     for (let i = 0; i < csv.length; i++) utf16[2 + i * 2] = csv.charCodeAt(i) & 0xff, (utf16[3 + i * 2] = csv.charCodeAt(i) >> 8);
-    expect(parseTimerFile(utf16).sessions[0].name).toBe('333-Café');
+    expect(parseTimerFile(utf16).sessions[0].name).toBe('333-Caf\u00e9');
   });
 });
 

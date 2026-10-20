@@ -9,7 +9,7 @@ import { noFocus } from './ConfigBar';
 
 const MAX_POINTS = 1500;
 
-/** "#e2b714" + "99" → "#e2b71499" (Monkeytype's translucent secondary line). */
+/** "#e2b714" + "99" -> "#e2b71499" (Monkeytype's translucent secondary line). */
 function alpha(hex: string, a: string): string {
   const h = hex.trim();
   if (/^#[0-9a-f]{6}$/i.test(h)) return h + a;
@@ -50,7 +50,7 @@ interface TrendProps {
   onOpenSolve: (index: number) => void;
 }
 
-/** Times over the session (points) with rolling ao5 / ao12 lines — styled like Monkeytype's history chart. */
+/** Times over the session (points) with rolling ao5 / ao12 lines - styled like Monkeytype's history chart. */
 export const TrendChart = memo(function TrendChart({ times, ao5, ao12, precision, onOpenSolve }: TrendProps) {
   const c = useThemeColors();
   const [hidden, setHidden] = useState<Set<SeriesKey>>(new Set());
@@ -248,7 +248,7 @@ export const HistogramChart = memo(function HistogramChart({ times, latest }: Hi
             callbacks: {
               title: (items) => {
                 const b = buckets[items[0]?.dataIndex ?? 0];
-                return b ? `${shortTime(b.from)} – ${shortTime(b.from + step)}` : '';
+                return b ? `${shortTime(b.from)} - ${shortTime(b.from + step)}` : '';
               },
               label: (item) => ` ${formatNumber(Number(item.raw))} solve${item.raw === 1 ? '' : 's'}`,
             },

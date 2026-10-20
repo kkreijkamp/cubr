@@ -13,11 +13,11 @@ interface Box {
 type ServiceId = 'web' | 'auth' | 'scramble' | 'wca' | 'solve' | 'stats' | 'leaderboard' | 'race';
 
 const SERVICES: { id: ServiceId; sub: string; hpa?: boolean }[] = [
-  { id: 'web', sub: 'nginx · spa', hpa: true },
-  { id: 'auth', sub: 'jwt · profiles' },
+  { id: 'web', sub: 'nginx - spa', hpa: true },
+  { id: 'auth', sub: 'jwt - profiles' },
   { id: 'scramble', sub: 'cubing.js pool', hpa: true },
   { id: 'wca', sub: 'results export' },
-  { id: 'solve', sub: 'crud · outbox', hpa: true },
+  { id: 'solve', sub: 'crud - outbox', hpa: true },
   { id: 'stats', sub: 'read model' },
   { id: 'leaderboard', sub: 'sorted sets' },
   { id: 'race', sub: 'websockets', hpa: true },
@@ -51,15 +51,15 @@ interface Layout {
   redisTitle: string;
   redisSub: string;
   segs: { streams: Box; cache: Box; boards: Box };
-  /** event flow: solve → stream, stream → stats, stream → leaderboard */
+  /** event flow: solve -> stream, stream -> stats, stream -> leaderboard */
   flows: Pt[][];
   chips: Box[];
 }
 
 const CHIPS = [
-  { t: 'hpa autoscaling', s: 'scramble · solve · web · race on cpu' },
-  { t: 'rolling updates', s: 'maxSurge 1 · maxUnavailable 0' },
-  { t: 'self-healing', s: 'probes · pdb · 2+ replicas each' },
+  { t: 'hpa autoscaling', s: 'scramble - solve - web - race on cpu' },
+  { t: 'rolling updates', s: 'maxSurge 1 - maxUnavailable 0' },
+  { t: 'self-healing', s: 'probes - pdb - 2+ replicas each' },
 ];
 
 function wideLayout(): Layout {
@@ -74,10 +74,10 @@ function wideLayout(): Layout {
     sub: 11,
     browser: { x: 390, y: 8, w: 220, h: 58 },
     lb: { x: 250, y: 108, w: 500, h: 52 },
-    lbSub: 'http · /api/* → services · /socket.io → race',
+    lbSub: 'http - /api/* -> services - /socket.io -> race',
     protocol: [510, 92],
     cluster: { x: 16, y: 190, w: 968, h: 460 },
-    clusterLabel: 'gke cluster · namespace cubetype',
+    clusterLabel: 'gke cluster - namespace cubetype',
     services,
     wires: [
       [
@@ -117,8 +117,8 @@ function wideLayout(): Layout {
     ],
     dots: [[500, 226] as Pt, ...SERVICES.map((s): Pt => [cx(s.id), 226]), ...dataIds.map((id): Pt => [cx(id), 376]), [255, 376]],
     pg: { x: 41, y: 414, w: 429, h: 152 },
-    pgTitle: 'postgresql 17 · cloudnativepg',
-    pgSub: 'schema per service · automatic failover',
+    pgTitle: 'postgresql 17 - cloudnativepg',
+    pgSub: 'schema per service - automatic failover',
     primary: { x: 72, y: 430, w: 132, h: 70 },
     replica: { x: 308, y: 430, w: 132, h: 70 },
     repl: [
@@ -127,8 +127,8 @@ function wideLayout(): Layout {
     ],
     replLabel: { x: 256, y: 464, anchor: 'middle' },
     redis: { x: 530, y: 414, w: 429, h: 152 },
-    redisTitle: 'redis 7 · statefulset',
-    redisSub: 'event bus · cache · leaderboards · race state',
+    redisTitle: 'redis 7 - statefulset',
+    redisSub: 'event bus - cache - leaderboards - race state',
     segs: {
       streams: { x: 544, y: 430, w: 126, h: 70 },
       cache: { x: 682, y: 430, w: 126, h: 70 },
@@ -175,10 +175,10 @@ function tallLayout(): Layout {
     sub: 10,
     browser: { x: 90, y: 8, w: 180, h: 54 },
     lb: { x: 24, y: 100, w: 312, h: 52 },
-    lbSub: 'gke ingress · path routing',
+    lbSub: 'gke ingress - path routing',
     protocol: [190, 86],
     cluster: { x: 8, y: 176, w: 344, h: 796 },
-    clusterLabel: 'gke cluster · ns cubetype',
+    clusterLabel: 'gke cluster - ns cubetype',
     services,
     wires: [
       [
@@ -223,7 +223,7 @@ function tallLayout(): Layout {
     replLabel: { x: 103, y: 660, anchor: 'start' },
     redis: { x: 194, y: 560, w: 142, h: 230 },
     redisTitle: 'redis 7',
-    redisSub: 'event bus · cache',
+    redisSub: 'event bus - cache',
     segs: {
       streams: { x: 206, y: 578, w: 118, h: 46 },
       cache: { x: 206, y: 632, w: 118, h: 46 },
@@ -342,7 +342,7 @@ function Diagram({ L }: { L: Layout }) {
         ))}
       </g>
       <text className="arch-sub" x={L.protocol[0]} y={L.protocol[1]} fontSize={L.sub}>
-        http · ws
+        http - ws
       </text>
 
       {/* browser */}
@@ -351,7 +351,7 @@ function Diagram({ L }: { L: Layout }) {
         {[0, 1, 2].map((i) => (
           <circle key={i} className="arch-chrome" cx={L.browser.x + 12 + i * 9} cy={L.browser.y + 11} r={2.6} />
         ))}
-        <Label box={{ ...L.browser, y: L.browser.y + 4 }} title="browser" sub="react spa · offline-first" L={L} />
+        <Label box={{ ...L.browser, y: L.browser.y + 4 }} title="browser" sub="react spa - offline-first" L={L} />
       </g>
 
       {/* load balancer */}
@@ -405,7 +405,7 @@ function Diagram({ L }: { L: Layout }) {
       </g>
       <g className="arch-node">
         <rect x={L.segs.cache.x} y={L.segs.cache.y} width={L.segs.cache.w} height={L.segs.cache.h} rx={8} />
-        <Label box={L.segs.cache} title="cache" sub="wca · rate limits" L={L} />
+        <Label box={L.segs.cache} title="cache" sub="wca - rate limits" L={L} />
       </g>
       <g className="arch-node">
         <rect x={L.segs.boards.x} y={L.segs.boards.y} width={L.segs.boards.w} height={L.segs.boards.h} rx={8} />
@@ -418,7 +418,7 @@ function Diagram({ L }: { L: Layout }) {
         {L.redisSub}
       </text>
 
-      {/* event flow: solve → stream → stats / leaderboard */}
+      {/* event flow: solve -> stream -> stats / leaderboard */}
       <g className="arch-flow">
         {L.flows.map((p, i) => (
           <path key={i} d={orth(p, 10)} markerEnd={`url(#${arrowMain})`} />

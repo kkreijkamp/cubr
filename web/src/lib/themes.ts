@@ -229,7 +229,7 @@ export function randomTheme(current: string, kind?: 'light' | 'dark'): Theme {
   return pool[Math.floor(Math.random() * pool.length)] ?? getTheme(current);
 }
 
-/** "serika_dark" → "serika dark" */
+/** "serika_dark" -> "serika dark" */
 export function themeLabel(name: string): string {
   return name.replace(/_/g, ' ');
 }

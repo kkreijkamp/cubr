@@ -22,7 +22,7 @@ import {
 } from './keys.js';
 
 // ---------------------------------------------------------------------------------------------
-// Turns domain events (SPEC §8) into board writes. The plan* functions are pure (unit-tested);
+// Turns domain events (SPEC section 8) into board writes. The plan* functions are pure (unit-tested);
 // makeHandler executes the plan against Redis with the anti-cheat check in front of every write.
 // All writes are idempotent (exact set / keep-best), so at-least-once redelivery is harmless.
 // ---------------------------------------------------------------------------------------------
@@ -60,7 +60,7 @@ function parseTime(v: unknown): number | null {
   return Number.isNaN(t) ? null : t;
 }
 
-/** pb.updated → exact all-time write, or removal when the PB no longer exists (null / -1). */
+/** pb.updated -> exact all-time write, or removal when the PB no longer exists (null / -1). */
 export function planPbUpdated(d: Data, nowMs = Date.now()): PbWrite | null {
   const event = String(d.event ?? '');
   const kind = String(d.kind ?? '');
@@ -77,7 +77,7 @@ export function planPbUpdated(d: Data, nowMs = Date.now()): PbWrite | null {
 }
 
 /**
- * solve.created → daily + weekly boards for the single (effectiveMs; null = DNF → skipped) and the
+ * solve.created -> daily + weekly boards for the single (effectiveMs; null = DNF -> skipped) and the
  * session's rolling ao5. Buckets are UTC days / ISO weeks of the solve's createdAt. Solves older
  * than a board's lifetime (3 d / 15 d) are skipped so replays don't resurrect expired boards.
  */
@@ -108,7 +108,7 @@ export function planSolveCreated(d: Data, nowMs = Date.now()): BestWrite[] {
   return out;
 }
 
-/** daily.completed → daily-challenge ao5 board (DNF ao5 = -1 is skipped). Kept without TTL (history). */
+/** daily.completed -> daily-challenge ao5 board (DNF ao5 = -1 is skipped). Kept without TTL (history). */
 export function planDailyCompleted(d: Data, nowMs = Date.now()): BestWrite | null {
   const event = String(d.event ?? '');
   const date = String(d.date ?? '');
@@ -145,7 +145,7 @@ export interface IngestDeps {
 
 export function makeHandler({ redis, floors, log }: IngestDeps) {
   /**
-   * Anti-cheat gate: true if the value may be written, otherwise it is recorded in lb:flagged —
+   * Anti-cheat gate: true if the value may be written, otherwise it is recorded in lb:flagged
    * once per event/kind/value per domain event (one solve feeds both a daily and a weekly board).
    */
   async function passesFloor(
@@ -210,7 +210,7 @@ export function makeHandler({ redis, floors, log }: IngestDeps) {
         return;
       }
       default:
-        return; // user.* — display info handled above
+        return; // user.* - display info handled above
     }
   };
 }

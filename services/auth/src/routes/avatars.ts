@@ -19,11 +19,11 @@ import { allow, publishSafely } from '../safe.js';
 
 /**
  * Profile pictures.
- *   PUT    /api/auth/me/avatar          raw image body (image/webp|jpeg|png, ≤ 300 KB) → {user}
- *   DELETE /api/auth/me/avatar          → {user}
+ *   PUT    /api/auth/me/avatar          raw image body (image/webp|jpeg|png, <= 300 KB) -> {user}
+ *   DELETE /api/auth/me/avatar          -> {user}
  *   GET    /api/users/:username/avatar  image bytes; the path segment may be a user id or a username
- * A changed picture publishes user.updated (with the new avatarUrl), so other services — e.g. the
- * leaderboard's display cache — pick it up through the event bus.
+ * A changed picture publishes user.updated (with the new avatarUrl), so other service, e.g. the
+ * leaderboard's display cache, pick it up through the event bus.
  */
 export async function registerAvatarRoutes(app: FastifyInstance, { pool, redis, auth }: Deps) {
   // Image uploads arrive as raw bytes; Fastify's default parsers only handle JSON/text.
@@ -84,7 +84,7 @@ export async function registerAvatarRoutes(app: FastifyInstance, { pool, redis, 
     reply
       .header('Content-Type', pic.content_type)
       .header('ETag', etag)
-      // a ?v= URL matching the current version never changes → cache for a year; otherwise revalidate
+      // a ?v= URL matching the current version never changes -> cache for a year; otherwise revalidate
       .header('Cache-Control', req.query.v === pic.version ? 'public, max-age=31536000, immutable' : 'public, max-age=300')
       .header('X-Content-Type-Options', 'nosniff')
       .header('Content-Security-Policy', "default-src 'none'; sandbox");

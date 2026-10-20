@@ -42,7 +42,7 @@ export function Segmented<T extends string | number>({
   );
 }
 
-/** Event chips using the short WCA names ("3x3", "Pyra", …). */
+/** Event chips using the short WCA names ("3x3", "Pyra", ...). */
 export function EventPicker({ events, value, onChange, label = 'event' }: { events: string[]; value: string; onChange: (e: string) => void; label?: string }) {
   return (
     <Segmented
@@ -62,7 +62,7 @@ export function ScrambleText({ scramble, event, muted, actions }: { scramble: st
   return (
     <div className={`live-scramble${muted ? ' muted' : ''}${event === 'minx' ? ' minx' : ''}`}>
       <div className="text" style={{ fontSize: `${size}rem` }}>
-        {scramble ?? ' '}
+        {scramble ?? '\u00a0'}
       </div>
       {scramble && (
         <div className="actions">

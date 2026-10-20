@@ -80,7 +80,7 @@ export function registerSessionRoutes(app: FastifyInstance, { pool, auth }: Rout
   });
 
   // Merge: move every solve of the source sessions into the target session, then delete the
-  // (now empty) sources — all in one transaction. Only sessions of the same event can be merged
+  // (now empty) sources - all in one transaction. Only sessions of the same event can be merged
   // (a solve's event is its session's event). sessions.merged makes stats recompute the event's
   // PBs, because combining sessions changes the within-session ao5/ao12 windows.
   app.post('/api/sessions/:id/merge', authed, async (req) => {

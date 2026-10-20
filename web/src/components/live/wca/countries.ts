@@ -1,6 +1,6 @@
 // Country options for the WCA rank calculator. Preferred source: GET /api/wca/countries (the WCA
 // export's own list). Fallback: every valid ISO-3166 alpha-2 code, discovered at runtime through
-// Intl.DisplayNames — no hard-coded list.
+// Intl.DisplayNames - no hard-coded list.
 import { request } from '../../../lib/api';
 
 export interface CountryOption {
@@ -15,7 +15,7 @@ try {
   displayNames = null;
 }
 
-/** "AU" → "Australia" (falls back to the code). */
+/** "AU" -> "Australia" (falls back to the code). */
 export function countryName(iso2: string | null | undefined): string {
   if (!iso2) return '';
   try {

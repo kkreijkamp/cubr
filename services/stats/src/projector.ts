@@ -242,8 +242,8 @@ export function createProjector(deps: ProjectorDeps) {
     });
   }
 
-  // ---- sessions.merged: sources are gone (tombstone + drop names), recompute the event —
-  //      merging interleaves solves, so within-session rolling PBs (ao5, ao12, …) change
+  // ---- sessions.merged: sources are gone (tombstone + drop names), recompute the event -
+  //      merging interleaves solves, so within-session rolling PBs (ao5, ao12, ...) change
   async function onSessionsMerged(evt: EventEnvelope) {
     const d = await payload(sessionsMergedSchema, evt);
     if (!d) return;

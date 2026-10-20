@@ -15,7 +15,7 @@ describe('cubing.js scrambles', () => {
     const scrambles = await gen.generateMany('333', 10);
     for (const s of scrambles) {
       const moves = s.split(' ');
-      // random-state 3x3x3 scrambles are usually 18–21 moves (rarely 17 or fewer)
+      // random-state 3x3x3 scrambles are usually 18-21 moves (rarely 17 or fewer)
       expect(moves.length).toBeGreaterThanOrEqual(15);
       expect(moves.length).toBeLessThanOrEqual(25);
       for (const m of moves) expect(m).toMatch(/^[UDLRFB]['2]?$/);

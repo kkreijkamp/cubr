@@ -1,5 +1,5 @@
 // Thin typed client for every cubetype microservice. All calls are same-origin paths that the
-// Ingress (cloud) or gateway (local) routes to the right service — see docs/SPEC.md §3.
+// Ingress (cloud) or gateway (local) routes to the right service - see docs/SPEC.md section 3.
 import type {
   ActivityDay,
   GlobalStats,
@@ -102,7 +102,7 @@ function transportError(err: unknown): unknown {
   const name = (err as Error | null)?.name;
   if (name === 'AbortError') return err;
   if (name === 'TimeoutError') return new ApiError(0, 'TIMEOUT', 'Request timed out');
-  return new ApiError(0, 'NETWORK', 'Network error — is the server reachable?');
+  return new ApiError(0, 'NETWORK', 'Network error - is the server reachable?');
 }
 
 /** Low-level request returning body + headers (used by the status page to show X-Served-By).
@@ -207,7 +207,7 @@ export const api = {
     updateMe: (body: Partial<Pick<PublicUser, 'displayName' | 'bio' | 'country' | 'wcaId'>>) =>
       request<{ user: PrivateUser }>('PATCH', '/api/auth/me', body),
     saveSettings: (settings: Record<string, unknown>) => request<{ settings: Record<string, unknown> }>('PUT', '/api/auth/me/settings', { settings }),
-    /** PUT the raw image bytes (image/webp | image/jpeg | image/png, ≤ 300 KB) → user with the new avatarUrl. */
+    /** PUT the raw image bytes (image/webp | image/jpeg | image/png, <= 300 KB) -> user with the new avatarUrl. */
     uploadAvatar: (blob: Blob) => request<{ user: PrivateUser }>('PUT', '/api/auth/me/avatar', blob, { timeoutMs: 30_000 }),
     removeAvatar: () => request<{ user: PrivateUser }>('DELETE', '/api/auth/me/avatar'),
     user: (username: string, signal?: AbortSignal) => get<{ user: PublicUser }>(`/api/users/${enc(username)}`, signal),
@@ -233,7 +233,7 @@ export const api = {
       request<{ solves: Solve[] }>('GET', `/api/sessions/${enc(id)}/solves`, undefined, { signal, timeoutMs: 60_000 }),
     import: (payload: ImportPayload) =>
       request<{ imported: { sessions: number; solves: number } }>('POST', '/api/sessions/import', payload, { timeoutMs: 120_000 }),
-    /** Moves every solve of `sourceIds` (1–50, same event, not the target) into `targetId` and
+    /** Moves every solve of `sourceIds` (1-50, same event, not the target) into `targetId` and
      *  deletes the sources, atomically. 404 = unknown session, 409 = different event. */
     merge: (targetId: string, sourceIds: string[]) =>
       request<{ session: Session; merged: { sessions: number; solves: number } }>(

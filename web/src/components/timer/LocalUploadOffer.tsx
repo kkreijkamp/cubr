@@ -25,7 +25,7 @@ export function LocalUploadOffer() {
       const r = await uploadLocalSolves();
       toast.success(`uploaded ${formatNumber(r.solves)} solves in ${r.sessions} session${r.sessions === 1 ? '' : 's'}`);
     } catch (e) {
-      setError((e as Error).message || 'upload failed — try again in a moment');
+      setError((e as Error).message || 'upload failed - try again in a moment');
     } finally {
       setBusy(false);
     }

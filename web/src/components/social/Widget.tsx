@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { CloudOff } from 'lucide-react';
 import { friendlyError } from './util';
 
-/** Calm, per-widget failure message with a retry — a down service only degrades its own widget. */
+/** Calm, per-widget failure message with a retry - a down service only degrades its own widget. */
 export function WidgetError({ error, what, onRetry, compact }: { error: unknown; what: string; onRetry?: () => void; compact?: boolean }) {
   return (
     <div className={`pv-widget-msg${compact ? ' compact' : ''}`} role="status">

@@ -1,4 +1,4 @@
-/* AvatarEditor: picker / drop zone → square crop viewport with circular mask, previews, zoom. */
+/* AvatarEditor: picker / drop zone -> square crop viewport with circular mask, previews, zoom. */
 .ae {
   display: grid;
   gap: 0.75rem;

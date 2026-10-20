@@ -15,7 +15,7 @@ export interface RecomputeDeps {
 
 /**
  * All of a user's solves for one event from solve-service (ordered by session, created_at).
- * Throws (→ the stream entry stays pending and is retried) when solve-service is unreachable.
+ * Throws (-> the stream entry stays pending and is retried) when solve-service is unreachable.
  */
 export async function fetchSolveList(deps: RecomputeDeps, userId: string, event: string): Promise<ListSolve[]> {
   const url = `${deps.solveUrl}/internal/users/${encodeURIComponent(userId)}/solves?event=${encodeURIComponent(event)}`;
@@ -23,7 +23,7 @@ export async function fetchSolveList(deps: RecomputeDeps, userId: string, event:
     const body = await fetchJson<unknown>(url, { timeoutMs: 15_000, retries: 1, headers: internalHeaders(deps.internalToken) });
     return parse(solveListSchema, body).solves;
   } catch (err) {
-    if (err instanceof HttpError && err.statusCode === 404) return []; // unknown user → no solves
+    if (err instanceof HttpError && err.statusCode === 404) return []; // unknown user -> no solves
     throw err;
   }
 }

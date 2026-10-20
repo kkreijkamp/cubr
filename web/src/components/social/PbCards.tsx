@@ -32,7 +32,7 @@ function PbCell({ kind, pb, precision }: { kind: PbKind; pb: PB | null; precisio
   );
 }
 
-/** One card per event the user has solved: single / mo3 / ao5 / ao12 / ao50 / ao100 (hover → date). */
+/** One card per event the user has solved: single / mo3 / ao5 / ao12 / ao50 / ao100 (hover -> date). */
 export function PbCards({ summary, own, precision }: { summary: AsyncState<StatsSummary>; own: boolean; precision: 2 | 3 }) {
   if (summary.error && !summary.data) {
     return (
@@ -55,11 +55,11 @@ export function PbCards({ summary, own, precision }: { summary: AsyncState<Stats
         <WidgetEmpty icon={<Trophy size={16} />}>
           {own ? (
             <>
-              no solves yet — <Link to="/" className="link-main">open the timer</Link> and press space. your personal bests, charts and wca
+              no solves yet - <Link to="/" className="link-main">open the timer</Link> and press space. your personal bests, charts and wca
               comparison will show up here.
             </>
           ) : (
-            'no solves yet — personal bests and charts will appear after the first solve.'
+            'no solves yet - personal bests and charts will appear after the first solve.'
           )}
         </WidgetEmpty>
       </section>
@@ -73,7 +73,7 @@ export function PbCards({ summary, own, precision }: { summary: AsyncState<Stats
             <h3 className="pv-pb-event">{eventLabel(e.event)}</h3>
             <span className="pv-pb-meta">
               {plural(e.solves, 'solve')}
-              {e.meanMs !== null && e.meanMs > 0 && <> · mean {formatTime(e.meanMs, precision)}</>}
+              {e.meanMs !== null && e.meanMs > 0 && <> - mean {formatTime(e.meanMs, precision)}</>}
             </span>
           </div>
           <div className="pv-pb-grid">

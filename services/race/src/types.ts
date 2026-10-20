@@ -26,7 +26,7 @@ export interface StoredPlayer {
   name: string;
   userId: string | null;
   status: PlayerStatus;
-  /** first join (ms) — the oldest connected player becomes host when the host goes away */
+  /** first join (ms) - the oldest connected player becomes host when the host goes away */
   joinedAt: number;
 }
 
@@ -48,7 +48,7 @@ export interface StoredRoom {
   results: Results;
   createdAt: string;
   createdBy: string | null;
-  /** incremented on every saved change — clients ignore room:state with an older rev */
+  /** incremented on every saved change - clients ignore room:state with an older rev */
   rev: number;
   updatedAt: number;
 }
@@ -72,7 +72,7 @@ export interface PublicPlayer {
   pods: string[];
 }
 
-/** SPEC §9.6 RoomState, plus isPrivate, rev, round.scrambleSource and players[].pods. */
+/** SPEC section 9.6 RoomState, plus isPrivate, rev, round.scrambleSource and players[].pods. */
 export interface RoomState {
   id: string;
   name: string;
@@ -95,7 +95,7 @@ export interface Identity {
   guest: boolean;
 }
 
-/** playerId → pods that hold a live socket for that player in this room. */
+/** playerId -> pods that hold a live socket for that player in this room. */
 export type Presence = Map<string, string[]>;
 
 export interface ChatMessage {

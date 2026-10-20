@@ -1,5 +1,5 @@
 // Race room: real-time multiplayer over Socket.IO (lib/race.ts). Any race pod can serve any
-// player — room state lives in Redis and the Redis adapter relays broadcasts between pods.
+// player - room state lives in Redis and the Redis adapter relays broadcasts between pods.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Link2, LogOut, Pencil, Radio, SkipForward, Swords, WifiOff } from 'lucide-react';
@@ -117,7 +117,7 @@ export default function RaceRoomPage() {
     }
     if (room.round?.n !== pending.round) {
       setPending(null);
-      toast.notice('the round moved on while you were offline — that time was not counted');
+      toast.notice('the round moved on while you were offline - that time was not counted');
       return;
     }
     const t = setTimeout(() => submit(pending), 300);
@@ -180,7 +180,7 @@ export default function RaceRoomPage() {
 
   const copyInvite = useCallback(async () => {
     if (await copyText(inviteLink(id))) toast.success('invite link copied');
-    else toast.error('could not copy — the link is ' + inviteLink(id));
+    else toast.error('could not copy - the link is ' + inviteLink(id));
   }, [id]);
 
   const leave = useCallback(async () => {
@@ -234,7 +234,7 @@ export default function RaceRoomPage() {
     return (
       <div className="stack" style={{ justifyItems: 'center', paddingTop: '3rem' }}>
         {state.connection === 'connecting' && !state.lastError ? (
-          <Loading label="joining room…" />
+          <Loading label="joining room..." />
         ) : (
           <Notice
             tone="error"
@@ -245,7 +245,7 @@ export default function RaceRoomPage() {
               </Link>
             }
           >
-            can't reach the race service{state.lastError ? ` (${state.lastError})` : ''} — retrying{state.attempt ? ` · attempt ${state.attempt}` : ''}…
+            can't reach the race service{state.lastError ? ` (${state.lastError})` : ''} - retrying{state.attempt ? ` - attempt ${state.attempt}` : ''}...
           </Notice>
         )}
       </div>
@@ -261,11 +261,11 @@ export default function RaceRoomPage() {
   const myName = user?.username ?? state.name ?? (getGuestName() || defaultGuestName());
 
   let roundLine: string;
-  if (!round) roundLine = isHost ? 'you are the host — start the first round when everyone is here' : `waiting for ${host?.name ?? 'the host'} to start the first round`;
-  else if (pending) roundLine = connected ? 'sending your time…' : 'offline — your time will be sent when you reconnect';
-  else if (room.status === 'finished') roundLine = isHost ? 'round finished — start the next one' : `round finished — waiting for ${host?.name ?? 'the host'}`;
-  else if (myResult) roundLine = `you're done · waiting for ${waitingNames}`;
-  else if (phase === 'running') roundLine = 'solving…';
+  if (!round) roundLine = isHost ? 'you are the host - start the first round when everyone is here' : `waiting for ${host?.name ?? 'the host'} to start the first round`;
+  else if (pending) roundLine = connected ? 'sending your time...' : 'offline - your time will be sent when you reconnect';
+  else if (room.status === 'finished') roundLine = isHost ? 'round finished - start the next one' : `round finished - waiting for ${host?.name ?? 'the host'}`;
+  else if (myResult) roundLine = `you're done - waiting for ${waitingNames}`;
+  else if (phase === 'running') roundLine = 'solving...';
   else roundLine = settings.inspection && event?.inspection ? 'press space to inspect' : 'hold space, release to start';
 
   return (
@@ -281,10 +281,10 @@ export default function RaceRoomPage() {
             {room.isPrivate && <span className="pill">private</span>}
           </h1>
           <div className="subtitle race-conn">
-            <span className={`via ${connected ? 'on' : 'off'}`} data-tip={'your websocket is served by this race pod.\nother players may be on other pods —\nthe redis adapter relays broadcasts.'} data-tip-pos="down">
+            <span className={`via ${connected ? 'on' : 'off'}`} data-tip={'your websocket is served by this race pod.\nother players may be on other pods -\nthe redis adapter relays broadcasts.'} data-tip-pos="down">
               <Dot state={connected ? 'up' : 'down'} pulse={connected} />
-              {connected ? 'connected via pod ' : 'reconnecting… last pod '}
-              <b>{state.servedBy ? shortPod(state.servedBy) : '…'}</b>
+              {connected ? 'connected via pod ' : 'reconnecting... last pod '}
+              <b>{state.servedBy ? shortPod(state.servedBy) : '...'}</b>
             </span>
             {state.previousPods.length > 0 && <span className="moved">moved from {shortPod(state.previousPods[0])}</span>}
             <span>
@@ -309,7 +309,7 @@ export default function RaceRoomPage() {
 
       {!connected && (
         <Notice tone="error" icon={<Radio />}>
-          connection lost — reconnecting{state.attempt ? ` (attempt ${state.attempt})` : ''}…{pending ? ' your time is saved and will be sent once you are back.' : ' the room keeps going without you.'}
+          connection lost - reconnecting{state.attempt ? ` (attempt ${state.attempt})` : ''}...{pending ? ' your time is saved and will be sent once you are back.' : ' the room keeps going without you.'}
         </Notice>
       )}
 
@@ -348,7 +348,7 @@ export default function RaceRoomPage() {
             )}
             {pending && (
               <div className="race-submitted">
-                <Spinner size={14} /> {connected ? 'sending…' : 'waiting for connection…'}
+                <Spinner size={14} /> {connected ? 'sending...' : 'waiting for connection...'}
               </div>
             )}
           </TimerArea>
@@ -368,12 +368,12 @@ export default function RaceRoomPage() {
                 <kbd>n</kbd>
               </button>
             ) : (
-              <span className="sub small">only the host ({host?.name ?? '…'}) can start rounds</span>
+              <span className="sub small">only the host ({host?.name ?? '...'}) can start rounds</span>
             )}
           </div>
 
           <div className="live-keytips fade-on-focus">
-            <kbd>space</kbd> start / stop · <kbd>esc</kbd> while solving = DNF{isHost ? ' · ' : ''}
+            <kbd>space</kbd> start / stop - <kbd>esc</kbd> while solving = DNF{isHost ? ' - ' : ''}
             {isHost && (
               <>
                 <kbd>n</kbd> next round

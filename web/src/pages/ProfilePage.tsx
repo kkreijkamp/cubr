@@ -26,9 +26,9 @@ export default function ProfilePage() {
         <div className="empty stack" style={{ justifyItems: 'center', paddingTop: '4rem' }}>
           <UserSearch size={40} className="sub" aria-hidden="true" />
           <div className="text" style={{ fontSize: '1.5rem' }}>
-            no cuber called “{username}”
+            no cuber called "{username}"
           </div>
-          <div className="sub">maybe they changed their name, or it was never solved ¯\_(ツ)_/¯</div>
+          <div className="sub">maybe they changed their name, or it was never solved {'\u00af\\_(\u30c4)_/\u00af'}</div>
           <div className="row" style={{ justifyContent: 'center' }}>
             <Link to="/leaderboards" className="btn">
               browse leaderboards
@@ -50,7 +50,7 @@ export default function ProfilePage() {
     <ProfileView user={own && me ? me : user} own={own}>
       {own && (
         <div className="center small sub">
-          this is your public profile — <Link to="/account" className="link-main">edit it on your account page</Link>
+          this is your public profile - <Link to="/account" className="link-main">edit it on your account page</Link>
         </div>
       )}
     </ProfileView>

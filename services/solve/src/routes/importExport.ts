@@ -7,14 +7,14 @@ import { enqueue } from '../outbox.js';
 import { listSessions } from '../repo.js';
 import { importBody, MAX_FUTURE_SKEW_MS } from '../schemas.js';
 
-/** A 100 000-solve csTimer import is ~15–20 MB of JSON. */
+/** A 100 000-solve csTimer import is ~15-20 MB of JSON. */
 export const IMPORT_BODY_LIMIT = 25 * 1024 * 1024;
 
 export function registerImportExportRoutes(app: FastifyInstance, { pool, auth }: RouteContext): void {
   /**
    * Bulk import (cubetype, csTimer and other timers' files are converted client-side with cubestats parseTimerFile).
    * Everything happens in ONE transaction: new sessions, solves in unnest() batches, and a
-   * single `solves.imported` outbox row — consumers recompute the user's affected events.
+   * single `solves.imported` outbox row - consumers recompute the user's affected events.
    * Auth runs onRequest, i.e. before a large body is read and parsed.
    */
   app.post('/api/sessions/import', { onRequest: auth.requireAuth, bodyLimit: IMPORT_BODY_LIMIT }, async (req) => {

@@ -2,7 +2,7 @@ import { Server } from 'lucide-react';
 import { vlabel, type ServiceView } from './monitor';
 import { podParts } from './ServiceCard';
 
-/** Which pods run on which node (from `_info.node`) — topology spread, node drains, rescheduling. */
+/** Which pods run on which node (from `_info.node`) - topology spread, node drains, rescheduling. */
 export function NodeMap({ services, vc }: { services: ServiceView[]; vc: (v: string) => string }) {
   const nodes = new Map<string, { service: string; pod: string; version: string; stale: boolean; fresh: boolean }[]>();
   for (const s of services) {
@@ -20,7 +20,7 @@ export function NodeMap({ services, vc }: { services: ServiceView[]; vc: (v: str
           <Server /> nodes
         </h3>
         <span className="meta">
-          {sorted.length} node{sorted.length === 1 ? '' : 's'} · from _info.node
+          {sorted.length} node{sorted.length === 1 ? '' : 's'} - from _info.node
         </span>
       </div>
       {sorted.length === 0 ? (
@@ -38,11 +38,11 @@ export function NodeMap({ services, vc }: { services: ServiceView[]; vc: (v: str
                   <span
                     key={`${p.service}|${p.pod}`}
                     className={`node-pod ${vc(p.version)}${p.stale ? ' stale' : ''}${p.fresh ? ' fresh' : ''}`}
-                    title={`${p.pod} · ${vlabel(p.version)}`}
+                    title={`${p.pod} - ${vlabel(p.version)}`}
                   >
                     <span className="vsq" aria-hidden="true" />
                     {p.service}
-                    <span className="id">·{podParts(p.pod, p.service).id}</span>
+                    <span className="id">-{podParts(p.pod, p.service).id}</span>
                   </span>
                 ))}
               </div>

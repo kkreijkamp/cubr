@@ -1,20 +1,20 @@
 # leaderboard service
 
 Global all-time / weekly / daily and daily-challenge leaderboards kept in Redis sorted sets
-(SPEC §7.6, §8, §9.5). No Postgres: the boards are a derived read model, rebuildable from stats.
+(SPEC section 7.6, section 8, section 9.5). No Postgres: the boards are a derived read model, rebuildable from stats.
 Readiness gates on Redis. Fastify on :8080.
 
 | Route | Notes |
 |---|---|
-| `GET /api/leaderboards/:event/:kind?period=all\|weekly\|daily&page=1&size=50[&key=]` | kind ∈ single, ao5, ao12 (weekly/daily: single, ao5). `key` views a past board (`YYYY-MM-DD` / `YYYY-Www`). `me` filled when a valid token is sent |
-| `GET /api/leaderboards/daily-challenge?date=&event=333` | kind `ao5`, period `challenge`; date defaults to today (UTC); event ∈ daily-challenge events |
+| `GET /api/leaderboards/:event/:kind?period=all\|weekly\|daily&page=1&size=50[&key=]` | kind in single, ao5, ao12 (weekly/daily: single, ao5). `key` views a past board (`YYYY-MM-DD` / `YYYY-Www`). `me` filled when a valid token is sent |
+| `GET /api/leaderboards/daily-challenge?date=&event=333` | kind `ao5`, period `challenge`; date defaults to today (UTC); event in daily-challenge events |
 | `GET /api/leaderboards/users/:userId/ranks` | every all-time board the user is on: `{event, kind, period:'all', rank, total, valueMs}` |
 | `GET /api/leaderboards/_info` | info + consumer stats, rebuild status, anti-cheat floor source |
 
-**Events consumed** (group `leaderboard`, consumer = pod name): `pb.updated` → all-time boards (exact
+**Events consumed** (group `leaderboard`, consumer = pod name): `pb.updated` -> all-time boards (exact
 ZADD, ZREM when null/-1; stale events are dropped via a per-user occurredAt guard in `<board>:ts`);
-`solve.created` → daily + weekly boards for the single and rolling ao5 (`ZADD LT`, DNF skipped);
-`daily.completed` → `lb:dc:<date>:<event>`; `user.*` and every payload with a `username` → `lb:users`.
+`solve.created` -> daily + weekly boards for the single and rolling ao5 (`ZADD LT`, DNF skipped);
+`daily.completed` -> `lb:dc:<date>:<event>`; `user.*` and every payload with a `username` -> `lb:users`.
 Score + achievedAt (`<board>:at` hash) are written atomically by small Lua scripts (`src/scripts.ts`).
 
 Decisions / simplifications:
@@ -30,7 +30,7 @@ Decisions / simplifications:
   pushed to `lb:flagged` (LPUSH + LTRIM 1000).
 - **Rebuild:** every 60 s (first check at startup, in the background) if `lb:meta:built` is missing,
   take `SET lb:rebuild-lock <pod> NX EX 120`, read `GET stats /internal/pbs?kind=` for single/ao5/ao12,
-  pipeline upserts into the all-time boards + `lb:users`, then set `lb:meta:built`. Stats unreachable →
+  pipeline upserts into the all-time boards + `lb:users`, then set `lb:meta:built`. Stats unreachable ->
   exponential backoff up to 30 s; existing boards keep serving meanwhile. Upsert only (does not delete
   entries stats no longer has).
 

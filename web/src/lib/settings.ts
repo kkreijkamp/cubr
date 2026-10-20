@@ -101,7 +101,7 @@ export function updateSettings(patch: Partial<Settings>, opts: { sync?: boolean 
     const fn = serverSync;
     syncTimer = setTimeout(() => {
       fn(settingsStore.get()).catch(() => {
-        /* offline — local copy is still saved */
+        /* offline - local copy is still saved */
       });
     }, 800);
   }

@@ -42,7 +42,7 @@ export function SolveModal({ solve, index, total, precision, preview, confirmDel
     if ((solve.comment ?? '') !== comment.trim()) void setComment(solve.id, comment);
   };
 
-  // ←/→ browse solves (not while typing a comment)
+  // <-/-> browse solves (not while typing a comment)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
@@ -79,10 +79,10 @@ export function SolveModal({ solve, index, total, precision, preview, confirmDel
         <span className="tp-modal-title">
           solve <span className="text">#{index + 1}</span>
           <span className="tp-modal-nav">
-            <button className="btn-text" onClick={() => onNavigate(index - 1)} disabled={index === 0} aria-label="previous solve" data-tip="previous (←)">
+            <button className="btn-text" onClick={() => onNavigate(index - 1)} disabled={index === 0} aria-label="previous solve" data-tip="previous (<-)">
               <ChevronLeft size={18} />
             </button>
-            <button className="btn-text" onClick={() => onNavigate(index + 1)} disabled={index >= total - 1} aria-label="next solve" data-tip="next (→)">
+            <button className="btn-text" onClick={() => onNavigate(index + 1)} disabled={index >= total - 1} aria-label="next solve" data-tip="next (->)">
               <ChevronRight size={18} />
             </button>
           </span>
@@ -96,7 +96,7 @@ export function SolveModal({ solve, index, total, precision, preview, confirmDel
       <div className="tp-solve-detail">
         <div className={`tp-solve-time${dnf ? ' dnf' : ''}`}>{fmtSolveLong(solve, precision)}</div>
         <div className="tp-solve-meta" title={formatDateTime(solve.createdAt)}>
-          {formatDateTime(solve.createdAt)} · {timeAgo(solve.createdAt)}
+          {formatDateTime(solve.createdAt)} - {timeAgo(solve.createdAt)}
           {solve.source !== 'timer' && <span className="pill">{solve.source}</span>}
         </div>
       </div>
@@ -137,7 +137,7 @@ export function SolveModal({ solve, index, total, precision, preview, confirmDel
           rows={2}
           maxLength={500}
           value={comment}
-          placeholder="add a note — e.g. pll skip, lockup on f2l"
+          placeholder="add a note - e.g. pll skip, lockup on f2l"
           onChange={(e) => setCommentText(e.target.value)}
           onBlur={saveComment}
           onKeyDown={(e) => {

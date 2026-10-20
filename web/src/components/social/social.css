@@ -1,4 +1,4 @@
-/* profile view (account + public profile) — Monkeytype account page, adapted for cubing */
+/* profile view (account + public profile) - Monkeytype account page, adapted for cubing */
 .pv {
   display: grid;
   gap: 2rem;
@@ -186,6 +186,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* overflow: hidden clips at the 1.1 line box, which cuts descenders (g, j, p, q, y) and accents
+     on tall capitals. Extend the clip box by 0.15em each way (the worst of the selectable fonts
+     needs 0.12em) and take it back with a negative margin, so the layout doesn't move. */
+  padding-block: 0.15em;
+  margin-block: -0.15em;
 }
 .pv-handle {
   display: flex;

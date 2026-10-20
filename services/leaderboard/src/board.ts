@@ -2,7 +2,7 @@ import type { Redis } from '@cubetype/common';
 import { EVENT_IDS } from '@cubetype/cubestats';
 import { KINDS, USERS_KEY, allTimeKey, atKey, pageRange, rankAt, type Kind } from './keys.js';
 
-// Read side: turns sorted sets + side hashes into the response shapes of SPEC §9.5.
+// Read side: turns sorted sets + side hashes into the response shapes of SPEC section 9.5.
 
 export interface BoardEntry {
   rank: number;
@@ -37,7 +37,7 @@ export function parseUserInfo(raw: string | null | undefined): { username: strin
   return { username: 'unknown', country: null, avatarUrl: null };
 }
 
-/** Splits a ZRANGE … WITHSCORES reply [member, score, member, score, …]. */
+/** Splits a ZRANGE ... WITHSCORES reply [member, score, member, score, ...]. */
 export function splitWithScores(flat: string[]): { ids: string[]; scores: number[] } {
   const ids: string[] = [];
   const scores: number[] = [];
@@ -87,7 +87,7 @@ export interface UserRank {
   valueMs: number;
 }
 
-/** The user's position on every all-time board they appear on (16 events × 3 kinds, one pipeline). */
+/** The user's position on every all-time board they appear on (16 events x 3 kinds, one pipeline). */
 export async function readUserRanks(redis: Redis, userId: string): Promise<UserRank[]> {
   const boards = EVENT_IDS.flatMap((event) => KINDS.map((kind) => ({ event, kind, key: allTimeKey(event, kind) })));
   const p = redis.pipeline();

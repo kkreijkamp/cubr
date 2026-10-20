@@ -14,7 +14,7 @@ export function ManualEntry({ onSubmit, disabled }: Props) {
   const [shake, setShake] = useState(0);
   const ref = useRef<HTMLInputElement>(null);
 
-  // focus the input — also after an invalid time, which re-mounts it to restart the shake animation
+  // focus the input - also after an invalid time, which re-mounts it to restart the shake animation
   useEffect(() => {
     if (!disabled) ref.current?.focus();
   }, [disabled, shake]);
@@ -63,7 +63,7 @@ export function ManualEntry({ onSubmit, disabled }: Props) {
           "that doesn't look like a time"
         ) : (
           <>
-            <kbd>enter</kbd> save · 12.34 · 1:02.34 · 1234 → 12.34 · 12.34+ · dnf(12.34)
+            <kbd>enter</kbd> save - 12.34, 1:02.34, 1234 -&gt; 12.34, 12.34+, dnf(12.34)
           </>
         )}
       </div>

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Builds the Blackboard submission archive: source code + README/deployment instructions +
 # proposal, without dependencies, build output or local data.
-#   scripts/package-submission.sh            # → ../Koen_Kreijkamp_s4890458_cubetype.zip
+#   scripts/package-submission.sh            # -> ../Koen_Kreijkamp_s4890458_cubetype.zip
 set -euo pipefail
 cd "$(dirname "$0")/.."                                   # repository root
 OUT="${1:-../Koen_Kreijkamp_s4890458_cubetype.zip}"       # archive path (default: next to the repo)
