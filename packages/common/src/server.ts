@@ -9,13 +9,13 @@ export interface ServerOptions {
   /** Public route prefixes for this service, e.g. ['/api/solves', '/api/sessions'].
    *  `<prefix>/_info` is registered for each one. */
   infoPrefixes: string[];
-  /** Named dependency checks that gate /readyz and appear in _info (e.g. { postgres: () => pool.query('select 1') }). */
+  /** Named dependency checks that gate /readyz and appear in _info (e.g. { postgres: () => pingPostgres(pool) }). */
   checks?: Record<string, DependencyCheck>;
   /** Dependencies shown in _info but NOT gating readiness (the service degrades gracefully without them). */
   softChecks?: Record<string, DependencyCheck>;
   /** Max request body in bytes (default 1 MiB). */
   bodyLimit?: number;
-  /** Extra fields merged into the _info payload. */
+  /** Extra fields merged into the _info payload (left out if they take longer than the 2 s check deadline). */
   info?: () => Record<string, unknown> | Promise<Record<string, unknown>>;
 }
 
@@ -29,12 +29,18 @@ export interface Server {
 const TRUST_PROXY_HOPS = Number(process.env.TRUST_PROXY_HOPS ?? 1);
 const CHECK_TIMEOUT_MS = 2000; // probes must answer fast even when a dependency hangs
 
+/** `p`, or a 'timeout' rejection once CHECK_TIMEOUT_MS has passed. */
+function withCheckTimeout<T>(p: Promise<T>): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('timeout')), CHECK_TIMEOUT_MS);
+  });
+  return Promise.race([p, timeout]).finally(() => clearTimeout(timer));
+}
+
 async function runCheck(fn: DependencyCheck): Promise<'ok' | 'down'> {
   try {
-    await Promise.race([
-      fn(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), CHECK_TIMEOUT_MS)),
-    ]);
+    await withCheckTimeout(fn());
     return 'ok';
   } catch {
     return 'down';
@@ -110,9 +116,13 @@ export function createServer(config: BaseConfig, opts: ServerOptions): Server {
 
   const allChecks = { ...checks, ...(opts.softChecks ?? {}) };
   const infoHandler = async () => {
-    const entries = await Promise.all(
-      Object.entries(allChecks).map(async ([name, fn]) => [name, await runCheck(fn)] as const),
-    );
+    // The service's extra fields may query a dependency too. Run them alongside the checks and
+    // under the same deadline (left out if late), so _info answers within ~2 s: the status page
+    // gives up after 2.5 s and would show "timeout" instead of which dependency is down.
+    const [entries, extra] = await Promise.all([
+      Promise.all(Object.entries(allChecks).map(async ([name, fn]) => [name, await runCheck(fn)] as const)),
+      opts.info ? withCheckTimeout(Promise.resolve().then(opts.info)).catch(() => ({})) : {},
+    ]);
     return {
       service: config.serviceName,
       version: config.version,
@@ -121,7 +131,7 @@ export function createServer(config: BaseConfig, opts: ServerOptions): Server {
       startedAt: startedAt.toISOString(),
       uptimeSec: Math.round((Date.now() - startedAt.getTime()) / 1000),
       deps: Object.fromEntries(entries),
-      ...(opts.info ? await opts.info() : {}),
+      ...extra,
     };
   };
   for (const prefix of opts.infoPrefixes) {

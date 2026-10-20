@@ -1,4 +1,4 @@
-import { createPool, createRedis, createServer, loadConfig, migrate, start } from '@cubetype/common';
+import { createPool, createRedis, createServer, loadConfig, migrate, pingPostgres, start } from '@cubetype/common';
 import { createBackend } from './backends.js';
 import { DailyChallenges } from './daily.js';
 import { ScrambleGenerator } from './generator.js';
@@ -29,7 +29,7 @@ const server = createServer(config, {
   // /daily) both degrade gracefully, so neither gates readiness.
   softChecks: {
     redis: () => redis.ping(),
-    postgres: () => pg.query('select 1'),
+    postgres: () => pingPostgres(pg),
   },
   info: async () => {
     const mem = process.memoryUsage();

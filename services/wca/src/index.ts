@@ -1,4 +1,4 @@
-import { loadConfig, createServer, start, createPool, waitForPostgres, createRedis } from '@cubetype/common';
+import { loadConfig, createServer, start, createPool, pingPostgres, waitForPostgres, createRedis } from '@cubetype/common';
 import { createCache } from './cache.js';
 import { createDataset } from './dataset.js';
 import { createRepo } from './repo.js';
@@ -14,7 +14,7 @@ const dataset = createDataset(pool);
 // so the service is ready (and answers 503 "WCA data not loaded yet") before the first import.
 const server = createServer(config, {
   infoPrefixes: ['/api/wca'],
-  checks: { postgres: () => pool.query('select 1') },
+  checks: { postgres: () => pingPostgres(pool) },
   softChecks: { redis: () => redis.ping() }, // cache only: fail open
   info: () => dataset.info(), // dataLoaded + export date / row counts
 });

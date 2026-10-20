@@ -1,4 +1,4 @@
-import { publishEvent, withTx, type Pool, type Redis } from '@cubetype/common';
+import { PG_PING_TIMEOUT_MS, publishEvent, queryWithTimeout, withTx, type Pool, type Redis } from '@cubetype/common';
 import type { FastifyBaseLogger } from 'fastify';
 
 const BATCH = 500;
@@ -90,7 +90,8 @@ export function createPbRelay(pool: Pool, redis: Redis, log: FastifyBaseLogger, 
     },
     async pending() {
       try {
-        const { rows } = await pool.query<{ n: number }>('SELECT count(*)::int AS n FROM stats.pb_outbox');
+        // For _info: short timeout, so a dead connection is dropped instead of held for 30 s.
+        const { rows } = await queryWithTimeout<{ n: number }>(pool, 'SELECT count(*)::int AS n FROM stats.pb_outbox', [], PG_PING_TIMEOUT_MS);
         return rows[0].n;
       } catch {
         return null;

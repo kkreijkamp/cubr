@@ -31,9 +31,9 @@ REGION="australia-southeast1"           # Sydney: Artifact Registry + Cloud Buil
 ZONE="australia-southeast1-a"           # zonal cluster = free GKE management fee (free tier)
 CLUSTER="cubetype"                      # GKE cluster name
 REPO="cubetype"                         # Artifact Registry Docker repository name
-VERSION="1.0.5"                         # release being deployed (image tag + APP_VERSION)
+VERSION="1.0.6"                         # release being deployed (image tag + APP_VERSION)
 NS="cubetype"                           # Kubernetes namespace of the app
-REGISTRY="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO"   # full image prefix, e.g. $REGISTRY/web:1.0.5
+REGISTRY="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO"   # full image prefix, e.g. $REGISTRY/web:1.0.6
 CNPG_VERSION="1.30.1"                   # CloudNativePG (PostgreSQL operator) release
 DEPLOYMENTS="auth scramble solve stats leaderboard race wca web"
 

@@ -62,8 +62,8 @@ changes neither that result nor the ao5 reported by `GET /api/solves/daily`.
   (ms, `-1` = DNF, `null` = not enough solves).
 - No-op PATCHes (same values) emit nothing.
 - Empty bodies sent with `Content-Type: application/json` (for example a DELETE from a fetch wrapper) are accepted.
-- The relay, the readiness check and the backlog count use short client-side Postgres query timeouts (`src/pgTimeout.ts`,
-  1.5–10 s) on top of the pool's defaults: a connection to a DB that vanished without a TCP reset (dead pod IP during a
+- The relay, the readiness check and the backlog count use short client-side Postgres query timeouts (`queryWithTimeout` /
+  `pingPostgres` from `@cubetype/common`, 1.5–10 s) on top of the pool's defaults: a connection to a DB that vanished without a TCP reset (dead pod IP during a
   failover, or a frozen VM) must not stall the relay, and frequent probes must not pile up pool clients — a timed-out
   client is released with its error, so the pool drops it.
 

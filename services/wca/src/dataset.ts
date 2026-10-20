@@ -1,5 +1,5 @@
 import type { Pool } from '@cubetype/common';
-import { unavailable } from '@cubetype/common';
+import { PG_PING_TIMEOUT_MS, queryWithTimeout, unavailable } from '@cubetype/common';
 
 /**
  * Which WCA export is currently loaded. The importer (jobs/wca-import) owns the `wca` schema
@@ -31,14 +31,13 @@ interface MetaRow {
 export function createDataset(pool: Pool) {
   let cached: { value: DatasetMeta | null; at: number } | null = null;
 
-  /** Reads wca.meta (memoised for 10 s so routes don't pay an extra round trip). */
-  async function meta(): Promise<DatasetMeta | null> {
+  /** Reads wca.meta (memoised for 10 s so routes don't pay an extra round trip). `timeoutMs` bounds the query. */
+  async function meta(timeoutMs?: number): Promise<DatasetMeta | null> {
     if (cached && Date.now() - cached.at < META_TTL_MS) return cached.value;
     let value: DatasetMeta | null = null;
     try {
-      const { rows } = await pool.query<MetaRow>(
-        'SELECT export_date, export_version, imported_at, row_counts, size_bytes FROM wca.meta LIMIT 1',
-      );
+      const sql = 'SELECT export_date, export_version, imported_at, row_counts, size_bytes FROM wca.meta LIMIT 1';
+      const { rows } = await (timeoutMs ? queryWithTimeout<MetaRow>(pool, sql, [], timeoutMs) : pool.query<MetaRow>(sql));
       const r = rows[0];
       if (r) {
         const exportDate = r.export_date.toISOString();
@@ -69,7 +68,8 @@ export function createDataset(pool: Pool) {
   /** Extra fields for GET /api/wca/_info. */
   async function info(): Promise<Record<string, unknown>> {
     try {
-      const m = await meta();
+      // short timeout: a dead connection is dropped instead of held for 30 s by every status poll
+      const m = await meta(PG_PING_TIMEOUT_MS);
       if (!m) return { dataLoaded: false };
       return {
         dataLoaded: true,

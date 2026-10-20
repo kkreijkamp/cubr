@@ -3,6 +3,7 @@ import {
   createServer,
   start,
   createPool,
+  pingPostgres,
   waitForPostgres,
   migrate,
   createRedis,
@@ -17,7 +18,7 @@ let migrated = false;
 const server = createServer(config, {
   infoPrefixes: ['/api/auth', '/api/users'],
   checks: {
-    postgres: () => pool.query('select 1'),
+    postgres: () => pingPostgres(pool),
     migrations: async () => {
       if (!migrated) throw new Error('migrations pending');
     },

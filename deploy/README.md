@@ -180,11 +180,11 @@ Run `scripts/commands.sh` section by section (`scripts/commands.sh list` prints 
 
 | § | Step |
 |---|---|
-| 0 | Variables (`PROJECT_ID=infs3208-a2-koen`, `ZONE=australia-southeast1-a`, `CLUSTER=cubetype`, `REPO=cubetype`, `VERSION=1.0.5`) |
+| 0 | Variables (`PROJECT_ID=infs3208-a2-koen`, `ZONE=australia-southeast1-a`, `CLUSTER=cubetype`, `REPO=cubetype`, `VERSION=1.0.6`) |
 | 1 | `gcloud auth list`, select `koen@mangotree.info`, set project/region/zone |
 | 2 | Enable container, artifactregistry, cloudbuild and compute APIs |
 | 3 | Artifact Registry repo. IAM: nodes get `artifactregistry.reader` and `container.defaultNodeServiceAccount`; the build SA gets `artifactregistry.writer`, `logging.logWriter` and `storage.objectViewer`. |
-| 4 | `gcloud builds submit --config cloudbuild.yaml --substitutions _VERSION=1.0.5,…` (10 images in parallel, native amd64) |
+| 4 | `gcloud builds submit --config cloudbuild.yaml --substitutions _VERSION=1.0.6,…` (10 images in parallel, native amd64) |
 | 5 | `gcloud container clusters create` (3× e2-standard-2, autoscaling 3–5, 30 GB pd-balanced, regular channel, VPC-native) + `get-credentials` |
 | 6 | Reserve the global static IP `cubetype-ip` |
 | 7 | Install CloudNativePG 1.30.1 (server-side apply) and wait for the operator |

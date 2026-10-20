@@ -1,6 +1,5 @@
 import type { FastifyBaseLogger } from 'fastify';
-import { publishEvent, type Pool, type PoolClient, type Redis } from '@cubetype/common';
-import { queryWithTimeout } from './pgTimeout.js';
+import { publishEvent, queryWithTimeout, type Pool, type PoolClient, type Redis } from '@cubetype/common';
 
 /**
  * Transactional outbox (docs/SPEC.md §7.2, §9.3).

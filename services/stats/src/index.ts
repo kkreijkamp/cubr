@@ -1,5 +1,5 @@
 import {
-  consumeEvents, createPool, createRedis, createServer, loadConfig, migrate, start, waitForPostgres,
+  consumeEvents, createPool, createRedis, createServer, loadConfig, migrate, pingPostgres, start, waitForPostgres,
   type Consumer,
 } from '@cubetype/common';
 import { CONSUMED_TYPES } from './eventSchemas.js';
@@ -21,7 +21,7 @@ let stopBackfill: (() => void) | null = null;
 const server = createServer(config, {
   infoPrefixes: ['/api/stats'],
   checks: {
-    postgres: () => pool.query('select 1'),
+    postgres: () => pingPostgres(pool),
     migrations: async () => {
       if (!migrated) throw new Error('migrations pending');
     },

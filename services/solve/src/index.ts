@@ -1,9 +1,8 @@
 import {
-  loadConfig, createServer, start, createPool, waitForPostgres, migrate, createRedis, makeAuth,
+  loadConfig, createServer, start, createPool, pingPostgres, waitForPostgres, migrate, createRedis, makeAuth,
 } from '@cubetype/common';
 import { migrations } from './migrations.js';
 import { startOutboxRelay, type Relay } from './outbox.js';
-import { queryWithTimeout } from './pgTimeout.js';
 import { registerRoutes } from './routes/index.js';
 
 const config = loadConfig('solve');
@@ -16,9 +15,7 @@ let relay: Relay | undefined;
 const server = createServer(config, {
   infoPrefixes: ['/api/solves', '/api/sessions'],
   checks: {
-    // Timeout-guarded so a probe against a dead-but-open connection drops that client instead of
-    // leaking it (otherwise frequent probes during an outage can exhaust the pool for good).
-    postgres: () => queryWithTimeout(pool, 'select 1', [], 1500),
+    postgres: () => pingPostgres(pool),
     migrations: async () => {
       if (!migrated) throw new Error('migrations pending');
     },

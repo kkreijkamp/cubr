@@ -1,4 +1,5 @@
 import pg from 'pg';
+import type { QueryConfig, QueryResult, QueryResultRow } from 'pg';
 import type { FastifyBaseLogger } from 'fastify';
 
 // int8 (bigint / bigserial / count(*)) → JS number. Our bigints (total ms, ids) stay < 2^53.
@@ -31,6 +32,36 @@ export function createPool(
   // An idle client erroring (e.g. Postgres failover) must not crash the process.
   pool.on('error', (err) => opts.log?.warn({ err }, 'postgres idle client error'));
   return pool;
+}
+
+/**
+ * Query with a client-side timeout ("Query read timeout").
+ *
+ * Without it, a connection whose server vanished without a TCP reset (DB pod/VM gone behind a
+ * port forwarder or a dead pod IP during failover) waits for the pool's 30 s query_timeout. Via
+ * `pool.query` a timed-out client is released with the error, so the pool drops it instead of
+ * keeping it checked out; callers holding a PoolClient must do `client.release(err)` themselves.
+ */
+export function queryWithTimeout<R extends QueryResultRow = QueryResultRow>(
+  db: Pool | PoolClient,
+  text: string,
+  values: unknown[] = [],
+  timeoutMs = 10_000,
+): Promise<QueryResult<R>> {
+  // `query_timeout` is honoured per query by pg but only typed on the connection config.
+  return db.query<R>({ text, values, query_timeout: timeoutMs } as QueryConfig);
+}
+
+/** Below the 2 s deadline of readiness checks and _info (server.ts), so a timed-out query has already freed its client. */
+export const PG_PING_TIMEOUT_MS = 1500;
+
+/**
+ * Postgres dependency check for /readyz and _info. A plain `pool.query('select 1')` against a
+ * dead-but-open connection would keep its client for 30 s, so probes every few seconds plus
+ * status-page polls could exhaust the pool and keep the service unready long after a failover.
+ */
+export function pingPostgres(pool: Pool): Promise<unknown> {
+  return queryWithTimeout(pool, 'select 1', [], PG_PING_TIMEOUT_MS);
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

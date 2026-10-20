@@ -55,7 +55,7 @@ services/<name>/
 ### `src/index.ts` template
 ```ts
 import {
-  loadConfig, createServer, start, createPool, waitForPostgres, migrate, createRedis, makeAuth,
+  loadConfig, createServer, start, createPool, pingPostgres, waitForPostgres, migrate, createRedis, makeAuth,
 } from '@cubetype/common';
 import { migrations } from './migrations.js';
 import { registerRoutes } from './routes/index.js';
@@ -66,7 +66,7 @@ let migrated = false;
 const server = createServer(config, {
   infoPrefixes: ['/api/auth', '/api/users'],
   checks: {
-    postgres: () => pool.query('select 1'),
+    postgres: () => pingPostgres(pool),   // select 1 with a 1.5 s timeout (never a plain pool.query)
     migrations: async () => { if (!migrated) throw new Error('migrations pending'); },
   },
   softChecks: { redis: () => redis.ping() },   // shown in _info, does not gate readiness
