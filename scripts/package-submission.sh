@@ -1,21 +1,28 @@
 #!/usr/bin/env bash
-# Builds the Blackboard submission archive: source code + README/deployment instructions +
-# proposal, without dependencies, build output or local data.
+# Builds the Blackboard submission archive from the last commit: source code and tests,
+# Dockerfiles, deployment manifests and scripts, README/deployment instructions.
+# Left out: the proposal (submitted on its own), git metadata (.git, the .github CI workflow,
+# .githooks), and - because git archive only takes committed files - dependencies, build output,
+# local data and OS junk. .gitignore stays: `gcloud builds submit` reads it to skip node_modules.
 #   scripts/package-submission.sh            # -> ../Koen_Kreijkamp_s4890458_cubetype.zip
 set -euo pipefail
 cd "$(dirname "$0")/.."                                   # repository root
 OUT="${1:-../Koen_Kreijkamp_s4890458_cubetype.zip}"       # archive path (default: next to the repo)
 
-# Re-render the proposal PDF from its HTML source so the archive has the latest version.
-#   --headless=new  no window   --no-pdf-header-footer  no URL/date in the margins
-"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --disable-gpu \
-  --no-pdf-header-footer --print-to-pdf=docs/proposal/proposal.pdf docs/proposal/proposal.html 2>/dev/null || true
+# Only committed files go into the archive, so refuse to run with uncommitted changes.
+#   --porcelain  stable, script-friendly output: empty when the working tree is clean
+if [ -n "$(git status --porcelain)" ]; then
+  echo "commit (or stash) your changes first: the archive is built from the last commit" >&2
+  exit 1
+fi
 
+# The files of the last commit as a zip.
+#   --format=zip        zip instead of tar            --prefix=cubetype/  one top-level folder
+#   -o "$OUT"           write the archive here        HEAD                the last commit
+#   ':!<path>'          pathspecs that leave a path out of the archive
 rm -f "$OUT"
-# zip -r: recurse into folders; -x: exclude dependencies, build output, secrets and OS junk
-zip -r -q "$OUT" . \
-  -x '*/node_modules/*' 'node_modules/*' '*/dist/*' 'web/dist/*' '.git/*' '*.DS_Store' \
-     '.env' '.env.*' 'deploy/k8s/secrets/*' 'data/*' '*.log'
-echo "created $OUT ($(du -h "$OUT" | cut -f1))"
-# List the top of the archive as a sanity check.
+git archive --format=zip --prefix=cubetype/ -o "$OUT" HEAD -- . \
+  ':!docs/proposal' ':!.github' ':!.githooks'
+echo "created $OUT ($(du -h "$OUT" | cut -f1)) from $(git log -1 --format='%h %s')"
+# Sanity check: the last line of the listing gives the total file count and size.
 unzip -l "$OUT" | tail -1

@@ -6,7 +6,7 @@ INFS3208 Cloud Computing - Individual Project (Type I: scalable & available web 
 
 | | |
 |---|---|
-| Proposal | [`docs/proposal/proposal.pdf`](docs/proposal/proposal.pdf) |
+| Proposal | submitted separately on Blackboard |
 | System spec (APIs, schemas, events) | [`docs/SPEC.md`](docs/SPEC.md) |
 | Deployment guide & demo runbook | [`deploy/README.md`](deploy/README.md) |
 | Every deploy/demo command, commented | [`scripts/commands.sh`](scripts/commands.sh) |
@@ -69,6 +69,11 @@ routes are never routed publicly and additionally require a shared token.
 | Seeded users / sessions / solves | ~150 / 600 / 100 k | PostgreSQL `auth`, `solve`; derived rows in `stats` |
 | Leaderboards, scramble pool, race rooms, event stream | - | Redis |
 
+The WCA data (~382 MB zipped) is not included: the `wca-import` job downloads the official WCA
+Results Export at deploy time from https://www.worldcubeassociation.org/export/results
+(API: https://www.worldcubeassociation.org/api/v0/export/public). The seed job generates the rest
+through the public APIs.
+
 ## Run locally
 
 Requirements: Docker Desktop, Node 22.
@@ -99,3 +104,6 @@ csTimer (inspiration for timer behaviour and statistics), Monkeytype (design lan
 palettes), cubing.js (scrambles and previews, MPL-2.0/GPL-3.0). This information is based on
 competition results owned and maintained by the World Cube Association, published at
 https://worldcubeassociation.org/results.
+
+## AI USAGE
+Throughout the project, I used assistence from claude opus 4.8 (through claude code) in order to test, and to help generate test files, as well as assisting with deployment issues I faced. I also used claude to help come up with the initial design, and much of the architecture was influenced under claude's advice. That said, I oversaw all of claude's actions, and am confident in my understanding of everything produced.
