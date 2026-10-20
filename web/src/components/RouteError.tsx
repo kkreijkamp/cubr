@@ -1,0 +1,25 @@
+import { useEffect, useState } from 'react';
+import { useRouteError } from 'react-router-dom';
+import { Loading } from './Spinner';
+import { isChunkLoadError, reloadForNewRelease } from '../lib/chunkReload';
+
+/** Route errorElement: reloads once when a page's chunk is gone after a rollout, else shows the error. */
+export function RouteError() {
+  const error = useRouteError();
+  const stale = isChunkLoadError(error);
+  const [reloading, setReloading] = useState(stale);
+  useEffect(() => {
+    if (stale && !reloadForNewRelease()) setReloading(false);
+  }, [stale]);
+
+  if (reloading) return <Loading label="loading the new version" />;
+  return (
+    <div className="empty stack" style={{ justifyItems: 'center', paddingTop: '4rem' }}>
+      <div className="sub">{stale ? 'cubetype was just updated.' : 'something went wrong.'}</div>
+      {!stale && error instanceof Error && <div className="error">{error.message}</div>}
+      <button className="btn" onClick={() => location.reload()}>
+        reload
+      </button>
+    </div>
+  );
+}

@@ -94,7 +94,7 @@ function Footer() {
           <Palette size={14} /> {themeLabel(settings.theme)}
         </button>
         <Link to="/status" className="btn-text" data-tip={info ? `served by ${info.pod}` : 'version'}>
-          v{info?.version ?? import.meta.env.VITE_APP_VERSION ?? 'dev'}
+          {info ? `v${info.version}` : 'version'}
         </Link>
       </div>
     </footer>

@@ -26,7 +26,9 @@ web/src/
   lib/store.ts                   # createStore/useStore, loadJson/saveJson
   lib/useAsync.ts                # useAsync(signal => promise, deps) → {data, error, loading, reload}
   lib/format.ts                  # formatTime, formatSolve, formatDate(Time), timeAgo, flagEmoji, utcDateKey, formatNumber, formatPercent
-  components/Layout.tsx          # header nav, footer (theme switcher, version), toasts, palette, guest-upload offer
+  lib/chunkReload.ts             # isChunkLoadError, reloadForNewRelease (once per 10 s) for tabs left open across a web rollout
+  components/Layout.tsx          # header nav, footer (theme switcher, version from /_info), toasts, palette, guest-upload offer
+  components/RouteError.tsx      # route errorElement: reloads when a page's chunk is gone after a rollout, else shows the error
   components/Modal.tsx           # <Modal title onClose wide center>
   components/Spinner.tsx         # <Spinner/>, <Loading/>, <ErrorState error onRetry/>
   components/ChartCanvas.tsx     # <ChartCanvas config height/>, useThemeColors(), themedScales()

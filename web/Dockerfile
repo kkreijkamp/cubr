@@ -9,8 +9,8 @@ COPY packages/cubestats packages/cubestats
 COPY web/package.json web/package-lock.json web/
 RUN --mount=type=cache,target=/root/.npm cd web && npm ci --no-audit --no-fund
 COPY web web
-ARG APP_VERSION=dev
-ENV VITE_APP_VERSION=${APP_VERSION}
+# No APP_VERSION here: the bundle doesn't contain the version (the footer reads it from /_info),
+# so a release that doesn't change web/ builds identical chunk names and a rollout can't 404 them.
 # npm run build = tsc --noEmit (type errors fail the image build) + vite build
 RUN cd web && npm run build
 
