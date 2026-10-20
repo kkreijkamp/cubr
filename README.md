@@ -20,7 +20,7 @@ Koen Kreijkamp (s4890458)
 - **Timer** — WCA-compliant: hold-to-start (space or touch), 15 s inspection with 8/12 s alerts and automatic +2/DNF, penalties, sessions per event (create, rename, merge), manual entry, focus mode.
 - **Scrambles** — official random-state scrambles for all 16 WCA events (cubing.js), with 2D/3D previews.
 - **Statistics** — mo3/ao5/ao12/ao50/ao100/ao1000 (current & best, WCA trimming rules), mean, σ, trend & histogram charts, PB detection.
-- **Accounts & sync** — solves stored in the cloud with offline-tolerant optimistic sync; csTimer import/export; settings follow you across devices; profile pictures.
+- **Accounts & sync** — solves stored in the cloud with offline-tolerant optimistic sync; import from cubetype and every timer csTimer can import (csTimer, Twisty Timer, CubeDesk, Block Keeper, DCTimer, …), JSON and csTimer export; settings follow you across devices; profile pictures.
 - **Leaderboards** — all-time / weekly / daily per event (single, ao5, ao12), WCA-record anti-cheat.
 - **Daily challenge** — everyone gets the same 5 scrambles each UTC day; one attempt per scramble, ranked by ao5.
 - **Race rooms** — real-time multiplayer rounds over WebSockets.

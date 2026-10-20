@@ -12,7 +12,7 @@ export const IMPORT_BODY_LIMIT = 25 * 1024 * 1024;
 
 export function registerImportExportRoutes(app: FastifyInstance, { pool, auth }: RouteContext): void {
   /**
-   * Bulk import (csTimer files are converted client-side with cubestats parseCsTimerExport).
+   * Bulk import (cubetype, csTimer and other timers' files are converted client-side with cubestats parseTimerFile).
    * Everything happens in ONE transaction: new sessions, solves in unnest() batches, and a
    * single `solves.imported` outbox row — consumers recompute the user's affected events.
    * Auth runs onRequest, i.e. before a large body is read and parsed.

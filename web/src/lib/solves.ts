@@ -1048,7 +1048,7 @@ async function mergeCloud(target: Session, ids: string[]): Promise<{ sessions: n
   return total;
 }
 
-/** Import parsed csTimer sessions (cloud: POST /api/sessions/import; local: localStorage). */
+/** Import sessions read by parseTimerFile (cloud: POST /api/sessions/import; local: localStorage). */
 export async function importSessions(sessions: ImportedSession[]): Promise<{ sessions: number; solves: number }> {
   if (!solveStore.get().ready) await whenReady();
   const valid = sessions.filter((s) => isEventId(s.event) && s.solves.length > 0);

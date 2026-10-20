@@ -1,8 +1,8 @@
 import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Download, FileUp, LogOut, Pencil, Upload, UserCog } from 'lucide-react';
-import { CsTimerFormatError, parseCsTimerExport, type ImportedSession } from '@cubetype/cubestats';
-import { downloadFile, eventLabel, friendlyError, plural } from './util';
+import { parseTimerFile, toCsTimerExport, TimerFormatError, type ImportedSession, type TimerImport } from '@cubetype/cubestats';
+import { csTimerFileName, downloadFile, eventLabel, friendlyError, plural, skippedNotes } from './util';
 import { useAuth } from '../../lib/auth';
 import { useRegisterCommands } from '../../lib/commands';
 import { formatDate, formatNumber, localDateKey } from '../../lib/format';
@@ -15,13 +15,9 @@ import { Spinner } from '../Spinner';
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_SOLVES = 100_000;
 
-/** csTimer's parser messages are technical; explain what to do instead. */
+/** The importer's messages already say what is wrong (and which formats work). */
 function importErrorMessage(err: unknown): string {
-  if (err instanceof CsTimerFormatError) {
-    if (/valid JSON/i.test(err.message)) return 'this file is not a csTimer export. in csTimer open export → "export to file" and pick that .txt file.';
-    if (/no session/i.test(err.message)) return 'no csTimer sessions found in this file.';
-    return `this file could not be read as a csTimer export (${err.message.toLowerCase()}).`;
-  }
+  if (err instanceof TimerFormatError) return err.message.charAt(0).toLowerCase() + err.message.slice(1);
   return friendlyError(err, 'the importer');
 }
 
@@ -33,7 +29,8 @@ function dateRange(s: ImportedSession): string {
   return a === b ? a : `${a} – ${b}`;
 }
 
-function ImportPreview({ fileName, sessions, onClose }: { fileName: string; sessions: ImportedSession[]; onClose: () => void }) {
+function ImportPreview({ fileName, parsed, onClose }: { fileName: string; parsed: TimerImport; onClose: () => void }) {
+  const { format, sessions, skipped } = parsed;
   const [selected, setSelected] = useState<Set<number>>(() => new Set(sessions.map((_, i) => i)));
   const [busy, setBusy] = useState(false);
   const chosen = useMemo(() => sessions.filter((_, i) => selected.has(i)), [sessions, selected]);
@@ -53,7 +50,7 @@ function ImportPreview({ fileName, sessions, onClose }: { fileName: string; sess
     setBusy(true);
     try {
       const res = await importSessions(chosen);
-      toast.success(`imported ${plural(res.sessions, 'session')} · ${plural(res.solves, 'solve')}`, { title: 'csTimer import', durationMs: 5000 });
+      toast.success(`imported ${plural(res.sessions, 'session')} · ${plural(res.solves, 'solve')}`, { title: `${format} import`, durationMs: 5000 });
       onClose();
     } catch (err) {
       toast.error(friendlyError(err, 'the solve service'), { title: 'import failed' });
@@ -62,12 +59,18 @@ function ImportPreview({ fileName, sessions, onClose }: { fileName: string; sess
   };
 
   return (
-    <Modal title="import from csTimer" onClose={busy ? () => undefined : onClose} wide>
+    <Modal title="import solves" onClose={busy ? () => undefined : onClose} wide>
       <div className="im-summary">
         <div className="stat">
           <span className="label">file</span>
           <span className="value text" style={{ fontSize: '1rem', whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
             {fileName}
+          </span>
+        </div>
+        <div className="stat">
+          <span className="label">format</span>
+          <span className="value text" style={{ fontSize: '1rem' }}>
+            {format}
           </span>
         </div>
         <div className="stat">
@@ -107,7 +110,12 @@ function ImportPreview({ fileName, sessions, onClose }: { fileName: string; sess
         </table>
       </div>
       {tooMany && <div className="error small">one import can hold at most {formatNumber(MAX_SOLVES)} solves — untick a few sessions.</div>}
-      <div className="sub small">non-wca scramble types are mapped to the closest event. dates, penalties, scrambles and comments are kept.</div>
+      {skippedNotes(skipped).map((note) => (
+        <div key={note} className="sub small">
+          {note}
+        </div>
+      ))}
+      <div className="sub small">non-wca puzzle types are mapped to the closest event. dates, penalties, scrambles and comments are kept.</div>
       <div className="im-actions">
         <button className="btn" onClick={onClose} disabled={busy}>
           cancel
@@ -120,14 +128,14 @@ function ImportPreview({ fileName, sessions, onClose }: { fileName: string; sess
   );
 }
 
-/** Account-only section: csTimer import, JSON export, profile + logout. */
+/** Account-only section: import (cubetype and every format csTimer imports), JSON and csTimer export, profile + logout. */
 export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: () => void }) {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [preview, setPreview] = useState<{ fileName: string; sessions: ImportedSession[] } | null>(null);
+  const [preview, setPreview] = useState<{ fileName: string; parsed: TimerImport } | null>(null);
   const [reading, setReading] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const [exporting, setExporting] = useState<'json' | 'cstimer' | null>(null);
 
   const pickFile = () => fileRef.current?.click();
 
@@ -140,9 +148,9 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
     }
     setReading(true);
     try {
-      const sessions = parseCsTimerExport(await file.text());
-      if (sessions.length === 0) throw new CsTimerFormatError('no session data found');
-      setPreview({ fileName: file.name, sessions });
+      // bytes, not text: DCTimer backups are SQLite files
+      const parsed = parseTimerFile(new Uint8Array(await file.arrayBuffer()));
+      setPreview({ fileName: file.name, parsed });
     } catch (err) {
       toast.error(importErrorMessage(err), { title: 'import failed' });
     } finally {
@@ -150,18 +158,19 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
     }
   };
 
-  const doExport = async () => {
+  const doExport = async (format: 'json' | 'cstimer') => {
     if (exporting) return;
-    setExporting(true);
+    setExporting(format);
     try {
       const data = await exportAll();
       const solves = data.sessions.reduce((a, s) => a + s.solves.length, 0);
-      downloadFile(`cubetype-export-${localDateKey()}.json`, JSON.stringify(data, null, solves > 20_000 ? undefined : 2));
+      if (format === 'json') downloadFile(`cubetype-export-${localDateKey()}.json`, JSON.stringify(data, null, solves > 20_000 ? undefined : 2));
+      else downloadFile(csTimerFileName(), toCsTimerExport(data.sessions), 'text/plain');
       toast.success(`exported ${plural(data.sessions.length, 'session')} · ${plural(solves, 'solve')}`);
     } catch (err) {
       toast.error(friendlyError(err, 'the solve service'), { title: 'export failed' });
     } finally {
-      setExporting(false);
+      setExporting(null);
     }
   };
 
@@ -175,8 +184,9 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
     'account',
     () => [
       { id: 'account-edit', label: 'Edit profile', icon: <Pencil />, run: onEdit },
-      { id: 'account-import', label: 'Import csTimer data…', icon: <FileUp />, keywords: ['cstimer', 'upload'], run: pickFile },
-      { id: 'account-export', label: 'Export data (json)', icon: <Download />, keywords: ['backup', 'download'], run: () => void doExport() },
+      { id: 'account-import', label: 'Import solves…', icon: <FileUp />, keywords: ['cstimer', 'twisty', 'cubedesk', 'block keeper', 'upload', 'restore'], run: pickFile },
+      { id: 'account-export', label: 'Export data (json)', icon: <Download />, keywords: ['backup', 'download'], run: () => void doExport('json') },
+      { id: 'account-export-cstimer', label: 'Export for csTimer', icon: <Download />, keywords: ['cstimer', 'backup', 'download'], run: () => void doExport('cstimer') },
     ],
     [onEdit],
   );
@@ -192,15 +202,15 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
         <div className="ac-row">
           <div>
             <div className="t">
-              <FileUp /> import from csTimer
+              <FileUp /> import solves
             </div>
             <div className="d">
-              in csTimer open <span className="text">export → export to file</span>, then pick that .txt here. you will see a preview before anything is
-              imported.
+              a cubetype export, or any file csTimer can import: csTimer (<span className="text">export → export to file</span>), Twisty Timer, Cubic Timer,
+              Block Keeper, CubeDesk, DCTimer, mateus Cubetimer or GAN CubeStation. you will see a preview before anything is imported.
             </div>
           </div>
           <div className="ac-actions">
-            <input ref={fileRef} type="file" accept=".txt,.json,text/plain,application/json" hidden onChange={(e) => void onFile(e.target.files?.[0])} />
+            <input ref={fileRef} type="file" hidden onChange={(e) => void onFile(e.target.files?.[0])} />
             <button className="btn" onClick={pickFile} disabled={reading}>
               {reading ? <Spinner size={16} /> : <Upload />} choose file
             </button>
@@ -211,11 +221,17 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
             <div className="t">
               <Download /> export
             </div>
-            <div className="d">download every session and solve as json — your data is yours.</div>
+            <div className="d">
+              every session and solve. json re-imports here or on another cubetype server; the csTimer file goes into csTimer with{' '}
+              <span className="text">export → import session(s) from other timers</span>, which adds sessions without replacing yours.
+            </div>
           </div>
           <div className="ac-actions">
-            <button className="btn" onClick={doExport} disabled={exporting}>
-              {exporting ? <Spinner size={16} /> : <Download />} export json
+            <button className="btn" onClick={() => void doExport('json')} disabled={exporting !== null}>
+              {exporting === 'json' ? <Spinner size={16} /> : <Download />} export json
+            </button>
+            <button className="btn" onClick={() => void doExport('cstimer')} disabled={exporting !== null}>
+              {exporting === 'cstimer' ? <Spinner size={16} /> : <Download />} export for csTimer
             </button>
           </div>
         </div>
@@ -238,7 +254,7 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
           </div>
         </div>
       </div>
-      {preview && <ImportPreview fileName={preview.fileName} sessions={preview.sessions} onClose={() => setPreview(null)} />}
+      {preview && <ImportPreview fileName={preview.fileName} parsed={preview.parsed} onClose={() => setPreview(null)} />}
     </section>
   );
 }

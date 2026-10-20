@@ -1,6 +1,7 @@
 // Small helpers shared by the social pages (login, profile/account, leaderboards, about).
-import { getEvent } from '@cubetype/cubestats';
+import { getEvent, type ImportSkipped } from '@cubetype/cubestats';
 import { ApiError } from '../../lib/api';
+import { localDateKey } from '../../lib/format';
 import type { PbKind } from '../../lib/types';
 
 export const PB_KINDS: PbKind[] = ['single', 'mo3', 'ao5', 'ao12', 'ao50', 'ao100'];
@@ -86,6 +87,19 @@ export function addDaysKey(key: string, days: number): string {
 /** "s" suffix helper: plural(3, 'solve') → "3 solves". */
 export function plural(n: number, word: string, pluralWord = `${word}s`): string {
   return `${n.toLocaleString('en-US')} ${n === 1 ? word : pluralWord}`;
+}
+
+/** "3 multi-blind solves left out …" lines for an import preview. */
+export function skippedNotes(skipped: ImportSkipped): string[] {
+  const notes: string[] = [];
+  if (skipped.multiBlind) notes.push(`${plural(skipped.multiBlind, 'multi-blind solve')} left out: cubetype has no multi-blind event.`);
+  if (skipped.invalid) notes.push(`${plural(skipped.invalid, 'solve')} without a valid time (1 ms – 24 h) left out.`);
+  return notes;
+}
+
+/** Like csTimer's own exports (cstimer_YYYYMMDD_hhmmss.txt). */
+export function csTimerFileName(now = new Date()): string {
+  return `cstimer_${localDateKey(now).replace(/-/g, '')}_cubetype.txt`;
 }
 
 export const prefersReducedMotion = (): boolean =>

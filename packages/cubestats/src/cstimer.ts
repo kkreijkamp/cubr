@@ -1,27 +1,15 @@
 import type { Penalty } from './averages.js';
+import { escapeHtml, finishImport, unescapeHtml, type ImportedSession, type RawSession, type RawSolve } from './importCommon.js';
 
 /**
- * csTimer export import. A csTimer export (`cstimer_YYYYMMDD_hhmmss.txt`) is one JSON object:
+ * csTimer files. A csTimer export (`cstimer_YYYYMMDD_hhmmss.txt`) is one JSON object:
  *   { "session1": [solve, ...], "session2": [...], ..., "properties": { "sessionData": "<JSON string>", ... } }
  * solve = [[penalty, rawMs, ...phaseEnds], scramble, comment, startUnixSeconds, optionalMoves]
  *   penalty: 0 = OK, 2000 = +2, -1 = DNF (raw time is kept even for DNF)
- * sessionData = JSON string: { "1": { "name": "...", "opt": { "scrType": "444wca" }, ... }, ... }
- *   (empty opt → 3x3; names are HTML-escaped)
+ * sessionData = JSON string: { "1": { "name": "...", "opt": { "scrType": "444wca" }, "rank": 1 }, ... }
+ *   (empty opt → 3x3; names are HTML-escaped). Older files store a session or `properties` as a
+ *   JSON string, and an older sessionData entry has `scr` instead of `opt.scrType`.
  */
-export interface ImportedSolve {
-  timeMs: number;
-  penalty: Penalty;
-  scramble: string;
-  comment: string | null;
-  createdAt: string;
-}
-
-export interface ImportedSession {
-  name: string;
-  event: string;
-  sourceType: string;
-  solves: ImportedSolve[];
-}
 
 /** csTimer scramble type → WCA event id. */
 export const CSTIMER_SCRTYPE_TO_EVENT: Record<string, string> = {
@@ -57,73 +45,112 @@ export function eventForScrType(scrType: string | undefined): string {
   return '333';
 }
 
-function unescapeHtml(s: string): string {
-  return s
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, '&');
-}
-
-function toPenalty(p: unknown): Penalty {
-  if (p === -1) return 'DNF';
-  if (typeof p === 'number' && p > 0) return '+2';
-  return 'OK';
-}
+/** csTimer's multi-blind scramble type: an attempt is a score, not a single time, and cubetype has no such event. */
+export const isMultiBlindScrType = (scrType: string | undefined): boolean => scrType === 'r3ni';
 
 export class CsTimerFormatError extends Error {}
 
+export function penaltyFromCsTimer(code: unknown): Penalty {
+  const n = Number(code);
+  if (n === -1) return 'DNF';
+  if (n > 0) return '+2';
+  return 'OK';
+}
+
+/** A JSON value that older csTimer versions stored as a JSON string. */
+function maybeJson(v: unknown): unknown {
+  if (typeof v !== 'string') return v;
+  try {
+    return JSON.parse(v);
+  } catch {
+    return undefined;
+  }
+}
+
+type SessionMeta = { name?: unknown; opt?: { scrType?: string }; scr?: string; rank?: unknown };
+
+/** The sessions of a parsed csTimer export, before limits (see finishImport). */
+export function csTimerSessions(root: Record<string, unknown>): RawSession[] {
+  const props = maybeJson(root.properties) as Record<string, unknown> | undefined;
+  const meta = ((props && maybeJson(props.sessionData)) ?? {}) as Record<string, SessionMeta>;
+  const out: RawSession[] = [];
+  for (const key of Object.keys(root)) {
+    const m = /^session(\d+)$/.exec(key);
+    if (!m) continue;
+    const times = maybeJson(root[key]);
+    if (!Array.isArray(times) || times.length === 0) continue;
+    const idx = String(Number(m[1]));
+    const info: SessionMeta | undefined = meta[idx];
+    const scrType = info?.opt?.scrType ?? info?.scr;
+    const name = info?.name !== undefined && info.name !== null && String(info.name).trim() ? unescapeHtml(String(info.name)) : `csTimer ${idx}`;
+    const solves: RawSolve[] = [];
+    for (const s of times) {
+      if (!Array.isArray(s) || !Array.isArray(s[0])) continue;
+      const ts = Number(s[3]);
+      solves.push({
+        timeMs: Number(s[0][1]),
+        penalty: penaltyFromCsTimer(s[0][0]),
+        scramble: s[1],
+        comment: s[2],
+        at: Number.isFinite(ts) && ts > 0 ? ts * 1000 : null,
+      });
+    }
+    const rank = Number(info?.rank);
+    out.push({
+      name,
+      event: isMultiBlindScrType(scrType) ? null : eventForScrType(scrType),
+      sourceType: scrType ?? '333',
+      rank: Number.isFinite(rank) ? rank : Number(idx),
+      solves,
+    });
+  }
+  return out;
+}
+
 /** Parses the text of a csTimer export file into sessions ready for POST /api/sessions/import. */
 export function parseCsTimerExport(text: string): ImportedSession[] {
-  let root: Record<string, unknown>;
+  let root: unknown;
   try {
     root = JSON.parse(text.trim());
   } catch {
     throw new CsTimerFormatError('Not a csTimer export: file is not valid JSON');
   }
-  if (!root || typeof root !== 'object') throw new CsTimerFormatError('Not a csTimer export');
-  const sessionKeys = Object.keys(root).filter((k) => /^session\d+$/.test(k));
-  if (sessionKeys.length === 0) throw new CsTimerFormatError('Not a csTimer export: no session data found');
+  if (!root || typeof root !== 'object' || Array.isArray(root)) throw new CsTimerFormatError('Not a csTimer export');
+  if (!Object.keys(root).some((k) => /^session\d+$/.test(k))) throw new CsTimerFormatError('Not a csTimer export: no session data found');
+  return finishImport(csTimerSessions(root as Record<string, unknown>)).sessions;
+}
 
-  let meta: Record<string, { name?: unknown; opt?: { scrType?: string } }> = {};
-  const props = root.properties as Record<string, unknown> | undefined;
-  if (props && typeof props.sessionData === 'string') {
-    try {
-      meta = JSON.parse(props.sessionData);
-    } catch {
-      meta = {};
-    }
-  } else if (props && typeof props.sessionData === 'object' && props.sessionData) {
-    meta = props.sessionData as typeof meta;
-  }
+/** The sessions and solves of a cubetype export (only the fields a csTimer file can hold). */
+export interface ExportSession {
+  name: string;
+  event: string;
+  solves: { timeMs: number; penalty: Penalty; scramble: string; comment: string | null; createdAt: string }[];
+}
 
-  const out: ImportedSession[] = [];
-  sessionKeys
-    .sort((a, b) => Number(a.slice(7)) - Number(b.slice(7)))
-    .forEach((key) => {
-      const idx = key.slice(7);
-      const raw = root[key];
-      if (!Array.isArray(raw) || raw.length === 0) return;
-      const m = meta[idx] ?? {};
-      const scrType = m.opt?.scrType;
-      const event = eventForScrType(scrType);
-      const name = m.name !== undefined && m.name !== null && String(m.name).trim() ? unescapeHtml(String(m.name)).slice(0, 40) : `csTimer ${idx}`;
-      const solves: ImportedSolve[] = [];
-      for (const s of raw) {
-        if (!Array.isArray(s) || !Array.isArray(s[0])) continue;
-        const [pen, ms] = s[0] as [unknown, unknown];
-        if (typeof ms !== 'number' || !Number.isFinite(ms) || ms <= 0) continue;
-        const ts = typeof s[3] === 'number' && s[3] > 0 ? s[3] : null;
-        solves.push({
-          timeMs: Math.round(ms),
-          penalty: toPenalty(pen),
-          scramble: typeof s[1] === 'string' ? s[1].slice(0, 2000) : '',
-          comment: typeof s[2] === 'string' && s[2] ? s[2].slice(0, 500) : null,
-          createdAt: ts ? new Date(ts * 1000).toISOString() : new Date(0).toISOString(),
-        });
-      }
-      if (solves.length) out.push({ name, event, sourceType: scrType ?? '333', solves });
-    });
-  return out;
+const EVENT_TO_SCRTYPE: Record<string, string> = Object.fromEntries(Object.entries(CSTIMER_SCRTYPE_TO_EVENT).map(([scr, event]) => [event, scr]));
+
+/**
+ * A csTimer export file of these sessions. It starts with `{"session1"` so csTimer's "Import
+ * session(s) from other timers" accepts it and adds the sessions; "Import from file" also reads
+ * it, but replaces all csTimer data. Names are HTML-escaped as csTimer stores them.
+ */
+export function toCsTimerExport(sessions: ExportSession[]): string {
+  const out: Record<string, unknown> = {};
+  const sessionData: Record<string, unknown> = {};
+  const list = sessions.length ? sessions : [{ name: 'cubetype', event: '333', solves: [] }];
+  list.forEach((s, i) => {
+    const n = i + 1;
+    out[`session${n}`] = [...s.solves]
+      .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
+      .map((x) => [
+        [x.penalty === 'DNF' ? -1 : x.penalty === '+2' ? 2000 : 0, x.timeMs],
+        x.scramble ?? '',
+        x.comment ?? '',
+        Math.max(0, Math.round(Date.parse(x.createdAt) / 1000) || 0),
+      ]);
+    const scrType = EVENT_TO_SCRTYPE[s.event] ?? '333';
+    sessionData[n] = { name: escapeHtml(s.name), opt: scrType === '333' ? {} : { scrType }, rank: n };
+  });
+  out.properties = { sessionN: list.length, sessionData: JSON.stringify(sessionData) };
+  return JSON.stringify(out);
 }

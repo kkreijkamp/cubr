@@ -24,7 +24,7 @@ cubetype/
   .github/workflows/ci.yml    # typecheck, tests, bundles, web build and kustomize render on every push
   packages/
     common/                   # @cubetype/common  (server bootstrap, db, redis, auth, events, http, internal calls)
-    cubestats/                # @cubetype/cubestats (WCA averaging, formatting, events, csTimer import) — used by web AND services
+    cubestats/                # @cubetype/cubestats (WCA averaging, formatting, events, solve import/export) — used by web AND services
   services/
     auth/  scramble/  solve/  stats/  leaderboard/  race/  wca/
   jobs/

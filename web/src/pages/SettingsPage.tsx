@@ -27,7 +27,8 @@ import {
   Upload,
   Volume2,
 } from 'lucide-react';
-import { CsTimerFormatError, EVENTS, parseCsTimerExport, type ImportedSession } from '@cubetype/cubestats';
+import { CsTimerFormatError, EVENTS, parseTimerFile, toCsTimerExport, type TimerImport } from '@cubetype/cubestats';
+import { csTimerFileName, skippedNotes } from '../components/social/util';
 import { ConfirmModal } from '../components/timer/Dialogs';
 import { playPbSound } from '../components/timer/feedback';
 import { AVG_CHOICES, parseAvgKey } from '../components/timer/statsUtil';
@@ -523,9 +524,9 @@ function ThemeGrid({ current }: { current: string }) {
 }
 
 function DataTools({ loggedIn }: { loggedIn: boolean }) {
-  const [parsed, setParsed] = useState<{ file: string; sessions: ImportedSession[] } | null>(null);
+  const [parsed, setParsed] = useState<({ file: string } & TimerImport) | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<'import' | 'export' | null>(null);
+  const [busy, setBusy] = useState<'import' | 'export' | 'export-cstimer' | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const summary = useMemo(() => {
@@ -540,10 +541,8 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
     setParsed(null);
     if (!f) return;
     try {
-      const text = await f.text();
-      const sessions = parseCsTimerExport(text);
-      if (!sessions.length) throw new CsTimerFormatError('That export has no solves in it.');
-      setParsed({ file: f.name, sessions });
+      // bytes, not text: DCTimer backups are SQLite files
+      setParsed({ file: f.name, ...parseTimerFile(new Uint8Array(await f.arrayBuffer())) });
     } catch (e) {
       setError(e instanceof CsTimerFormatError ? e.message : 'Could not read that file.');
     } finally {
@@ -566,11 +565,12 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
     }
   };
 
-  const doExport = async () => {
-    setBusy('export');
+  const doExport = async (format: 'json' | 'cstimer') => {
+    setBusy(format === 'json' ? 'export' : 'export-cstimer');
     try {
       const data = await exportAll();
-      download(`cubetype-export-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data));
+      if (format === 'json') download(`cubetype-export-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data));
+      else download(csTimerFileName(), toCsTimerExport(data.sessions));
       const n = data.sessions.reduce((a, x) => a + x.solves.length, 0);
       toast.success(`exported ${formatNumber(n)} solves`);
     } catch (e) {
@@ -584,16 +584,17 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
     <>
       <SettingRow
         icon={<Upload size={16} />}
-        title="import from csTimer"
+        title="import solves"
         description={
           <>
-            In csTimer open <span className="text">export → export to file</span>, then pick that .txt file here. Each csTimer session becomes a cubetype
-            session {loggedIn ? 'in your account' : 'in this browser'}.
+            A cubetype export, or any file csTimer can import: csTimer (<span className="text">export → export to file</span>), Twisty Timer, Cubic Timer,
+            Block Keeper, CubeDesk, DCTimer, mateus Cubetimer or GAN CubeStation. Each session becomes a cubetype session{' '}
+            {loggedIn ? 'in your account' : 'in this browser'}.
           </>
         }
       >
         <div className="st-import">
-          <input ref={fileRef} type="file" accept=".txt,.json,text/plain,application/json" hidden onChange={(e) => void onFile(e.target.files?.[0])} />
+          <input ref={fileRef} type="file" hidden onChange={(e) => void onFile(e.target.files?.[0])} />
           {!parsed ? (
             <button className="btn" onClick={() => fileRef.current?.click()} disabled={busy !== null}>
               <Upload size={16} /> choose file
@@ -601,10 +602,16 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
           ) : (
             <div className="st-import-preview">
               <div className="small">
-                <span className="text">{parsed.file}</span>
+                <span className="text">{parsed.file}</span> ({parsed.format})
                 <br />
                 <span className="main">{formatNumber(summary?.solves ?? 0)} solves</span> · {parsed.sessions.length} session{parsed.sessions.length === 1 ? '' : 's'} ·{' '}
                 {summary?.events.join(', ')}
+                {skippedNotes(parsed.skipped).map((note) => (
+                  <span key={note}>
+                    <br />
+                    {note}
+                  </span>
+                ))}
               </div>
               <div className="row">
                 <button className="btn" onClick={() => setParsed(null)} disabled={busy !== null}>
@@ -619,10 +626,24 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
           {error && <div className="error small">{error}</div>}
         </div>
       </SettingRow>
-      <SettingRow icon={<Download size={16} />} title="export" description="Download every session and solve as JSON — your data is yours.">
-        <button className="btn" onClick={doExport} disabled={busy !== null}>
-          <Download size={16} /> {busy === 'export' ? 'exporting…' : 'export json'}
-        </button>
+      <SettingRow
+        icon={<Download size={16} />}
+        title="export"
+        description={
+          <>
+            Every session and solve. JSON re-imports here or on another cubetype server; the csTimer file goes into csTimer with{' '}
+            <span className="text">export → import session(s) from other timers</span>, which adds sessions without replacing yours.
+          </>
+        }
+      >
+        <div className="row">
+          <button className="btn" onClick={() => void doExport('json')} disabled={busy !== null}>
+            <Download size={16} /> {busy === 'export' ? 'exporting…' : 'export json'}
+          </button>
+          <button className="btn" onClick={() => void doExport('cstimer')} disabled={busy !== null}>
+            <Download size={16} /> {busy === 'export-cstimer' ? 'exporting…' : 'export for csTimer'}
+          </button>
+        </div>
       </SettingRow>
       <SettingRow
         icon={<Database size={16} />}
