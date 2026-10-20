@@ -180,11 +180,11 @@ Run `scripts/commands.sh` section by section (`scripts/commands.sh list` prints 
 
 | § | Step |
 |---|---|
-| 0 | Variables (`PROJECT_ID=infs3208-a2-koen`, `ZONE=australia-southeast1-a`, `CLUSTER=cubetype`, `REPO=cubetype`, `VERSION=1.0.9`) |
+| 0 | Variables (`PROJECT_ID=infs3208-a2-koen`, `ZONE=australia-southeast1-a`, `CLUSTER=cubetype`, `REPO=cubetype`, `VERSION=1.0.10`) |
 | 1 | `gcloud auth list`, select `koen@mangotree.info`, set project/region/zone |
 | 2 | Enable container, artifactregistry, cloudbuild and compute APIs |
 | 3 | Artifact Registry repo. IAM: nodes get `artifactregistry.reader` and `container.defaultNodeServiceAccount`; the build SA gets `artifactregistry.writer`, `logging.logWriter` and `storage.objectViewer`. |
-| 4 | `gcloud builds submit --config cloudbuild.yaml --substitutions _VERSION=1.0.9,…` (10 images in parallel, native amd64) |
+| 4 | `gcloud builds submit --config cloudbuild.yaml --substitutions _VERSION=1.0.10,…` (10 images in parallel, native amd64) |
 | 5 | `gcloud container clusters create` (3× e2-standard-2, autoscaling 3–5, 30 GB pd-balanced, regular channel, VPC-native) + `get-credentials` |
 | 6 | Reserve the global static IP `cubetype-ip` |
 | 7 | Install CloudNativePG 1.30.1 (server-side apply) and wait for the operator |
@@ -217,11 +217,21 @@ To release a new version permanently, change `newTag` in `k8s/overlays/gke/kusto
 **Preparation (before the talk):**
 
 - Cluster is up and seeded (§9, §10).
+- In **both terminals**, start `bash`: zsh on macOS has `interactivecomments` off, so every pasted comment line would print `command not found: #`. Then paste the variables and the `ingress_ip` helper that the `scripts/commands.sh` sections use. Without them, `$REGISTRY` is empty and the rollout's `set image … web=$REGISTRY/web:1.1.0` becomes `web=/web:1.1.0`, an invalid image name. Don't `source scripts/commands.sh` instead: its `set -euo pipefail` would close the terminal at the first failing command.
+  ```bash
+  # Same values as the variable block at the top of scripts/commands.sh.
+  export PROJECT_ID=infs3208-a2-koen REGION=australia-southeast1 REPO=cubetype NS=cubetype
+  export REGISTRY="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO"
+  # Prints the Ingress's public IP; -o jsonpath extracts only that field.
+  ingress_ip() { kubectl -n "$NS" get ingress cubetype -o jsonpath='{.status.loadBalancer.ingress[0].ip}'; }
+  # Both must show a value. An empty IP means kubectl points at another cluster:
+  # check `kubectl config current-context`.
+  IP=$(ingress_ip); echo "IP=$IP REGISTRY=$REGISTRY"
+  ```
 - Open `http://<IP>/status` in the browser. The in-app cluster view polls every service's `_info`.
-- Terminal 1: `export NS=cubetype`, with the `scripts/commands.sh` sections ready to paste.
+- Terminal 1: the `scripts/commands.sh` sections 11–14, ready to paste.
 - Terminal 2: the probe loop from §13. It polls the demo user's sessions, so every request goes through the gateway, a solve pod and the PostgreSQL primary. (A leaderboard route is served from Redis alone and would print `200` whatever solve or PostgreSQL do.)
   ```bash
-  IP=<IP>
   # Log in as the seeded demo user; -d sends the credentials as JSON, jq -r .token prints the raw token.
   TOKEN=$(curl -s -X POST http://$IP/api/auth/login -H 'content-type: application/json' -d '{"login":"demo","password":"cubetype-demo"}' | jq -r .token)
   # Print one status code every 0.5 s: -m 2 gives up after 2 s (prints 000), -o /dev/null discards
