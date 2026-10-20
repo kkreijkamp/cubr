@@ -436,7 +436,10 @@ async function main() {
     while (next < users.length) {
       const i = next++;
       try {
-        total += await seedUser(users[i], i, daily, today);
+        // await first: `total += await …` reads total before the await, so the workers would
+        // overwrite each other's counts
+        const written = await seedUser(users[i], i, daily, today);
+        total += written;
       } catch (err) {
         console.warn(`  ! ${users[i].username}: ${(err as Error).message}`);
       }
