@@ -169,6 +169,7 @@ The HPA demo works the same way: `kubectl apply -k deploy/k8s/jobs/loadgen; kube
 - HPA scaled scramble 2 → 4 → 8 within about 40 s of loadgen.
 - PDBs present.
 - Rolling update, a broken tag (ErrImagePull contained by `maxUnavailable: 0`), `rollout undo` and `--to-revision=1` all ran with **70/70 HTTP 200** during the whole sequence.
+- Deleting the PostgreSQL primary promoted the replica after **12.7 s**. An authenticated `GET /api/sessions` loop (every 0.5 s, through solve to `pg-rw`) failed for about 1.5 s (4 of 45 requests). With CNPG's default `smartShutdownTimeout` of 180 s, the same test took 186 s.
 
 To match GKE's version exactly, create the cluster with `NODE_IMAGE=kindest/node:v1.36.4 scripts/kind-up.sh`.
 
@@ -178,11 +179,11 @@ Run `scripts/commands.sh` section by section (`scripts/commands.sh list` prints 
 
 | § | Step |
 |---|---|
-| 0 | Variables (`PROJECT_ID=infs3208-a2-koen`, `ZONE=australia-southeast1-a`, `CLUSTER=cubetype`, `REPO=cubetype`, `VERSION=1.0.3`) |
+| 0 | Variables (`PROJECT_ID=infs3208-a2-koen`, `ZONE=australia-southeast1-a`, `CLUSTER=cubetype`, `REPO=cubetype`, `VERSION=1.0.4`) |
 | 1 | `gcloud auth list`, select `koen@mangotree.info`, set project/region/zone |
 | 2 | Enable container, artifactregistry, cloudbuild and compute APIs |
 | 3 | Artifact Registry repo. IAM: nodes get `artifactregistry.reader` and `container.defaultNodeServiceAccount`; the build SA gets `artifactregistry.writer`, `logging.logWriter` and `storage.objectViewer`. |
-| 4 | `gcloud builds submit --config cloudbuild.yaml --substitutions _VERSION=1.0.3,…` (10 images in parallel, native amd64) |
+| 4 | `gcloud builds submit --config cloudbuild.yaml --substitutions _VERSION=1.0.4,…` (10 images in parallel, native amd64) |
 | 5 | `gcloud container clusters create` (3× e2-standard-2, autoscaling 3–5, 30 GB pd-balanced, regular channel, VPC-native) + `get-credentials` |
 | 6 | Reserve the global static IP `cubetype-ip` |
 | 7 | Install CloudNativePG 1.30.1 (server-side apply) and wait for the operator |

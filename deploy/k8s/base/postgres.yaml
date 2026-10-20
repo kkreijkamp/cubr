@@ -19,6 +19,10 @@ spec:
   instances: 2                          # primary + 1 replica (the GKE overlay raises this to 3)
   imageName: ghcr.io/cloudnative-pg/postgresql:17.11-minimal-trixie   # PostgreSQL 17 (SPEC §2), pinned
   primaryUpdateStrategy: unsupervised   # operator may restart/switch over the primary on its own during upgrades
+  # A deleted/evicted instance first gets a "smart" shutdown, which waits for every client to
+  # disconnect -- pooled services never do, so the primary would refuse new connections for the
+  # full default of 180 s before a replica is promoted. After 10 s, fast shutdown closes them.
+  smartShutdownTimeout: 10
 
   postgresql:
     parameters:
