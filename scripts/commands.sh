@@ -12,8 +12,9 @@
 #   A whole section can also be run non-interactively:
 #       scripts/commands.sh 5          # runs section 0 (variables) + section 5
 #       scripts/commands.sh list       # lists the sections
-#   The demo sections (11-14) contain `kubectl ... -w` (watch) commands that run until you
-#   press Ctrl+C -- run those sections by copy-pasting.
+#   Sections 11 and 13 contain `kubectl ... -w` (watch) commands that run until you press
+#   Ctrl+C, which also stops a non-interactive run -- run the demo sections (11-14) by
+#   copy-pasting. The other sections run unattended (section 9 waits in bounded loops).
 #
 # PREREQUISITES on the laptop: gcloud CLI, kubectl, openssl, curl, jq (optional: hey).
 # Local alternatives (no cloud): docker compose (docker-compose.yml) and kind
@@ -31,9 +32,9 @@ REGION="australia-southeast1"           # Sydney: Artifact Registry + Cloud Buil
 ZONE="australia-southeast1-a"           # zonal cluster = free GKE management fee (free tier)
 CLUSTER="cubetype"                      # GKE cluster name
 REPO="cubetype"                         # Artifact Registry Docker repository name
-VERSION="1.0.8"                         # release being deployed (image tag + APP_VERSION)
+VERSION="1.0.9"                         # release being deployed (image tag + APP_VERSION)
 NS="cubetype"                           # Kubernetes namespace of the app
-REGISTRY="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO"   # full image prefix, e.g. $REGISTRY/web:1.0.8
+REGISTRY="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO"   # full image prefix, e.g. $REGISTRY/web:1.0.9
 CNPG_VERSION="1.30.1"                   # CloudNativePG (PostgreSQL operator) release
 DEPLOYMENTS="auth scramble solve stats leaderboard race wca web"
 
@@ -301,10 +302,33 @@ section_9() {
   kubectl -n "$NS" get svc,hpa,pdb
   kubectl -n "$NS" get cluster pg
 
-  # Watch the Ingress until the ADDRESS column shows the static IP (Ctrl+C to stop).
-  # The load balancer + health checks need ~5-10 minutes; until then expect 404/502.
-  #   -w  watch: print a new line on every change
-  kubectl -n "$NS" get ingress cubetype -w || true
+  # Wait for the load balancer in two bounded loops instead of `get ingress -w`: Ctrl+C on a
+  # watch would stop this whole script, so the smoke test below would never run.
+  # 1) Up to 10 min until the Ingress has its address (the static IP, once Google has created
+  #    the load balancer's forwarding rule). Checked every 10 s.
+  waited=0
+  until [ -n "$(ingress_ip)" ]; do
+    if [ "$waited" -ge 600 ]; then
+      echo "no Ingress address after 10 min: see kubectl -n $NS describe ingress cubetype" >&2
+      return 1
+    fi
+    sleep 10; waited=$((waited + 10))
+  done
+  kubectl -n "$NS" get ingress cubetype
+
+  # 2) Up to 10 more min until it answers: Google returns 404/502 until the backends' health
+  #    checks pass (usually 5-10 min).
+  #   -s  silent    -m 5  give up on a request after 5 s    -o /dev/null  discard the body
+  #   -w '%{http_code}'  print only the HTTP status (000 if there was no answer)
+  waited=0
+  until [ "$(curl -s -m 5 -o /dev/null -w '%{http_code}' "http://$(ingress_ip)/_info")" = 200 ]; do
+    if [ "$waited" -ge 600 ]; then
+      echo "the load balancer still doesn't answer after 10 min: see the backends' health below" >&2
+      kubectl -n "$NS" describe ingress cubetype
+      return 1
+    fi
+    sleep 10; waited=$((waited + 10))
+  done
 
   # Per-backend health as seen by Google (annotation ingress.kubernetes.io/backends -> HEALTHY).
   kubectl -n "$NS" describe ingress cubetype
