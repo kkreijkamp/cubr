@@ -41,10 +41,15 @@ spec:
           env:
             - name: TARGET_URL
               value: "http://scramble:8080/api/scrambles/444?count=5&fresh=1"
+            # Each request keeps one scramble pod busy (up to 1 core); ~1.2 cores (8 pods x 60 % of
+            # 250m) already hold scramble at its max of 8 pods. Measured on kind: 4 in flight used
+            # ~3-4 cores and every request was answered; 16 used ~6 cores across the nodes and a
+            # quarter of the requests timed out. 3 e2-standard-2 nodes have 6 vCPU in total, so 16
+            # would starve the other services' probes. Lower to 3 if `kubectl top nodes` shows 100 %.
             - name: CONCURRENCY
-              value: "16"
-            - name: DURATION
-              value: "4m"
+              value: "4"
+            - name: DURATION              # covers the scale-up and the rest of the demo
+              value: "6m"
           # $(VAR) is expanded by Kubernetes from the env list above.
           args:
             - load
