@@ -117,11 +117,11 @@ Run `scripts/commands.sh` section by section (`scripts/commands.sh list` prints 
 
 | section  | Step |
 |---|---|
-| 0 | Variables (`PROJECT_ID=infs3208-a2-koen`, `ZONE=australia-southeast1-a`, `CLUSTER=cubetype`, `REPO=cubetype`, `VERSION=1.0.18`) |
+| 0 | Variables (`PROJECT_ID=infs3208-a2-koen`, `ZONE=australia-southeast1-a`, `CLUSTER=cubetype`, `REPO=cubetype`, `VERSION=1.0.19`) |
 | 1 | `gcloud auth list`, select `koen@mangotree.info`, set project/region/zone |
 | 2 | Enable container, artifactregistry, cloudbuild and compute APIs |
 | 3 | Artifact Registry repo. IAM: nodes get `artifactregistry.reader` and `container.defaultNodeServiceAccount`; the build SA gets `artifactregistry.writer`, `logging.logWriter` and `storage.objectViewer`. |
-| 4 | `gcloud builds submit --config cloudbuild.yaml --substitutions _VERSION=1.0.18,...` (10 images in parallel, native amd64) |
+| 4 | `gcloud builds submit --config cloudbuild.yaml --substitutions _VERSION=1.0.19,...` (10 images in parallel, native amd64) |
 | 5 | `gcloud container clusters create` (3x e2-standard-2, autoscaling 3-5, 30 GB pd-balanced, regular channel, VPC-native) + `get-credentials` |
 | 6 | Reserve the global static IP `cubetype-ip` |
 | 7 | Install CloudNativePG 1.30.1 (server-side apply) and wait for the operator |
@@ -129,7 +129,7 @@ Run `scripts/commands.sh` section by section (`scripts/commands.sh list` prints 
 | 9 | `kubectl apply -k deploy/k8s/overlays/gke`, wait for pg/redis/rollouts, wait for the Ingress IP (up to 25 min: ~17 min on a first deploy) and for the load balancer to answer (up to 10 min), smoke test |
 | 10 | `kubectl create job --from=cronjob/wca-import wca-import-now`, seed Job |
 | 11-14 | Demos: scalability, load balancing, reliability, rolling update / rollback |
-| 15 | Cost control: pause (hibernate PostgreSQL, switch the autoscaler off, pool to 0) and resume / delete the namespace, cluster, IP and repo |
+| 15 | Cost control: pause (autoscaler off, app and Redis to 0 replicas, hibernate PostgreSQL, pool to 0); resume and delete (namespace, cluster, IP, repo) as commented copy-paste steps |
 
 To release a new version permanently: commit (the pre-commit hook bumps the version in every deploy file and the commit is tagged `vX.Y.Z`; enable the hooks once per clone with `git config core.hooksPath .githooks`, and see `scripts/bump-version.sh` for the details), build that version with section 4, then apply it with section 9. Don't edit `newTag` by hand, and always build before applying: until section 4 has run, the overlay names images that don't exist yet. `kubectl set image` is for the demo; a later `kubectl apply -k` reverts to the overlay's tag.
 
