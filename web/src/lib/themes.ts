@@ -247,7 +247,15 @@ const VARS: [Exclude<keyof Theme, 'name' | 'original'>, string][] = [
   ['colorfulErrorExtra', '--colorful-error-extra-color'],
 ];
 
-/** Applies a theme's colours to :root. `persist` stores them for the pre-paint script in index.html. */
+/** The favicon (a 3x3 cube face, as in public/favicon.svg) in a theme's colours: main-colour stickers, text-colour centre. */
+export function faviconSvg(theme: Theme): string {
+  const stickers = [6, 13, 20].flatMap((y) =>
+    [6, 13, 20].map((x) => `<rect x="${x}" y="${y}" width="6" height="6" rx="1.5"${x === 13 && y === 13 ? ` fill="${theme.text}"` : ''}/>`),
+  );
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="${theme.bg}"/><g fill="${theme.main}">${stickers.join('')}</g></svg>`;
+}
+
+/** Applies a theme's colours to :root and the favicon. `persist` stores them for the pre-paint script in index.html. */
 export function applyTheme(name: string, persist = true): void {
   const theme = getTheme(name);
   const root = document.documentElement;
@@ -257,6 +265,7 @@ export function applyTheme(name: string, persist = true): void {
     colors[v] = theme[k];
   }
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme.bg);
+  document.querySelector('link[rel="icon"]')?.setAttribute('href', `data:image/svg+xml,${encodeURIComponent(faviconSvg(theme))}`);
   if (persist) {
     try {
       localStorage.setItem('cubetype.themeColors', JSON.stringify(colors));
