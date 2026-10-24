@@ -220,8 +220,7 @@ function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, 
         onClick={() => setOpen(!open)}
         aria-haspopup="menu"
         aria-expanded={open}
-        data-tip={open ? undefined : 'session'}
-        data-tip-pos="down"
+        aria-label={`session: ${current?.name ?? 'none'}`}
         {...noFocus}
       >
         <Layers size={14} />
