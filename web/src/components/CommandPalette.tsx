@@ -50,6 +50,8 @@ function PaletteInner({ initial }: { initial: string | null }) {
   const [stack, setStack] = useState<{ title: string; items: () => Command[] }[]>([]);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
+  /** the row the keyboard left highlighted; the highlight returns here when the mouse leaves the list */
+  const restIndex = useRef(0);
   const [previewing, setPreviewing] = useState(false);
   const previewed = useRef(false);
   const committed = useRef(false);
@@ -95,20 +97,23 @@ function PaletteInner({ initial }: { initial: string | null }) {
   // a sub-list opens on its current choice (e.g. the active theme of ~180), like Monkeytype
   useEffect(() => {
     const current = stack.length && !query ? rows.findIndex((r) => r.cmd.active) : -1;
-    setActive(Math.max(0, current));
+    restIndex.current = Math.max(0, current);
+    setActive(restIndex.current);
     centerNext.current = current > 0;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, stack]);
 
-  // live preview of the highlighted row (themes), after a short delay like Monkeytype
+  // live preview of the highlighted row (themes), after a short delay like Monkeytype; a row
+  // without a preview (e.g. "random theme") shows the saved theme/font again
   const activeRow = rows[Math.min(active, rows.length - 1)];
   useEffect(() => {
     const cmd = activeRow?.cmd;
     setPreviewing(Boolean(cmd?.preview));
-    if (!cmd?.preview) return;
+    if (!cmd?.preview && !previewed.current) return;
     const t = setTimeout(() => {
-      previewed.current = true;
-      cmd.preview?.();
+      previewed.current = Boolean(cmd?.preview);
+      if (cmd?.preview) cmd.preview();
+      else applyVisualSettings();
     }, 120);
     return () => clearTimeout(t);
   }, [activeRow]);
@@ -131,14 +136,19 @@ function PaletteInner({ initial }: { initial: string | null }) {
     if (!keepOpen) closePalette();
   };
 
+  const highlight = (i: number) => {
+    restIndex.current = i;
+    setActive(i);
+  };
+
   const onKeyDown = (e: React.KeyboardEvent) => {
     const n = rows.length;
     if (e.key === 'ArrowDown' || (e.key === 'Tab' && !e.shiftKey) || (e.ctrlKey && (e.key === 'j' || e.key === 'n'))) {
       e.preventDefault();
-      setActive((a) => (n ? (a + 1) % n : 0));
+      highlight(n ? (active + 1) % n : 0);
     } else if (e.key === 'ArrowUp' || (e.key === 'Tab' && e.shiftKey) || (e.ctrlKey && e.key === 'p')) {
       e.preventDefault();
-      setActive((a) => (n ? (a - 1 + n) % n : 0));
+      highlight(n ? (active - 1 + n) % n : 0);
     } else if (e.key === 'Enter') {
       e.preventDefault();
       choose(rows[active]);
@@ -169,7 +179,7 @@ function PaletteInner({ initial }: { initial: string | null }) {
           <Search size={16} />
           <input ref={inputRef} value={query} onChange={(e) => setQuery(e.target.value)} placeholder={placeholder} aria-label="Search commands" />
         </div>
-        <div className="palette-list" ref={listRef}>
+        <div className="palette-list" ref={listRef} onMouseLeave={() => setActive(restIndex.current)}>
           {rows.length === 0 && <div className="palette-empty">No commands found</div>}
           {rows.map((row, i) => (
             <div
