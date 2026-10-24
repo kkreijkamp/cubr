@@ -9,34 +9,54 @@
 }
 
 /* ------------------------------------------------------------ config bar */
+/* One test-config card (as in Monkeytype): events | session | inspection typing | sync. */
 .tp-config {
-  align-items: stretch;
-  row-gap: 0.5rem;
+  min-width: 0; /* the page's width, not the bar's, so the fit check can collapse the events */
 }
-.tp-config .config-card {
-  min-height: 2.35rem;
+.tp-bar {
+  position: relative;
+  flex-wrap: nowrap;
+  min-height: 2.4rem;
+  padding: 0 0.6em;
 }
-.tp-config .btn-text {
-  gap: 0.35em;
+.tp-bar .btn-text {
+  gap: 0.4em;
+  transition-duration: 0.2s;
 }
-.tp-events-full .btn-text {
-  padding-left: 0.42em;
-  padding-right: 0.42em;
+.tp-events {
+  display: flex;
+  align-items: center;
 }
-.tp-events-compact {
+.tp-events .btn-text {
+  padding-left: 0.5em;
+  padding-right: 0.5em;
+}
+.tp-event-chip {
   display: none !important;
 }
-.tp-toggles .divider,
-.tp-session-card .divider {
-  margin: 0 0.15em;
+.tp-bar.compact .tp-events {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+}
+.tp-bar.compact .tp-event-chip {
+  display: inline-flex !important;
+}
+.tp-bar .divider {
+  width: 2px;
+  height: 1.1em;
+  margin: 0 0.55em;
+  border-radius: 1px;
 }
 .tp-sync {
+  display: inline-flex;
+  align-items: center;
   gap: 0.4em;
+  padding: 0 0.5em;
   color: var(--sub-color);
-  padding: 0 0.85em !important;
   cursor: default;
-  font-size: 0.75rem;
-  transition: color var(--dur);
+  white-space: nowrap;
+  transition: color 0.2s;
 }
 .tp-sync.warn {
   color: var(--error-color);
@@ -48,20 +68,12 @@
   animation: spin 1.2s linear infinite;
 }
 
-@media (max-width: 1180px) {
-  .tp-events-full {
-    display: none !important;
-  }
-  .tp-events-compact {
-    display: inline-flex !important;
-  }
-}
 @media (max-width: 560px) {
   .tp-hide-narrow {
     display: none;
   }
-  .tp-config {
-    gap: 0.4rem;
+  .tp-bar .divider {
+    margin: 0 0.35em;
   }
 }
 

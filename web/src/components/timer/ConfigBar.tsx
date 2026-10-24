@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Check, ChevronDown, Cloud, CloudOff, Eye, HardDrive, Keyboard, Layers, Merge, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { EVENTS, getEvent } from '@cubetype/cubestats';
 import { Modal } from '../Modal';
@@ -38,36 +38,59 @@ export function ConfigBar(p: Props) {
   const current = p.sessions.find((s) => s.id === p.currentSessionId) ?? null;
   const eventSessions = p.sessions.filter((s) => s.event === p.event);
   const { onOverlayChange } = p;
+  const barRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const eventsRef = useRef<HTMLDivElement>(null);
+  const chipRef = useRef<HTMLButtonElement>(null);
+  // the events collapse into one button when the bar doesn't fit (measured: the font sets its width)
+  const [compact, setCompact] = useState(false);
 
   useEffect(() => {
     onOverlayChange(menuOpen || pickerOpen);
   }, [menuOpen, pickerOpen, onOverlayChange]);
 
+  useLayoutEffect(() => {
+    const bar = barRef.current;
+    const card = cardRef.current;
+    const events = eventsRef.current;
+    const chip = chipRef.current;
+    if (!bar || !card || !events || !chip) return;
+    const check = () => {
+      // width with every event inline; while compact the events stay laid out (hidden) to measure
+      const inline = card.offsetWidth - chip.offsetWidth + (card.classList.contains('compact') ? events.offsetWidth : 0);
+      setCompact(inline > bar.clientWidth);
+    };
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(bar);
+    ro.observe(events);
+    void document.fonts?.ready.then(check);
+    return () => ro.disconnect();
+  }, []);
+
   return (
-    <div className="config-bar tp-config fade-on-focus">
-      {/* desktop: every event inline */}
-      <div className="config-card tp-events-full" role="group" aria-label="event">
-        {EVENTS.map((e) => (
-          <button
-            key={e.id}
-            className={`btn-text${e.id === p.event ? ' active' : ''}`}
-            onClick={() => p.onEvent(e.id)}
-            aria-pressed={e.id === p.event}
-            title={e.name}
-            {...noFocus}
-          >
-            {shortLabel(e.id)}
-          </button>
-        ))}
-      </div>
-      {/* narrow screens: one button that opens a picker */}
-      <div className="config-card tp-events-compact">
-        <button className="btn-text active" onClick={() => setPickerOpen(true)} aria-label="choose event" {...noFocus}>
+    <div className="config-bar tp-config fade-on-focus" ref={barRef}>
+      <div className={`config-card tp-bar${compact ? ' compact' : ''}`} ref={cardRef}>
+        <div className="tp-events" role="group" aria-label="event" aria-hidden={compact || undefined} ref={eventsRef}>
+          {EVENTS.map((e) => (
+            <button
+              key={e.id}
+              className={`btn-text${e.id === p.event ? ' active' : ''}`}
+              onClick={() => p.onEvent(e.id)}
+              aria-pressed={e.id === p.event}
+              title={e.name}
+              {...noFocus}
+            >
+              {shortLabel(e.id)}
+            </button>
+          ))}
+        </div>
+        {/* when the events don't fit: one button that opens a picker */}
+        <button className="btn-text active tp-event-chip" onClick={() => setPickerOpen(true)} aria-label="choose event" ref={chipRef} {...noFocus}>
           {shortLabel(p.event)} <ChevronDown size={14} />
         </button>
-      </div>
 
-      <div className="config-card tp-session-card">
+        <div className="divider" />
         <SessionMenu
           open={menuOpen}
           setOpen={setMenuOpen}
@@ -80,9 +103,8 @@ export function ConfigBar(p: Props) {
           onDelete={p.onDeleteSession}
           onMerge={p.onMergeSessions}
         />
-      </div>
 
-      <div className="config-card tp-toggles">
+        <div className="divider" />
         <button
           className={`btn-text${p.inspection ? ' active' : ''}`}
           onClick={p.onToggleInspection}
@@ -94,7 +116,6 @@ export function ConfigBar(p: Props) {
           <Eye size={14} />
           <span className="tp-hide-narrow">inspection</span>
         </button>
-        <div className="divider" />
         <button
           className={`btn-text${p.manual ? ' active' : ''}`}
           onClick={p.onToggleManual}
@@ -106,9 +127,10 @@ export function ConfigBar(p: Props) {
           <Keyboard size={14} />
           <span className="tp-hide-narrow">typing</span>
         </button>
-      </div>
 
-      <SyncStatus mode={p.mode} pending={p.pending} syncError={p.syncError} />
+        <div className="divider" />
+        <SyncStatus mode={p.mode} pending={p.pending} syncError={p.syncError} />
+      </div>
 
       {pickerOpen && (
         <Modal title="event" onClose={() => setPickerOpen(false)} center>
@@ -275,9 +297,9 @@ function SyncStatus({ mode, pending, syncError }: { mode: 'local' | 'cloud'; pen
     tip = syncError;
   }
   return (
-    <div className={`config-card tp-sync${cls}`} data-tip={tip} data-tip-pos="down" role="status" aria-label={tip}>
+    <span className={`tp-sync${cls}`} data-tip={tip} data-tip-pos="down" role="status" aria-label={tip}>
       {icon}
       <span className="tp-hide-narrow">{label}</span>
-    </div>
+    </span>
   );
 }
