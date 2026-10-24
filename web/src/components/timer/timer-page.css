@@ -9,59 +9,182 @@
 }
 
 /* ------------------------------------------------------------ config bar */
-.tp-config {
-  align-items: stretch;
-  row-gap: 0.5rem;
+/* Two quiet tiers: an event rail (a capsule with a gliding highlight) over a row of small
+   session / switch / sync controls split by hairlines. Theme colours only, via color-mix. */
+.cb {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  min-width: 0; /* take the page's width, not the rail's, so the fit check can collapse it */
+  gap: 0.6rem;
+  font-size: 0.8rem;
+  --cb-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --cb-tint: color-mix(in srgb, var(--main-color) 13%, transparent);
+  /* the gliding thumb: neutral glass, so only the chosen label carries the theme colour */
+  --cb-thumb: color-mix(in srgb, var(--text-color) 9%, transparent);
+  --cb-thumb-edge: color-mix(in srgb, var(--text-color) 7%, transparent);
 }
-.tp-config .config-card {
-  min-height: 2.35rem;
+.cb-rail {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0.25rem 0.3rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sub-alt-color) 75%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-color) 5%, transparent);
 }
-.tp-config .btn-text {
-  gap: 0.35em;
+.cb-group {
+  display: flex;
+  align-items: center;
 }
-.tp-events-full .btn-text {
-  padding-left: 0.42em;
-  padding-right: 0.42em;
+.cb-group + .cb-group::before {
+  content: '';
+  width: 3px;
+  height: 3px;
+  margin: 0 0.4rem;
+  border-radius: 50%;
+  background: var(--sub-color);
+  opacity: 0.5;
 }
-.tp-events-compact {
-  display: none !important;
+.cb .cb-event {
+  position: relative;
+  z-index: 1;
+  padding: 0.42rem 0.68rem;
+  border-radius: 999px;
+  letter-spacing: 0.01em;
+  transition: color 0.3s ease;
 }
-.tp-toggles .divider,
-.tp-session-card .divider {
-  margin: 0 0.15em;
+.cb-glide {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 999px;
+  background: var(--cb-thumb);
+  box-shadow: inset 0 0 0 1px var(--cb-thumb-edge), 0 1px 3px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
 }
-.tp-sync {
+.cb-glide.animate {
+  transition: transform 0.45s var(--cb-ease), width 0.45s var(--cb-ease);
+}
+.cb .cb-chip {
+  display: none;
   gap: 0.4em;
-  color: var(--sub-color);
-  padding: 0 0.85em !important;
-  cursor: default;
-  font-size: 0.75rem;
-  transition: color var(--dur);
-}
-.tp-sync.warn {
-  color: var(--error-color);
-}
-.tp-sync svg {
-  flex-shrink: 0;
-}
-.tp-spin {
-  animation: spin 1.2s linear infinite;
+  padding: 0.5rem 1.1rem;
+  border-radius: 999px;
+  color: var(--main-color);
+  background: var(--cb-thumb);
+  box-shadow: inset 0 0 0 1px var(--cb-thumb-edge);
 }
 
-@media (max-width: 1180px) {
-  .tp-events-full {
-    display: none !important;
-  }
-  .tp-events-compact {
-    display: inline-flex !important;
+.cb-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem 0.3rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  color: var(--sub-color);
+}
+.cb .cb-meta .btn-text {
+  gap: 0.45em;
+  padding: 0.35rem 0.55rem;
+  border-radius: 999px;
+}
+.cb-rule {
+  width: 1px;
+  height: 0.85rem;
+  margin: 0 0.2rem;
+  background: var(--sub-color);
+  opacity: 0.3;
+}
+.cb-session-btn .tp-session-name {
+  color: var(--text-color);
+}
+
+/* inspection / typing: a small outlined switch that fills with the main colour when on */
+.cb .cb-toggle[aria-pressed='true'] {
+  color: var(--text-color);
+}
+.cb-switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 1.7em;
+  height: 1em;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px currentColor;
+  opacity: 0.75;
+  transition: background 0.25s ease, box-shadow 0.25s ease, opacity 0.25s ease;
+}
+.cb-switch::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0.22em;
+  width: 0.56em;
+  height: 0.56em;
+  border-radius: 50%;
+  background: currentColor;
+  transform: translateY(-50%);
+  transition: transform 0.3s var(--cb-ease), background 0.25s ease;
+}
+.cb-toggle[aria-pressed='true'] .cb-switch {
+  background: var(--main-color);
+  box-shadow: none;
+  opacity: 1;
+}
+.cb-toggle[aria-pressed='true'] .cb-switch::after {
+  background: var(--bg-color);
+  transform: translate(0.7em, -50%);
+}
+
+/* sync: hollow = this browser only, filled = saved to the account, pulsing = syncing */
+.cb-sync {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55em;
+  padding: 0.35rem 0.55rem;
+  cursor: default;
+  transition: color var(--dur);
+}
+.cb-dot {
+  width: 0.45em;
+  height: 0.45em;
+  border-radius: 50%;
+  background: var(--main-color);
+  box-shadow: 0 0 0 0.22em var(--cb-tint);
+}
+.cb-sync.local .cb-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--sub-color);
+}
+.cb-sync.syncing .cb-dot {
+  animation: cbPulse 1.4s ease-in-out infinite;
+}
+.cb-sync.warn {
+  color: var(--error-color);
+}
+.cb-sync.warn .cb-dot {
+  background: var(--error-color);
+  box-shadow: 0 0 0 0.22em color-mix(in srgb, var(--error-color) 18%, transparent);
+}
+@keyframes cbPulse {
+  50% {
+    opacity: 0.3;
   }
 }
+
+.cb.compact .cb-rail {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+}
+.cb.compact .cb-chip {
+  display: inline-flex;
+}
 @media (max-width: 560px) {
-  .tp-hide-narrow {
+  .cb-label {
     display: none;
-  }
-  .tp-config {
-    gap: 0.4rem;
   }
 }
 
@@ -70,7 +193,7 @@
   position: relative;
   display: inline-flex;
 }
-.tp-session-btn {
+.cb-session-btn {
   max-width: 16rem;
 }
 .tp-session-name {
@@ -79,13 +202,13 @@
   white-space: nowrap;
   max-width: 11rem;
 }
-.tp-session-btn .tp-chevron {
+.cb-session-btn .tp-chevron {
   transition: transform var(--dur);
 }
-.tp-session-btn.open {
+.cb-session-btn.open {
   color: var(--text-color);
 }
-.tp-session-btn.open .tp-chevron {
+.cb-session-btn.open .tp-chevron {
   transform: rotate(180deg);
 }
 .tp-menu {
@@ -97,8 +220,8 @@
   min-width: 15rem;
   max-width: min(22rem, calc(100vw - 2rem));
   background: var(--bg-color);
-  border-radius: var(--roundness);
-  box-shadow: 0 0 0 2px var(--sub-alt-color);
+  border-radius: calc(var(--roundness) * 1.5);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-color) 9%, transparent), 0 18px 40px -14px rgba(0, 0, 0, 0.55);
   padding: 0.4rem;
   font-size: 0.8rem;
   animation: fadeIn 0.1s ease-out;
