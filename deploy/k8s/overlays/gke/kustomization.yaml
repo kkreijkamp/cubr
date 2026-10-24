@@ -21,31 +21,31 @@ resources:
 images:
   - name: cubetype/auth
     newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/auth
-    newTag: "1.0.26"
+    newTag: "1.0.27"
   - name: cubetype/scramble
     newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/scramble
-    newTag: "1.0.26"
+    newTag: "1.0.27"
   - name: cubetype/solve
     newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/solve
-    newTag: "1.0.26"
+    newTag: "1.0.27"
   - name: cubetype/stats
     newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/stats
-    newTag: "1.0.26"
+    newTag: "1.0.27"
   - name: cubetype/leaderboard
     newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/leaderboard
-    newTag: "1.0.26"
+    newTag: "1.0.27"
   - name: cubetype/race
     newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/race
-    newTag: "1.0.26"
+    newTag: "1.0.27"
   - name: cubetype/wca
     newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/wca
-    newTag: "1.0.26"
+    newTag: "1.0.27"
   - name: cubetype/web
     newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/web
-    newTag: "1.0.26"
+    newTag: "1.0.27"
   - name: cubetype/wca-import
     newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/wca-import
-    newTag: "1.0.26"
+    newTag: "1.0.27"
 
 patches:
   # Behind the Google load balancer X-Forwarded-For is "<client-ip>, <lb-ip>" -> trust 2 hops.

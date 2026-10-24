@@ -151,8 +151,6 @@ function EventMenu({ open, setOpen, event, sessions, onEvent }: EventMenuProps) 
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`event: ${getEvent(event)?.name ?? event}`}
-        data-tip={open ? undefined : getEvent(event)?.name}
-        data-tip-pos="down"
         {...noFocus}
       >
         {shortLabel(event)}
@@ -175,7 +173,7 @@ function EventMenu({ open, setOpen, event, sessions, onEvent }: EventMenuProps) 
                       setOpen(false);
                       if (e.id !== event) onEvent(e.id);
                     }}
-                    title={e.name}
+                    aria-label={e.name}
                     {...noFocus}
                   >
                     <span className="tp-menu-check">{e.id === event && <Check size={14} />}</span>
