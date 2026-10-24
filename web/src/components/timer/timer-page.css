@@ -9,10 +9,7 @@
 }
 
 /* ------------------------------------------------------------ config bar */
-/* One test-config card (as in Monkeytype): events | session | inspection typing | sync. */
-.tp-config {
-  min-width: 0; /* the page's width, not the bar's, so the fit check can collapse the events */
-}
+/* One test-config card (as in Monkeytype): event | session | inspection typing | sync. */
 .tp-bar {
   position: relative;
   flex-wrap: nowrap;
@@ -22,25 +19,6 @@
 .tp-bar .btn-text {
   gap: 0.4em;
   transition-duration: 0.2s;
-}
-.tp-events {
-  display: flex;
-  align-items: center;
-}
-.tp-events .btn-text {
-  padding-left: 0.5em;
-  padding-right: 0.5em;
-}
-.tp-event-chip {
-  display: none !important;
-}
-.tp-bar.compact .tp-events {
-  position: absolute;
-  visibility: hidden;
-  pointer-events: none;
-}
-.tp-bar.compact .tp-event-chip {
-  display: inline-flex !important;
 }
 .tp-bar .divider {
   width: 2px;
@@ -68,12 +46,40 @@
   animation: spin 1.2s linear infinite;
 }
 
+/* event dropdown: the menu hangs from the bar's left edge, one column per group */
+.tp-event-btn .tp-chevron {
+  transition: transform var(--dur);
+}
+.tp-event-btn.open .tp-chevron {
+  transform: rotate(180deg);
+}
+.tp-menu.tp-events-menu {
+  left: 0;
+  transform: none;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(8.5rem, 1fr));
+  column-gap: 0.25rem;
+  max-width: calc(100vw - 2rem);
+}
+
 @media (max-width: 560px) {
   .tp-hide-narrow {
     display: none;
   }
   .tp-bar .divider {
     margin: 0 0.35em;
+  }
+  .tp-menu.tp-events-menu {
+    grid-template-columns: repeat(3, minmax(5.5rem, 1fr));
+  }
+  /* no counts on phones: drop their column (and its gap) so "3x3 oh" fits */
+  .tp-events-menu .tp-menu-item {
+    grid-template-columns: 1rem 1fr;
+    gap: 0.4rem;
+    padding: 0.5rem 0.45rem;
+  }
+  .tp-events-menu .tp-menu-count {
+    display: none;
   }
 }
 
@@ -113,7 +119,13 @@
   box-shadow: 0 0 0 2px var(--sub-alt-color);
   padding: 0.4rem;
   font-size: 0.8rem;
-  animation: fadeIn 0.1s ease-out;
+  animation: tpMenuIn 0.16s ease-out;
+}
+@keyframes tpMenuIn {
+  from {
+    opacity: 0;
+    translate: 0 -4px;
+  }
 }
 .tp-menu-title {
   color: var(--sub-color);
@@ -177,25 +189,6 @@
   background: var(--sub-alt-color);
   margin: 0.35rem 0.25rem;
   border-radius: 2px;
-}
-
-/* event picker (narrow screens) */
-.tp-event-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
-  gap: 0.5rem;
-}
-.tp-event-grid .btn {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.15rem;
-  padding: 0.65rem 0.75rem;
-}
-.tp-event-grid-name {
-  font-size: 0.65rem;
-  opacity: 0.6;
-  white-space: normal;
-  text-align: left;
 }
 
 /* ------------------------------------------------------------ scramble */

@@ -1,7 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { Check, ChevronDown, Cloud, CloudOff, Eye, HardDrive, Keyboard, Layers, Merge, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
-import { EVENTS, getEvent } from '@cubetype/cubestats';
-import { Modal } from '../Modal';
+import { EVENTS, getEvent, type EventInfo } from '@cubetype/cubestats';
 import type { Session } from '../../lib/types';
 import { formatNumber } from '../../lib/format';
 
@@ -9,6 +8,15 @@ import { formatNumber } from '../../lib/format';
 export const noFocus = { onMouseDown: (e: React.MouseEvent) => e.preventDefault() };
 
 const shortLabel = (id: string) => (getEvent(id)?.short ?? id).toLowerCase();
+
+/** The event dropdown's columns, in WCA order: NxN cubes, their OH / blind / FMC events, other puzzles. */
+const isCube = (e: EventInfo) => /^(\d)\1\1$/.test(e.id);
+const isCubeVariant = (e: EventInfo) => !isCube(e) && /^\dx\dx\d$/.test(e.puzzle);
+const EVENT_GROUPS = [
+  { title: 'cubes', events: EVENTS.filter(isCube) },
+  { title: 'variants', events: EVENTS.filter(isCubeVariant) },
+  { title: 'other', events: EVENTS.filter((e) => !isCube(e) && !isCubeVariant(e)) },
+];
 
 interface Props {
   event: string;
@@ -33,62 +41,20 @@ interface Props {
 }
 
 export function ConfigBar(p: Props) {
+  const [eventsOpen, setEventsOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
   const current = p.sessions.find((s) => s.id === p.currentSessionId) ?? null;
   const eventSessions = p.sessions.filter((s) => s.event === p.event);
   const { onOverlayChange } = p;
-  const barRef = useRef<HTMLDivElement>(null);
-  const cardRef = useRef<HTMLDivElement>(null);
-  const eventsRef = useRef<HTMLDivElement>(null);
-  const chipRef = useRef<HTMLButtonElement>(null);
-  // the events collapse into one button when the bar doesn't fit (measured: the font sets its width)
-  const [compact, setCompact] = useState(false);
 
   useEffect(() => {
-    onOverlayChange(menuOpen || pickerOpen);
-  }, [menuOpen, pickerOpen, onOverlayChange]);
-
-  useLayoutEffect(() => {
-    const bar = barRef.current;
-    const card = cardRef.current;
-    const events = eventsRef.current;
-    const chip = chipRef.current;
-    if (!bar || !card || !events || !chip) return;
-    const check = () => {
-      // width with every event inline; while compact the events stay laid out (hidden) to measure
-      const inline = card.offsetWidth - chip.offsetWidth + (card.classList.contains('compact') ? events.offsetWidth : 0);
-      setCompact(inline > bar.clientWidth);
-    };
-    check();
-    const ro = new ResizeObserver(check);
-    ro.observe(bar);
-    ro.observe(events);
-    void document.fonts?.ready.then(check);
-    return () => ro.disconnect();
-  }, []);
+    onOverlayChange(eventsOpen || menuOpen);
+  }, [eventsOpen, menuOpen, onOverlayChange]);
 
   return (
-    <div className="config-bar tp-config fade-on-focus" ref={barRef}>
-      <div className={`config-card tp-bar${compact ? ' compact' : ''}`} ref={cardRef}>
-        <div className="tp-events" role="group" aria-label="event" aria-hidden={compact || undefined} ref={eventsRef}>
-          {EVENTS.map((e) => (
-            <button
-              key={e.id}
-              className={`btn-text${e.id === p.event ? ' active' : ''}`}
-              onClick={() => p.onEvent(e.id)}
-              aria-pressed={e.id === p.event}
-              title={e.name}
-              {...noFocus}
-            >
-              {shortLabel(e.id)}
-            </button>
-          ))}
-        </div>
-        {/* when the events don't fit: one button that opens a picker */}
-        <button className="btn-text active tp-event-chip" onClick={() => setPickerOpen(true)} aria-label="choose event" ref={chipRef} {...noFocus}>
-          {shortLabel(p.event)} <ChevronDown size={14} />
-        </button>
+    <div className="config-bar tp-config fade-on-focus">
+      <div className="config-card tp-bar">
+        <EventMenu open={eventsOpen} setOpen={setEventsOpen} event={p.event} sessions={p.sessions} onEvent={p.onEvent} />
 
         <div className="divider" />
         <SessionMenu
@@ -131,25 +97,96 @@ export function ConfigBar(p: Props) {
         <div className="divider" />
         <SyncStatus mode={p.mode} pending={p.pending} syncError={p.syncError} />
       </div>
+    </div>
+  );
+}
 
-      {pickerOpen && (
-        <Modal title="event" onClose={() => setPickerOpen(false)} center>
-          <div className="tp-event-grid">
-            {EVENTS.map((e) => (
-              <button
-                key={e.id}
-                className={`btn${e.id === p.event ? ' active' : ''}`}
-                onClick={() => {
-                  setPickerOpen(false);
-                  p.onEvent(e.id);
-                }}
-              >
-                <span>{shortLabel(e.id)}</span>
-                <span className="tp-event-grid-name">{e.name}</span>
-              </button>
-            ))}
-          </div>
-        </Modal>
+/** Closes a dropdown on a click outside `ref` or on Escape. */
+function useDismiss(open: boolean, setOpen: (o: boolean) => void, ref: RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        setOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', onDown);
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      window.removeEventListener('mousedown', onDown);
+      window.removeEventListener('keydown', onKey, true);
+    };
+  }, [open, setOpen, ref]);
+}
+
+interface EventMenuProps {
+  open: boolean;
+  setOpen: (o: boolean) => void;
+  event: string;
+  /** every session (all events), for the solve count next to each event */
+  sessions: Session[];
+  onEvent: (event: string) => void;
+}
+
+/** The chosen event (main colour); opens every event in three columns, with its solve count. */
+function EventMenu({ open, setOpen, event, sessions, onEvent }: EventMenuProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  useDismiss(open, setOpen, ref);
+  const counts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const s of sessions) m.set(s.event, (m.get(s.event) ?? 0) + s.solveCount);
+    return m;
+  }, [sessions]);
+
+  return (
+    <div className="tp-event-menu" ref={ref}>
+      <button
+        className={`btn-text active tp-event-btn${open ? ' open' : ''}`}
+        onClick={() => setOpen(!open)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`event: ${getEvent(event)?.name ?? event}`}
+        data-tip={open ? undefined : getEvent(event)?.name}
+        data-tip-pos="down"
+        {...noFocus}
+      >
+        {shortLabel(event)}
+        <ChevronDown size={14} className="tp-chevron" />
+      </button>
+      {open && (
+        <div className="tp-menu tp-events-menu" role="menu" aria-label="event">
+          {EVENT_GROUPS.map((g) => (
+            <div key={g.title} role="group" aria-label={g.title}>
+              <div className="tp-menu-title">{g.title}</div>
+              {g.events.map((e) => {
+                const n = counts.get(e.id) ?? 0;
+                return (
+                  <button
+                    key={e.id}
+                    role="menuitemradio"
+                    aria-checked={e.id === event}
+                    className={`tp-menu-item${e.id === event ? ' active' : ''}`}
+                    onClick={() => {
+                      setOpen(false);
+                      if (e.id !== event) onEvent(e.id);
+                    }}
+                    title={e.name}
+                    {...noFocus}
+                  >
+                    <span className="tp-menu-check">{e.id === event && <Check size={14} />}</span>
+                    <span className="tp-menu-label">{shortLabel(e.id)}</span>
+                    <span className="tp-menu-count">{n > 0 ? formatNumber(n) : ''}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -171,25 +208,7 @@ interface MenuProps {
 function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, onNew, onRename, onDelete, onMerge }: MenuProps) {
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        e.stopPropagation();
-        setOpen(false);
-      }
-    };
-    window.addEventListener('mousedown', onDown);
-    window.addEventListener('keydown', onKey, true);
-    return () => {
-      window.removeEventListener('mousedown', onDown);
-      window.removeEventListener('keydown', onKey, true);
-    };
-  }, [open, setOpen]);
+  useDismiss(open, setOpen, ref);
 
   const act = (fn: () => void) => () => {
     setOpen(false);
