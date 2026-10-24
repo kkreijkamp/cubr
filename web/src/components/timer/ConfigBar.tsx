@@ -290,7 +290,8 @@ function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, 
 
 function SyncStatus({ mode, pending, syncError }: { mode: 'local' | 'cloud'; pending: number; syncError: string | null }) {
   let icon = <HardDrive size={14} />;
-  let label = 'local';
+  /** null = icon only (the calm "synced" state) */
+  let label: string | null = 'local';
   let tip = 'guest mode: solves are saved in this browser';
   let cls = '';
   if (mode === 'cloud') {
@@ -306,7 +307,7 @@ function SyncStatus({ mode, pending, syncError }: { mode: 'local' | 'cloud'; pen
       cls = ' warn';
     } else {
       icon = <Cloud size={14} />;
-      label = 'synced';
+      label = null;
       tip = 'all solves are saved to your account';
     }
   } else if (syncError) {
@@ -316,7 +317,7 @@ function SyncStatus({ mode, pending, syncError }: { mode: 'local' | 'cloud'; pen
   return (
     <span className={`tp-sync${cls}`} data-tip={tip} data-tip-pos="down" role="status" aria-label={tip}>
       {icon}
-      <span className="tp-hide-narrow">{label}</span>
+      {label && <span className="tp-hide-narrow">{label}</span>}
     </span>
   );
 }
