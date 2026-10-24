@@ -974,6 +974,20 @@ table.im-table label {
   }
 }
 
+/* ---------------------------------------------------------------- solve list (bottom of the profile) */
+.ps {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+table.ps-table td.dnf {
+  color: var(--error-color);
+}
+.ps-more {
+  justify-self: center;
+  min-width: 8rem;
+}
+
 /* ---------------------------------------------------------------- solve history chart */
 .pv-seg {
   display: inline-flex;

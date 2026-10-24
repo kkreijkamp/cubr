@@ -5,6 +5,7 @@ import { SolveHistoryChart } from './HistoryChart';
 import { ActivityHeatmap } from './Heatmap';
 import { PbCards } from './PbCards';
 import { ProfileHeader } from './ProfileHeader';
+import { ProfileSolves } from './ProfileSolves';
 import { RanksCard } from './RanksCard';
 import { WcaComparison } from './WcaComparison';
 import { api } from '../../lib/api';
@@ -51,6 +52,7 @@ export function ProfileView({ user, own, onEdit, children }: Props) {
           <SolveHistoryChart key={`hist-${user.id}-${defaultEvent}`} userId={user.id} events={events} defaultEvent={defaultEvent} precision={precision} />
           <HourlyChart key={`hr-${user.id}-${defaultEvent}`} userId={user.id} events={events} defaultEvent={defaultEvent} precision={precision} />
           <WcaComparison summary={summary} wcaId={user.wcaId} country={user.country} own={own} onEdit={onEdit} precision={precision} />
+          <ProfileSolves key={`solves-${user.id}-${defaultEvent}`} userId={user.id} events={events} defaultEvent={defaultEvent} precision={precision} />
         </>
       )}
       {children}
