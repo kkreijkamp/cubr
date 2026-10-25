@@ -164,13 +164,6 @@ h4 {
   letter-spacing: -0.02em;
   transition: color 0.25s;
 }
-.logo .logo-sub {
-  display: block;
-  font-size: 0.6rem;
-  color: var(--sub-color);
-  margin-bottom: -0.2rem;
-  letter-spacing: 0.02em;
-}
 .nav {
   display: flex;
   align-items: center;
@@ -200,9 +193,6 @@ h4 {
 @media (max-width: 720px) {
   .logo .logo-text {
     font-size: 1.4rem;
-  }
-  .logo .logo-sub {
-    display: none;
   }
   .nav .btn-text {
     padding: 0.35rem;
