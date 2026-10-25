@@ -247,14 +247,17 @@ const VARS: [Exclude<keyof Theme, 'name' | 'original'>, string][] = [
   ['colorfulErrorExtra', '--colorful-error-extra-color'],
 ];
 
-/** The favicon (a 3x3 cube face, as in public/favicon.svg) in a theme's colours: main-colour stickers, text-colour centre. */
+/**
+ * The favicon (a 3x3 cube face, as in public/favicon.svg) in a theme's colours: main-colour stickers and a
+ * text-colour centre on the theme's background, which fills the whole icon.
+ */
 export function faviconSvg(theme: Theme): string {
-  // no background square: the stickers fill the whole icon (gap = 1/6 of a sticker, like the header logo)
-  const at = [0, 11.2, 22.4];
+  // the cube spans 24 of the 32 units (gap = 1/6 of a sticker, like the header logo)
+  const at = [4, 12.4, 20.8];
   const stickers = at.flatMap((y) =>
-    at.map((x) => `<rect x="${x}" y="${y}" width="9.6" height="9.6" rx="2.4"${x === at[1] && y === at[1] ? ` fill="${theme.text}"` : ''}/>`),
+    at.map((x) => `<rect x="${x}" y="${y}" width="7.2" height="7.2" rx="1.8"${x === at[1] && y === at[1] ? ` fill="${theme.text}"` : ''}/>`),
   );
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><g fill="${theme.main}">${stickers.join('')}</g></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="5" fill="${theme.bg}"/><g fill="${theme.main}">${stickers.join('')}</g></svg>`;
 }
 
 /** Applies a theme's colours to :root and the favicon. `persist` stores them for the pre-paint script in index.html. */
