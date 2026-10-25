@@ -153,13 +153,13 @@ h4 {
   color: var(--text-color);
 }
 .logo .logo-icon {
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 2rem;
+  height: 2rem;
   color: var(--main-color);
   transition: color 0.25s;
 }
 .logo .logo-text {
-  font-size: 2rem;
+  font-size: 2.3rem;
   line-height: 1;
   letter-spacing: -0.02em;
   transition: color 0.25s;
@@ -192,7 +192,7 @@ h4 {
 }
 @media (max-width: 720px) {
   .logo .logo-text {
-    font-size: 1.4rem;
+    font-size: 1.6rem;
   }
   .nav .btn-text {
     padding: 0.35rem;
@@ -209,11 +209,11 @@ h4 {
 }
 @media (max-width: 400px) {
   .logo .logo-icon {
-    width: 1.4rem;
-    height: 1.4rem;
+    width: 1.6rem;
+    height: 1.6rem;
   }
   .logo .logo-text {
-    font-size: 1.15rem;
+    font-size: 1.3rem;
   }
   .nav .btn-text {
     padding: 0.3rem 0.25rem;

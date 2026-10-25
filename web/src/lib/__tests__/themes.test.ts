@@ -50,7 +50,7 @@ describe('themes', () => {
     expect(faviconSvg(getTheme(DEFAULT_THEME))).toBe(shippedFavicon.trim());
     const t = getTheme('8008');
     const svg = faviconSvg(t);
-    expect(svg).toContain(`rx="7" fill="${t.bg}"`);
+    expect(svg).not.toContain(t.bg); // transparent: no background square around the cube
     expect(svg).toContain(`<g fill="${t.main}">`);
     expect(svg.match(/<rect x=/g)).toHaveLength(9);
     expect(svg.match(new RegExp(`fill="${t.text}"`, 'g'))).toHaveLength(1);
