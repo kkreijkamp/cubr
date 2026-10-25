@@ -244,7 +244,7 @@ function MeCard({ board, sel, precision, onJump }: { board: Leaderboard | undefi
         <span className="sub">{me.rank === 1 ? 'goat - nobody is faster' : `you - top ${formatPercent(top)} of ${formatNumber(board.total)}`}</span>
       </div>
       <div className="lb-me-value">{formatTime(me.valueMs, precision)}</div>
-      <button className="btn small lb-me-jump" onClick={onJump} data-tip="my rank">
+      <button className="btn small lb-me-jump" onClick={onJump} data-tip="jump to my rank">
         <UserIcon /> my rank
       </button>
     </div>
@@ -505,7 +505,7 @@ export default function LeaderboardsPage() {
                 <button className="btn" onClick={() => goPage(1)} disabled={sel.page === 1} data-tip="first page" aria-label="first page">
                   <TrophyIcon />
                 </button>
-                <button className="btn" onClick={jumpToMe} disabled={!myPage} data-tip="my rank" aria-label="my rank">
+                <button className="btn" onClick={jumpToMe} disabled={!myPage} data-tip="jump to my rank" aria-label="jump to my rank">
                   <UserIcon />
                 </button>
                 <button className="btn" onClick={() => goPage(sel.page - 1)} disabled={sel.page === 1} data-tip="previous page <-" aria-label="previous page">
