@@ -520,7 +520,7 @@
   cursor: pointer;
   transition: background var(--dur), color var(--dur);
 }
-.tp-solve-row > span:not(.idx):not(.time) {
+.tp-solve-row > span:not(.idx):not(.time):not(.pb) {
   color: var(--sub-color);
 }
 .tp-solve-row.odd {
@@ -530,6 +530,10 @@
   color: var(--sub-color);
 }
 .tp-solve-row.best .time {
+  color: var(--main-color);
+}
+/* a session pb when it was set (single, ao5, ao12): text colour only */
+.tp-solve-row .pb {
   color: var(--main-color);
 }
 .tp-solve-row .time.dnf {

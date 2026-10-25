@@ -33,7 +33,7 @@ import { ManualEntry } from '../components/timer/ManualEntry';
 import { ConfirmModal, PromptModal } from '../components/timer/Dialogs';
 import { MergeSessionsModal } from '../components/timer/MergeSessionsModal';
 import { copyText, isTouchDevice, playPbSound } from '../components/timer/feedback';
-import { averageWindow, detectPbs, fmtAvg, fmtSolveShort, statNs } from '../components/timer/statsUtil';
+import { averageWindow, detectPbs, fmtAvg, fmtSolveShort, pbFlags, statNs } from '../components/timer/statsUtil';
 import { noFocus } from '../components/timer/ConfigBar';
 import '../components/timer/timer-page.css';
 import { useAuth } from '../lib/auth';
@@ -118,6 +118,8 @@ export default function TimerPage() {
   const times = useMemo(() => solves.map(effectiveMs), [solves]);
   const ao5 = useMemo(() => rollingAverage(times, 5), [times]);
   const ao12 = useMemo(() => rollingAverage(times, 12), [times]);
+  // every session pb as it was set, for the solve list (singles count from the 6th solve, like detectPbs)
+  const pbs = useMemo(() => ({ single: pbFlags(times, 5), ao5: pbFlags(ao5), ao12: pbFlags(ao12) }), [times, ao5, ao12]);
 
   // ---------------------------------------------------------------- refs for stable callbacks
   const scrRef = useRef(scr);
@@ -498,7 +500,7 @@ export default function TimerPage() {
           </section>
         )}
         {settings.showSolveList && (
-          <SolveList solves={solves} ao5={ao5} ao12={ao12} bestIndex={stats.bestIndex} precision={settings.precision} loading={st.loading || !st.ready} onOpen={openSolve} />
+          <SolveList solves={solves} ao5={ao5} ao12={ao12} pbs={pbs} bestIndex={stats.bestIndex} precision={settings.precision} loading={st.loading || !st.ready} onOpen={openSolve} />
         )}
       </div>
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseTimeInput, sessionStats } from '@cubetype/cubestats';
+import { effectiveMs, parseTimeInput, rollingAverage, sessionStats } from '@cubetype/cubestats';
 import {
   averageReport,
   averageWindow,
@@ -10,6 +10,7 @@ import {
   histogram,
   parseAvgKey,
   parseManualEntry,
+  pbFlags,
   shortTime,
   statNs,
   strideIndices,
@@ -88,6 +89,20 @@ describe('pb detection', () => {
     const before = mk([12000, 11000, 13000, 12500, 11800, 12100]);
     const after = mk([12000, 11000, 13000, 12500, 11800, 12100, 15000]);
     expect(detectPbs(sessionStats(before, [5]), sessionStats(after, [5]))).toEqual([]);
+  });
+  it('pbFlags marks exactly the solves detectPbs announces, one solve at a time', () => {
+    const solves = mk([12000, 11500, 'DNF', 11800, 12500, 11000, 11900, 10800, 'DNF', 11200, 10900, 9800, 12000, 10100]);
+    const ms = solves.map(effectiveMs);
+    const single = pbFlags(ms, 5);
+    const ao5 = pbFlags(rollingAverage(ms, 5));
+    for (let i = 1; i < solves.length; i++) {
+      const kinds = detectPbs(sessionStats(solves.slice(0, i), [5]), sessionStats(solves.slice(0, i + 1), [5])).map((p) => p.kind);
+      expect([i, single[i], ao5[i]]).toEqual([i, kinds.includes('single'), kinds.includes('ao5')]);
+    }
+    expect(single.filter(Boolean)).toHaveLength(3); // 11.00, 10.80, 9.80
+  });
+  it('pbFlags: the first value, ties, DNFs and missing averages never count', () => {
+    expect(pbFlags([null, null, 900, Infinity, 900, 800, null, 850, 700])).toEqual([false, false, false, false, false, true, false, false, true]);
   });
 });
 

@@ -112,6 +112,22 @@ export function detectPbs(prev: SessionStats, next: SessionStats): { kind: PbKin
   return out;
 }
 
+/**
+ * Which entries set a new session best when they happened: each beats every earlier finite value,
+ * and (like detectPbs) there must be an earlier one to beat and at least `from` entries before it.
+ */
+export function pbFlags(values: readonly (number | null)[], from = 0): boolean[] {
+  const out = new Array<boolean>(values.length).fill(false);
+  let best = Infinity;
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i];
+    if (v === null || !(v < best)) continue;
+    if (best !== Infinity && i >= from) out[i] = true;
+    best = v;
+  }
+  return out;
+}
+
 /** Evenly thins a series to at most `max` points (keeps first & last). */
 export function strideIndices(length: number, max: number): number[] {
   if (length <= max) return Array.from({ length }, (_, i) => i);
