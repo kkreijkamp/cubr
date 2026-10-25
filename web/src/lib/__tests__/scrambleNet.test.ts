@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { puzzles } from 'cubing/puzzles';
 import {
+  closeUp,
   convexHull,
   insetConvex,
   parsePoints,
   parseTransform,
   pathPoints,
+  polygonDistance,
   signedArea,
   stickerColour,
   stickerSources,
@@ -162,6 +164,41 @@ describe('convexHull / touchingGroups', () => {
       [0, 1, 2, 3],
       [4, 5],
     ]);
+  });
+});
+
+describe('polygonDistance / closeUp', () => {
+  it('measures the gap between two polygons, side to side or corner to corner', () => {
+    expect(polygonDistance(square(0, 0), square(1.5, 0))).toBeCloseTo(0.5);
+    expect(polygonDistance(square(0, 0), square(2, 2))).toBeCloseTo(Math.SQRT2);
+  });
+
+  it("pulls a cube net's faces together until the closest are `gap` apart, keeping the layout", () => {
+    // cubing.js's 3x3 cross: faces 3 wide, 0.2 apart
+    const at = [
+      [1, 0],
+      [0, 1],
+      [1, 1],
+      [2, 1],
+      [3, 1],
+      [1, 2],
+    ];
+    const faces = at.map(([c, r]) => square(c * 3.2, r * 3.2, 3));
+    const moves = closeUp(faces, 0.05);
+    const moved = faces.map((f, i) => f.map(([x, y]): Point => [x + moves[i][0], y + moves[i][1]]));
+    const gaps = moved.flatMap((a, i) => moved.slice(i + 1).map((b) => polygonDistance(a, b)));
+    expect(Math.min(...gaps)).toBeCloseTo(0.05);
+    // every face moves as a whole and neighbours stay neighbours: one step is now 3.05
+    moved.forEach((f, i) => {
+      expect(f[0][0]).toBeCloseTo(moved[2][0][0] + (at[i][0] - 1) * 3.05);
+      expect(f[0][1]).toBeCloseTo(moved[2][0][1] + (at[i][1] - 1) * 3.05);
+    });
+  });
+
+  it('leaves faces that are already close (or a single face) alone', () => {
+    const still = (moves: Point[]) => moves.flat().every((v) => v === 0);
+    expect(still(closeUp([square(0, 0, 3), square(3.02, 0, 3)], 0.05))).toBe(true);
+    expect(still(closeUp([square(0, 0, 3)], 0.05))).toBe(true);
   });
 });
 

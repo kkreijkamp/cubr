@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { KPuzzle } from 'cubing/kpuzzle';
 import {
+  closeUp,
   convexHull,
   IDENTITY,
   multiply,
@@ -44,13 +45,15 @@ interface Style {
   radius: number;
   /** a dark plate behind each face, so white and yellow stickers stand out on light themes too */
   plates: boolean;
+  /** the gap between faces as a fraction of a face's size (cubing.js lays them out further apart), or null to keep its layout */
+  faceGap: number | null;
 }
-const STYLE: Style = { gap: 0.14, radius: 0.16, plates: true };
+const STYLE: Style = { gap: 0.14, radius: 0.16, plates: true, faceGap: 0.035 };
 const PLATE_RADIUS = 0.22;
 const STYLES: Record<string, Style> = {
   // square-1's net splits each sticker into a few polygons, and its pieces are irregular: drawn
   // flat, each polygon overlapping its neighbours a little so no seams show, as one shape per layer
-  square1: { gap: -0.03, radius: 0.015, plates: false },
+  square1: { gap: -0.03, radius: 0.015, plates: false, faceGap: null },
 };
 
 /** the transforms from `el` up to (not including) `stop`, as one matrix */
@@ -133,22 +136,30 @@ async function buildNet(puzzle: string): Promise<Net> {
   // gaps and corners scale with the stickers, so a 7x7 looks like a 3x3
   const sizes = cells.map((c) => Math.sqrt(Math.abs(signedArea(c.points)))).sort((a, b) => a - b);
   const size = sizes[Math.floor(sizes.length / 2)];
+  const style = STYLES[puzzle] ?? STYLE;
+  const faces = touchingGroups(
+    cells.map((c) => c.points),
+    size * 0.02,
+  );
+  if (style.faceGap !== null) {
+    // a gap sized by the face, not the sticker, so a 7x7's faces are as far apart as a 3x3's
+    const hulls = faces.map((face) => convexHull(face.flatMap((i) => cells[i].points)));
+    const faceSizes = hulls.map((h) => Math.sqrt(Math.abs(signedArea(h)))).sort((a, b) => a - b);
+    const moves = closeUp(hulls, style.faceGap * faceSizes[Math.floor(faceSizes.length / 2)]);
+    faces.forEach((face, f) => {
+      for (const i of face) cells[i].points = cells[i].points.map(([x, y]) => [x + moves[f][0], y + moves[f][1]]);
+    });
+  }
   const all = [...cells.flatMap((c) => c.points), ...lines.flatMap((l): Point[] => [[l.x1, l.y1], [l.x2, l.y2]])];
   const [x0, y0] = [Math.min(...all.map((p) => p[0])), Math.min(...all.map((p) => p[1]))];
   const [x1, y1] = [Math.max(...all.map((p) => p[0])), Math.max(...all.map((p) => p[1]))];
-  const style = STYLES[puzzle] ?? STYLE;
   const r = (v: number) => Math.round(v * 1000) / 1000;
   const draw = (t: Tile) => ({ points: t.points.map((p) => `${r(p[0])},${r(p[1])}`).join(' '), stroke: r(t.stroke) });
   return {
     puzzle,
     kpuzzle,
     viewBox: [x0, y0, x1 - x0, y1 - y0].map(r).join(' '),
-    plates: style.plates
-      ? touchingGroups(
-          cells.map((c) => c.points),
-          size * 0.02,
-        ).map((face) => draw(tile(convexHull(face.flatMap((i) => cells[i].points)), 0, PLATE_RADIUS * size)))
-      : [],
+    plates: style.plates ? faces.map((face) => draw(tile(convexHull(face.flatMap((i) => cells[i].points)), 0, PLATE_RADIUS * size))) : [],
     stickers: cells.map(({ id, points }) => ({ id, ...draw(tile(points, style.gap * size, style.radius * size)) })),
     lines: lines.map((l) => ({ x1: r(l.x1), y1: r(l.y1), x2: r(l.x2), y2: r(l.y2), width: r(l.width) })),
     solved,

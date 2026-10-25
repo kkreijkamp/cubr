@@ -247,6 +247,46 @@ export function touchingGroups(polygons: Point[][], eps: number): number[][] {
   return [...groups.values()];
 }
 
+const segmentDistance = (p: Point, a: Point, b: Point) => {
+  const [dx, dy] = [b[0] - a[0], b[1] - a[1]];
+  const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / (dx * dx + dy * dy || 1)));
+  return Math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy));
+};
+
+/** the shortest distance between two polygons that don't overlap */
+export function polygonDistance(a: Point[], b: Point[]): number {
+  let best = Infinity;
+  for (const [from, to] of [
+    [a, b],
+    [b, a],
+  ]) {
+    for (const p of from) {
+      for (let i = 0; i < to.length; i++) best = Math.min(best, segmentDistance(p, to[i], to[(i + 1) % to.length]));
+    }
+  }
+  return best;
+}
+
+/**
+ * Moves a net's faces (given as outlines) towards its middle, all by the same factor, until the
+ * closest two are `gap` apart: the same layout, tighter. Returns how far to move each face. Faces
+ * that are already closer than that stay where they are.
+ */
+export function closeUp(faces: Point[][], gap: number): Point[] {
+  const centres = faces.map((f) => f.reduce<Point>((s, p) => [s[0] + p[0] / f.length, s[1] + p[1] / f.length], [0, 0]));
+  // moving every face (1 - k) of the way to the middle brings two faces (1 - k) * (their distance) closer
+  let pull = 1;
+  for (let i = 0; i < faces.length; i++) {
+    for (let j = i + 1; j < faces.length; j++) {
+      const d = Math.hypot(centres[i][0] - centres[j][0], centres[i][1] - centres[j][1]);
+      pull = Math.min(pull, (polygonDistance(faces[i], faces[j]) - gap) / d);
+    }
+  }
+  pull = Math.max(0, pull);
+  const mid = centres.reduce<Point>((s, c) => [s[0] + c[0] / centres.length, s[1] + c[1] / centres.length], [0, 0]);
+  return centres.map((c) => [pull * (mid[0] - c[0]), pull * (mid[1] - c[1])]);
+}
+
 export interface Orbit {
   orbitName: string;
   numPieces: number;
