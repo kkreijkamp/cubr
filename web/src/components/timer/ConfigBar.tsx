@@ -89,7 +89,7 @@ export function ConfigBar(p: Props) {
           className={`btn-text${p.inspection ? ' active' : ''}`}
           onClick={p.onToggleInspection}
           aria-pressed={p.inspection}
-          data-tip={p.inspection ? 'WCA inspection on (alt+i)' : 'WCA inspection off (alt+i)'}
+          data-tip={p.inspection ? 'WCA inspection on (alt+w)' : 'WCA inspection off (alt+w)'}
           data-tip-pos="down"
           {...noFocus}
         >
@@ -100,7 +100,7 @@ export function ConfigBar(p: Props) {
           className={`btn-text${p.manual ? ' active' : ''}`}
           onClick={p.onToggleManual}
           aria-pressed={p.manual}
-          data-tip="type times in manually (alt+m)"
+          data-tip={p.manual ? 'typing times in - ctrl+alt+t for the timer' : 'type times in (ctrl+alt+i)'}
           data-tip-pos="down"
           {...noFocus}
         >

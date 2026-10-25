@@ -8,7 +8,7 @@ migrated at startup. Port 8080.
 | Route | Notes |
 |---|---|
 | `GET /api/sessions` | creates a default `3x3`/`333` session on first call (per-user advisory lock -> exactly one) |
-| `POST /api/sessions` `{id?, name, event}` | 201; same id again for this user -> 200 existing; id owned by someone else -> 409 |
+| `POST /api/sessions` `{id?, name, event, createdAt?}` | 201; same id again for this user -> 200 existing; id owned by someone else -> 409. `createdAt` (future clamped to now) keeps a cleared session's replacement in its place |
 | `PATCH /api/sessions/:id` `{name}` / `DELETE /api/sessions/:id` | rename emits `session.renamed`; delete cascades solves, emits `session.deleted` |
 | `POST /api/sessions/:id/merge` `{sourceIds}` | moves every solve of 1-50 source sessions into `:id` and deletes the sources in **one transaction**; only sessions of the same event (409 otherwise); emits `sessions.merged` |
 | `GET /api/sessions/:id/solves` | ascending; capped at the **latest** 50 000 (`truncated: true` when cut) |

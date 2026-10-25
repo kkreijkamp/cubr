@@ -109,7 +109,7 @@ export function ScrambleBar({ scramble, onNext, onPrev, hasPrev, onCustom, editi
         <button className="btn-text" onClick={copy} aria-label="copy scramble" data-tip="copy scramble" disabled={!scramble} {...noFocus}>
           <Square2StackIcon width={16} height={16} />
         </button>
-        <button className="btn-text" onClick={() => setEditing(true)} aria-label="enter a custom scramble" data-tip="custom scramble" {...noFocus}>
+        <button className="btn-text" onClick={() => setEditing(true)} aria-label="enter a custom scramble" data-tip="custom scramble (alt+i)" {...noFocus}>
           <PencilIcon width={16} height={16} />
         </button>
         {scramble?.offline && (

@@ -11,9 +11,9 @@ interface Props {
 }
 
 const OPTIONS: { p: Penalty; label: string; key: string }[] = [
-  { p: 'OK', label: 'ok', key: 'alt+1' },
-  { p: '+2', label: '+2', key: 'alt+2' },
-  { p: 'DNF', label: 'dnf', key: 'alt+3' },
+  { p: 'OK', label: 'ok', key: 'ctrl+1' },
+  { p: '+2', label: '+2', key: 'ctrl+2' },
+  { p: 'DNF', label: 'dnf', key: 'ctrl+3' },
 ];
 
 /** OK / +2 / DNF / comment / delete for the latest solve (Monkeytype result-button style). */
@@ -39,12 +39,12 @@ export function QuickActions({ last, onPenalty, onComment, onDelete }: Props) {
         onClick={onComment}
         disabled={!last}
         aria-label="comment on the latest solve"
-        data-tip={last?.comment ? `"${last.comment.slice(0, 40)}${last.comment.length > 40 ? '...' : ''}"` : 'comment (alt+c)'}
+        data-tip={last?.comment ? `"${last.comment.slice(0, 40)}${last.comment.length > 40 ? '...' : ''}"` : 'comment (alt+n)'}
         {...noFocus}
       >
         <ChatBubbleLeftIcon width={16} height={16} />
       </button>
-      <button className="btn-text danger" onClick={onDelete} disabled={!last} aria-label="delete the latest solve" data-tip="delete (alt+backspace)" {...noFocus}>
+      <button className="btn-text danger" onClick={onDelete} disabled={!last} aria-label="delete the latest solve" data-tip="delete (alt+z)" {...noFocus}>
         <TrashIcon width={16} height={16} />
       </button>
     </div>

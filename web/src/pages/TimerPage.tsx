@@ -21,6 +21,7 @@ import { EVENTS, effectiveMs, formatTime, getEvent, rollingAverage, sessionStats
 import { TimerDisplay } from '../timer/TimerDisplay';
 import { useTimerEngine, type TimerResult, type TimerState } from '../timer/useTimerEngine';
 import { useScrambleQueue } from '../timer/useScrambleQueue';
+import { shortcutFor, type ShortcutAction } from '../timer/shortcuts';
 import { TwistyPreview } from '../components/TwistyPreview';
 import { ConfigBar } from '../components/timer/ConfigBar';
 import { ScrambleBar } from '../components/timer/ScrambleBar';
@@ -41,6 +42,7 @@ import { paletteStore, useRegisterCommands, type Command } from '../lib/commands
 import { updateSettings, useSettings } from '../lib/settings';
 import {
   addSolve,
+  clearSession,
   createSession,
   deleteSession,
   deleteSolve,
@@ -61,6 +63,7 @@ type ModalState =
   | { kind: 'newSession' }
   | { kind: 'renameSession' }
   | { kind: 'deleteSession' }
+  | { kind: 'clearSession' }
   | { kind: 'mergeSessions' }
   | { kind: 'deleteLast' }
   | { kind: 'comment'; solveId: string }
@@ -269,36 +272,50 @@ export default function TimerPage() {
       const p = phaseRef.current;
       if (p !== 'idle' && p !== 'stopped') return;
       const inManualInput = e.target instanceof HTMLElement && e.target.hasAttribute('data-manual-entry');
-      if (isTyping(e.target) && !(inManualInput && e.altKey)) return;
+      // in the typing box, alt / ctrl+alt shortcuts and ctrl+1/2/3 still work (ctrl+z stays undo there)
+      if (isTyping(e.target) && !(inManualInput && (e.altKey || (e.ctrlKey && /^Digit[123]$/.test(e.code))))) return;
       if (e.key === 'Tab' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
         scrRef.current.next();
         return;
       }
-      if (!e.altKey || e.ctrlKey || e.metaKey) return;
-      const actions: Record<string, () => void> = {
-        Digit1: () => penaltyLast('OK'),
-        Digit2: () => penaltyLast('+2'),
-        Digit3: () => penaltyLast('DNF'),
-        Backspace: deleteLast,
-        KeyZ: deleteLast,
-        KeyC: commentLast,
-        ArrowLeft: () => scrRef.current.prev(),
-        ArrowRight: () => scrRef.current.next(),
-        ArrowUp: () => cycleSession(-1),
-        ArrowDown: () => cycleSession(1),
-        KeyI: () => updateSettings({ inspection: !settings.inspection }),
-        KeyM: () => setManual((m) => !m),
-      };
-      const fn = actions[e.code];
-      if (fn) {
-        e.preventDefault();
-        fn();
+      const action = shortcutFor(e);
+      if (!action) return;
+      e.preventDefault();
+      runShortcut(action);
+    };
+    const runShortcut = (a: ShortcutAction) => {
+      switch (a.kind) {
+        case 'event':
+          if (a.event !== event) changeEvent(a.event);
+          return;
+        case 'penalty':
+          return penaltyLast(a.penalty);
+        case 'deleteLast':
+          return deleteLast();
+        case 'clearSession':
+          if (session && session.solveCount > 0) setModal({ kind: 'clearSession' });
+          return;
+        case 'session':
+          return cycleSession(a.dir);
+        case 'scramble':
+          return a.dir < 0 ? scrRef.current.prev() : scrRef.current.next();
+        case 'customScramble':
+          return setEditingScramble(true);
+        case 'input':
+          return setManual(a.input === 'typing');
+        case 'missingInput':
+          toast.notice(`cubetype has no ${a.name} input: ctrl+alt+t times with the keyboard, ctrl+alt+i types times in`);
+          return;
+        case 'comment':
+          return commentLast();
+        case 'inspection':
+          return updateSettings({ inspection: !settings.inspection });
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [penaltyLast, deleteLast, commentLast, cycleSession, settings.inspection]);
+  }, [penaltyLast, deleteLast, commentLast, cycleSession, changeEvent, event, session, settings.inspection]);
 
   // ---------------------------------------------------------------- palette commands
   useRegisterCommands(
@@ -363,6 +380,7 @@ export default function TimerPage() {
           },
           { id: 'timer-comment-last', label: 'Comment last solve', icon: <ChatBubbleLeftIcon />, run: commentLast },
           { id: 'timer-delete-last', label: 'Delete last solve', icon: <TrashIcon />, run: deleteLast },
+          { id: 'timer-clear-session', label: 'Clear session (delete all its solves)', icon: <TrashIcon />, keywords: ['reset', 'empty'], run: () => setModal({ kind: 'clearSession' }) },
         );
       }
       cmds.push(
@@ -601,6 +619,23 @@ export default function TimerPage() {
           }
           confirmLabel="delete session"
           onConfirm={() => deleteSession(session.id)}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal?.kind === 'clearSession' && session && (
+        <ConfirmModal
+          title="clear session"
+          message={
+            <>
+              Delete all {session.solveCount} solve{session.solveCount === 1 ? '' : 's'} in <span className="main">{session.name}</span>? The session stays. This can't be undone.
+            </>
+          }
+          confirmLabel="clear session"
+          onConfirm={async () => {
+            await clearSession(session.id);
+            clearResult();
+            toast.notice(`cleared ${session.name}`, { durationMs: 1500 });
+          }}
           onClose={() => setModal(null)}
         />
       )}

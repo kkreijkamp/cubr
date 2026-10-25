@@ -61,6 +61,12 @@ describe('createSessionBody / patchSolveBody', () => {
     expect(errorOf(() => parse(createSessionBody, { name: 'x', event: '333mbf' })).message).toMatch(/^event: unknown event/);
   });
 
+  it('takes an optional createdAt (a cleared session keeps its place), which must be a timestamp', () => {
+    const at = '2026-03-01T10:00:00.000Z';
+    expect(parse(createSessionBody, { name: 'x', event: '333', createdAt: at })).toEqual({ name: 'x', event: '333', createdAt: at });
+    expect(errorOf(() => parse(createSessionBody, { name: 'x', event: '333', createdAt: 'yesterday' })).message).toMatch(/^createdAt:/);
+  });
+
   it('requires at least one patch field, allows clearing the comment', () => {
     expect(() => parse(patchSolveBody, {})).toThrow(HttpError);
     expect(parse(patchSolveBody, { comment: null })).toEqual({ comment: null });

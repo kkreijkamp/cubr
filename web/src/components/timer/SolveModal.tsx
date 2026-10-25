@@ -49,7 +49,7 @@ export function SolveModal({ solve, index, total, precision, preview, confirmDel
       if (t && ['INPUT', 'TEXTAREA'].includes(t.tagName)) return;
       if (e.key === 'ArrowLeft' && index > 0) onNavigate(index - 1);
       else if (e.key === 'ArrowRight' && index < total - 1) onNavigate(index + 1);
-      else if (e.altKey && /^Digit[123]$/.test(e.code)) {
+      else if (e.ctrlKey && !e.altKey && !e.metaKey && /^Digit[123]$/.test(e.code)) {
         e.preventDefault();
         void setPenalty(solve.id, PENALTIES[Number(e.code.slice(5)) - 1]);
       }
@@ -103,7 +103,7 @@ export function SolveModal({ solve, index, total, precision, preview, confirmDel
 
       <div className="option-group" role="group" aria-label="penalty">
         {PENALTIES.map((p, i) => (
-          <button key={p} className={`btn${solve.penalty === p ? ' active' : ''}`} onClick={() => void setPenalty(solve.id, p)} data-tip={`alt+${i + 1}`}>
+          <button key={p} className={`btn${solve.penalty === p ? ' active' : ''}`} onClick={() => void setPenalty(solve.id, p)} data-tip={`ctrl+${i + 1}`}>
             {p === 'OK' ? 'no penalty' : p.toLowerCase()}
           </button>
         ))}

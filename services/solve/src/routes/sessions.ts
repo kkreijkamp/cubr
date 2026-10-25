@@ -5,7 +5,7 @@ import { currentUser, tzFrom, type RouteContext } from '../context.js';
 import { SOLVE_COLUMNS, toSession, toSolve, type SessionRow, type SolveRow } from '../mapping.js';
 import { enqueue } from '../outbox.js';
 import { ensureDefaultSession, getSession, listSessions } from '../repo.js';
-import { createSessionBody, idParams, mergeSessionsBody, patchSessionBody } from '../schemas.js';
+import { createSessionBody, idParams, mergeSessionsBody, patchSessionBody, resolveCreatedAt } from '../schemas.js';
 
 /** GET /api/sessions/:id/solves returns at most this many (the latest ones, ascending). */
 export const SESSION_SOLVES_CAP = 50_000;
@@ -29,10 +29,10 @@ export function registerSessionRoutes(app: FastifyInstance, { pool, auth }: Rout
     const body = parse(createSessionBody, req.body ?? {});
     const id = body.id ?? randomUUID();
     const ins = await pool.query<SessionRow>(
-      `INSERT INTO solve.sessions (id, user_id, name, event) VALUES ($1, $2, $3, $4)
+      `INSERT INTO solve.sessions (id, user_id, name, event, created_at) VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (id) DO NOTHING
        RETURNING id, name, event, created_at, updated_at, 0 AS solve_count`,
-      [id, user.id, body.name, body.event],
+      [id, user.id, body.name, body.event, resolveCreatedAt(body.createdAt)],
     );
     if (ins.rowCount) return reply.code(201).send({ session: toSession(ins.rows[0]) });
     const existing = await getSession(pool, user.id, id);

@@ -226,7 +226,7 @@ export const api = {
   },
   sessions: {
     list: (signal?: AbortSignal) => get<{ sessions: Session[] }>('/api/sessions', signal),
-    create: (body: { id?: string; name: string; event: string }) => request<{ session: Session }>('POST', '/api/sessions', body),
+    create: (body: { id?: string; name: string; event: string; createdAt?: string }) => request<{ session: Session }>('POST', '/api/sessions', body),
     rename: (id: string, name: string) => request<{ session: Session }>('PATCH', `/api/sessions/${enc(id)}`, { name }),
     remove: (id: string) => request<void>('DELETE', `/api/sessions/${enc(id)}`),
     solves: (id: string, signal?: AbortSignal) =>

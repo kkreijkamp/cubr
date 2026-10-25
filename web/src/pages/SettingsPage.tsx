@@ -97,16 +97,10 @@ function set<K extends keyof Settings>(key: K) {
   return (v: Settings[K]) => updateSettings({ [key]: v } as Partial<Settings>);
 }
 
+// csTimer's shortcuts (all of them), then cubetype's own on keys csTimer leaves free
 const SHORTCUTS: [ReactNode, string][] = [
   [<kbd key="s">space</kbd>, 'hold to get ready, release to start, any key stops'],
   [<kbd key="e">esc</kbd>, 'cancel inspection - stop as DNF while running - command line when idle'],
-  [
-    <>
-      <kbd>ctrl</kbd>+<kbd>k</kbd>
-    </>,
-    'command line (anywhere)',
-  ],
-  [<kbd key="t">tab</kbd>, 'next scramble'],
   [
     <>
       <kbd>alt</kbd>+<kbd>left</kbd> / <kbd>right</kbd>
@@ -115,21 +109,39 @@ const SHORTCUTS: [ReactNode, string][] = [
   ],
   [
     <>
-      <kbd>alt</kbd>+<kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>
+      <kbd>alt</kbd>+<kbd>i</kbd>
+    </>,
+    'type in your own scramble',
+  ],
+  [
+    <>
+      <kbd>alt</kbd>+<kbd>2</kbd> ... <kbd>7</kbd>
+    </>,
+    'event: 2x2 ... 7x7',
+  ],
+  [
+    <>
+      <kbd>alt</kbd>+<kbd>1</kbd> <kbd>p</kbd> <kbd>m</kbd> <kbd>c</kbd> <kbd>s</kbd>
+    </>,
+    'event: square-1 / pyraminx / megaminx / clock / skewb',
+  ],
+  [
+    <>
+      <kbd>ctrl</kbd>+<kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>
     </>,
     'latest solve: no penalty / +2 / DNF',
   ],
   [
     <>
-      <kbd>alt</kbd>+<kbd>backspace</kbd> or <kbd>alt</kbd>+<kbd>z</kbd>
+      <kbd>alt</kbd>+<kbd>z</kbd> or <kbd>ctrl</kbd>+<kbd>z</kbd>
     </>,
-    'delete the latest solve',
+    'delete the latest solve (alt+backspace too)',
   ],
   [
     <>
-      <kbd>alt</kbd>+<kbd>c</kbd>
+      <kbd>alt</kbd>+<kbd>d</kbd>
     </>,
-    'comment on the latest solve',
+    'clear the session (delete all its solves)',
   ],
   [
     <>
@@ -139,15 +151,28 @@ const SHORTCUTS: [ReactNode, string][] = [
   ],
   [
     <>
-      <kbd>alt</kbd>+<kbd>i</kbd>
+      <kbd>ctrl</kbd>+<kbd>alt</kbd>+<kbd>t</kbd> / <kbd>i</kbd>
     </>,
-    'toggle WCA inspection',
+    'time with the timer / type times in',
   ],
   [
     <>
-      <kbd>alt</kbd>+<kbd>m</kbd>
+      <kbd>ctrl</kbd>+<kbd>k</kbd>
     </>,
-    'toggle manual time entry',
+    'command line (anywhere)',
+  ],
+  [<kbd key="t">tab</kbd>, 'next scramble'],
+  [
+    <>
+      <kbd>alt</kbd>+<kbd>n</kbd>
+    </>,
+    'comment on the latest solve',
+  ],
+  [
+    <>
+      <kbd>alt</kbd>+<kbd>w</kbd>
+    </>,
+    'toggle WCA inspection',
   ],
   [
     <>
@@ -332,7 +357,7 @@ export default function SettingsPage() {
             })}
           </div>
         </SettingRow>
-        <SettingRow icon={<TrashIcon width={16} height={16} />} title="confirm delete" description="Ask before deleting a solve with alt+backspace or from the solve window.">
+        <SettingRow icon={<TrashIcon width={16} height={16} />} title="confirm delete" description="Ask before deleting a solve with alt+z (or ctrl+z, alt+backspace) or from the solve window.">
           <Options value={s.confirmDelete} options={onOff} onChange={set('confirmDelete')} />
         </SettingRow>
         <SettingRow
@@ -360,6 +385,9 @@ export default function SettingsPage() {
       </Section>
 
       <Section id="shortcuts" title="keyboard shortcuts">
+        <div className="st-desc">
+          All of csTimer's shortcuts work the same here, so your habits carry over. The last five are cubetype's own. Some browsers use ctrl+1/2/3 to switch tabs and don't pass them on; the penalty buttons under the timer do the same job.
+        </div>
         <div className="st-shortcuts">
           {SHORTCUTS.map(([keys, label], i) => (
             <div key={i} className="st-shortcut">

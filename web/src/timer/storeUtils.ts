@@ -185,7 +185,8 @@ export function encodeLocalDb(db: LocalDb): string {
 export const QUEUE_KEY = 'cubetype.queue.v1';
 
 export type SyncOp =
-  | { kind: 'createSession'; session: { id: string; name: string; event: string; createdAt: string } }
+  /** keepCreatedAt: send createdAt too (a cleared session's replacement keeps the old one's place) */
+  | { kind: 'createSession'; session: { id: string; name: string; event: string; createdAt: string }; keepCreatedAt?: boolean }
   | { kind: 'renameSession'; id: string; name: string }
   | { kind: 'deleteSession'; id: string }
   | { kind: 'createSolve'; solve: NewSolve & { event: string; createdAt: string } }

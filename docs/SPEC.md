@@ -378,7 +378,7 @@ Pool: keep `scramble:pool:<event>` topped up (333/222/pyram/skewb: 200; 444/sq1/
 | Method & path | Body / query | Response |
 |---|---|---|
 | GET `/api/sessions` | - | `{sessions: Session[]}` (created_at asc). If the user has none, create a default "3x3" session (event 333) first. |
-| POST `/api/sessions` | `{id?, name, event}` | 201 `{session}` (idempotent on id: same id again -> 200; an id of another user -> 409) |
+| POST `/api/sessions` | `{id?, name, event, createdAt?}` | 201 `{session}` (idempotent on id: same id again -> 200; an id of another user -> 409). `createdAt` (ISO 8601, future values clamped to now) lets the empty session that replaces a cleared one keep its place in the list. |
 | PATCH `/api/sessions/:id` | `{name}` | `{session}` (+ `session.renamed`) |
 | DELETE `/api/sessions/:id` | - | 204 (+ `session.deleted`) |
 | POST `/api/sessions/:id/merge` | `{sourceIds: uuid[]}` (1-50, != `:id`) | `{session, merged: {sessions, solves}}` - moves all solves of the source sessions into `:id` and deletes the sources in one transaction; 404 unknown session, 409 different event (+ `sessions.merged`) |

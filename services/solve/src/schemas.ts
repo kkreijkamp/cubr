@@ -30,6 +30,8 @@ export const createSessionBody = z.object({
   id: uuid.optional(),
   name: sessionName,
   event: eventId,
+  // sessions are listed oldest first: a cleared session's empty replacement keeps its place
+  createdAt: isoDateTime.optional(),
 });
 
 export const patchSessionBody = z.object({ name: sessionName });

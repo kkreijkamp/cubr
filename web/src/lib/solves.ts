@@ -343,7 +343,7 @@ async function send(op: SyncOp): Promise<void> {
   };
   switch (op.kind) {
     case 'createSession':
-      await api.sessions.create({ id: op.session.id, name: op.session.name, event: op.session.event });
+      await api.sessions.create({ id: op.session.id, name: op.session.name, event: op.session.event, ...(op.keepCreatedAt ? { createdAt: op.session.createdAt } : {}) });
       return;
     case 'renameSession':
       await api.sessions.rename(op.id, op.name).catch(ignore404);
@@ -864,6 +864,36 @@ export async function deleteSession(sessionId: string): Promise<void> {
     const next = sibling ?? createSessionInternal(suggestSessionNameFor(s.event), s.event);
     commit();
     await switchSession(next.id);
+    return;
+  }
+  commit();
+}
+
+/**
+ * Deletes every solve in a session but keeps the session: its name and its place in the list
+ * (csTimer's alt+d). Signed in, an empty session with the same name and creation time takes its
+ * place - one request to create it and one to delete the old one, however many solves there were.
+ */
+export async function clearSession(sessionId: string): Promise<void> {
+  const old = sessionById(sessionId);
+  if (!old || old.solveCount === 0) return;
+  const now = new Date().toISOString();
+  if (scope?.mode !== 'cloud') {
+    model.solves.set(sessionId, []);
+    patchSession(sessionId, { solveCount: 0, updatedAt: now });
+    commit();
+    return;
+  }
+  const fresh: Session = { id: uuid(), name: old.name, event: old.event, createdAt: old.createdAt, updatedAt: now, solveCount: 0 };
+  model.sessions = model.sessions.map((s) => (s.id === sessionId ? fresh : s));
+  model.solves.delete(sessionId);
+  model.solves.set(fresh.id, []);
+  for (const [ev, id] of Object.entries(model.lastByEvent)) if (id === sessionId) model.lastByEvent[ev] = fresh.id;
+  enqueue({ kind: 'createSession', session: { id: fresh.id, name: fresh.name, event: fresh.event, createdAt: fresh.createdAt }, keepCreatedAt: true });
+  enqueue({ kind: 'deleteSession', id: sessionId });
+  if (model.current === sessionId) {
+    commit();
+    await switchSession(fresh.id);
     return;
   }
   commit();
