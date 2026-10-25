@@ -9,7 +9,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import { IconAlertCircle, IconPhotoPlus, IconTrash, IconUpload, IconZoomIn, IconZoomOut } from '@tabler/icons-react';
+import { ImageIcon, MagnifyingGlassMinusIcon, MagnifyingGlassPlusIcon, TrashIcon, UploadSimpleIcon, WarningCircleIcon } from '@phosphor-icons/react';
 import { friendlyError } from './util';
 import { api, ApiError } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
@@ -442,14 +442,14 @@ export function AvatarEditor({ onDone, onCancel }: Props) {
             <Avatar user={user} size={72} />
             {dragging && (
               <span className="ae-current-drop" aria-hidden="true">
-                <IconPhotoPlus />
+                <ImageIcon />
               </span>
             )}
           </div>
           <div className="ae-drop-body">
             <div className="ae-drop-line">
               <button type="button" className="btn small" onClick={openPicker} disabled={busy !== null}>
-                <IconUpload /> {hasAvatar ? 'change picture' : 'upload picture'}
+                <UploadSimpleIcon /> {hasAvatar ? 'change picture' : 'upload picture'}
               </button>
               <span className="ae-drop-or">{dragging ? 'drop it!' : 'or drop an image here'}</span>
             </div>
@@ -461,7 +461,7 @@ export function AvatarEditor({ onDone, onCancel }: Props) {
                 onClick={remove}
                 disabled={busy !== null}
               >
-                {busy === 'remove' ? <Spinner size={14} /> : <IconTrash />}
+                {busy === 'remove' ? <Spinner size={14} /> : <TrashIcon />}
                 {confirmRemove ? 'click again to remove' : 'remove picture'}
               </button>
             )}
@@ -503,7 +503,7 @@ export function AvatarEditor({ onDone, onCancel }: Props) {
                   disabled={busy !== null || view.zoom <= 1}
                   aria-label="zoom out"
                 >
-                  <IconZoomOut />
+                  <MagnifyingGlassMinusIcon />
                 </button>
                 <input
                   type="range"
@@ -523,7 +523,7 @@ export function AvatarEditor({ onDone, onCancel }: Props) {
                   disabled={busy !== null || view.zoom >= MAX_ZOOM}
                   aria-label="zoom in"
                 >
-                  <IconZoomIn />
+                  <MagnifyingGlassPlusIcon />
                 </button>
               </div>
               <div className="ae-hint ae-hint-pointer">drag to move - scroll to zoom</div>
@@ -542,7 +542,7 @@ export function AvatarEditor({ onDone, onCancel }: Props) {
 
           <div className="ae-actions">
             <button type="button" className="btn-text small" onClick={openPicker} disabled={busy !== null}>
-              <IconPhotoPlus /> choose another
+              <ImageIcon /> choose another
             </button>
             <span className="ae-spacer" />
             <button
@@ -566,7 +566,7 @@ export function AvatarEditor({ onDone, onCancel }: Props) {
 
       {error && (
         <div className="ep-error" role="alert">
-          <IconAlertCircle size={15} /> {error}
+          <WarningCircleIcon size={15} /> {error}
         </div>
       )}
     </div>

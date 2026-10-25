@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { IconArrowLeft, IconDatabase, IconExternalLink, IconSearch } from '@tabler/icons-react';
+import { ArrowLeftIcon, ArrowSquareOutIcon, DatabaseIcon, MagnifyingGlassIcon } from '@phosphor-icons/react';
 import { EVENTS, getEvent } from '@cubetype/cubestats';
 import { api } from '../../../lib/api';
 import { useAuth } from '../../../lib/auth';
@@ -23,7 +23,7 @@ export function WcaError({ error, onRetry, what = 'WCA data' }: { error: Error; 
     return (
       <Notice
         tone="main"
-        icon={<IconDatabase />}
+        icon={<DatabaseIcon />}
         action={
           onRetry && (
             <button className="btn small" onClick={onRetry}>
@@ -323,7 +323,7 @@ export function PeopleSearch({ initialQuery, onQuery, onPerson }: { initialQuery
   return (
     <div className="stack">
       <div className="wca-search">
-        <IconSearch size={16} className="sub" />
+        <MagnifyingGlassIcon size={16} className="sub" />
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="search by name or WCA ID (e.g. 2009ZEMD01)" aria-label="search WCA competitors" autoFocus />
         {res.loading && dq.length >= 2 && <Spinner size={14} />}
       </div>
@@ -367,7 +367,7 @@ export function PersonCard({ wcaId, onBack }: { wcaId: string; onBack: () => voi
   const res = useAsync((signal) => api.wca.person(wcaId, signal), [wcaId]);
   const back = (
     <button className="btn-text wca-back" onClick={onBack}>
-      <IconArrowLeft size={14} /> back
+      <ArrowLeftIcon size={14} /> back
     </button>
   );
   if (res.error) {
@@ -408,7 +408,7 @@ export function PersonCard({ wcaId, onBack }: { wcaId: string; onBack: () => voi
           </div>
         </div>
         <a className="btn small" href={`https://www.worldcubeassociation.org/persons/${encodeURIComponent(person.wcaId)}`} target="_blank" rel="noreferrer">
-          <IconExternalLink /> WCA profile
+          <ArrowSquareOutIcon /> WCA profile
         </a>
       </div>
       {pbs.length === 0 ? (

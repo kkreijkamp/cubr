@@ -2,7 +2,7 @@
 // a second and visualises load balancing (pods answering), scaling (new pods), self-healing (pods
 // replaced, outages + recovery) and rolling updates (versions changing colour).
 import { useEffect, useMemo, useState } from 'react';
-import { IconActivity, IconCheck, IconPlayerPause, IconPlayerPlay, IconTerminal } from '@tabler/icons-react';
+import { CheckIcon, PauseIcon, PlayIcon, PulseIcon, TerminalIcon } from '@phosphor-icons/react';
 import { useStore } from '../lib/store';
 import { useRegisterCommands } from '../lib/commands';
 import { usePageVisible, copyText } from '../components/live/hooks';
@@ -50,7 +50,7 @@ function Cheatsheet({ services }: { services: ServiceView[] }) {
         >
           <span className="label">{label}</span>
           <code>{cmd}</code>
-          <span className="copied">{copied === cmd ? <IconCheck size={14} /> : null}</span>
+          <span className="copied">{copied === cmd ? <CheckIcon size={14} /> : null}</span>
         </button>
       ))}
     </div>
@@ -77,10 +77,10 @@ export default function StatusPage() {
       {
         id: 'status-pause',
         label: userPaused ? 'Resume status polling' : 'Pause status polling',
-        icon: userPaused ? <IconPlayerPlay /> : <IconPlayerPause />,
+        icon: userPaused ? <PlayIcon /> : <PauseIcon />,
         run: () => setUserPaused((p) => !p),
       },
-      { id: 'status-cheats', label: 'Toggle kubectl cheatsheet', icon: <IconTerminal />, run: () => setShowCheats((v) => !v) },
+      { id: 'status-cheats', label: 'Toggle kubectl cheatsheet', icon: <TerminalIcon />, run: () => setShowCheats((v) => !v) },
     ],
     [userPaused],
   );
@@ -103,7 +103,7 @@ export default function StatusPage() {
       <div className="live-head">
         <div className="titles">
           <h1 className="h2">
-            <IconActivity /> cluster status
+            <PulseIcon /> cluster status
           </h1>
           <div className="subtitle">
             live view of the kubernetes deployment - every number below comes from a real request to a service's <code>_info</code> endpoint.
@@ -115,10 +115,10 @@ export default function StatusPage() {
             {state.running ? 'live - 1s' : state.pausedReason === 'hidden' ? 'paused (tab hidden)' : 'paused'}
           </span>
           <button className="btn small" onClick={() => setUserPaused((p) => !p)} aria-label={userPaused ? 'resume polling' : 'pause polling'}>
-            {userPaused ? <IconPlayerPlay /> : <IconPlayerPause />} {userPaused ? 'resume' : 'pause'}
+            {userPaused ? <PlayIcon /> : <PauseIcon />} {userPaused ? 'resume' : 'pause'}
           </button>
           <button className={`btn small${showCheats ? ' active' : ''}`} onClick={() => setShowCheats((v) => !v)} aria-expanded={showCheats}>
-            <IconTerminal /> kubectl
+            <TerminalIcon /> kubectl
           </button>
         </div>
       </div>

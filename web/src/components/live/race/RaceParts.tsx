@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { IconCrown, IconMessage, IconSend, IconTrophy, IconUsers } from '@tabler/icons-react';
+import { ChatIcon, CrownIcon, PaperPlaneRightIcon, TrophyIcon, UsersIcon } from '@phosphor-icons/react';
 import { effectiveMs, formatTime, fromApiValue, type Penalty, type Precision } from '@cubetype/cubestats';
 import type { ChatMessage, LivePlayer, LiveRoomState } from '../../../lib/race';
 import { Dot, type DotState } from '../ui';
@@ -38,7 +38,7 @@ export function PlayersCard({ room, playerId, precision }: { room: LiveRoomState
     <section className="card race-card" aria-labelledby="players-title">
       <div className="live-section-title">
         <h3 className="h3" id="players-title">
-          <IconUsers /> players
+          <UsersIcon /> players
         </h3>
         <span className="meta">
           {connected}/{room.players.length} online
@@ -49,7 +49,7 @@ export function PlayersCard({ room, playerId, precision }: { room: LiveRoomState
           <tr>
             <th className="left">name</th>
             <th data-tip="rounds won">
-              <IconTrophy size={12} aria-label="wins" />
+              <TrophyIcon size={12} aria-label="wins" />
             </th>
             <th>mean</th>
             <th>ao5</th>
@@ -68,7 +68,7 @@ export function PlayersCard({ room, playerId, precision }: { room: LiveRoomState
                       <div className="name">
                         {anyRounds && <span className="rank">{i + 1}</span>}
                         <span className="text-name">{p.name}</span>
-                        {p.id === room.hostId && <IconCrown size={12} className="host" aria-label="host" />}
+                        {p.id === room.hostId && <CrownIcon size={12} className="host" aria-label="host" />}
                         {p.id === playerId && <span className="you">you</span>}
                       </div>
                       <div className="status">
@@ -111,7 +111,7 @@ export function ResultsGrid({ room, playerId, precision }: { room: LiveRoomState
     <section className="race-results" aria-labelledby="results-title">
       <div className="live-section-title">
         <h3 className="h3" id="results-title">
-          <IconTrophy /> results
+          <TrophyIcon /> results
         </h3>
         <span className="meta">
           {rounds.length} round{rounds.length === 1 ? '' : 's'}
@@ -203,7 +203,7 @@ export function RaceChat({
     <section className="card race-card race-chat" aria-labelledby="chat-title">
       <div className="live-section-title">
         <h3 className="h3" id="chat-title">
-          <IconMessage /> chat
+          <ChatIcon /> chat
         </h3>
       </div>
       <ol
@@ -250,7 +250,7 @@ export function RaceChat({
         />
         {text.length > 150 && <span className="count">{200 - text.length}</span>}
         <button className="btn-text" type="submit" disabled={disabled || !text.trim() || sending} aria-label="send">
-          <IconSend size={16} />
+          <PaperPlaneRightIcon size={16} />
         </button>
       </form>
     </section>

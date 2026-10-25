@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { IconList } from '@tabler/icons-react';
+import { ListBulletsIcon } from '@phosphor-icons/react';
 import { rollingAverage, type Penalty } from '@cubetype/cubestats';
 import { EventSelect } from './Charts';
 import { WidgetEmpty, WidgetError } from './Widget';
@@ -105,7 +105,7 @@ export function ProfileSolves({ userId, events, defaultEvent, precision }: { use
     <section className="ps" aria-label="solves">
       <div className="pv-section-head">
         <h2 className="pv-title">
-          <IconList /> solves
+          <ListBulletsIcon /> solves
           {data && data.total > 0 && (
             <span className="sub">
               - {formatNumber(rows.length)} of {formatNumber(data.total)}

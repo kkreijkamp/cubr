@@ -1,4 +1,4 @@
-import { IconCopy } from '@tabler/icons-react';
+import { CopyIcon } from '@phosphor-icons/react';
 import type { Precision } from '@cubetype/cubestats';
 import { Modal } from '../Modal';
 import { toast } from '../../lib/toast';
@@ -38,7 +38,7 @@ export function AverageModal({ label, window: w, precision, onOpenSolve, onClose
             </span>
           )}
           <button className="btn small" onClick={copy}>
-            <IconCopy size={14} /> copy as text
+            <CopyIcon size={14} /> copy as text
           </button>
         </div>
       </div>

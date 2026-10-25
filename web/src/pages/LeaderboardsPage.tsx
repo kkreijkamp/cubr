@@ -1,20 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
-  IconCalendarCheck,
-  IconCalendarEvent,
-  IconCalendarWeek,
-  IconChevronLeft,
-  IconChevronRight,
-  IconCrown,
-  IconHash,
-  IconStopwatch,
-  IconSum,
-  IconSun,
-  IconUser,
-  IconUserX,
-  IconWorld,
-} from '@tabler/icons-react';
+  CalendarBlankIcon,
+  CalendarCheckIcon,
+  CalendarDotsIcon,
+  CaretLeftIcon,
+  CaretRightIcon,
+  CrownIcon,
+  GlobeIcon,
+  HashIcon,
+  SigmaIcon,
+  SunIcon,
+  TimerIcon,
+  UserIcon,
+  UserMinusIcon,
+} from '@phosphor-icons/react';
 import { DAILY_EVENTS, EVENTS } from '@cubetype/cubestats';
 import { Avatar } from '../components/Avatar';
 import { Modal } from '../components/Modal';
@@ -33,16 +33,16 @@ import '../components/social/leaderboards.css';
 const PAGE_SIZE = 50;
 
 type Period = 'all' | 'weekly' | 'daily' | 'challenge';
-const PERIODS: { id: Period; label: string; icon: typeof IconWorld }[] = [
-  { id: 'all', label: 'all-time', icon: IconWorld },
-  { id: 'weekly', label: 'weekly', icon: IconCalendarWeek },
-  { id: 'daily', label: 'daily', icon: IconSun },
-  { id: 'challenge', label: 'daily challenge', icon: IconCalendarCheck },
+const PERIODS: { id: Period; label: string; icon: typeof GlobeIcon }[] = [
+  { id: 'all', label: 'all-time', icon: GlobeIcon },
+  { id: 'weekly', label: 'weekly', icon: CalendarBlankIcon },
+  { id: 'daily', label: 'daily', icon: SunIcon },
+  { id: 'challenge', label: 'daily challenge', icon: CalendarCheckIcon },
 ];
-const KINDS: { id: LbKind; icon: typeof IconStopwatch }[] = [
-  { id: 'single', icon: IconStopwatch },
-  { id: 'ao5', icon: IconSum },
-  { id: 'ao12', icon: IconSum },
+const KINDS: { id: LbKind; icon: typeof TimerIcon }[] = [
+  { id: 'single', icon: TimerIcon },
+  { id: 'ao5', icon: SigmaIcon },
+  { id: 'ao12', icon: SigmaIcon },
 ];
 /** FMC results are move counts, not times, so there are no FMC leaderboards. */
 const BOARD_EVENTS = EVENTS.filter((e) => e.unit === 'time');
@@ -189,7 +189,7 @@ function Subtitle({ sel, periodKey }: { sel: Selection; periodKey: string | unde
         <>
           <span className="lb-pipe" aria-hidden="true" />
           <Link to="/daily">
-            play today&apos;s challenge <IconChevronRight />
+            play today&apos;s challenge <CaretRightIcon />
           </Link>
           <span>next in {formatDuration(msUntilReset('daily'))}</span>
         </>
@@ -203,7 +203,7 @@ function MeCard({ board, sel, precision, onJump }: { board: Leaderboard | undefi
   if (status === 'guest') {
     return (
       <div className="lb-me lb-me-empty">
-        <IconUser size={20} />
+        <UserIcon size={20} />
         <span>
           <Link to={`/login?next=${encodeURIComponent('/leaderboards')}`}>sign in</Link> to save your solves and see where you rank.
         </span>
@@ -224,7 +224,7 @@ function MeCard({ board, sel, precision, onJump }: { board: Leaderboard | undefi
           : `solve some ${eventLabel(sel.event)} ${sel.period === 'daily' ? 'today' : 'this week'} to get ranked.`;
     return (
       <div className="lb-me lb-me-empty">
-        <IconUserX size={20} />
+        <UserMinusIcon size={20} />
         <span>
           you are not on this leaderboard yet. {how}{' '}
           {sel.period === 'challenge' ? (sel.date === utcDateKey() ? <Link to="/daily">go to the challenge</Link> : null) : <Link to="/">open the timer</Link>}
@@ -236,7 +236,7 @@ function MeCard({ board, sel, precision, onJump }: { board: Leaderboard | undefi
   const top = board.total > 0 ? (me.rank / board.total) * 100 : 100;
   return (
     <div className="lb-me" aria-label="your rank">
-      <div className="lb-me-rank">{me.rank === 1 ? <IconCrown size={22} aria-label="first place" /> : `#${formatNumber(me.rank)}`}</div>
+      <div className="lb-me-rank">{me.rank === 1 ? <CrownIcon size={22} aria-label="first place" /> : `#${formatNumber(me.rank)}`}</div>
       <div className="lb-me-who">
         <span className="name">
           <Avatar user={user} size={20} />
@@ -246,7 +246,7 @@ function MeCard({ board, sel, precision, onJump }: { board: Leaderboard | undefi
       </div>
       <div className="lb-me-value">{formatTime(me.valueMs, precision)}</div>
       <button className="btn small lb-me-jump" onClick={onJump} data-tip="jump to my page">
-        <IconUser /> my page
+        <UserIcon /> my page
       </button>
     </div>
   );
@@ -385,13 +385,13 @@ export default function LeaderboardsPage() {
         {
           id: 'lb-period',
           label: 'Leaderboard period...',
-          icon: <IconCrown />,
+          icon: <CrownIcon />,
           children: () => PERIODS.map((p) => ({ id: `lb-period-${p.id}`, label: p.label, active: sel.period === p.id, run: () => update({ period: p.id }) })),
         },
         {
           id: 'lb-event',
           label: 'Leaderboard event...',
-          icon: <IconCrown />,
+          icon: <CrownIcon />,
           children: () =>
             BOARD_EVENTS.filter((e) => sel.period !== 'challenge' || DAILY_EVENTS.includes(e.id)).map((e) => ({
               id: `lb-event-${e.id}`,
@@ -404,14 +404,14 @@ export default function LeaderboardsPage() {
         {
           id: 'lb-kind',
           label: 'Leaderboard type...',
-          icon: <IconCrown />,
+          icon: <CrownIcon />,
           keywords: ['single', 'average'],
           children: () => kindsFor(sel.period).map((k) => ({ id: `lb-kind-${k}`, label: k, active: sel.kind === k, run: () => update({ kind: k }) })),
         },
       ];
-      if (sel.page < pages) cmds.push({ id: 'lb-next', label: 'Leaderboard: next page', icon: <IconChevronRight />, run: () => goPage(sel.page + 1) });
-      if (sel.page > 1) cmds.push({ id: 'lb-prev', label: 'Leaderboard: previous page', icon: <IconChevronLeft />, run: () => goPage(sel.page - 1) });
-      if (myPage) cmds.push({ id: 'lb-me', label: 'Leaderboard: jump to my page', icon: <IconUser />, run: jumpToMe });
+      if (sel.page < pages) cmds.push({ id: 'lb-next', label: 'Leaderboard: next page', icon: <CaretRightIcon />, run: () => goPage(sel.page + 1) });
+      if (sel.page > 1) cmds.push({ id: 'lb-prev', label: 'Leaderboard: previous page', icon: <CaretLeftIcon />, run: () => goPage(sel.page - 1) });
+      if (myPage) cmds.push({ id: 'lb-me', label: 'Leaderboard: jump to my page', icon: <UserIcon />, run: jumpToMe });
       return cmds;
     },
     [sel, pages, myPage, update, goPage, jumpToMe],
@@ -436,7 +436,7 @@ export default function LeaderboardsPage() {
           <div className="lb-group lb-dates" role="group" aria-label="challenge date">
             {days.map((d, i) => (
               <button key={d} className={`btn${sel.date === d ? ' active' : ''}`} aria-pressed={sel.date === d} onClick={() => update({ date: d })}>
-                {i < 2 && <IconCalendarEvent />} {shortDay(d, i)}
+                {i < 2 && <CalendarDotsIcon />} {shortDay(d, i)}
               </button>
             ))}
           </div>
@@ -504,19 +504,19 @@ export default function LeaderboardsPage() {
               </span>
               <nav className="lb-pager" aria-label="pagination">
                 <button className="btn" onClick={() => goPage(1)} disabled={sel.page === 1} data-tip="first page" aria-label="first page">
-                  <IconCrown />
+                  <CrownIcon />
                 </button>
                 <button className="btn" onClick={jumpToMe} disabled={!myPage} data-tip="jump to my page" aria-label="jump to my page">
-                  <IconUser />
+                  <UserIcon />
                 </button>
                 <button className="btn" onClick={() => goPage(sel.page - 1)} disabled={sel.page === 1} data-tip="previous page <-" aria-label="previous page">
-                  <IconChevronLeft />
+                  <CaretLeftIcon />
                 </button>
                 <button className="btn" onClick={() => setGotoOpen(true)} data-tip="go to page" aria-label={`page ${sel.page} of ${pages}, go to page`}>
                   {sel.page} / {pages}
                 </button>
                 <button className="btn" onClick={() => goPage(sel.page + 1)} disabled={sel.page >= pages} data-tip="next page ->" aria-label="next page">
-                  <IconChevronRight />
+                  <CaretRightIcon />
                 </button>
               </nav>
             </div>
@@ -525,7 +525,7 @@ export default function LeaderboardsPage() {
                 <thead>
                   <tr>
                     <th className="rank">
-                      <IconHash aria-label="rank" />
+                      <HashIcon aria-label="rank" />
                     </th>
                     <th className="name">name</th>
                     <th>{data.kind || sel.kind}</th>
@@ -537,7 +537,7 @@ export default function LeaderboardsPage() {
                     const mine = user?.id === e.userId;
                     return (
                       <tr key={`${e.rank}-${e.userId}`} className={mine ? 'me' : undefined}>
-                        <td className="rank">{e.rank === 1 ? <IconCrown size={18} aria-label="1" /> : formatNumber(e.rank)}</td>
+                        <td className="rank">{e.rank === 1 ? <CrownIcon size={18} aria-label="1" /> : formatNumber(e.rank)}</td>
                         <td className="name">
                           <Link to={`/profile/${encodeURIComponent(e.username)}`} className="lb-user">
                             <Avatar user={e} size={20} />

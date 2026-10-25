@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { ChartConfiguration } from 'chart.js';
-import { IconClock } from '@tabler/icons-react';
+import { ClockIcon } from '@phosphor-icons/react';
 import { EVENTS } from '@cubetype/cubestats';
 import { WidgetError } from './Widget';
 import { eventLabel, plural } from './util';
@@ -136,7 +136,7 @@ export function HourlyChart({ userId, events, defaultEvent, precision }: { userI
     <section className="pv-card" aria-label="time of day">
       <div className="pv-card-head">
         <h2 className="pv-title">
-          <IconClock /> time of day {hourly.loading && hourly.data && <Spinner size={14} />}
+          <ClockIcon /> time of day {hourly.loading && hourly.data && <Spinner size={14} />}
         </h2>
         <div className="pv-head-tools">
           <div className="pv-seg" role="group" aria-label="metric">

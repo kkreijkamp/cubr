@@ -1,7 +1,7 @@
-import { IconAlertCircle, IconCircleCheck, IconCrown, IconInfoCircle } from '@tabler/icons-react';
+import { CheckCircleIcon, CrownIcon, InfoIcon, WarningCircleIcon } from '@phosphor-icons/react';
 import { dismissToast, useToasts } from '../lib/toast';
 
-const ICONS = { notice: IconInfoCircle, success: IconCircleCheck, error: IconAlertCircle, pb: IconCrown };
+const ICONS = { notice: InfoIcon, success: CheckCircleIcon, error: WarningCircleIcon, pb: CrownIcon };
 
 export function Toasts() {
   const toasts = useToasts();

@@ -1,7 +1,7 @@
 // Daily challenge: 5 scrambles per event per UTC day, identical for everyone, ranked by ao5.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { IconCalendarEvent, IconCloudOff, IconLogin2, IconRotate } from '@tabler/icons-react';
+import { ArrowCounterClockwiseIcon, CalendarDotsIcon, CloudSlashIcon, SignInIcon } from '@phosphor-icons/react';
 import { averageOfN, DAILY_EVENTS, effectiveMs, formatSolve, formatTime, getEvent, type Penalty } from '@cubetype/cubestats';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -220,7 +220,7 @@ export default function DailyPage() {
       {
         id: 'daily-event',
         label: 'Daily challenge event...',
-        icon: <IconCalendarEvent />,
+        icon: <CalendarDotsIcon />,
         children: () => DAILY_EVENTS.map((id) => ({ id: `daily-event-${id}`, label: getEvent(id)?.name ?? id, active: id === event, run: () => setEvent(id) })),
       },
     ],
@@ -248,7 +248,7 @@ export default function DailyPage() {
       <div className="live-head fade-on-focus">
         <div className="titles">
           <h1 className="h2">
-            <IconCalendarEvent /> daily challenge
+            <CalendarDotsIcon /> daily challenge
           </h1>
           <div className="subtitle">5 scrambles - the same for everyone - ranked by ao5 - resets at 00:00 UTC</div>
         </div>
@@ -265,7 +265,7 @@ export default function DailyPage() {
 
       {!authed && status !== 'loading' && isToday && (
         <Notice
-          icon={<IconLogin2 />}
+          icon={<SignInIcon />}
           action={
             <Link to="/login?next=/daily" className="btn small">
               sign in
@@ -309,10 +309,10 @@ export default function DailyPage() {
                     {a?.state === 'saving' && <Spinner size={12} />}
                     {a?.state === 'failed' && (
                       <button className="btn-text" onClick={() => retry(a)} aria-label="retry" data-tip={a.error ?? 'retry'}>
-                        <IconRotate size={12} />
+                        <ArrowCounterClockwiseIcon size={12} />
                       </button>
                     )}
-                    {a?.state === 'failed' && <IconCloudOff size={12} />}
+                    {a?.state === 'failed' && <CloudSlashIcon size={12} />}
                   </span>
                 </li>
               );
@@ -368,10 +368,10 @@ export default function DailyPage() {
               {!authed && isToday && (
                 <div className="row wrap" style={{ justifyContent: 'center' }}>
                   <button className="btn small" onClick={resetPractice}>
-                    <IconRotate /> practise again
+                    <ArrowCounterClockwiseIcon /> practise again
                   </button>
                   <Link to="/login?next=/daily" className="btn small primary">
-                    <IconLogin2 /> sign in to compete
+                    <SignInIcon /> sign in to compete
                   </Link>
                 </div>
               )}

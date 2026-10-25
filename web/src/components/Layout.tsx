@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
-  IconActivity,
-  IconCalendarEvent,
-  IconCrown,
-  IconInfoCircle,
-  IconKeyboard,
-  IconPalette,
-  IconSettings,
-  IconStopwatch,
-  IconSwords,
-  IconUser,
-  IconWorld,
-} from '@tabler/icons-react';
+  CalendarDotsIcon,
+  CrownIcon,
+  GearIcon,
+  GlobeIcon,
+  InfoIcon,
+  KeyboardIcon,
+  PaletteIcon,
+  PulseIcon,
+  SwordIcon,
+  TimerIcon,
+  UserIcon,
+} from '@phosphor-icons/react';
 import { Avatar } from './Avatar';
 import { CubeLogo } from './CubeLogo';
 import { Toasts } from './Toasts';
@@ -26,13 +26,13 @@ import { themeLabel } from '../lib/themes';
 import { api } from '../lib/api';
 
 const NAV = [
-  { to: '/', icon: IconStopwatch, label: 'timer', end: true },
-  { to: '/daily', icon: IconCalendarEvent, label: 'daily challenge' },
-  { to: '/race', icon: IconSwords, label: 'race' },
-  { to: '/leaderboards', icon: IconCrown, label: 'leaderboards' },
-  { to: '/wca', icon: IconWorld, label: 'wca rankings' },
-  { to: '/about', icon: IconInfoCircle, label: 'about', hideMobile: true },
-  { to: '/settings', icon: IconSettings, label: 'settings' },
+  { to: '/', icon: TimerIcon, label: 'timer', end: true },
+  { to: '/daily', icon: CalendarDotsIcon, label: 'daily challenge' },
+  { to: '/race', icon: SwordIcon, label: 'race' },
+  { to: '/leaderboards', icon: CrownIcon, label: 'leaderboards' },
+  { to: '/wca', icon: GlobeIcon, label: 'wca rankings' },
+  { to: '/about', icon: InfoIcon, label: 'about', hideMobile: true },
+  { to: '/settings', icon: GearIcon, label: 'settings' },
 ];
 
 function Header() {
@@ -63,16 +63,16 @@ function Header() {
       </nav>
       <div className="nav nav-side">
         <NavLink to="/status" className={({ isActive }) => `btn-text hide-mobile${isActive ? ' active' : ''}`} data-tip="cluster status" data-tip-pos="down" aria-label="cluster status">
-          <IconActivity size={20} />
+          <PulseIcon size={20} />
         </NavLink>
         {status === 'authed' && user ? (
           <NavLink to="/account" className={({ isActive }) => `btn-text nav-user${isActive ? ' active' : ''}`} data-tip="account" data-tip-pos="down">
-            {user.avatarUrl ? <Avatar user={user} size={20} className="nav-avatar" /> : <IconUser size={20} />}
+            {user.avatarUrl ? <Avatar user={user} size={20} className="nav-avatar" /> : <UserIcon size={20} />}
             <span className="hide-mobile">{user.username}</span>
           </NavLink>
         ) : (
           <NavLink to="/login" className={({ isActive }) => `btn-text${isActive ? ' active' : ''}`} data-tip="sign in" data-tip-pos="down" aria-label="sign in">
-            <IconUser size={20} />
+            <UserIcon size={20} />
           </NavLink>
         )}
       </div>
@@ -93,18 +93,18 @@ function Footer() {
     <footer className="footer">
       <div className="footer-links">
         <button className="btn-text" onClick={() => openPalette()}>
-          <IconKeyboard size={14} /> <kbd>esc</kbd> command line
+          <KeyboardIcon size={14} /> <kbd>esc</kbd> command line
         </button>
         <Link to="/status" className="btn-text">
-          <IconActivity size={14} /> status
+          <PulseIcon size={14} /> status
         </Link>
         <Link to="/about" className="btn-text">
-          <IconInfoCircle size={14} /> about
+          <InfoIcon size={14} /> about
         </Link>
       </div>
       <div className="footer-right">
         <button className="btn-text" onClick={() => openPalette('theme')} data-tip="change theme" aria-label="change theme">
-          <IconPalette size={14} /> {themeLabel(settings.theme)}
+          <PaletteIcon size={14} /> {themeLabel(settings.theme)}
         </button>
         <Link to="/status" className="btn-text" data-tip={info ? `served by ${info.pod}` : 'version'}>
           {info ? `v${info.version}` : 'version'}

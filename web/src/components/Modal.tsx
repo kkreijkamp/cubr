@@ -1,6 +1,6 @@
 import { useEffect, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { IconX } from '@tabler/icons-react';
+import { XIcon } from '@phosphor-icons/react';
 
 interface ModalProps {
   title?: ReactNode;
@@ -36,7 +36,7 @@ export function Modal({ title, onClose, children, wide, center }: ModalProps) {
           <div className="modal-title">
             <span>{title}</span>
             <button className="btn-text" onClick={onClose} aria-label="Close">
-              <IconX />
+              <XIcon />
             </button>
           </div>
         )}

@@ -1,8 +1,8 @@
-import { IconLoader2 } from '@tabler/icons-react';
+import { CircleNotchIcon } from '@phosphor-icons/react';
 import { useEffect, useState } from 'react';
 
 export function Spinner({ size = 20 }: { size?: number }) {
-  return <IconLoader2 className="spinner" size={size} />;
+  return <CircleNotchIcon className="spinner" size={size} />;
 }
 
 /** Centered spinner that only appears after a short delay (no flash on fast loads). */

@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { IconCamera, IconExternalLink, IconLink, IconPencil } from '@tabler/icons-react';
+import { ArrowSquareOutIcon, CameraIcon, LinkIcon, PencilSimpleIcon } from '@phosphor-icons/react';
 import { formatDuration } from '@cubetype/cubestats';
 import { AvatarEditor } from './AvatarEditor';
 import { countryName } from './countries';
@@ -54,10 +54,10 @@ export function ProfileHeader({ user, summary, own, onEdit }: Props) {
           >
             <Avatar user={user} size={80} />
             <span className="pv-avatar-overlay" aria-hidden="true">
-              <IconCamera />
+              <CameraIcon />
             </span>
             <span className="pv-avatar-badge" aria-hidden="true">
-              <IconCamera />
+              <CameraIcon />
             </span>
           </button>
         ) : (
@@ -114,7 +114,7 @@ export function ProfileHeader({ user, summary, own, onEdit }: Props) {
                 aria-label="open WCA profile"
                 data-tip="wca profile"
               >
-                <IconExternalLink size={13} />
+                <ArrowSquareOutIcon size={13} />
               </a>
             </span>
           </div>
@@ -170,11 +170,11 @@ export function ProfileHeader({ user, summary, own, onEdit }: Props) {
       <div className="pv-strip">
         {own && onEdit && (
           <button className="btn-text" onClick={onEdit} data-tip="edit profile" data-tip-pos="left" aria-label="edit profile">
-            <IconPencil />
+            <PencilSimpleIcon />
           </button>
         )}
         <button className="btn-text" onClick={() => copyProfileLink(user.username)} data-tip="copy profile link" data-tip-pos="left" aria-label="copy profile link">
-          <IconLink />
+          <LinkIcon />
         </button>
       </div>
 

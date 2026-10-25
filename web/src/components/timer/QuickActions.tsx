@@ -1,4 +1,4 @@
-import { IconMessage, IconTrash } from '@tabler/icons-react';
+import { ChatIcon, TrashIcon } from '@phosphor-icons/react';
 import type { Penalty } from '@cubetype/cubestats';
 import type { Solve } from '../../lib/types';
 import { noFocus } from './ConfigBar';
@@ -42,10 +42,10 @@ export function QuickActions({ last, onPenalty, onComment, onDelete }: Props) {
         data-tip={last?.comment ? `"${last.comment.slice(0, 40)}${last.comment.length > 40 ? '...' : ''}"` : 'comment (alt+c)'}
         {...noFocus}
       >
-        <IconMessage size={16} />
+        <ChatIcon size={16} />
       </button>
       <button className="btn-text danger" onClick={onDelete} disabled={!last} aria-label="delete the latest solve" data-tip="delete (alt+backspace)" {...noFocus}>
-        <IconTrash size={16} />
+        <TrashIcon size={16} />
       </button>
     </div>
   );

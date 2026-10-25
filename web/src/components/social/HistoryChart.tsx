@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { ChartConfiguration } from 'chart.js';
-import { IconHistory } from '@tabler/icons-react';
+import { ClockCounterClockwiseIcon } from '@phosphor-icons/react';
 import { rollingAverage } from '@cubetype/cubestats';
 import { EventSelect } from './Charts';
 import { WidgetError } from './Widget';
@@ -371,7 +371,7 @@ export function SolveHistoryChart({ userId, events, defaultEvent, precision }: {
     <section className="pv-card pv-history" aria-label="solve history">
       <div className="pv-card-head">
         <h2 className="pv-title">
-          <IconHistory /> solve history
+          <ClockCounterClockwiseIcon /> solve history
           {series.data && (
             <span className="sub">
               - {session >= 0 && prep ? `${formatNumber(prep.n)} of ` : ''}

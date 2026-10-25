@@ -1,5 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
-import { IconArrowMerge, IconCheck, IconStack2 } from '@tabler/icons-react';
+import { ArrowsMergeIcon, CheckIcon, StackIcon } from '@phosphor-icons/react';
 import { formatTime, getEvent, sessionStats, type Penalty, type Precision } from '@cubetype/cubestats';
 import { Modal } from '../Modal';
 import { Spinner } from '../Spinner';
@@ -253,7 +253,7 @@ export function MergeSessionsModal({ sessions, currentSessionId, event, mode, us
         <div className="merge-section">
           <div className="merge-label">into</div>
           <div className="merge-target">
-            <IconStack2 size={16} className="merge-target-icon" />
+            <StackIcon size={16} className="merge-target-icon" />
             <div className="merge-target-text">
               <div className="merge-target-name">{target.name}</div>
               <div className="merge-target-meta">
@@ -276,7 +276,7 @@ export function MergeSessionsModal({ sessions, currentSessionId, event, mode, us
                   onClick={() => pickTarget(s.id)}
                   autoFocus={s.id === target.id || (i === 0 && !eventSessions.some((x) => x.id === target.id))}
                 >
-                  <span className="merge-pick-check">{s.id === target.id && <IconCheck size={14} />}</span>
+                  <span className="merge-pick-check">{s.id === target.id && <CheckIcon size={14} />}</span>
                   <span className="merge-name">{s.name}</span>
                   <span className="merge-count">{formatNumber(s.solveCount)}</span>
                 </button>
@@ -356,7 +356,7 @@ export function MergeSessionsModal({ sessions, currentSessionId, event, mode, us
             cancel
           </button>
           <button type="submit" className="btn primary" disabled={busy || chosen.length === 0}>
-            {busy ? <Spinner size={16} /> : <IconArrowMerge size={16} />} {busy ? 'merging...' : 'merge'}
+            {busy ? <Spinner size={16} /> : <ArrowsMergeIcon size={16} />} {busy ? 'merging...' : 'merge'}
           </button>
         </div>
       </form>

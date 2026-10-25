@@ -1,6 +1,6 @@
 // Small presentational pieces shared by the live pages (daily, race, wca, status).
 import { useState, type ReactNode } from 'react';
-import { IconCheck, IconCopy } from '@tabler/icons-react';
+import { CheckIcon, CopyIcon } from '@phosphor-icons/react';
 import { getEvent } from '@cubetype/cubestats';
 import { copyText } from './hooks';
 import './live.css';
@@ -79,7 +79,7 @@ export function ScrambleText({ scramble, event, muted, actions }: { scramble: st
               }
             }}
           >
-            {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
+            {copied ? <CheckIcon size={16} /> : <CopyIcon size={16} />}
           </button>
         </div>
       )}
