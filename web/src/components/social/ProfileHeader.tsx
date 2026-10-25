@@ -34,7 +34,8 @@ export function ProfileHeader({ user, summary, own, onEdit }: Props) {
   const name = user.displayName?.trim() || user.username;
   const totals = summary.data?.totals;
   const flag = flagEmoji(user.country);
-  const hasDetails = Boolean(user.bio || user.wcaId || user.country);
+  // the country is the flag next to the name, not a detail of its own
+  const hasDetails = Boolean(user.bio || user.wcaId);
   // the picture is editable where the rest of the profile is (account page)
   const editableAvatar = own && Boolean(onEdit);
   const [avatarOpen, setAvatarOpen] = useState(false);
@@ -93,12 +94,21 @@ export function ProfileHeader({ user, summary, own, onEdit }: Props) {
             <span className="value">{user.bio}</span>
           </div>
         )}
-        {user.country && (
-          <div className="pv-detail">
-            <span className="label">country</span>
-            <span className="value">
-              {flag} {countryName(user.country)}
-            </span>
+        {!hasDetails && (
+          <div className="pv-detail wide">
+            <span className="label">bio</span>
+            {own ? (
+              <span className="value muted">
+                tell people about yourself - add a bio, your country and your wca id.{' '}
+                {onEdit && (
+                  <button className="btn-text small" style={{ padding: 0, color: 'var(--main-color)' }} onClick={onEdit}>
+                    edit profile
+                  </button>
+                )}
+              </span>
+            ) : (
+              <span className="value muted">no bio yet.</span>
+            )}
           </div>
         )}
         {user.wcaId && (
@@ -123,23 +133,6 @@ export function ProfileHeader({ user, summary, own, onEdit }: Props) {
           <div className="pv-detail">
             <span className="label">active days</span>
             <span className="value">{formatNumber(totals.activeDays)}</span>
-          </div>
-        )}
-        {!hasDetails && (
-          <div className="pv-detail wide">
-            <span className="label">bio</span>
-            {own ? (
-              <span className="value muted">
-                tell people about yourself - add a bio, your country and your wca id.{' '}
-                {onEdit && (
-                  <button className="btn-text small" style={{ padding: 0, color: 'var(--main-color)' }} onClick={onEdit}>
-                    edit profile
-                  </button>
-                )}
-              </span>
-            ) : (
-              <span className="value muted">no bio yet.</span>
-            )}
           </div>
         )}
       </div>

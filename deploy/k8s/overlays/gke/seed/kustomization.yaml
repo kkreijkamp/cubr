@@ -7,4 +7,4 @@ resources:
 images:
   - name: cubetype/seed
     newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/seed
-    newTag: "1.0.42"
+    newTag: "1.0.43"
