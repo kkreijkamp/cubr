@@ -36,7 +36,7 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   theme: DEFAULT_THEME,
-  font: 'Roboto Mono',
+  font: 'Comfortaa',
   inspection: false,
   inspectionAlerts: 'beep',
   holdMs: 300,
@@ -54,6 +54,7 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 export const FONTS: { name: string; css: string }[] = [
+  { name: 'Comfortaa', css: "'Comfortaa', system-ui, sans-serif" },
   { name: 'Roboto Mono', css: "'Roboto Mono', ui-monospace, monospace" },
   { name: 'Lexend Deca', css: "'Lexend Deca', system-ui, sans-serif" },
   { name: 'System Mono', css: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace' },
