@@ -935,6 +935,23 @@ body.focus .toast:not(.important) {
   background: var(--main-color);
 }
 
+/* scramble preview net (ScrambleNet): as big as the box allows, never wider; the face plates are
+   the theme's background darkened, so they stand apart from it on light and dark themes alike */
+.scramble-net {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  --net-plate: color-mix(in srgb, var(--bg-color) 25%, #000);
+}
+.scramble-net .plate {
+  fill: var(--net-plate);
+  stroke: var(--net-plate);
+}
+.scramble-net .guide {
+  stroke: var(--net-plate);
+  stroke-linecap: round;
+}
+
 /* ---------------------------------------------------------------- animations */
 @keyframes fadeIn {
   from {

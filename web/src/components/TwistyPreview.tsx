@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ScrambleNet } from './ScrambleNet';
 
 interface Props {
   /** cubing.js puzzle id, e.g. "3x3x3", "pyraminx", "megaminx", "square1", "clock", "skewb" */
@@ -10,10 +11,21 @@ interface Props {
 }
 
 /**
- * Renders a scramble preview with cubing.js's <twisty-player>. cubing/twisty is large, so it is
- * lazy-loaded the first time a preview is shown.
+ * A scramble preview: in 2D cubetype's own flat net (ScrambleNet), in 3D cubing.js's <twisty-player>.
+ * The clock's net is dials and hands rather than stickers, so cubing.js draws that too.
  */
-export function TwistyPreview({ puzzle, scramble, visualization = '2D', height = 180 }: Props) {
+export function TwistyPreview(props: Props) {
+  const [netFailed, setNetFailed] = useState(false);
+  const onNetError = useCallback(() => setNetFailed(true), []);
+  const { puzzle, scramble, visualization = '2D', height = 180 } = props;
+  if (visualization === '2D' && puzzle !== 'clock' && !netFailed) {
+    return <ScrambleNet puzzle={puzzle} scramble={scramble} height={height} onError={onNetError} />;
+  }
+  return <TwistyPlayerPreview {...props} />;
+}
+
+/** cubing/twisty is large, so it is lazy-loaded the first time a preview is shown */
+function TwistyPlayerPreview({ puzzle, scramble, visualization = '2D', height = 180 }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<HTMLElement | null>(null);
   const [failed, setFailed] = useState(false);
