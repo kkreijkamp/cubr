@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { ChartBarIcon } from '@phosphor-icons/react';
+import { ChartBarIcon } from '@heroicons/react/24/outline';
 import { avgKey, formatTime, type Precision, type SessionStats } from '@cubetype/cubestats';
 import type { Solve } from '../../lib/types';
 import { fmtAvg, fmtSolveShort } from './statsUtil';
@@ -33,7 +33,7 @@ export const StatsPanel = memo(function StatsPanel({ stats, ns, solves, precisio
   return (
     <section className="tp-panel" aria-label="session statistics">
       <div className="tp-panel-title">
-        <ChartBarIcon size={14} /> stats
+        <ChartBarIcon width={14} height={14} /> stats
       </div>
       <table className="tp-stats">
         <thead>

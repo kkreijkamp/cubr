@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CloudArrowUpIcon } from '@phosphor-icons/react';
+import { CloudArrowUpIcon } from '@heroicons/react/24/outline';
 import { Modal } from '../Modal';
 import { Spinner } from '../Spinner';
 import { dismissUploadOffer, uploadLocalSolves, useUploadOffer } from '../../lib/solves';
@@ -52,7 +52,7 @@ export function LocalUploadOffer() {
           not now
         </button>
         <button className="btn primary" onClick={upload} disabled={busy} autoFocus>
-          {busy ? <Spinner size={16} /> : <CloudArrowUpIcon size={16} />} upload {formatNumber(offer.solves)} solves
+          {busy ? <Spinner size={16} /> : <CloudArrowUpIcon width={16} height={16} />} upload {formatNumber(offer.solves)} solves
         </button>
       </div>
     </Modal>

@@ -1,22 +1,22 @@
 import { lazy, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowsClockwiseIcon,
-  ArrowsMergeIcon,
-  ChartLineIcon,
-  ChatIcon,
-  CopyIcon,
-  CrownIcon,
+  ArrowPathIcon,
+  ArrowTrendingUpIcon,
+  ArrowsPointingInIcon,
+  ChatBubbleLeftIcon,
+  ClockIcon,
+  CommandLineIcon,
   EyeIcon,
-  KeyboardIcon,
-  ListBulletsIcon,
-  PencilSimpleIcon,
+  ListBulletIcon,
+  PencilIcon,
   PlusIcon,
-  StackIcon,
-  TimerIcon,
+  Square2StackIcon,
+  Square3Stack3DIcon,
   TrashIcon,
-  XIcon,
-} from '@phosphor-icons/react';
+  TrophyIcon,
+  XMarkIcon,
+} from '@heroicons/react/24/outline';
 import { EVENTS, effectiveMs, formatTime, getEvent, rollingAverage, sessionStats, type Penalty } from '@cubetype/cubestats';
 import { TimerDisplay } from '../timer/TimerDisplay';
 import { useTimerEngine, type TimerResult, type TimerState } from '../timer/useTimerEngine';
@@ -307,7 +307,7 @@ export default function TimerPage() {
         {
           id: 'timer-event',
           label: 'Event...',
-          icon: <TimerIcon />,
+          icon: <ClockIcon />,
           keywords: ['puzzle', 'cube'],
           children: () =>
             EVENTS.map((e) => ({
@@ -321,7 +321,7 @@ export default function TimerPage() {
         {
           id: 'timer-session',
           label: 'Session...',
-          icon: <StackIcon />,
+          icon: <Square3Stack3DIcon />,
           children: () =>
             eventSessions.map((s) => ({
               id: `timer-session-${s.id}`,
@@ -331,25 +331,25 @@ export default function TimerPage() {
             })),
         },
         { id: 'timer-new-session', label: 'New session', icon: <PlusIcon />, run: () => setModal({ kind: 'newSession' }) },
-        { id: 'timer-rename-session', label: 'Rename session', icon: <PencilSimpleIcon />, run: () => setModal({ kind: 'renameSession' }) },
+        { id: 'timer-rename-session', label: 'Rename session', icon: <PencilIcon />, run: () => setModal({ kind: 'renameSession' }) },
         {
           id: 'timer-merge-sessions',
           label: 'Merge sessions...',
-          icon: <ArrowsMergeIcon />,
+          icon: <ArrowsPointingInIcon />,
           keywords: ['combine', 'join', 'session'],
           run: () => setModal({ kind: 'mergeSessions' }),
         },
         { id: 'timer-delete-session', label: 'Delete session', icon: <TrashIcon />, run: () => setModal({ kind: 'deleteSession' }) },
-        { id: 'timer-new-scramble', label: 'New scramble', icon: <ArrowsClockwiseIcon />, keywords: ['next'], run: () => scrRef.current.next() },
-        { id: 'timer-custom-scramble', label: 'Enter custom scramble', icon: <PencilSimpleIcon />, keywords: ['edit'], run: () => setEditingScramble(true) },
-        { id: 'timer-copy-scramble', label: 'Copy scramble', icon: <CopyIcon />, run: () => void copyScramble() },
+        { id: 'timer-new-scramble', label: 'New scramble', icon: <ArrowPathIcon />, keywords: ['next'], run: () => scrRef.current.next() },
+        { id: 'timer-custom-scramble', label: 'Enter custom scramble', icon: <PencilIcon />, keywords: ['edit'], run: () => setEditingScramble(true) },
+        { id: 'timer-copy-scramble', label: 'Copy scramble', icon: <Square2StackIcon />, run: () => void copyScramble() },
       ];
       if (last) {
         cmds.push(
           {
             id: 'timer-penalty',
             label: 'Penalty last solve...',
-            icon: <TimerIcon />,
+            icon: <ClockIcon />,
             keywords: ['dnf', '+2', 'ok'],
             children: () =>
               (['OK', '+2', 'DNF'] as Penalty[]).map((p) => ({
@@ -359,14 +359,14 @@ export default function TimerPage() {
                 run: () => penaltyLast(p),
               })),
           },
-          { id: 'timer-comment-last', label: 'Comment last solve', icon: <ChatIcon />, run: commentLast },
+          { id: 'timer-comment-last', label: 'Comment last solve', icon: <ChatBubbleLeftIcon />, run: commentLast },
           { id: 'timer-delete-last', label: 'Delete last solve', icon: <TrashIcon />, run: deleteLast },
         );
       }
       cmds.push(
-        { id: 'timer-toggle-charts', label: settings.showCharts ? 'Hide charts' : 'Show charts', icon: <ChartLineIcon />, keywords: ['toggle'], run: () => updateSettings({ showCharts: !settings.showCharts }) },
-        { id: 'timer-toggle-list', label: settings.showSolveList ? 'Hide solve list' : 'Show solve list', icon: <ListBulletsIcon />, keywords: ['toggle'], run: () => updateSettings({ showSolveList: !settings.showSolveList }) },
-        { id: 'timer-manual', label: manual ? 'Use the timer (leave manual entry)' : 'Manual entry (type times)', icon: <KeyboardIcon />, keywords: ['typing', 'toggle'], run: () => setManual((m) => !m) },
+        { id: 'timer-toggle-charts', label: settings.showCharts ? 'Hide charts' : 'Show charts', icon: <ArrowTrendingUpIcon />, keywords: ['toggle'], run: () => updateSettings({ showCharts: !settings.showCharts }) },
+        { id: 'timer-toggle-list', label: settings.showSolveList ? 'Hide solve list' : 'Show solve list', icon: <ListBulletIcon />, keywords: ['toggle'], run: () => updateSettings({ showSolveList: !settings.showSolveList }) },
+        { id: 'timer-manual', label: manual ? 'Use the timer (leave manual entry)' : 'Manual entry (type times)', icon: <CommandLineIcon />, keywords: ['typing', 'toggle'], run: () => setManual((m) => !m) },
         { id: 'timer-inspection-toggle', label: settings.inspection ? 'Turn inspection off' : 'Turn inspection on', icon: <EyeIcon />, keywords: ['toggle', 'wca'], run: () => updateSettings({ inspection: !settings.inspection }) },
       );
       return cmds;
@@ -469,7 +469,7 @@ export default function TimerPage() {
           <div className="tp-avgline">
             {pbKinds && (
               <span className="pb-badge">
-                <CrownIcon size={14} /> {pbKinds}
+                <TrophyIcon width={14} height={14} /> {pbKinds}
               </span>
             )}
             <span>
@@ -488,7 +488,7 @@ export default function TimerPage() {
         {showPreview && (
           <section className="tp-panel tp-preview" aria-label="scramble preview">
             <div className="tp-panel-title">
-              <EyeIcon size={14} /> scramble preview
+              <EyeIcon width={14} height={14} /> scramble preview
             </div>
             <div className="tp-preview-box">
               {previewScramble ? (
@@ -516,7 +516,7 @@ export default function TimerPage() {
       ) : (
         <div className="tp-charts-toggle fade-on-focus">
           <button className="btn-text small" onClick={() => updateSettings({ showCharts: true })} {...noFocus}>
-            <ChartLineIcon size={14} /> show charts
+            <ArrowTrendingUpIcon width={14} height={14} /> show charts
           </button>
         </div>
       )}
@@ -543,7 +543,7 @@ export default function TimerPage() {
             }}
             {...noFocus}
           >
-            <XIcon size={12} />
+            <XMarkIcon width={12} height={12} />
           </button>
         </div>
       )}

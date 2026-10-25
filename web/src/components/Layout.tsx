@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
-  CalendarDotsIcon,
-  CrownIcon,
-  GearIcon,
-  GlobeIcon,
-  InfoIcon,
-  KeyboardIcon,
-  PaletteIcon,
-  PulseIcon,
-  SwordIcon,
-  TimerIcon,
+  CalendarDaysIcon,
+  ClockIcon,
+  Cog6ToothIcon,
+  CommandLineIcon,
+  FlagIcon,
+  GlobeAltIcon,
+  InformationCircleIcon,
+  SignalIcon,
+  SwatchIcon,
+  TrophyIcon,
   UserIcon,
-} from '@phosphor-icons/react';
+} from '@heroicons/react/24/outline';
 import { Avatar } from './Avatar';
 import { CubeLogo } from './CubeLogo';
 import { Toasts } from './Toasts';
@@ -26,13 +26,13 @@ import { themeLabel } from '../lib/themes';
 import { api } from '../lib/api';
 
 const NAV = [
-  { to: '/', icon: TimerIcon, label: 'timer', end: true },
-  { to: '/daily', icon: CalendarDotsIcon, label: 'daily challenge' },
-  { to: '/race', icon: SwordIcon, label: 'race' },
-  { to: '/leaderboards', icon: CrownIcon, label: 'leaderboards' },
-  { to: '/wca', icon: GlobeIcon, label: 'wca rankings' },
-  { to: '/about', icon: InfoIcon, label: 'about', hideMobile: true },
-  { to: '/settings', icon: GearIcon, label: 'settings' },
+  { to: '/', icon: ClockIcon, label: 'timer', end: true },
+  { to: '/daily', icon: CalendarDaysIcon, label: 'daily challenge' },
+  { to: '/race', icon: FlagIcon, label: 'race' },
+  { to: '/leaderboards', icon: TrophyIcon, label: 'leaderboards' },
+  { to: '/wca', icon: GlobeAltIcon, label: 'wca rankings' },
+  { to: '/about', icon: InformationCircleIcon, label: 'about', hideMobile: true },
+  { to: '/settings', icon: Cog6ToothIcon, label: 'settings' },
 ];
 
 function Header() {
@@ -57,22 +57,22 @@ function Header() {
             data-tip-pos="down"
             aria-label={label}
           >
-            <Icon size={20} />
+            <Icon width={20} height={20} />
           </NavLink>
         ))}
       </nav>
       <div className="nav nav-side">
         <NavLink to="/status" className={({ isActive }) => `btn-text hide-mobile${isActive ? ' active' : ''}`} data-tip="cluster status" data-tip-pos="down" aria-label="cluster status">
-          <PulseIcon size={20} />
+          <SignalIcon width={20} height={20} />
         </NavLink>
         {status === 'authed' && user ? (
           <NavLink to="/account" className={({ isActive }) => `btn-text nav-user${isActive ? ' active' : ''}`} data-tip="account" data-tip-pos="down">
-            {user.avatarUrl ? <Avatar user={user} size={20} className="nav-avatar" /> : <UserIcon size={20} />}
+            {user.avatarUrl ? <Avatar user={user} size={20} className="nav-avatar" /> : <UserIcon width={20} height={20} />}
             <span className="hide-mobile">{user.username}</span>
           </NavLink>
         ) : (
           <NavLink to="/login" className={({ isActive }) => `btn-text${isActive ? ' active' : ''}`} data-tip="sign in" data-tip-pos="down" aria-label="sign in">
-            <UserIcon size={20} />
+            <UserIcon width={20} height={20} />
           </NavLink>
         )}
       </div>
@@ -93,18 +93,18 @@ function Footer() {
     <footer className="footer">
       <div className="footer-links">
         <button className="btn-text" onClick={() => openPalette()}>
-          <KeyboardIcon size={14} /> <kbd>esc</kbd> command line
+          <CommandLineIcon width={14} height={14} /> <kbd>esc</kbd> command line
         </button>
         <Link to="/status" className="btn-text">
-          <PulseIcon size={14} /> status
+          <SignalIcon width={14} height={14} /> status
         </Link>
         <Link to="/about" className="btn-text">
-          <InfoIcon size={14} /> about
+          <InformationCircleIcon width={14} height={14} /> about
         </Link>
       </div>
       <div className="footer-right">
         <button className="btn-text" onClick={() => openPalette('theme')} data-tip="change theme" aria-label="change theme">
-          <PaletteIcon size={14} /> {themeLabel(settings.theme)}
+          <SwatchIcon width={14} height={14} /> {themeLabel(settings.theme)}
         </button>
         <Link to="/status" className="btn-text" data-tip={info ? `served by ${info.pod}` : 'version'}>
           {info ? `v${info.version}` : 'version'}

@@ -1,4 +1,4 @@
-import { ChatIcon, TrashIcon } from '@phosphor-icons/react';
+import { ChatBubbleLeftIcon, TrashIcon } from '@heroicons/react/24/outline';
 import type { Penalty } from '@cubetype/cubestats';
 import type { Solve } from '../../lib/types';
 import { noFocus } from './ConfigBar';
@@ -42,10 +42,10 @@ export function QuickActions({ last, onPenalty, onComment, onDelete }: Props) {
         data-tip={last?.comment ? `"${last.comment.slice(0, 40)}${last.comment.length > 40 ? '...' : ''}"` : 'comment (alt+c)'}
         {...noFocus}
       >
-        <ChatIcon size={16} />
+        <ChatBubbleLeftIcon width={16} height={16} />
       </button>
       <button className="btn-text danger" onClick={onDelete} disabled={!last} aria-label="delete the latest solve" data-tip="delete (alt+backspace)" {...noFocus}>
-        <TrashIcon size={16} />
+        <TrashIcon width={16} height={16} />
       </button>
     </div>
   );

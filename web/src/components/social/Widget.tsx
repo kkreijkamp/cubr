@@ -1,12 +1,12 @@
 import type { ReactNode } from 'react';
-import { CloudSlashIcon } from '@phosphor-icons/react';
+import { SignalSlashIcon } from '@heroicons/react/24/outline';
 import { friendlyError } from './util';
 
 /** Calm, per-widget failure message with a retry - a down service only degrades its own widget. */
 export function WidgetError({ error, what, onRetry, compact }: { error: unknown; what: string; onRetry?: () => void; compact?: boolean }) {
   return (
     <div className={`pv-widget-msg${compact ? ' compact' : ''}`} role="status">
-      <CloudSlashIcon size={16} aria-hidden="true" />
+      <SignalSlashIcon width={16} height={16} aria-hidden="true" />
       <span>{friendlyError(error, what)}</span>
       {onRetry && (
         <button className="btn-text" onClick={onRetry}>

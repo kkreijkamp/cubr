@@ -1,22 +1,22 @@
 import { useNavigate } from 'react-router-dom';
 import {
-  CalendarDotsIcon,
-  CrownIcon,
+  ArrowRightEndOnRectangleIcon,
+  ArrowRightStartOnRectangleIcon,
+  ArrowsRightLeftIcon,
+  BoldIcon,
+  BoltIcon,
+  CalendarDaysIcon,
+  ClockIcon,
+  Cog6ToothIcon,
   EyeIcon,
-  GearIcon,
-  GlobeIcon,
-  InfoIcon,
-  LightningIcon,
-  PaletteIcon,
-  PulseIcon,
-  ShuffleIcon,
-  SignInIcon,
-  SignOutIcon,
-  SwordIcon,
-  TextAaIcon,
-  TimerIcon,
+  FlagIcon,
+  GlobeAltIcon,
+  InformationCircleIcon,
+  SignalIcon,
+  SwatchIcon,
+  TrophyIcon,
   UserIcon,
-} from '@phosphor-icons/react';
+} from '@heroicons/react/24/outline';
 import { useRegisterCommands, type Command } from '../lib/commands';
 import { useAuth } from '../lib/auth';
 import { FONTS, updateSettings, useSettings, type Settings as S } from '../lib/settings';
@@ -35,7 +35,7 @@ function options<K extends keyof S>(key: K, label: string, values: { value: S[K]
   return {
     id: `setting-${String(key)}`,
     label: `${label}...`,
-    icon: <GearIcon />,
+    icon: <Cog6ToothIcon />,
     keywords: ['setting'],
     children: () =>
       values.map((v) => ({
@@ -58,25 +58,25 @@ export function GlobalCommands() {
     () => {
       const go = (path: string) => () => navigate(path);
       const nav: Command[] = [
-        { id: 'go-timer', label: 'Go to timer', icon: <TimerIcon />, run: go('/') },
-        { id: 'go-daily', label: 'Go to daily challenge', icon: <CalendarDotsIcon />, run: go('/daily') },
-        { id: 'go-race', label: 'Go to race rooms', icon: <SwordIcon />, keywords: ['multiplayer'], run: go('/race') },
-        { id: 'go-lb', label: 'Go to leaderboards', icon: <CrownIcon />, run: go('/leaderboards') },
-        { id: 'go-wca', label: 'Go to WCA rankings', icon: <GlobeIcon />, run: go('/wca') },
-        { id: 'go-settings', label: 'Go to settings', icon: <GearIcon />, run: go('/settings') },
-        { id: 'go-status', label: 'Go to cluster status', icon: <PulseIcon />, keywords: ['kubernetes', 'pods'], run: go('/status') },
-        { id: 'go-about', label: 'Go to about', icon: <InfoIcon />, run: go('/about') },
+        { id: 'go-timer', label: 'Go to timer', icon: <ClockIcon />, run: go('/') },
+        { id: 'go-daily', label: 'Go to daily challenge', icon: <CalendarDaysIcon />, run: go('/daily') },
+        { id: 'go-race', label: 'Go to race rooms', icon: <FlagIcon />, keywords: ['multiplayer'], run: go('/race') },
+        { id: 'go-lb', label: 'Go to leaderboards', icon: <TrophyIcon />, run: go('/leaderboards') },
+        { id: 'go-wca', label: 'Go to WCA rankings', icon: <GlobeAltIcon />, run: go('/wca') },
+        { id: 'go-settings', label: 'Go to settings', icon: <Cog6ToothIcon />, run: go('/settings') },
+        { id: 'go-status', label: 'Go to cluster status', icon: <SignalIcon />, keywords: ['kubernetes', 'pods'], run: go('/status') },
+        { id: 'go-about', label: 'Go to about', icon: <InformationCircleIcon />, run: go('/about') },
       ];
       const theme: Command = {
         id: 'theme',
         label: 'Theme...',
-        icon: <PaletteIcon />,
+        icon: <SwatchIcon />,
         keywords: ['color', 'colour'],
         children: () => [
           ...(['', 'light', 'dark'] as const).map((kind) => ({
             id: `theme-random${kind && `-${kind}`}`,
             label: `random${kind && ` ${kind}`} theme`,
-            icon: <ShuffleIcon />,
+            icon: <ArrowsRightLeftIcon />,
             keywords: ['shuffle', 'surprise'],
             run: () => updateSettings({ theme: randomTheme(settings.theme, kind || undefined).name }),
           })),
@@ -95,7 +95,7 @@ export function GlobalCommands() {
       const font: Command = {
         id: 'font',
         label: 'Font...',
-        icon: <TextAaIcon />,
+        icon: <BoldIcon />,
         children: () => FONTS.map((f) => ({ id: `font-${f.name}`, label: f.name, active: settings.font === f.name, run: () => updateSettings({ font: f.name }) })),
       };
       const timer: Command[] = [
@@ -115,14 +115,14 @@ export function GlobalCommands() {
         options('precision', 'Precision', [{ value: 2, label: '0.01 (centiseconds)' }, { value: 3, label: '0.001 (milliseconds)' }], settings.precision),
         options('scramblePreview', 'Scramble preview', [{ value: 'off', label: 'off' }, { value: '2D', label: '2D' }, { value: '3D', label: '3D' }], settings.scramblePreview),
         { ...options('focusMode', 'Focus mode', [{ value: true, label: 'on' }, { value: false, label: 'off' }], settings.focusMode), icon: <EyeIcon /> },
-        { ...options('inspectionAlerts', 'Inspection alerts', [{ value: 'off', label: 'off' }, { value: 'beep', label: 'beep' }, { value: 'voice', label: 'voice' }], settings.inspectionAlerts), icon: <LightningIcon /> },
+        { ...options('inspectionAlerts', 'Inspection alerts', [{ value: 'off', label: 'off' }, { value: 'beep', label: 'beep' }, { value: 'voice', label: 'voice' }], settings.inspectionAlerts), icon: <BoltIcon /> },
       ];
       const auth: Command[] = user
         ? [
             { id: 'go-account', label: 'Go to account', icon: <UserIcon />, run: go('/account') },
-            { id: 'logout', label: 'Log out', icon: <SignOutIcon />, run: () => void logout() },
+            { id: 'logout', label: 'Log out', icon: <ArrowRightStartOnRectangleIcon />, run: () => void logout() },
           ]
-        : [{ id: 'login', label: 'Log in / register', icon: <SignInIcon />, run: go('/login') }];
+        : [{ id: 'login', label: 'Log in / register', icon: <ArrowRightEndOnRectangleIcon />, run: go('/login') }];
       return [theme, font, ...timer, ...nav, ...auth];
     },
     [settings, user, navigate, logout],

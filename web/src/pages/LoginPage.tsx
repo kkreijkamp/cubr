@@ -1,6 +1,16 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
-import { CalendarDotsIcon, CheckIcon, CloudIcon, CrownIcon, SignInIcon, SwordIcon, UserPlusIcon, WarningCircleIcon, XIcon } from '@phosphor-icons/react';
+import {
+  ArrowRightEndOnRectangleIcon,
+  CalendarDaysIcon,
+  CheckIcon,
+  CloudIcon,
+  ExclamationCircleIcon,
+  FlagIcon,
+  TrophyIcon,
+  UserPlusIcon,
+  XMarkIcon,
+} from '@heroicons/react/24/outline';
 import { Loading, Spinner } from '../components/Spinner';
 import { safeNext } from '../components/social/util';
 import { ApiError } from '../lib/api';
@@ -85,12 +95,12 @@ function Field({ type = 'text', name, placeholder, value, onChange, autoComplete
         />
         {bad && (
           <span className="lg-indicator bad" aria-hidden="true">
-            <XIcon size={16} />
+            <XMarkIcon width={16} height={16} />
           </span>
         )}
         {ok && (
           <span className="lg-indicator ok" aria-hidden="true">
-            <CheckIcon size={16} />
+            <CheckIcon width={16} height={16} />
           </span>
         )}
       </div>
@@ -106,7 +116,7 @@ function Field({ type = 'text', name, placeholder, value, onChange, autoComplete
 function FormError({ children, shakeKey }: { children: ReactNode; shakeKey: number }) {
   return (
     <div key={shakeKey} className="lg-form-error shake" role="alert">
-      <WarningCircleIcon size={15} />
+      <ExclamationCircleIcon width={15} height={15} />
       <span>{children}</span>
     </div>
   );
@@ -265,7 +275,7 @@ function LoginForm() {
   return (
     <form className="lg-form lg-login" onSubmit={onSubmit} noValidate>
       <h2 className="h3">
-        <SignInIcon /> login
+        <ArrowRightEndOnRectangleIcon /> login
       </h2>
       <Field
         name="login"
@@ -290,7 +300,7 @@ function LoginForm() {
       />
       {formError && <FormError shakeKey={errorTick}>{formError}</FormError>}
       <button type="submit" className="btn block" disabled={busy}>
-        {busy ? <Spinner size={16} /> : <SignInIcon />} sign in
+        {busy ? <Spinner size={16} /> : <ArrowRightEndOnRectangleIcon />} sign in
       </button>
     </form>
   );
@@ -318,16 +328,16 @@ export default function LoginPage() {
       <LoginForm />
       <div className="lg-perks">
         <span>
-          <CloudIcon size={14} /> solves synced across devices
+          <CloudIcon width={14} height={14} /> solves synced across devices
         </span>
         <span>
-          <CrownIcon size={14} /> a spot on the leaderboards
+          <TrophyIcon width={14} height={14} /> a spot on the leaderboards
         </span>
         <span>
-          <CalendarDotsIcon size={14} /> daily challenge rankings
+          <CalendarDaysIcon width={14} height={14} /> daily challenge rankings
         </span>
         <span>
-          <SwordIcon size={14} /> race with your name
+          <FlagIcon width={14} height={14} /> race with your name
         </span>
       </div>
     </div>

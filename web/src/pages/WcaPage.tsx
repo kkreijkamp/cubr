@@ -3,7 +3,7 @@
 // so results are shareable and other pages can deep-link (e.g. /wca?person=2009ZEMD01).
 import { useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { GlobeIcon, MagnifyingGlassIcon, MedalIcon, UsersIcon } from '@phosphor-icons/react';
+import { GlobeAltIcon, MagnifyingGlassIcon, StarIcon, UsersIcon } from '@heroicons/react/24/outline';
 import { EVENTS } from '@cubetype/cubestats';
 import { api } from '../lib/api';
 import { formatDate } from '../lib/format';
@@ -83,8 +83,8 @@ export default function WcaPage() {
   useRegisterCommands(
     'wca',
     () => [
-      { id: 'wca-rank', label: 'WCA: where would I rank?', icon: <MedalIcon />, run: () => setTab('rank') },
-      { id: 'wca-records', label: 'WCA: world records', icon: <GlobeIcon />, run: () => setTab('records') },
+      { id: 'wca-rank', label: 'WCA: where would I rank?', icon: <StarIcon />, run: () => setTab('rank') },
+      { id: 'wca-records', label: 'WCA: world records', icon: <GlobeAltIcon />, run: () => setTab('records') },
       { id: 'wca-people', label: 'WCA: search competitors', icon: <MagnifyingGlassIcon />, run: () => setTab('people') },
     ],
     [],
@@ -95,7 +95,7 @@ export default function WcaPage() {
       <div className="live-head">
         <div className="titles">
           <h1 className="h2">
-            <GlobeIcon /> wca rankings
+            <GlobeAltIcon /> wca rankings
           </h1>
           <div className="subtitle">official World Cube Association results - see how your times compare with every competitor.</div>
         </div>

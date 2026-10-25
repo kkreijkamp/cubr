@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowSquareOutIcon, CameraIcon, LinkIcon, PencilSimpleIcon } from '@phosphor-icons/react';
+import { ArrowTopRightOnSquareIcon, CameraIcon, LinkIcon, PencilIcon } from '@heroicons/react/24/outline';
 import { formatDuration } from '@cubetype/cubestats';
 import { AvatarEditor } from './AvatarEditor';
 import { countryName } from './countries';
@@ -114,7 +114,7 @@ export function ProfileHeader({ user, summary, own, onEdit }: Props) {
                 aria-label="open WCA profile"
                 data-tip="wca profile"
               >
-                <ArrowSquareOutIcon size={13} />
+                <ArrowTopRightOnSquareIcon width={13} height={13} />
               </a>
             </span>
           </div>
@@ -170,7 +170,7 @@ export function ProfileHeader({ user, summary, own, onEdit }: Props) {
       <div className="pv-strip">
         {own && onEdit && (
           <button className="btn-text" onClick={onEdit} data-tip="edit profile" data-tip-pos="left" aria-label="edit profile">
-            <PencilSimpleIcon />
+            <PencilIcon />
           </button>
         )}
         <button className="btn-text" onClick={() => copyProfileLink(user.username)} data-tip="copy profile link" data-tip-pos="left" aria-label="copy profile link">

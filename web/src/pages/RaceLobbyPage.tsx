@@ -1,7 +1,7 @@
 // Race lobby: public rooms (polled every 5 s), create a room, join by code / invite link.
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRightIcon, ArrowsClockwiseIcon, DoorOpenIcon, HashIcon, PlusIcon, SwordIcon, UserIcon } from '@phosphor-icons/react';
+import { ArrowPathIcon, ArrowRightEndOnRectangleIcon, ArrowRightIcon, FlagIcon, HashtagIcon, PlusIcon, UserIcon } from '@heroicons/react/24/outline';
 import { EVENTS, getEvent } from '@cubetype/cubestats';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -49,10 +49,10 @@ function RoomsTable({ onJoin }: { onJoin: (id: string) => void }) {
     <section className="card race-rooms" aria-labelledby="rooms-title">
       <div className="live-section-title">
         <h3 className="h3" id="rooms-title">
-          <SwordIcon /> public rooms
+          <FlagIcon /> public rooms
         </h3>
         <button className="btn-text small" onClick={load} aria-label="refresh" style={{ padding: 0 }}>
-          {loading ? <Spinner size={14} /> : <ArrowsClockwiseIcon size={14} />} {rooms ? `${rooms.length} open` : ''}
+          {loading ? <Spinner size={14} /> : <ArrowPathIcon width={14} height={14} />} {rooms ? `${rooms.length} open` : ''}
         </button>
       </div>
       {error && !rooms ? (
@@ -85,7 +85,7 @@ function RoomsTable({ onJoin }: { onJoin: (id: string) => void }) {
                   </td>
                   <td className="secondary hide-sm">{timeAgo(r.createdAt)}</td>
                   <td className="hide-sm">
-                    <ArrowRightIcon size={16} aria-label="join" />
+                    <ArrowRightIcon width={16} height={16} aria-label="join" aria-hidden={false} />
                   </td>
                 </tr>
               ))}
@@ -143,7 +143,7 @@ export default function RaceLobbyPage() {
     'race-lobby',
     () => [
       { id: 'race-create', label: 'Create race room', icon: <PlusIcon />, run: () => nameRef.current?.focus() },
-      { id: 'race-join-code', label: 'Join race room by code', icon: <HashIcon />, run: () => codeRef.current?.focus() },
+      { id: 'race-join-code', label: 'Join race room by code', icon: <HashtagIcon />, run: () => codeRef.current?.focus() },
     ],
     [],
   );
@@ -153,7 +153,7 @@ export default function RaceLobbyPage() {
       <div className="live-head">
         <div className="titles">
           <h1 className="h2">
-            <SwordIcon /> race
+            <FlagIcon /> race
           </h1>
           <div className="subtitle">
             real-time races with friends - same scramble, live status, results per round. rooms live in redis and websockets are spread across all
@@ -225,7 +225,7 @@ export default function RaceLobbyPage() {
               </label>
               {createError && <div className="small error">{createError}</div>}
               <button className="btn primary block" type="submit" disabled={creating}>
-                {creating ? <Spinner size={16} /> : <DoorOpenIcon />} create &amp; join
+                {creating ? <Spinner size={16} /> : <ArrowRightEndOnRectangleIcon />} create &amp; join
               </button>
             </form>
           </section>
@@ -233,7 +233,7 @@ export default function RaceLobbyPage() {
           <section className="card race-card" aria-labelledby="join-title">
             <div className="live-section-title">
               <h3 className="h3" id="join-title">
-                <HashIcon /> join by code
+                <HashtagIcon /> join by code
               </h3>
             </div>
             <form

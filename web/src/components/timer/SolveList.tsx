@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { ChatTextIcon, ListBulletsIcon } from '@phosphor-icons/react';
+import { ChatBubbleLeftEllipsisIcon, ListBulletIcon } from '@heroicons/react/24/outline';
 import type { Precision } from '@cubetype/cubestats';
 import type { Solve } from '../../lib/types';
 import { fmtAvg, fmtSolveShort } from './statsUtil';
@@ -65,7 +65,7 @@ export const SolveList = memo(function SolveList({ solves, ao5, ao12, bestIndex,
         <span className="idx">{i + 1}</span>
         <span className={`time${s.penalty === 'DNF' ? ' dnf' : ''}`}>
           {fmtSolveShort(s, precision)}
-          {s.comment && <ChatTextIcon size={11} className="tp-comment-mark" aria-label="has comment" />}
+          {s.comment && <ChatBubbleLeftEllipsisIcon width={11} height={11} className="tp-comment-mark" aria-label="has comment" aria-hidden={false} />}
         </span>
         <span>{fmtAvg(ao5[i], precision)}</span>
         <span>{fmtAvg(ao12[i], precision)}</span>
@@ -76,7 +76,7 @@ export const SolveList = memo(function SolveList({ solves, ao5, ao12, bestIndex,
   return (
     <section className="tp-panel tp-solves" aria-label="solves">
       <div className="tp-panel-title">
-        <ListBulletsIcon size={14} /> solves
+        <ListBulletIcon width={14} height={14} /> solves
       </div>
       {loading && n === 0 ? (
         <Loading />

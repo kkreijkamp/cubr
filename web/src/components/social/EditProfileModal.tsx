@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { WarningCircleIcon } from '@phosphor-icons/react';
+import { ExclamationCircleIcon } from '@heroicons/react/24/outline';
 import { AvatarEditor } from './AvatarEditor';
 import { CountrySelect } from './CountrySelect';
 import { friendlyError } from './util';
@@ -155,7 +155,7 @@ export function EditProfileModal({ user, onClose }: { user: PrivateUser; onClose
         )}
         {error && (
           <div className="ep-error" role="alert">
-            <WarningCircleIcon size={15} /> {error}
+            <ExclamationCircleIcon width={15} height={15} /> {error}
           </div>
         )}
         <div className="ep-actions">

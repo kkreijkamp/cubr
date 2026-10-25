@@ -9,7 +9,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import { ImageIcon, MagnifyingGlassMinusIcon, MagnifyingGlassPlusIcon, TrashIcon, UploadSimpleIcon, WarningCircleIcon } from '@phosphor-icons/react';
+import { ArrowUpTrayIcon, ExclamationCircleIcon, MagnifyingGlassMinusIcon, MagnifyingGlassPlusIcon, PhotoIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { friendlyError } from './util';
 import { api, ApiError } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
@@ -442,14 +442,14 @@ export function AvatarEditor({ onDone, onCancel }: Props) {
             <Avatar user={user} size={72} />
             {dragging && (
               <span className="ae-current-drop" aria-hidden="true">
-                <ImageIcon />
+                <PhotoIcon />
               </span>
             )}
           </div>
           <div className="ae-drop-body">
             <div className="ae-drop-line">
               <button type="button" className="btn small" onClick={openPicker} disabled={busy !== null}>
-                <UploadSimpleIcon /> {hasAvatar ? 'change picture' : 'upload picture'}
+                <ArrowUpTrayIcon /> {hasAvatar ? 'change picture' : 'upload picture'}
               </button>
               <span className="ae-drop-or">{dragging ? 'drop it!' : 'or drop an image here'}</span>
             </div>
@@ -542,7 +542,7 @@ export function AvatarEditor({ onDone, onCancel }: Props) {
 
           <div className="ae-actions">
             <button type="button" className="btn-text small" onClick={openPicker} disabled={busy !== null}>
-              <ImageIcon /> choose another
+              <PhotoIcon /> choose another
             </button>
             <span className="ae-spacer" />
             <button
@@ -566,7 +566,7 @@ export function AvatarEditor({ onDone, onCancel }: Props) {
 
       {error && (
         <div className="ep-error" role="alert">
-          <WarningCircleIcon size={15} /> {error}
+          <ExclamationCircleIcon width={15} height={15} /> {error}
         </div>
       )}
     </div>

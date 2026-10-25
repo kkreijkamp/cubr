@@ -96,6 +96,12 @@ h4 {
   margin: 0;
 }
 
+/* heroicons carry no size: unsized ones default to 24px (zero specificity, so any rule above still wins) */
+:where(svg[data-slot='icon']:not([width])) {
+  width: 24px;
+  height: 24px;
+}
+
 /* ---------------------------------------------------------------- app shell */
 .app {
   display: grid;

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { ChartConfiguration } from 'chart.js';
-import { ClockIcon } from '@phosphor-icons/react';
+import { ClockIcon } from '@heroicons/react/24/outline';
 import { EVENTS } from '@cubetype/cubestats';
 import { WidgetError } from './Widget';
 import { eventLabel, plural } from './util';

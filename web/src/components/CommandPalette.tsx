@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CaretRightIcon, CheckIcon, MagnifyingGlassIcon } from '@phosphor-icons/react';
+import { CheckIcon, ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { closePalette, matches, openPalette, paletteStore, useAllCommands, type Command } from '../lib/commands';
 import { applyVisualSettings } from '../lib/settings';
 import { useStore } from '../lib/store';
@@ -176,7 +176,7 @@ function PaletteInner({ initial }: { initial: string | null }) {
     >
       <div className="modal palette" role="dialog" aria-label="Command palette" onKeyDown={onKeyDown}>
         <div className="palette-input">
-          <MagnifyingGlassIcon size={16} />
+          <MagnifyingGlassIcon width={16} height={16} />
           <input ref={inputRef} value={query} onChange={(e) => setQuery(e.target.value)} placeholder={placeholder} aria-label="Search commands" />
         </div>
         <div className="palette-list" ref={listRef} onMouseLeave={() => setActive(restIndex.current)}>
@@ -190,7 +190,7 @@ function PaletteInner({ initial }: { initial: string | null }) {
             >
               <span>{row.cmd.active ? <CheckIcon /> : row.cmd.icon ?? null}</span>
               <span>{row.label}</span>
-              <span>{row.cmd.children ? <CaretRightIcon /> : null}</span>
+              <span>{row.cmd.children ? <ChevronRightIcon /> : null}</span>
             </div>
           ))}
         </div>

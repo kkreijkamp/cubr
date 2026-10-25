@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScrollIcon } from '@phosphor-icons/react';
+import { DocumentTextIcon } from '@heroicons/react/24/outline';
 import type { LogEntry } from './monitor';
 
 const time = (t: number) => {
@@ -15,7 +15,7 @@ export function EventLog({ log }: { log: LogEntry[] }) {
     <section className="card status-panel" aria-labelledby="log-title">
       <div className="live-section-title">
         <h3 className="h3" id="log-title">
-          <ScrollIcon /> cluster events
+          <DocumentTextIcon /> cluster events
         </h3>
         <button className={`btn-text small${onlyImportant ? ' active' : ''}`} onClick={() => setOnlyImportant((v) => !v)} style={{ padding: 0 }}>
           {onlyImportant ? 'showing changes only' : 'show changes only'}

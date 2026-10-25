@@ -1,20 +1,20 @@
 import { useEffect } from 'react';
 import {
-  CalendarCheckIcon,
+  ArrowUpTrayIcon,
+  CalendarDaysIcon,
   ChartBarIcon,
-  CrownIcon,
-  GlobeIcon,
+  ClockIcon,
+  CommandLineIcon,
+  FlagIcon,
+  GlobeAltIcon,
   HeartIcon,
-  KeyboardIcon,
-  PaletteIcon,
-  StackIcon,
-  SwordIcon,
-  TimerIcon,
-  TreeStructureIcon,
-  UploadSimpleIcon,
-  WifiSlashIcon,
+  RectangleGroupIcon,
+  SignalSlashIcon,
+  Square3Stack3DIcon,
+  SwatchIcon,
+  TrophyIcon,
   WrenchIcon,
-} from '@phosphor-icons/react';
+} from '@heroicons/react/24/outline';
 import { CubeLogo } from '../components/CubeLogo';
 import { ArchitectureDiagram } from '../components/social/ArchitectureDiagram';
 import { useCountUp } from '../components/social/useCountUp';
@@ -29,15 +29,15 @@ import '../components/social/about.css';
 const REFRESH_MS = 15_000;
 
 const FEATURES = [
-  { icon: TimerIcon, t: 'a timer that gets out of the way', d: 'space to start, hold-to-ready, wca inspection with 8 s / 12 s alerts, +2 and dnf, focus mode while solving.' },
+  { icon: ClockIcon, t: 'a timer that gets out of the way', d: 'space to start, hold-to-ready, wca inspection with 8 s / 12 s alerts, +2 and dnf, focus mode while solving.' },
   { icon: ChartBarIcon, t: 'csTimer-grade stats', d: 'mo3, ao5 ... ao1000 with wca trimming, session bests, trend and histogram charts.' },
-  { icon: UploadSimpleIcon, t: 'sessions & import', d: 'unlimited sessions for all 16 wca events, import from csTimer and every timer it reads, json and csTimer export.' },
-  { icon: CalendarCheckIcon, t: 'daily challenge', d: 'five shared scrambles a day for everyone, ranked by ao5 on a global board.' },
-  { icon: SwordIcon, t: 'live races', d: 'real-time multiplayer rooms over websockets - share a link and race any event.' },
-  { icon: CrownIcon, t: 'leaderboards', d: 'all-time, weekly and daily boards for every event, single, ao5 and ao12.' },
-  { icon: GlobeIcon, t: 'wca comparison', d: 'see where your personal bests would rank among every official wca competitor.' },
-  { icon: PaletteIcon, t: 'themes & command line', d: `${THEMES.length} themes - monkeytype classics plus cube-inspired originals - with live preview. press esc and type - everything is a command.` },
-  { icon: WifiSlashIcon, t: 'offline first', d: 'guest mode works with no backend at all; sign in to sync solves to the cloud.' },
+  { icon: ArrowUpTrayIcon, t: 'sessions & import', d: 'unlimited sessions for all 16 wca events, import from csTimer and every timer it reads, json and csTimer export.' },
+  { icon: CalendarDaysIcon, t: 'daily challenge', d: 'five shared scrambles a day for everyone, ranked by ao5 on a global board.' },
+  { icon: FlagIcon, t: 'live races', d: 'real-time multiplayer rooms over websockets - share a link and race any event.' },
+  { icon: TrophyIcon, t: 'leaderboards', d: 'all-time, weekly and daily boards for every event, single, ao5 and ao12.' },
+  { icon: GlobeAltIcon, t: 'wca comparison', d: 'see where your personal bests would rank among every official wca competitor.' },
+  { icon: SwatchIcon, t: 'themes & command line', d: `${THEMES.length} themes - monkeytype classics plus cube-inspired originals - with live preview. press esc and type - everything is a command.` },
+  { icon: SignalSlashIcon, t: 'offline first', d: 'guest mode works with no backend at all; sign in to sync solves to the cloud.' },
 ];
 
 const STACK: [string, string][] = [
@@ -159,7 +159,7 @@ export default function AboutPage() {
 
       <section aria-labelledby="ab-features">
         <h2 className="ab-h" id="ab-features">
-          <StackIcon /> features
+          <Square3Stack3DIcon /> features
         </h2>
         <div className="ab-features">
           {FEATURES.map(({ icon: Icon, t, d }) => (
@@ -174,7 +174,7 @@ export default function AboutPage() {
 
       <section aria-labelledby="ab-arch">
         <h2 className="ab-h" id="ab-arch">
-          <TreeStructureIcon /> architecture
+          <RectangleGroupIcon /> architecture
         </h2>
         <p className="ab-p">
           the web app and seven microservices run as replicated deployments on google kubernetes engine behind a single cloud load balancer. services
@@ -223,7 +223,7 @@ export default function AboutPage() {
         </section>
         <section aria-labelledby="ab-keys">
           <h2 className="ab-h" id="ab-keys">
-            <KeyboardIcon /> keyboard shortcuts
+            <CommandLineIcon /> keyboard shortcuts
           </h2>
           <div className="ab-keys">
             {KEYS.map(([keys, label]) => (

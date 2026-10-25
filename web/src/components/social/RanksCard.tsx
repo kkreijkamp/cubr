@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CrownIcon } from '@phosphor-icons/react';
+import { TrophyIcon } from '@heroicons/react/24/outline';
 import { EVENT_IDS } from '@cubetype/cubestats';
 import { WidgetEmpty, WidgetError } from './Widget';
 import { eventLabel } from './util';
@@ -28,7 +28,7 @@ export function RanksCard({ userId, own, precision }: { userId: string; own: boo
     <section className="pv-card" aria-label="leaderboard positions">
       <div className="pv-card-head" style={{ marginBottom: list.length ? '0.85rem' : 0 }}>
         <h2 className="pv-title">
-          <CrownIcon /> all-time leaderboards
+          <TrophyIcon /> all-time leaderboards
         </h2>
         <Link to="/leaderboards" className="small">
           view leaderboards
@@ -59,7 +59,7 @@ export function RanksCard({ userId, own, precision }: { userId: string; own: boo
                     {eventLabel(r.event)} {r.kind}
                   </span>
                   <span className="r">
-                    {r.rank === 1 && <CrownIcon />}#{formatNumber(r.rank)}
+                    {r.rank === 1 && <TrophyIcon />}#{formatNumber(r.rank)}
                   </span>
                   <span className="h">
                     {formatTime(r.valueMs, precision)} - top {formatPercent(top)}

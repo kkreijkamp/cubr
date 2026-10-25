@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowsClockwiseIcon, CaretLeftIcon, CheckIcon, CopyIcon, PencilSimpleIcon, WifiSlashIcon, XIcon } from '@phosphor-icons/react';
+import { ArrowPathIcon, CheckIcon, ChevronLeftIcon, PencilIcon, SignalSlashIcon, Square2StackIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import type { ScrambleItem } from '../../timer/useScrambleQueue';
 import { toast } from '../../lib/toast';
 import { copyText } from './feedback';
@@ -76,10 +76,10 @@ export function ScrambleBar({ scramble, onNext, onPrev, hasPrev, onCustom, editi
         />
         <div className="tp-scramble-actions">
           <button className="btn-text" onClick={save}>
-            <CheckIcon size={16} /> use scramble <kbd>enter</kbd>
+            <CheckIcon width={16} height={16} /> use scramble <kbd>enter</kbd>
           </button>
           <button className="btn-text" onClick={() => setEditing(false)}>
-            <XIcon size={16} /> cancel <kbd>esc</kbd>
+            <XMarkIcon width={16} height={16} /> cancel <kbd>esc</kbd>
           </button>
         </div>
       </div>
@@ -100,21 +100,21 @@ export function ScrambleBar({ scramble, onNext, onPrev, hasPrev, onCustom, editi
       <div className="tp-scramble-actions">
         {hasPrev && (
           <button className="btn-text" onClick={onPrev} aria-label="previous scramble" data-tip="previous scramble (alt+<-)" {...noFocus}>
-            <CaretLeftIcon size={16} />
+            <ChevronLeftIcon width={16} height={16} />
           </button>
         )}
         <button className="btn-text" onClick={onNext} aria-label="new scramble" data-tip="new scramble (tab)" {...noFocus}>
-          <ArrowsClockwiseIcon size={16} />
+          <ArrowPathIcon width={16} height={16} />
         </button>
         <button className="btn-text" onClick={copy} aria-label="copy scramble" data-tip="copy scramble" disabled={!scramble} {...noFocus}>
-          <CopyIcon size={16} />
+          <Square2StackIcon width={16} height={16} />
         </button>
         <button className="btn-text" onClick={() => setEditing(true)} aria-label="enter a custom scramble" data-tip="custom scramble" {...noFocus}>
-          <PencilSimpleIcon size={16} />
+          <PencilIcon width={16} height={16} />
         </button>
         {scramble?.offline && (
           <span className="tp-scramble-hint" data-tip="the scramble service is unreachable - using random-move scrambles">
-            <WifiSlashIcon size={12} /> offline scramble
+            <SignalSlashIcon width={12} height={12} /> offline scramble
           </span>
         )}
         {scramble?.custom && <span className="tp-scramble-hint">custom scramble</span>}

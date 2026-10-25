@@ -1,4 +1,4 @@
-import { CopyIcon } from '@phosphor-icons/react';
+import { Square2StackIcon } from '@heroicons/react/24/outline';
 import type { Precision } from '@cubetype/cubestats';
 import { Modal } from '../Modal';
 import { toast } from '../../lib/toast';
@@ -38,7 +38,7 @@ export function AverageModal({ label, window: w, precision, onOpenSolve, onClose
             </span>
           )}
           <button className="btn small" onClick={copy}>
-            <CopyIcon size={14} /> copy as text
+            <Square2StackIcon width={14} height={14} /> copy as text
           </button>
         </div>
       </div>

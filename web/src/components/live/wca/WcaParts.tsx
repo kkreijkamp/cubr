@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeftIcon, ArrowSquareOutIcon, DatabaseIcon, MagnifyingGlassIcon } from '@phosphor-icons/react';
+import { ArrowLeftIcon, ArrowTopRightOnSquareIcon, CircleStackIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { EVENTS, getEvent } from '@cubetype/cubestats';
 import { api } from '../../../lib/api';
 import { useAuth } from '../../../lib/auth';
@@ -23,7 +23,7 @@ export function WcaError({ error, onRetry, what = 'WCA data' }: { error: Error; 
     return (
       <Notice
         tone="main"
-        icon={<DatabaseIcon />}
+        icon={<CircleStackIcon />}
         action={
           onRetry && (
             <button className="btn small" onClick={onRetry}>
@@ -323,7 +323,7 @@ export function PeopleSearch({ initialQuery, onQuery, onPerson }: { initialQuery
   return (
     <div className="stack">
       <div className="wca-search">
-        <MagnifyingGlassIcon size={16} className="sub" />
+        <MagnifyingGlassIcon width={16} height={16} className="sub" />
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="search by name or WCA ID (e.g. 2009ZEMD01)" aria-label="search WCA competitors" autoFocus />
         {res.loading && dq.length >= 2 && <Spinner size={14} />}
       </div>
@@ -367,7 +367,7 @@ export function PersonCard({ wcaId, onBack }: { wcaId: string; onBack: () => voi
   const res = useAsync((signal) => api.wca.person(wcaId, signal), [wcaId]);
   const back = (
     <button className="btn-text wca-back" onClick={onBack}>
-      <ArrowLeftIcon size={14} /> back
+      <ArrowLeftIcon width={14} height={14} /> back
     </button>
   );
   if (res.error) {
@@ -408,7 +408,7 @@ export function PersonCard({ wcaId, onBack }: { wcaId: string; onBack: () => voi
           </div>
         </div>
         <a className="btn small" href={`https://www.worldcubeassociation.org/persons/${encodeURIComponent(person.wcaId)}`} target="_blank" rel="noreferrer">
-          <ArrowSquareOutIcon /> WCA profile
+          <ArrowTopRightOnSquareIcon /> WCA profile
         </a>
       </div>
       {pbs.length === 0 ? (

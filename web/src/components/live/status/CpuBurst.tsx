@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { FlameIcon, LightningIcon, StopIcon } from '@phosphor-icons/react';
+import { BoltIcon, FireIcon, StopIcon } from '@heroicons/react/24/outline';
 import { requestRaw } from '../../../lib/api';
 import { useRegisterCommands } from '../../../lib/commands';
 import { useStoredState } from '../hooks';
@@ -196,7 +196,7 @@ export function CpuBurst({ onLog }: { onLog: (text: string, service: string) => 
     () => [
       running
         ? { id: 'status-burst-stop', label: 'Stop CPU burst', icon: <StopIcon />, run: () => finish('stopped') }
-        : { id: 'status-burst-start', label: 'Start CPU burst (scramble HPA)', icon: <FlameIcon />, keywords: ['load', 'hpa', 'autoscaler'], run: start },
+        : { id: 'status-burst-start', label: 'Start CPU burst (scramble HPA)', icon: <FireIcon />, keywords: ['load', 'hpa', 'autoscaler'], run: start },
     ],
     [running, concurrency, duration],
   );
@@ -205,7 +205,7 @@ export function CpuBurst({ onLog }: { onLog: (text: string, service: string) => 
     <section className="card status-panel burst" aria-labelledby="burst-title">
       <div className="live-section-title">
         <h3 className="h3" id="burst-title">
-          <FlameIcon /> cpu burst
+          <FireIcon /> cpu burst
         </h3>
         <span className="meta" title={`GET ${PATH}`}>
           drives the scramble HPA
@@ -229,7 +229,7 @@ export function CpuBurst({ onLog }: { onLog: (text: string, service: string) => 
             </button>
           ) : (
             <button className="btn primary" onClick={start}>
-              <LightningIcon /> start burst
+              <BoltIcon /> start burst
             </button>
           )}
         </div>

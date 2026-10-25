@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from 'react';
-import { ChartBarIcon, ChartLineIcon } from '@phosphor-icons/react';
+import { ArrowTrendingUpIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import type { ChartConfiguration } from 'chart.js';
 import { formatTime, type Precision } from '@cubetype/cubestats';
 import { ChartCanvas, themedScales, useThemeColors, type ThemeColors } from '../ChartCanvas';
@@ -191,7 +191,7 @@ export const TrendChart = memo(function TrendChart({ times, ao5, ao12, precision
   return (
     <section className="tp-panel tp-chart" aria-label="trend chart">
       <div className="tp-panel-title">
-        <ChartLineIcon size={14} /> trend
+        <ArrowTrendingUpIcon width={14} height={14} /> trend
         <div className="tp-legend">
           {(['single', 'ao5', 'ao12'] as const).map((k) => (
             <button key={k} className={`tp-legend-item ${k}${hidden.has(k) ? ' off' : ''}`} onClick={() => toggle(k)} aria-pressed={!hidden.has(k)} {...noFocus}>
@@ -266,7 +266,7 @@ export const HistogramChart = memo(function HistogramChart({ times, latest }: Hi
   return (
     <section className="tp-panel tp-chart" aria-label="time distribution">
       <div className="tp-panel-title">
-        <ChartBarIcon size={14} /> distribution
+        <ChartBarIcon width={14} height={14} /> distribution
       </div>
       {enough ? (
         <ChartCanvas config={config} height={220} />

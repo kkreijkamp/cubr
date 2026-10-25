@@ -1,4 +1,4 @@
-import { HardDrivesIcon } from '@phosphor-icons/react';
+import { ServerStackIcon } from '@heroicons/react/24/outline';
 import { vlabel, type ServiceView } from './monitor';
 import { podParts } from './ServiceCard';
 
@@ -17,7 +17,7 @@ export function NodeMap({ services, vc }: { services: ServiceView[]; vc: (v: str
     <section className="card status-panel" aria-labelledby="nodes-title">
       <div className="live-section-title">
         <h3 className="h3" id="nodes-title">
-          <HardDrivesIcon /> nodes
+          <ServerStackIcon /> nodes
         </h3>
         <span className="meta">
           {sorted.length} node{sorted.length === 1 ? '' : 's'} - from _info.node

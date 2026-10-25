@@ -1,32 +1,32 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowCounterClockwiseIcon,
+  AdjustmentsHorizontalIcon,
+  ArrowDownTrayIcon,
+  ArrowTrendingUpIcon,
   ArrowUpRightIcon,
-  ArrowsOutSimpleIcon,
+  ArrowUpTrayIcon,
+  ArrowUturnLeftIcon,
+  ArrowsPointingOutIcon,
+  ArrowsRightLeftIcon,
   BellIcon,
-  ChartLineIcon,
+  BoldIcon,
+  CalculatorIcon,
+  CircleStackIcon,
+  ClockIcon,
+  CommandLineIcon,
   CubeIcon,
-  DatabaseIcon,
-  DownloadSimpleIcon,
+  ExclamationTriangleIcon,
   EyeIcon,
-  GaugeIcon,
-  HandIcon,
-  HashIcon,
-  KeyboardIcon,
-  ListBulletsIcon,
+  HandRaisedIcon,
+  HashtagIcon,
+  ListBulletIcon,
   MagnifyingGlassIcon,
-  PaletteIcon,
   PlayIcon,
-  ShuffleIcon,
-  SigmaIcon,
-  SpeakerHighIcon,
-  TextAaIcon,
-  TimerIcon,
+  SpeakerWaveIcon,
+  SwatchIcon,
   TrashIcon,
-  UploadSimpleIcon,
-  WarningIcon,
-} from '@phosphor-icons/react';
+} from '@heroicons/react/24/outline';
 import { CsTimerFormatError, EVENTS, parseTimerFile, toCsTimerExport, type TimerImport } from '@cubetype/cubestats';
 import { csTimerFileName, skippedNotes } from '../components/social/util';
 import { ConfirmModal } from '../components/timer/Dialogs';
@@ -41,14 +41,14 @@ import { applyTheme, isLightTheme, randomTheme, THEMES, themeLabel, type Theme }
 import { toast } from '../lib/toast';
 
 const SECTIONS = [
-  { id: 'timer', label: 'timer', icon: TimerIcon },
+  { id: 'timer', label: 'timer', icon: ClockIcon },
   { id: 'inspection', label: 'inspection', icon: EyeIcon },
-  { id: 'display', label: 'display', icon: ArrowsOutSimpleIcon },
-  { id: 'stats', label: 'stats', icon: SigmaIcon },
-  { id: 'theme', label: 'theme', icon: PaletteIcon },
-  { id: 'data', label: 'data', icon: DatabaseIcon },
-  { id: 'shortcuts', label: 'shortcuts', icon: KeyboardIcon },
-  { id: 'danger', label: 'danger zone', icon: WarningIcon },
+  { id: 'display', label: 'display', icon: ArrowsPointingOutIcon },
+  { id: 'stats', label: 'stats', icon: CalculatorIcon },
+  { id: 'theme', label: 'theme', icon: SwatchIcon },
+  { id: 'data', label: 'data', icon: CircleStackIcon },
+  { id: 'shortcuts', label: 'shortcuts', icon: CommandLineIcon },
+  { id: 'danger', label: 'danger zone', icon: ExclamationTriangleIcon },
 ] as const;
 
 interface RowProps {
@@ -184,16 +184,16 @@ export default function SettingsPage() {
       <nav className="st-quicknav" aria-label="settings sections">
         {SECTIONS.map(({ id, label, icon: Icon }) => (
           <button key={id} className="btn-text" onClick={() => document.getElementById(`settings-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-            <Icon size={14} /> {label}
+            <Icon width={14} height={14} /> {label}
           </button>
         ))}
       </nav>
 
       <Section id="timer" title="timer">
-        <SettingRow icon={<HandIcon size={16} />} title="hold to start" description="How long space (or your finger) must be held before the timer turns green and is ready to start. Stops accidental starts.">
+        <SettingRow icon={<HandRaisedIcon width={16} height={16} />} title="hold to start" description="How long space (or your finger) must be held before the timer turns green and is ready to start. Stops accidental starts.">
           <Options value={s.holdMs} options={[0, 300, 550, 1000].map((v) => ({ value: v, label: v === 0 ? 'off' : `${v / 1000}s` }))} onChange={set('holdMs')} />
         </SettingRow>
-        <SettingRow icon={<GaugeIcon size={16} />} title="timer update" description="What the timer shows while you solve. Hiding the time helps you stay relaxed instead of watching the clock.">
+        <SettingRow icon={<AdjustmentsHorizontalIcon width={16} height={16} />} title="timer update" description="What the timer shows while you solve. Hiding the time helps you stay relaxed instead of watching the clock.">
           <Options
             value={s.timerUpdate}
             options={[
@@ -205,7 +205,7 @@ export default function SettingsPage() {
             onChange={set('timerUpdate')}
           />
         </SettingRow>
-        <SettingRow icon={<HashIcon size={16} />} title="precision" description="Decimal places for times and averages. Singles are truncated, averages rounded like the WCA.">
+        <SettingRow icon={<HashtagIcon width={16} height={16} />} title="precision" description="Decimal places for times and averages. Singles are truncated, averages rounded like the WCA.">
           <Options
             value={s.precision}
             options={[
@@ -215,7 +215,7 @@ export default function SettingsPage() {
             onChange={set('precision')}
           />
         </SettingRow>
-        <SettingRow icon={<ArrowsOutSimpleIcon size={16} />} title="timer size" description="Size of the big timer on the timer page.">
+        <SettingRow icon={<ArrowsPointingOutIcon width={16} height={16} />} title="timer size" description="Size of the big timer on the timer page.">
           <div className="st-size">
             <Options
               value={s.timerSize}
@@ -232,13 +232,13 @@ export default function SettingsPage() {
             </div>
           </div>
         </SettingRow>
-        <SettingRow icon={<EyeIcon size={16} />} title="focus mode" description="Fade out everything except the timer while you inspect and solve.">
+        <SettingRow icon={<EyeIcon width={16} height={16} />} title="focus mode" description="Fade out everything except the timer while you inspect and solve.">
           <Options value={s.focusMode} options={onOff} onChange={set('focusMode')} />
         </SettingRow>
       </Section>
 
       <Section id="inspection" title="inspection">
-        <SettingRow icon={<TimerIcon size={16} />} title="WCA inspection" description="15 seconds of inspection before each solve. Starting after 15 s adds +2, after 17 s the solve is a DNF (WCA A4d).">
+        <SettingRow icon={<ClockIcon width={16} height={16} />} title="WCA inspection" description="15 seconds of inspection before each solve. Starting after 15 s adds +2, after 17 s the solve is a DNF (WCA A4d).">
           <Options
             value={s.inspection}
             options={[
@@ -248,7 +248,7 @@ export default function SettingsPage() {
             onChange={set('inspection')}
           />
         </SettingRow>
-        <SettingRow icon={<BellIcon size={16} />} title="inspection alerts" description="Called out at 8 and 12 seconds, like a judge at a competition.">
+        <SettingRow icon={<BellIcon width={16} height={16} />} title="inspection alerts" description="Called out at 8 and 12 seconds, like a judge at a competition.">
           <Options
             value={s.inspectionAlerts}
             options={[
@@ -262,7 +262,7 @@ export default function SettingsPage() {
       </Section>
 
       <Section id="display" title="display">
-        <SettingRow icon={<EyeIcon size={16} />} title="scramble preview" description="Draw the scrambled puzzle next to your stats so you can check you scrambled correctly.">
+        <SettingRow icon={<EyeIcon width={16} height={16} />} title="scramble preview" description="Draw the scrambled puzzle next to your stats so you can check you scrambled correctly.">
           <Options
             value={s.scramblePreview}
             options={[
@@ -273,13 +273,13 @@ export default function SettingsPage() {
             onChange={set('scramblePreview')}
           />
         </SettingRow>
-        <SettingRow icon={<ListBulletsIcon size={16} />} title="solve list" description="Show the list of solves in the current session on the timer page.">
+        <SettingRow icon={<ListBulletIcon width={16} height={16} />} title="solve list" description="Show the list of solves in the current session on the timer page.">
           <Options value={s.showSolveList} options={onOff} onChange={set('showSolveList')} />
         </SettingRow>
-        <SettingRow icon={<ChartLineIcon size={16} />} title="charts" description="Show the trend and distribution charts below your solves.">
+        <SettingRow icon={<ArrowTrendingUpIcon width={16} height={16} />} title="charts" description="Show the trend and distribution charts below your solves.">
           <Options value={s.showCharts} options={onOff} onChange={set('showCharts')} />
         </SettingRow>
-        <SettingRow icon={<TextAaIcon size={16} />} title="font" description="One font for the whole app. Hover to preview." wide>
+        <SettingRow icon={<BoldIcon width={16} height={16} />} title="font" description="One font for the whole app. Hover to preview." wide>
           <div className="option-group wide st-fonts" onMouseLeave={() => applyVisualSettings()}>
             {FONTS.map((f) => (
               <button
@@ -297,7 +297,7 @@ export default function SettingsPage() {
       </Section>
 
       <Section id="stats" title="stats">
-        <SettingRow icon={<SigmaIcon size={16} />} title="averages shown" description="Which averages appear in the stats panel. Averages trim the best and worst 5 % (at least one each side); mo3 is a plain mean.">
+        <SettingRow icon={<CalculatorIcon width={16} height={16} />} title="averages shown" description="Which averages appear in the stats panel. Averages trim the best and worst 5 % (at least one each side); mo3 is a plain mean.">
           <div className="st-chips">
             {AVG_CHOICES.map((k) => {
               const on = s.statsShown.includes(k);
@@ -317,17 +317,17 @@ export default function SettingsPage() {
             })}
           </div>
         </SettingRow>
-        <SettingRow icon={<TrashIcon size={16} />} title="confirm delete" description="Ask before deleting a solve with alt+backspace or from the solve window.">
+        <SettingRow icon={<TrashIcon width={16} height={16} />} title="confirm delete" description="Ask before deleting a solve with alt+backspace or from the solve window.">
           <Options value={s.confirmDelete} options={onOff} onChange={set('confirmDelete')} />
         </SettingRow>
         <SettingRow
-          icon={<SpeakerHighIcon size={16} />}
+          icon={<SpeakerWaveIcon width={16} height={16} />}
           title="pb sound"
           description={
             <>
               Play a short chime when you set a new personal best.{' '}
               <button className="btn-text st-inline" onClick={playPbSound}>
-                <PlayIcon size={12} /> preview
+                <PlayIcon width={12} height={12} /> preview
               </button>
             </>
           }
@@ -357,7 +357,7 @@ export default function SettingsPage() {
 
       <Section id="danger" title="danger zone">
         <SettingRow
-          icon={<TrashIcon size={16} />}
+          icon={<TrashIcon width={16} height={16} />}
           title="clear guest data"
           description={
             <>
@@ -378,7 +378,7 @@ export default function SettingsPage() {
             clear guest data
           </button>
         </SettingRow>
-        <SettingRow icon={<ArrowCounterClockwiseIcon size={16} />} title="reset settings" description="Put every setting on this page back to its default (your solves are kept).">
+        <SettingRow icon={<ArrowUturnLeftIcon width={16} height={16} />} title="reset settings" description="Put every setting on this page back to its default (your solves are kept).">
           <button className="btn danger" onClick={() => setConfirm('reset')}>
             reset settings
           </button>
@@ -463,19 +463,19 @@ function ThemeGrid({ current }: { current: string }) {
     <div className="st-theme-picker">
       <div className="st-theme-tools">
         <label className="st-theme-search">
-          <MagnifyingGlassIcon size={14} aria-hidden="true" />
+          <MagnifyingGlassIcon width={14} height={14} aria-hidden="true" />
           <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="search themes" aria-label="search themes" />
         </label>
         <div className="st-theme-filters">
           {THEME_FILTERS.map((f) => (
             <button key={f.value} className={`btn${f.value === filter ? ' active' : ''}`} onClick={() => setFilter(f.value)} aria-pressed={f.value === filter}>
-              {f.value === 'originals' && <CubeIcon size={14} />}
+              {f.value === 'originals' && <CubeIcon width={14} height={14} />}
               {f.label}
             </button>
           ))}
         </div>
         <button className="btn" onClick={shuffle} data-tip="pick a random theme from this list">
-          <ShuffleIcon size={14} /> random
+          <ArrowsRightLeftIcon width={14} height={14} /> random
         </button>
         <span className="st-theme-count">
           {shown.length} / {THEMES.length}
@@ -507,7 +507,7 @@ function ThemeGrid({ current }: { current: string }) {
               }}
             >
               <span className="st-theme-name">
-                {t.original && <CubeIcon size={11} className="st-theme-original" style={{ color: t.main }} aria-label="cubetype original" />}
+                {t.original && <CubeIcon width={11} height={11} className="st-theme-original" style={{ color: t.main }} aria-label="cubetype original" aria-hidden={false} />}
                 {themeLabel(t.name)}
               </span>
               <span className="st-theme-dots" aria-hidden="true">
@@ -583,7 +583,7 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
   return (
     <>
       <SettingRow
-        icon={<UploadSimpleIcon size={16} />}
+        icon={<ArrowUpTrayIcon width={16} height={16} />}
         title="import solves"
         description={
           <>
@@ -597,7 +597,7 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
           <input ref={fileRef} type="file" hidden onChange={(e) => void onFile(e.target.files?.[0])} />
           {!parsed ? (
             <button className="btn" onClick={() => fileRef.current?.click()} disabled={busy !== null}>
-              <UploadSimpleIcon size={16} /> choose file
+              <ArrowUpTrayIcon width={16} height={16} /> choose file
             </button>
           ) : (
             <div className="st-import-preview">
@@ -627,7 +627,7 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
         </div>
       </SettingRow>
       <SettingRow
-        icon={<DownloadSimpleIcon size={16} />}
+        icon={<ArrowDownTrayIcon width={16} height={16} />}
         title="export"
         description={
           <>
@@ -638,20 +638,20 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
       >
         <div className="row">
           <button className="btn" onClick={() => void doExport('json')} disabled={busy !== null}>
-            <DownloadSimpleIcon size={16} /> {busy === 'export' ? 'exporting...' : 'export json'}
+            <ArrowDownTrayIcon width={16} height={16} /> {busy === 'export' ? 'exporting...' : 'export json'}
           </button>
           <button className="btn" onClick={() => void doExport('cstimer')} disabled={busy !== null}>
-            <DownloadSimpleIcon size={16} /> {busy === 'export-cstimer' ? 'exporting...' : 'export for csTimer'}
+            <ArrowDownTrayIcon width={16} height={16} /> {busy === 'export-cstimer' ? 'exporting...' : 'export for csTimer'}
           </button>
         </div>
       </SettingRow>
       <SettingRow
-        icon={<DatabaseIcon size={16} />}
+        icon={<CircleStackIcon width={16} height={16} />}
         title="account"
         description={loggedIn ? 'Profile, PB history, activity and more data tools live on your account page.' : 'Sign in to sync your solves across devices, get on the leaderboards and race others.'}
       >
         <Link className="btn" to={loggedIn ? '/account' : '/login'}>
-          {loggedIn ? 'open account' : 'sign in'} <ArrowUpRightIcon size={16} />
+          {loggedIn ? 'open account' : 'sign in'} <ArrowUpRightIcon width={16} height={16} />
         </Link>
       </SettingRow>
     </>

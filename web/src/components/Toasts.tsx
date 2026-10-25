@@ -1,7 +1,7 @@
-import { CheckCircleIcon, CrownIcon, InfoIcon, WarningCircleIcon } from '@phosphor-icons/react';
+import { CheckCircleIcon, ExclamationCircleIcon, InformationCircleIcon, TrophyIcon } from '@heroicons/react/24/outline';
 import { dismissToast, useToasts } from '../lib/toast';
 
-const ICONS = { notice: InfoIcon, success: CheckCircleIcon, error: WarningCircleIcon, pb: CrownIcon };
+const ICONS = { notice: InformationCircleIcon, success: CheckCircleIcon, error: ExclamationCircleIcon, pb: TrophyIcon };
 
 export function Toasts() {
   const toasts = useToasts();
@@ -12,7 +12,7 @@ export function Toasts() {
         return (
           <div key={t.id} className={`toast ${t.type}${t.important ? ' important' : ''}`} onClick={() => dismissToast(t.id)}>
             <div className="title">
-              <Icon size={14} /> {t.title}
+              <Icon width={14} height={14} /> {t.title}
             </div>
             <div>{t.message}</div>
           </div>

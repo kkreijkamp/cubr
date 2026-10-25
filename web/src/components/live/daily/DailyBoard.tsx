@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CrownIcon, TrophyIcon } from '@phosphor-icons/react';
+import { TrophyIcon } from '@heroicons/react/24/outline';
 import { formatTime, fromApiValue, type Precision } from '@cubetype/cubestats';
 import { api, ApiError } from '../../../lib/api';
 import { flagEmoji, formatNumber } from '../../../lib/format';
@@ -74,7 +74,7 @@ export function DailyBoard({
             <tbody>
               {shown.map((e) => (
                 <tr key={e.userId} className={e.userId === userId ? 'me' : ''}>
-                  <td className="center">{e.rank === 1 ? <CrownIcon size={14} aria-label="1st" className="crown" /> : e.rank}</td>
+                  <td className="center">{e.rank === 1 ? <TrophyIcon width={14} height={14} aria-label="1st" aria-hidden={false} className="crown" /> : e.rank}</td>
                   <td className="left name">
                     {e.country && <span className="flag">{flagEmoji(e.country)}</span>}
                     <Link to={`/profile/${encodeURIComponent(e.username)}`}>{e.username}</Link>
