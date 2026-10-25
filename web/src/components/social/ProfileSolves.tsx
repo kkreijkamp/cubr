@@ -11,15 +11,16 @@ import { useAsync } from '../../lib/useAsync';
 import { Loading, Spinner } from '../Spinner';
 
 const PAGE = 25;
-/** older solves fetched beyond the listed ones, so the oldest listed row still gets its ao12 */
-const CONTEXT = 11;
+/** older solves fetched beyond the listed ones, so the oldest listed row still gets its ao1000 */
+const CONTEXT = 999;
 /** the stats service's ?limit= cap */
 const MAX_LIMIT = 50_000;
 
 /**
  * Monkeytype-style results table at the bottom of the profile: the newest solves of one event,
- * newest first, with the rolling ao5 / ao12 at each solve (over the whole history, like the history
- * chart) and "load more". Served from the stats read model, so it works on any public profile.
+ * newest first, with the rolling ao5 / ao12 / ao100 / ao1000 at each solve (over the whole history,
+ * like the history chart) and "load more". Served from the stats read model, so it works on any
+ * public profile.
  */
 export function ProfileSolves({ userId, events, defaultEvent, precision }: { userId: string; events: string[]; defaultEvent: string; precision: 2 | 3 }) {
   const [event, setEvent] = useState(defaultEvent);
@@ -33,6 +34,8 @@ export function ProfileSolves({ userId, events, defaultEvent, precision }: { use
     const eff = data.solves.map((r) => (r[2] === null ? Number.POSITIVE_INFINITY : r[2]));
     const ao5 = rollingAverage(eff, 5);
     const ao12 = rollingAverage(eff, 12);
+    const ao100 = rollingAverage(eff, 100);
+    const ao1000 = rollingAverage(eff, 1000);
     const before = data.total - data.solves.length; // older solves that were not fetched
     // while "load more" is loading, only list rows whose averages are already complete
     const count = Math.min(listed, data.solves.length - (data.truncated ? CONTEXT : 0));
@@ -48,6 +51,8 @@ export function ProfileSolves({ userId, events, defaultEvent, precision }: { use
         dnf: penalty === 'DNF',
         ao5: fmtAvg(ao5[i], precision),
         ao12: fmtAvg(ao12[i], precision),
+        ao100: fmtAvg(ao100[i], precision),
+        ao1000: fmtAvg(ao1000[i], precision),
         session: s ? (s.name ?? `session ${session + 1}`) : '-',
       });
     }
@@ -71,6 +76,8 @@ export function ProfileSolves({ userId, events, defaultEvent, precision }: { use
                 <th>time</th>
                 <th>ao5</th>
                 <th>ao12</th>
+                <th className="ps-long">ao100</th>
+                <th className="ps-long">ao1000</th>
                 <th className="left hide-mobile-cell">session</th>
                 <th>date</th>
               </tr>
@@ -82,6 +89,8 @@ export function ProfileSolves({ userId, events, defaultEvent, precision }: { use
                   <td className={r.dnf ? 'dnf' : undefined}>{r.time}</td>
                   <td>{r.ao5}</td>
                   <td>{r.ao12}</td>
+                  <td className="ps-long">{r.ao100}</td>
+                  <td className="ps-long">{r.ao1000}</td>
                   <td className="left sub hide-mobile-cell">{r.session}</td>
                   <td className="sub" title={`${formatDateTime(r.at)} - ${timeAgo(r.at)}`}>
                     {formatDate(r.at)}

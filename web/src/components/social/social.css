@@ -987,6 +987,12 @@ table.ps-table td.dnf {
   justify-self: center;
   min-width: 8rem;
 }
+/* narrow phones: ao100 / ao1000 don't fit next to ao5 / ao12 without scrolling sideways */
+@media (max-width: 500px) {
+  table.ps-table .ps-long {
+    display: none;
+  }
+}
 
 /* ---------------------------------------------------------------- solve history chart */
 .pv-seg {
