@@ -10,6 +10,15 @@
   transition: color 0.08s;
   white-space: nowrap;
 }
+/* one fixed-width cell per digit (TimerDisplay): tabular-nums does nothing for fonts without tabular
+   figures (Comfortaa), and then every tick would re-centre the number. 1ch = the font's "0" (fonts whose
+   widest digit is wider set --digit-width), less the letter-spacing above, so in a monospace font the
+   cells are exactly the old character advance. */
+.timer-display .digit {
+  display: inline-block;
+  width: calc(var(--digit-width, 1ch) - 0.02em);
+  text-align: center;
+}
 .timer-display.running {
   color: var(--main-color);
 }

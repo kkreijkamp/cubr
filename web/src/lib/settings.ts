@@ -53,8 +53,15 @@ export const DEFAULT_SETTINGS: Settings = {
   lastEvent: '333',
 };
 
-export const FONTS: { name: string; css: string }[] = [
-  { name: 'Comfortaa', css: "'Comfortaa', system-ui, sans-serif" },
+export interface FontOption {
+  name: string;
+  css: string;
+  /** widest digit, when wider than the "0" (no tabular figures): sizes the timer's digit cells (default 1ch) */
+  digitWidth?: string;
+}
+
+export const FONTS: FontOption[] = [
+  { name: 'Comfortaa', css: "'Comfortaa', system-ui, sans-serif", digitWidth: '0.65em' },
   { name: 'Roboto Mono', css: "'Roboto Mono', ui-monospace, monospace" },
   { name: 'Lexend Deca', css: "'Lexend Deca', system-ui, sans-serif" },
   { name: 'System Mono', css: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace' },
@@ -72,7 +79,10 @@ export const settingsStore = createStore<Settings>(sanitize(loadJson<Partial<Set
 
 function applyFont(name: string) {
   const f = FONTS.find((x) => x.name === name) ?? FONTS[0];
-  document.documentElement.style.setProperty('--font', f.css);
+  const root = document.documentElement.style;
+  root.setProperty('--font', f.css);
+  if (f.digitWidth) root.setProperty('--digit-width', f.digitWidth);
+  else root.removeProperty('--digit-width');
 }
 
 /** Apply visual settings to the document (call once at startup). */
