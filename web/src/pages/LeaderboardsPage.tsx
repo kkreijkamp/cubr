@@ -244,8 +244,8 @@ function MeCard({ board, sel, precision, onJump }: { board: Leaderboard | undefi
         <span className="sub">{me.rank === 1 ? 'goat - nobody is faster' : `you - top ${formatPercent(top)} of ${formatNumber(board.total)}`}</span>
       </div>
       <div className="lb-me-value">{formatTime(me.valueMs, precision)}</div>
-      <button className="btn small lb-me-jump" onClick={onJump} data-tip="jump to my page">
-        <UserIcon /> my page
+      <button className="btn small lb-me-jump" onClick={onJump} data-tip="my rank">
+        <UserIcon /> my rank
       </button>
     </div>
   );
@@ -410,7 +410,7 @@ export default function LeaderboardsPage() {
       ];
       if (sel.page < pages) cmds.push({ id: 'lb-next', label: 'Leaderboard: next page', icon: <ChevronRightIcon />, run: () => goPage(sel.page + 1) });
       if (sel.page > 1) cmds.push({ id: 'lb-prev', label: 'Leaderboard: previous page', icon: <ChevronLeftIcon />, run: () => goPage(sel.page - 1) });
-      if (myPage) cmds.push({ id: 'lb-me', label: 'Leaderboard: jump to my page', icon: <UserIcon />, run: jumpToMe });
+      if (myPage) cmds.push({ id: 'lb-me', label: 'Leaderboard: my rank', icon: <UserIcon />, run: jumpToMe });
       return cmds;
     },
     [sel, pages, myPage, update, goPage, jumpToMe],
@@ -505,7 +505,7 @@ export default function LeaderboardsPage() {
                 <button className="btn" onClick={() => goPage(1)} disabled={sel.page === 1} data-tip="first page" aria-label="first page">
                   <TrophyIcon />
                 </button>
-                <button className="btn" onClick={jumpToMe} disabled={!myPage} data-tip="jump to my page" aria-label="jump to my page">
+                <button className="btn" onClick={jumpToMe} disabled={!myPage} data-tip="my rank" aria-label="my rank">
                   <UserIcon />
                 </button>
                 <button className="btn" onClick={() => goPage(sel.page - 1)} disabled={sel.page === 1} data-tip="previous page <-" aria-label="previous page">
