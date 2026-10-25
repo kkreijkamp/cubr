@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   ArrowUpTrayIcon,
   CalendarDaysIcon,
@@ -48,14 +49,17 @@ const STACK: [string, string][] = [
   ['patterns', 'transactional outbox - event-driven read models - consumer groups - cache-aside'],
 ];
 
+// the everyday ones - csTimer's keys; settings > keyboard shortcuts lists them all
 const KEYS: [string[], string][] = [
   [['esc'], 'command line (or ctrl + k)'],
   [['space'], 'hold, release to start - press to stop'],
   [['tab'], 'new scramble'],
-  [['alt', '1'], 'mark the last solve ok'],
-  [['alt', '2'], 'add a +2 to the last solve'],
-  [['alt', '3'], 'mark the last solve dnf'],
-  [['alt', 'backspace'], 'delete the last solve'],
+  [['alt', '1-7'], 'switch event: square-1, 2x2 ... 7x7 (alt + p / m / c / s for the others)'],
+  [['ctrl', '1'], 'mark the last solve ok'],
+  [['ctrl', '2'], 'add a +2 to the last solve'],
+  [['ctrl', '3'], 'mark the last solve dnf'],
+  [['alt', 'z'], 'delete the last solve (or ctrl + z)'],
+  [['alt', 'd'], 'clear the session'],
   [['<-', '->'], 'flip leaderboard pages'],
 ];
 
@@ -225,6 +229,9 @@ export default function AboutPage() {
           <h2 className="ab-h" id="ab-keys">
             <CommandLineIcon /> keyboard shortcuts
           </h2>
+          <p className="ab-p">
+            The same keys as csTimer, so your habits carry over. The everyday ones are below; <Link to="/settings">settings</Link> lists them all.
+          </p>
           <div className="ab-keys">
             {KEYS.map(([keys, label]) => (
               <div key={label} style={{ display: 'contents' }}>
