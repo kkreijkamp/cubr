@@ -118,8 +118,8 @@ export default function TimerPage() {
   const times = useMemo(() => solves.map(effectiveMs), [solves]);
   const ao5 = useMemo(() => rollingAverage(times, 5), [times]);
   const ao12 = useMemo(() => rollingAverage(times, 12), [times]);
-  // every session pb as it was set, for the solve list (singles count from the 6th solve, like detectPbs)
-  const pbs = useMemo(() => ({ single: pbFlags(times, 5), ao5: pbFlags(ao5), ao12: pbFlags(ao12) }), [times, ao5, ao12]);
+  // every session pb as it was set, for the solve list
+  const pbs = useMemo(() => ({ single: pbFlags(times), ao5: pbFlags(ao5), ao12: pbFlags(ao12) }), [times, ao5, ao12]);
 
   // ---------------------------------------------------------------- refs for stable callbacks
   const scrRef = useRef(scr);

@@ -532,9 +532,10 @@
 .tp-solve-row.best .time {
   color: var(--main-color);
 }
-/* a session pb when it was set (single, ao5, ao12): text colour only */
+/* a session pb when it was set (single, ao5, ao12): bold main-colour text, no background */
 .tp-solve-row .pb {
   color: var(--main-color);
+  font-weight: 700;
 }
 .tp-solve-row .time.dnf {
   color: var(--error-color);
