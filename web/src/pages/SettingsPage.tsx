@@ -279,14 +279,13 @@ export default function SettingsPage() {
         <SettingRow icon={<ArrowTrendingUpIcon width={16} height={16} />} title="charts" description="Show the trend and distribution charts below your solves.">
           <Options value={s.showCharts} options={onOff} onChange={set('showCharts')} />
         </SettingRow>
-        <SettingRow icon={<BoldIcon width={16} height={16} />} title="font" description="One font for the whole app. Hover to preview." wide>
-          <div className="option-group wide st-fonts" onMouseLeave={() => applyVisualSettings()}>
+        <SettingRow icon={<BoldIcon width={16} height={16} />} title="font" description="One font for the whole app." wide>
+          <div className="option-group wide st-fonts">
             {FONTS.map((f) => (
               <button
                 key={f.name}
                 className={`btn${s.font === f.name ? ' active' : ''}`}
                 style={{ fontFamily: f.css }}
-                onMouseEnter={() => document.documentElement.style.setProperty('--font', f.css)}
                 onClick={() => updateSettings({ font: f.name })}
               >
                 {f.name.toLowerCase()}

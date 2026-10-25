@@ -47,7 +47,7 @@ function options<K extends keyof S>(key: K, label: string, values: { value: S[K]
   };
 }
 
-/** App-wide palette commands: navigation, theme/font with live preview, timer settings, auth. */
+/** App-wide palette commands: navigation, theme (with live preview) and font, timer settings, auth. */
 export function GlobalCommands() {
   const navigate = useNavigate();
   const settings = useSettings();
