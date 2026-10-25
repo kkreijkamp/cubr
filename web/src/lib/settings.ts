@@ -21,6 +21,10 @@ export interface Settings {
   /** timer font size in rem */
   timerSize: number;
   scramblePreview: PreviewMode;
+  /** the 2D scramble preview's sticker colours: cubetype's, or your own (customStickers) */
+  stickerColours: 'default' | 'custom';
+  /** your own sticker colours: per scheme (lib/scrambleNet SCHEMES), one per face; gaps are the default */
+  customStickers: Record<string, (string | null)[]>;
   /** fade the UI while solving */
   focusMode: boolean;
   /** which averages appear in the timer stats panel */
@@ -44,6 +48,8 @@ export const DEFAULT_SETTINGS: Settings = {
   precision: 2,
   timerSize: 7,
   scramblePreview: '2D',
+  stickerColours: 'default',
+  customStickers: {},
   focusMode: true,
   statsShown: ['mo3', 'ao5', 'ao12', 'ao100'],
   confirmDelete: true,
@@ -72,7 +78,10 @@ export const FONTS: FontOption[] = [
 const KEY = 'cubetype.settings';
 
 function sanitize(raw: Partial<Settings> | null | undefined): Settings {
-  return { ...DEFAULT_SETTINGS, ...(raw && typeof raw === 'object' ? raw : {}) };
+  const s = { ...DEFAULT_SETTINGS, ...(raw && typeof raw === 'object' ? raw : {}) };
+  // read by puzzle, so it has to be an object (each colour in it is checked where it is used)
+  if (!s.customStickers || typeof s.customStickers !== 'object' || Array.isArray(s.customStickers)) s.customStickers = {};
+  return s;
 }
 
 export const settingsStore = createStore<Settings>(sanitize(loadJson<Partial<Settings>>(KEY, {})));

@@ -36,6 +36,7 @@ import '../components/timer/settings-page.css';
 import { useAuth } from '../lib/auth';
 import { formatNumber } from '../lib/format';
 import { applyVisualSettings, DEFAULT_SETTINGS, FONTS, updateSettings, useSettings, type Settings } from '../lib/settings';
+import { SCHEMES, stickerColour, type Scheme } from '../lib/scrambleNet';
 import { clearLocalData, exportAll, importSessions, localDataSummary, useSolveState } from '../lib/solves';
 import { applyTheme, isLightTheme, randomTheme, THEMES, themeLabel, type Theme } from '../lib/themes';
 import { toast } from '../lib/toast';
@@ -273,6 +274,21 @@ export default function SettingsPage() {
             onChange={set('scramblePreview')}
           />
         </SettingRow>
+        <SettingRow
+          icon={<SwatchIcon width={16} height={16} />}
+          title="sticker colours"
+          description="The colours of the 2D scramble preview: the standard colour scheme, or your own colour for each face of each puzzle. The 3D preview always uses the standard colours."
+        >
+          <Options
+            value={s.stickerColours}
+            options={[
+              { value: 'default', label: 'default' },
+              { value: 'custom', label: 'custom' },
+            ]}
+            onChange={set('stickerColours')}
+          />
+        </SettingRow>
+        {s.stickerColours === 'custom' && <StickerColours custom={s.customStickers} />}
         <SettingRow icon={<ListBulletIcon width={16} height={16} />} title="solve list" description="Show the list of solves in the current session on the timer page.">
           <Options value={s.showSolveList} options={onOff} onChange={set('showSolveList')} />
         </SettingRow>
@@ -426,6 +442,48 @@ function Section({ id, title, children }: { id: string; title: string; children:
       </h2>
       <div className="st-section-body">{children}</div>
     </section>
+  );
+}
+
+/** your own sticker colours: per puzzle, a swatch for each face that opens a colour picker */
+function StickerColours({ custom }: { custom: Settings['customStickers'] }) {
+  const save = (scheme: Scheme, faces: (string | null)[]) => {
+    const next = { ...custom };
+    if (faces.every((c) => c === null)) delete next[scheme.id];
+    else next[scheme.id] = faces;
+    updateSettings({ customStickers: next });
+  };
+  const pick = (scheme: Scheme, face: number, colour: string) =>
+    // only the faces you changed are stored, so a later change to a default colour still reaches you
+    save(
+      scheme,
+      scheme.faces.map((f, i) => (i === face ? (colour === f.colour ? null : colour) : (custom[scheme.id]?.[i] ?? null))),
+    );
+
+  return (
+    <div className="st-stickers">
+      {SCHEMES.map((scheme) => {
+        const own = custom[scheme.id];
+        return (
+          <div key={scheme.id} className="st-sticker-row">
+            <span className="st-sticker-label">{scheme.label}</span>
+            <div className="st-swatches">
+              {scheme.faces.map((f, i) => {
+                const colour = stickerColour(f.cubing[0], scheme, own);
+                return (
+                  <label key={f.name} className="st-swatch" style={{ background: colour }} data-tip={f.name}>
+                    <input type="color" value={colour} onChange={(e) => pick(scheme, i, e.target.value)} aria-label={`${scheme.label}: ${f.name} face colour`} />
+                  </label>
+                );
+              })}
+            </div>
+            <button className="btn-text small" onClick={() => save(scheme, [])} disabled={!own} aria-label={`reset the ${scheme.label} colours`}>
+              <ArrowUturnLeftIcon width={14} height={14} /> reset
+            </button>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

@@ -8,6 +8,8 @@ import {
   parseTransform,
   pathPoints,
   polygonDistance,
+  schemeFor,
+  SCHEMES,
   signedArea,
   stickerColour,
   stickerSources,
@@ -237,17 +239,42 @@ describe('stickerSources (cubing.js puzzles)', () => {
   });
 });
 
-describe('stickerColour', () => {
-  it('has a cubetype colour for every colour on the sticker nets', async () => {
-    for (const id of ['2x2x2', '3x3x3', '4x4x4', '5x5x5', '6x6x6', '7x7x7', 'megaminx', 'pyraminx', 'skewb', 'square1']) {
-      const svg = await puzzles[id].svg();
-      for (const [, , fill] of svg.matchAll(/id="([A-Z0-9]+-l\d+-o\d+)"[^>]*style="fill: ?([^;"]+)/g)) {
-        expect(stickerColour(fill), `${id} ${fill}`).not.toBe(fill);
-      }
+describe('stickerColour / schemes', () => {
+  const ALL = ['2x2x2', '3x3x3', '4x4x4', '5x5x5', '6x6x6', '7x7x7', 'megaminx', 'pyraminx', 'skewb', 'square1'];
+  const fills = async (id: string) => [...(await puzzles[id].svg()).matchAll(/id="([A-Z0-9]+-l\d+-o\d+)"[^>]*style="fill: ?([^;"]+)/g)].map((m) => m[2]);
+
+  it('every sticker net has a scheme, and every face of it is a colour on the net', async () => {
+    for (const id of ALL) {
+      const scheme = schemeFor(id);
+      expect(scheme, id).toBeDefined();
+      const seen = new Set((await fills(id)).map((f) => f.trim().toLowerCase()));
+      // each colour on the net belongs to exactly one face, and each face's colour is on the net
+      for (const c of seen) expect(scheme!.faces.filter((f) => f.cubing.includes(c)), `${id} ${c}`).toHaveLength(1);
+      for (const f of scheme!.faces) expect(f.cubing.some((c) => seen.has(c)), `${id} ${f.name}`).toBe(true);
     }
+    expect(SCHEMES.flatMap((s) => s.puzzles).sort()).toEqual([...ALL].sort());
   });
-  it('is case- and space-insensitive and leaves unknown colours alone', () => {
-    expect(stickerColour(' #FFFFFF ')).toBe(stickerColour('white'));
-    expect(stickerColour('#123456')).toBe('#123456');
+
+  it("draws cubetype's colours by default and leaves unknown colours alone", async () => {
+    const cube = schemeFor('3x3x3')!;
+    for (const id of ALL) {
+      for (const fill of await fills(id)) expect(stickerColour(fill, schemeFor(id)), `${id} ${fill}`).not.toBe(fill);
+    }
+    expect(stickerColour(' #FFFFFF ', schemeFor('4x4x4'))).toBe(stickerColour('white', cube));
+    expect(stickerColour('#123456', cube)).toBe('#123456');
+    expect(stickerColour('white', undefined)).toBe('white');
+  });
+
+  it('uses your own colour for a face, and the default for faces you left alone or set to junk', () => {
+    const cube = schemeFor('3x3x3')!;
+    const own = ['#000000', null, 'red', 42, '#ABCDEF'];
+    expect(stickerColour('white', cube, own)).toBe('#000000'); // top
+    expect(stickerColour('limegreen', cube, own)).toBe(stickerColour('limegreen', cube)); // front: not set
+    expect(stickerColour('red', cube, own)).toBe(stickerColour('red', cube)); // right: not a hex colour
+    expect(stickerColour('#26f', cube, own)).toBe(stickerColour('#26f', cube)); // back: not a string
+    expect(stickerColour('orange', cube, own)).toBe('#abcdef'); // left
+    expect(stickerColour('yellow', cube, own)).toBe(stickerColour('yellow', cube)); // bottom: past the end
+    // 4x4 nets spell the colours differently but share the cube's scheme
+    expect(stickerColour('#ffffff', schemeFor('4x4x4'), own)).toBe('#000000');
   });
 });

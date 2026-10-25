@@ -99,6 +99,58 @@
   font-size: 0.95rem;
 }
 
+/* sticker colours: per puzzle, a swatch per face (each a hidden colour picker) */
+.st-stickers {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: -1.25rem;
+}
+.st-sticker-row {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.5rem 0.5rem 0.9rem;
+  border-radius: var(--roundness);
+  background: var(--sub-alt-color);
+}
+.st-sticker-label {
+  color: var(--sub-color);
+  font-size: 0.8rem;
+}
+.st-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.st-swatch {
+  /* a faint edge, so a swatch as light (or dark) as the row behind it still shows */
+  --edge: inset 0 0 0 1px color-mix(in srgb, var(--text-color) 20%, transparent);
+  position: relative;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: calc(var(--roundness) * 0.75);
+  box-shadow: var(--edge);
+  cursor: pointer;
+  transition: box-shadow var(--dur);
+}
+.st-swatch:hover {
+  box-shadow: var(--edge), 0 0 0 2px var(--text-color);
+}
+.st-swatch:focus-within {
+  box-shadow: var(--edge), 0 0 0 2px var(--main-color);
+}
+.st-swatch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
 /* theme tiles */
 .st-theme-picker {
   display: grid;
@@ -262,6 +314,19 @@
   }
 }
 @media (max-width: 560px) {
+  .st-sticker-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .st-sticker-label {
+    grid-row: 1;
+  }
+  .st-sticker-row .btn-text {
+    grid-row: 1;
+    grid-column: 2;
+  }
+  .st-swatches {
+    grid-column: 1 / -1;
+  }
   /* two theme tiles per row on phones (180 tiles in one column is a long scroll) */
   .st-themes {
     grid-template-columns: repeat(2, minmax(0, 1fr));

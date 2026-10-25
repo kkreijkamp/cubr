@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { KPuzzle } from 'cubing/kpuzzle';
+import { useSettings } from '../lib/settings';
 import {
   closeUp,
   convexHull,
@@ -8,6 +9,7 @@ import {
   parsePoints,
   parseTransform,
   pathPoints,
+  schemeFor,
   signedArea,
   stickerColour,
   stickerId,
@@ -189,6 +191,7 @@ interface Props {
 /** The scrambled puzzle as a flat net of rounded stickers (see lib/scrambleNet). */
 export function ScrambleNet({ puzzle, scramble, height, onError }: Props) {
   const [net, setNet] = useState<Net | null>(null);
+  const { stickerColours, customStickers } = useSettings();
 
   useEffect(() => {
     let live = true;
@@ -203,14 +206,16 @@ export function ScrambleNet({ puzzle, scramble, height, onError }: Props) {
 
   const fills = useMemo(() => {
     if (!net || net.puzzle !== puzzle) return null;
+    const scheme = schemeFor(puzzle);
+    const custom = stickerColours === 'custom' && scheme ? customStickers?.[scheme.id] : undefined;
     try {
       const sources = stickerSources(net.kpuzzle.definition.orbits, net.kpuzzle.defaultPattern().applyAlg(scramble).patternData);
-      return new Map(net.stickers.map((s) => [s.id, stickerColour(net.solved.get(sources.get(s.id) ?? s.id) ?? '#888')]));
+      return new Map(net.stickers.map((s) => [s.id, stickerColour(net.solved.get(sources.get(s.id) ?? s.id) ?? '#888', scheme, custom)]));
     } catch {
       // not a scramble for this puzzle (e.g. a hand-typed one): show nothing rather than a wrong state
       return null;
     }
-  }, [net, puzzle, scramble]);
+  }, [net, puzzle, scramble, stickerColours, customStickers]);
 
   return (
     <div className="twisty-host" style={{ minHeight: height }}>

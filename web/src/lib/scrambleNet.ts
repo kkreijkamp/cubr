@@ -317,7 +317,24 @@ export function stickerSources(orbits: Orbit[], pattern: Record<string, OrbitPat
   return out;
 }
 
-// cubing.js colours its nets with pure web colours; these are the same colours a little softer
+// cubing.js colours its nets with pure web colours; cubetype's defaults are the same colours a little
+// softer, and each face's colour can be your own (settings: sticker colours)
+export interface SchemeFace {
+  /** what the face is called in the settings (its position, or its usual colour) */
+  name: string;
+  /** how cubing.js colours this face in its nets */
+  cubing: string[];
+  /** cubetype's colour for it */
+  colour: string;
+}
+
+export interface Scheme {
+  id: 'cube' | 'skewb' | 'square1' | 'pyraminx' | 'megaminx';
+  label: string;
+  puzzles: string[];
+  faces: SchemeFace[];
+}
+
 const WHITE = '#f4f4f4';
 const YELLOW = '#ffd500';
 const RED = '#e8343a';
@@ -325,32 +342,73 @@ const ORANGE = '#ff8a1c';
 const GREEN = '#2fb84c';
 const BLUE = '#2d6ff2';
 
-const STICKER_COLOURS: Record<string, string> = {
-  white: WHITE,
-  '#ffffff': WHITE,
-  yellow: YELLOW,
-  '#f4f400': YELLOW,
-  red: RED,
-  '#ff0000': RED,
-  orange: ORANGE,
-  '#ff8000': ORANGE,
-  limegreen: GREEN,
-  '#44ee00': GREEN,
-  '#26f': BLUE,
-  '#2266ff': BLUE,
-  // megaminx's other six
-  '#008800': '#16884a',
-  '#8800dd': '#8a4fd8',
-  '#0000ff': '#2f46c4',
-  '#e8d0a0': '#ead6aa',
-  '#ff66cc': '#f472b6',
-  '#99ff00': '#a3d93b',
-  '#3399ff': '#46a8f5',
-  '#888888': '#9a9a9a',
-  // square-1's piece sides
-  '#d8d8d8': '#a0a0a0',
-};
+const CUBE_FACES: SchemeFace[] = [
+  { name: 'top', cubing: ['white', '#ffffff'], colour: WHITE },
+  { name: 'front', cubing: ['limegreen', '#44ee00'], colour: GREEN },
+  { name: 'right', cubing: ['red', '#ff0000'], colour: RED },
+  { name: 'back', cubing: ['#26f', '#2266ff'], colour: BLUE },
+  { name: 'left', cubing: ['orange', '#ff8000'], colour: ORANGE },
+  { name: 'bottom', cubing: ['yellow', '#f4f400'], colour: YELLOW },
+];
 
-export function stickerColour(original: string): string {
-  return STICKER_COLOURS[original.trim().toLowerCase()] ?? original;
+export const SCHEMES: Scheme[] = [
+  { id: 'cube', label: 'cubes', puzzles: ['2x2x2', '3x3x3', '4x4x4', '5x5x5', '6x6x6', '7x7x7'], faces: CUBE_FACES },
+  { id: 'skewb', label: 'skewb', puzzles: ['skewb'], faces: CUBE_FACES },
+  {
+    id: 'square1',
+    label: 'square-1',
+    puzzles: ['square1'],
+    faces: [
+      ...CUBE_FACES.map((f, i) => ({ ...f, name: ['white', 'green', 'red', 'blue', 'orange', 'yellow'][i] })),
+      { name: 'piece sides', cubing: ['#d8d8d8'], colour: '#a0a0a0' },
+    ],
+  },
+  {
+    id: 'pyraminx',
+    label: 'pyraminx',
+    puzzles: ['pyraminx'],
+    faces: [
+      { name: 'front', cubing: ['limegreen'], colour: GREEN },
+      { name: 'left', cubing: ['red'], colour: RED },
+      { name: 'right', cubing: ['#26f'], colour: BLUE },
+      { name: 'bottom', cubing: ['yellow'], colour: YELLOW },
+    ],
+  },
+  {
+    id: 'megaminx',
+    label: 'megaminx',
+    puzzles: ['megaminx'],
+    faces: [
+      { name: 'white', cubing: ['#ffffff'], colour: WHITE },
+      { name: 'dark green', cubing: ['#008800'], colour: '#16884a' },
+      { name: 'red', cubing: ['#ff0000'], colour: RED },
+      { name: 'purple', cubing: ['#8800dd'], colour: '#8a4fd8' },
+      { name: 'yellow', cubing: ['#f4f400'], colour: YELLOW },
+      { name: 'dark blue', cubing: ['#0000ff'], colour: '#2f46c4' },
+      { name: 'grey', cubing: ['#888888'], colour: '#9a9a9a' },
+      { name: 'beige', cubing: ['#e8d0a0'], colour: '#ead6aa' },
+      { name: 'light blue', cubing: ['#3399ff'], colour: '#46a8f5' },
+      { name: 'orange', cubing: ['#ff8000'], colour: ORANGE },
+      { name: 'light green', cubing: ['#99ff00'], colour: '#a3d93b' },
+      { name: 'pink', cubing: ['#ff66cc'], colour: '#f472b6' },
+    ],
+  },
+];
+
+export function schemeFor(puzzle: string): Scheme | undefined {
+  return SCHEMES.find((s) => s.puzzles.includes(puzzle));
+}
+
+const HEX = /^#[0-9a-f]{6}$/i;
+
+/**
+ * A net colour (as cubing.js gives it) as cubetype draws it: your own colour for that face when you
+ * picked one (`custom`, one per face of the scheme), otherwise cubetype's.
+ */
+export function stickerColour(original: string, scheme: Scheme | undefined, custom?: readonly unknown[]): string {
+  const c = original.trim().toLowerCase();
+  const face = scheme ? scheme.faces.findIndex((f) => f.cubing.includes(c)) : -1;
+  if (!scheme || face < 0) return original;
+  const own = custom?.[face];
+  return typeof own === 'string' && HEX.test(own) ? own.toLowerCase() : scheme.faces[face].colour;
 }
