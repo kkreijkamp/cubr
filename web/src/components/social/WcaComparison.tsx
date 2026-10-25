@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { Globe, Hourglass, Medal } from 'lucide-react';
+import { IconHourglass, IconMedal, IconWorld } from '@tabler/icons-react';
 import { EVENT_IDS } from '@cubetype/cubestats';
 import { countryName } from './countries';
 import { WidgetEmpty, WidgetError } from './Widget';
@@ -337,11 +337,11 @@ export function WcaComparison({ summary, wcaId, country, own, onEdit, precision 
   if (summary.error && !summary.data) body = <WidgetError error={summary.error} what="the stats service" onRetry={summary.reload} />;
   else if (!summary.data) body = <Loading />;
   else if (rows.length === 0)
-    body = <WidgetEmpty icon={<Medal size={16} />}>no personal bests in wca events yet - {own ? 'go set some!' : 'check back later.'}</WidgetEmpty>;
+    body = <WidgetEmpty icon={<IconMedal size={16} />}>no personal bests in wca events yet - {own ? 'go set some!' : 'check back later.'}</WidgetEmpty>;
   else if (meta.error && isWcaNotLoaded(meta.error))
     body = (
       <div className="pv-widget-msg">
-        <Hourglass size={16} />
+        <IconHourglass size={16} />
         <span>wca data is being imported - try again in a minute.</span>
         <button className="btn-text" onClick={meta.reload}>
           retry
@@ -434,7 +434,7 @@ export function WcaComparison({ summary, wcaId, country, own, onEdit, precision 
     <section className="wc" aria-label="wca comparison">
       <div className="pv-section-head">
         <h2 className="pv-title">
-          <Globe /> wca comparison
+          <IconWorld /> wca comparison
         </h2>
         <span className="wc-sub">
           {wcaId ? (

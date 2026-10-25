@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { UserSearch } from 'lucide-react';
+import { IconUserSearch } from '@tabler/icons-react';
 import { ErrorState, Loading } from '../components/Spinner';
 import { ProfileView } from '../components/social/ProfileView';
 import { friendlyError } from '../components/social/util';
@@ -24,7 +24,7 @@ export default function ProfilePage() {
     if (profile.error instanceof ApiError && profile.error.status === 404) {
       return (
         <div className="empty stack" style={{ justifyItems: 'center', paddingTop: '4rem' }}>
-          <UserSearch size={40} className="sub" aria-hidden="true" />
+          <IconUserSearch size={40} className="sub" aria-hidden="true" />
           <div className="text" style={{ fontSize: '1.5rem' }}>
             no cuber called "{username}"
           </div>

@@ -1,5 +1,19 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { Check, ChevronDown, Cloud, CloudOff, Eye, HardDrive, Keyboard, Layers, Merge, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import {
+  IconArrowMerge,
+  IconBrowser,
+  IconCheck,
+  IconChevronDown,
+  IconCloud,
+  IconCloudOff,
+  IconEye,
+  IconKeyboard,
+  IconPencil,
+  IconPlus,
+  IconRefresh,
+  IconStack2,
+  IconTrash,
+} from '@tabler/icons-react';
 import { EVENTS, getEvent, type EventInfo } from '@cubetype/cubestats';
 import type { Session } from '../../lib/types';
 import { formatNumber } from '../../lib/format';
@@ -79,7 +93,7 @@ export function ConfigBar(p: Props) {
           data-tip-pos="down"
           {...noFocus}
         >
-          <Eye size={14} />
+          <IconEye size={14} />
           <span className="tp-hide-narrow">inspection</span>
         </button>
         <button
@@ -90,7 +104,7 @@ export function ConfigBar(p: Props) {
           data-tip-pos="down"
           {...noFocus}
         >
-          <Keyboard size={14} />
+          <IconKeyboard size={14} />
           <span className="tp-hide-narrow">typing</span>
         </button>
 
@@ -154,7 +168,7 @@ function EventMenu({ open, setOpen, event, sessions, onEvent }: EventMenuProps) 
         {...noFocus}
       >
         {shortLabel(event)}
-        <ChevronDown size={14} className="tp-chevron" />
+        <IconChevronDown size={14} className="tp-chevron" />
       </button>
       {open && (
         <div className="tp-menu tp-events-menu" role="menu" aria-label="event">
@@ -176,7 +190,7 @@ function EventMenu({ open, setOpen, event, sessions, onEvent }: EventMenuProps) 
                     aria-label={e.name}
                     {...noFocus}
                   >
-                    <span className="tp-menu-check">{e.id === event && <Check size={14} />}</span>
+                    <span className="tp-menu-check">{e.id === event && <IconCheck size={14} />}</span>
                     <span className="tp-menu-label">{shortLabel(e.id)}</span>
                     <span className="tp-menu-count">{n > 0 ? formatNumber(n) : ''}</span>
                   </button>
@@ -223,9 +237,9 @@ function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, 
         aria-label={`session: ${current?.name ?? 'none'}`}
         {...noFocus}
       >
-        <Layers size={14} />
+        <IconStack2 size={14} />
         <span className="tp-session-name">{current?.name ?? '...'}</span>
-        <ChevronDown size={14} className="tp-chevron" />
+        <IconChevronDown size={14} className="tp-chevron" />
       </button>
       {open && (
         <div className="tp-menu" role="menu">
@@ -240,7 +254,7 @@ function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, 
                 onClick={act(() => onSession(s.id))}
                 {...noFocus}
               >
-                <span className="tp-menu-check">{s.id === current?.id && <Check size={14} />}</span>
+                <span className="tp-menu-check">{s.id === current?.id && <IconCheck size={14} />}</span>
                 <span className="tp-menu-label">{s.name}</span>
                 <span className="tp-menu-count">{formatNumber(s.solveCount)}</span>
               </button>
@@ -249,13 +263,13 @@ function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, 
           <div className="tp-menu-sep" />
           <button role="menuitem" className="tp-menu-item" onClick={act(onNew)} {...noFocus}>
             <span className="tp-menu-check">
-              <Plus size={14} />
+              <IconPlus size={14} />
             </span>
             <span className="tp-menu-label">new session</span>
           </button>
           <button role="menuitem" className="tp-menu-item" onClick={act(onRename)} disabled={!current} {...noFocus}>
             <span className="tp-menu-check">
-              <Pencil size={14} />
+              <IconPencil size={14} />
             </span>
             <span className="tp-menu-label">rename</span>
           </button>
@@ -269,7 +283,7 @@ function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, 
               {...noFocus}
             >
               <span className="tp-menu-check">
-                <Merge size={14} />
+                <IconArrowMerge size={14} />
               </span>
               <span className="tp-menu-label">merge sessions...</span>
               {sessions.length < 2 && <span className="tp-menu-hint">needs another {eventLabel} session</span>}
@@ -277,7 +291,7 @@ function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, 
           )}
           <button role="menuitem" className="tp-menu-item danger" onClick={act(onDelete)} disabled={!current} {...noFocus}>
             <span className="tp-menu-check">
-              <Trash2 size={14} />
+              <IconTrash size={14} />
             </span>
             <span className="tp-menu-label">delete</span>
           </button>
@@ -288,24 +302,24 @@ function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, 
 }
 
 function SyncStatus({ mode, pending, syncError }: { mode: 'local' | 'cloud'; pending: number; syncError: string | null }) {
-  let icon = <HardDrive size={14} />;
+  let icon = <IconBrowser size={14} />;
   /** null = icon only (the calm "synced" state) */
   let label: string | null = 'local';
   let tip = 'guest mode: solves are saved in this browser';
   let cls = '';
   if (mode === 'cloud') {
     if (pending > 0) {
-      icon = syncError ? <CloudOff size={14} /> : <RefreshCw size={14} className="tp-spin" />;
+      icon = syncError ? <IconCloudOff size={14} /> : <IconRefresh size={14} className="tp-spin" />;
       label = `${pending} unsynced`;
       tip = syncError ? `${syncError} - retrying automatically` : 'syncing...';
       cls = syncError ? ' warn' : '';
     } else if (syncError) {
-      icon = <CloudOff size={14} />;
+      icon = <IconCloudOff size={14} />;
       label = 'offline';
       tip = `${syncError} - showing cached solves`;
       cls = ' warn';
     } else {
-      icon = <Cloud size={14} />;
+      icon = <IconCloud size={14} />;
       label = null;
       tip = 'all solves are saved to your account';
     }

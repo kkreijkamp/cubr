@@ -1,8 +1,8 @@
-import { LoaderCircle } from 'lucide-react';
+import { IconLoader2 } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 
 export function Spinner({ size = 20 }: { size?: number }) {
-  return <LoaderCircle className="spinner" size={size} />;
+  return <IconLoader2 className="spinner" size={size} />;
 }
 
 /** Centered spinner that only appears after a short delay (no flash on fast loads). */

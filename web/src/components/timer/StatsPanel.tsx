@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { ChartNoAxesColumn } from 'lucide-react';
+import { IconChartBarPopular } from '@tabler/icons-react';
 import { avgKey, formatTime, type Precision, type SessionStats } from '@cubetype/cubestats';
 import type { Solve } from '../../lib/types';
 import { fmtAvg, fmtSolveShort } from './statsUtil';
@@ -33,7 +33,7 @@ export const StatsPanel = memo(function StatsPanel({ stats, ns, solves, precisio
   return (
     <section className="tp-panel" aria-label="session statistics">
       <div className="tp-panel-title">
-        <ChartNoAxesColumn size={14} /> stats
+        <IconChartBarPopular size={14} /> stats
       </div>
       <table className="tp-stats">
         <thead>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Copy, Trash2 } from 'lucide-react';
+import { IconChevronLeft, IconChevronRight, IconCopy, IconTrash } from '@tabler/icons-react';
 import { getEvent, type Penalty, type Precision } from '@cubetype/cubestats';
 import { Modal } from '../Modal';
 import { TwistyPreview } from '../TwistyPreview';
@@ -80,10 +80,10 @@ export function SolveModal({ solve, index, total, precision, preview, confirmDel
           solve <span className="text">#{index + 1}</span>
           <span className="tp-modal-nav">
             <button className="btn-text" onClick={() => onNavigate(index - 1)} disabled={index === 0} aria-label="previous solve" data-tip="previous (<-)">
-              <ChevronLeft size={18} />
+              <IconChevronLeft size={18} />
             </button>
             <button className="btn-text" onClick={() => onNavigate(index + 1)} disabled={index >= total - 1} aria-label="next solve" data-tip="next (->)">
-              <ChevronRight size={18} />
+              <IconChevronRight size={18} />
             </button>
           </span>
         </span>
@@ -119,7 +119,7 @@ export function SolveModal({ solve, index, total, precision, preview, confirmDel
             }}
             disabled={!solve.scramble}
           >
-            <Copy size={14} /> copy
+            <IconCopy size={14} /> copy
           </button>
         </div>
         <div className="tp-detail-scramble">{solve.scramble || <span className="sub">no scramble recorded</span>}</div>
@@ -152,7 +152,7 @@ export function SolveModal({ solve, index, total, precision, preview, confirmDel
 
       <div className="dialog-actions tp-detail-actions">
         <button className={`btn ${armed ? 'danger' : ''}`} onClick={remove}>
-          <Trash2 size={16} /> {armed ? 'click again to delete' : 'delete solve'}
+          <IconTrash size={16} /> {armed ? 'click again to delete' : 'delete solve'}
         </button>
         <button
           className="btn primary"

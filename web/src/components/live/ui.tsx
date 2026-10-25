@@ -1,6 +1,6 @@
 // Small presentational pieces shared by the live pages (daily, race, wca, status).
 import { useState, type ReactNode } from 'react';
-import { Check, Copy } from 'lucide-react';
+import { IconCheck, IconCopy } from '@tabler/icons-react';
 import { getEvent } from '@cubetype/cubestats';
 import { copyText } from './hooks';
 import './live.css';
@@ -79,7 +79,7 @@ export function ScrambleText({ scramble, event, muted, actions }: { scramble: st
               }
             }}
           >
-            {copied ? <Check size={16} /> : <Copy size={16} />}
+            {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
           </button>
         </div>
       )}

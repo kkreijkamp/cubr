@@ -1,7 +1,7 @@
-import { AlertCircle, CheckCircle2, Crown, Info } from 'lucide-react';
+import { IconAlertCircle, IconCircleCheck, IconCrown, IconInfoCircle } from '@tabler/icons-react';
 import { dismissToast, useToasts } from '../lib/toast';
 
-const ICONS = { notice: Info, success: CheckCircle2, error: AlertCircle, pb: Crown };
+const ICONS = { notice: IconInfoCircle, success: IconCircleCheck, error: IconAlertCircle, pb: IconCrown };
 
 export function Toasts() {
   const toasts = useToasts();

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Trophy } from 'lucide-react';
+import { IconTrophy } from '@tabler/icons-react';
 import { EVENT_IDS } from '@cubetype/cubestats';
 import { WidgetEmpty, WidgetError } from './Widget';
 import { PB_KINDS, eventLabel, plural } from './util';
@@ -52,7 +52,7 @@ export function PbCards({ summary, own, precision }: { summary: AsyncState<Stats
   if (events.length === 0) {
     return (
       <section className="pv-card" aria-label="personal bests">
-        <WidgetEmpty icon={<Trophy size={16} />}>
+        <WidgetEmpty icon={<IconTrophy size={16} />}>
           {own ? (
             <>
               no solves yet - <Link to="/" className="link-main">open the timer</Link> and press space. your personal bests, charts and wca

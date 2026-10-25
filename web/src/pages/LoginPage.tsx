@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
-import { AlertCircle, CalendarDays, Check, Cloud, Crown, LogIn, Swords, UserPlus, X } from 'lucide-react';
+import { IconAlertCircle, IconCalendarEvent, IconCheck, IconCloud, IconCrown, IconLogin2, IconSwords, IconUserPlus, IconX } from '@tabler/icons-react';
 import { Loading, Spinner } from '../components/Spinner';
 import { safeNext } from '../components/social/util';
 import { ApiError } from '../lib/api';
@@ -85,12 +85,12 @@ function Field({ type = 'text', name, placeholder, value, onChange, autoComplete
         />
         {bad && (
           <span className="lg-indicator bad" aria-hidden="true">
-            <X size={16} />
+            <IconX size={16} />
           </span>
         )}
         {ok && (
           <span className="lg-indicator ok" aria-hidden="true">
-            <Check size={16} />
+            <IconCheck size={16} />
           </span>
         )}
       </div>
@@ -106,7 +106,7 @@ function Field({ type = 'text', name, placeholder, value, onChange, autoComplete
 function FormError({ children, shakeKey }: { children: ReactNode; shakeKey: number }) {
   return (
     <div key={shakeKey} className="lg-form-error shake" role="alert">
-      <AlertCircle size={15} />
+      <IconAlertCircle size={15} />
       <span>{children}</span>
     </div>
   );
@@ -159,7 +159,7 @@ function RegisterForm() {
   return (
     <form className="lg-form lg-register" onSubmit={onSubmit} noValidate>
       <h2 className="h3">
-        <UserPlus /> register
+        <IconUserPlus /> register
       </h2>
       <Field
         name="username"
@@ -212,7 +212,7 @@ function RegisterForm() {
       />
       {formError && <FormError shakeKey={errorTick}>{formError}</FormError>}
       <button type="submit" className="btn block" disabled={busy}>
-        {busy ? <Spinner size={16} /> : <UserPlus />} sign up
+        {busy ? <Spinner size={16} /> : <IconUserPlus />} sign up
       </button>
     </form>
   );
@@ -265,7 +265,7 @@ function LoginForm() {
   return (
     <form className="lg-form lg-login" onSubmit={onSubmit} noValidate>
       <h2 className="h3">
-        <LogIn /> login
+        <IconLogin2 /> login
       </h2>
       <Field
         name="login"
@@ -290,7 +290,7 @@ function LoginForm() {
       />
       {formError && <FormError shakeKey={errorTick}>{formError}</FormError>}
       <button type="submit" className="btn block" disabled={busy}>
-        {busy ? <Spinner size={16} /> : <LogIn />} sign in
+        {busy ? <Spinner size={16} /> : <IconLogin2 />} sign in
       </button>
     </form>
   );
@@ -318,16 +318,16 @@ export default function LoginPage() {
       <LoginForm />
       <div className="lg-perks">
         <span>
-          <Cloud size={14} /> solves synced across devices
+          <IconCloud size={14} /> solves synced across devices
         </span>
         <span>
-          <Crown size={14} /> a spot on the leaderboards
+          <IconCrown size={14} /> a spot on the leaderboards
         </span>
         <span>
-          <CalendarDays size={14} /> daily challenge rankings
+          <IconCalendarEvent size={14} /> daily challenge rankings
         </span>
         <span>
-          <Swords size={14} /> race with your name
+          <IconSwords size={14} /> race with your name
         </span>
       </div>
     </div>

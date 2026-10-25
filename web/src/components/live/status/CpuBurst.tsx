@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Flame, Square, Zap } from 'lucide-react';
+import { IconBolt, IconFlame, IconPlayerStop } from '@tabler/icons-react';
 import { requestRaw } from '../../../lib/api';
 import { useRegisterCommands } from '../../../lib/commands';
 import { useStoredState } from '../hooks';
@@ -195,8 +195,8 @@ export function CpuBurst({ onLog }: { onLog: (text: string, service: string) => 
     'status-burst',
     () => [
       running
-        ? { id: 'status-burst-stop', label: 'Stop CPU burst', icon: <Square />, run: () => finish('stopped') }
-        : { id: 'status-burst-start', label: 'Start CPU burst (scramble HPA)', icon: <Flame />, keywords: ['load', 'hpa', 'autoscaler'], run: start },
+        ? { id: 'status-burst-stop', label: 'Stop CPU burst', icon: <IconPlayerStop />, run: () => finish('stopped') }
+        : { id: 'status-burst-start', label: 'Start CPU burst (scramble HPA)', icon: <IconFlame />, keywords: ['load', 'hpa', 'autoscaler'], run: start },
     ],
     [running, concurrency, duration],
   );
@@ -205,7 +205,7 @@ export function CpuBurst({ onLog }: { onLog: (text: string, service: string) => 
     <section className="card status-panel burst" aria-labelledby="burst-title">
       <div className="live-section-title">
         <h3 className="h3" id="burst-title">
-          <Flame /> cpu burst
+          <IconFlame /> cpu burst
         </h3>
         <span className="meta" title={`GET ${PATH}`}>
           drives the scramble HPA
@@ -225,11 +225,11 @@ export function CpuBurst({ onLog }: { onLog: (text: string, service: string) => 
           <Segmented label="duration" value={duration} onChange={setDuration} options={DURATIONS.map((d) => ({ value: d, label: `${d}s`, disabled: running }))} />
           {running ? (
             <button className="btn danger" onClick={() => finish('stopped')}>
-              <Square /> stop
+              <IconPlayerStop /> stop
             </button>
           ) : (
             <button className="btn primary" onClick={start}>
-              <Zap /> start burst
+              <IconBolt /> start burst
             </button>
           )}
         </div>

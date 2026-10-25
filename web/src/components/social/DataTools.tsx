@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Download, FileUp, LogOut, Pencil, Upload, UserCog } from 'lucide-react';
+import { IconDownload, IconFileUpload, IconLogout2, IconPencil, IconUpload, IconUserCog } from '@tabler/icons-react';
 import { parseTimerFile, toCsTimerExport, TimerFormatError, type ImportedSession, type TimerImport } from '@cubetype/cubestats';
 import { csTimerFileName, downloadFile, eventLabel, friendlyError, plural, skippedNotes } from './util';
 import { useAuth } from '../../lib/auth';
@@ -121,7 +121,7 @@ function ImportPreview({ fileName, parsed, onClose }: { fileName: string; parsed
           cancel
         </button>
         <button className="btn primary" onClick={confirm} disabled={!chosen.length || busy || tooMany}>
-          {busy ? <Spinner size={16} /> : <Upload />} import {plural(solveCount, 'solve')}
+          {busy ? <Spinner size={16} /> : <IconUpload />} import {plural(solveCount, 'solve')}
         </button>
       </div>
     </Modal>
@@ -183,10 +183,10 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
   useRegisterCommands(
     'account',
     () => [
-      { id: 'account-edit', label: 'Edit profile', icon: <Pencil />, run: onEdit },
-      { id: 'account-import', label: 'Import solves...', icon: <FileUp />, keywords: ['cstimer', 'twisty', 'cubedesk', 'block keeper', 'upload', 'restore'], run: pickFile },
-      { id: 'account-export', label: 'Export data (json)', icon: <Download />, keywords: ['backup', 'download'], run: () => void doExport('json') },
-      { id: 'account-export-cstimer', label: 'Export for csTimer', icon: <Download />, keywords: ['cstimer', 'backup', 'download'], run: () => void doExport('cstimer') },
+      { id: 'account-edit', label: 'Edit profile', icon: <IconPencil />, run: onEdit },
+      { id: 'account-import', label: 'Import solves...', icon: <IconFileUpload />, keywords: ['cstimer', 'twisty', 'cubedesk', 'block keeper', 'upload', 'restore'], run: pickFile },
+      { id: 'account-export', label: 'Export data (json)', icon: <IconDownload />, keywords: ['backup', 'download'], run: () => void doExport('json') },
+      { id: 'account-export-cstimer', label: 'Export for csTimer', icon: <IconDownload />, keywords: ['cstimer', 'backup', 'download'], run: () => void doExport('cstimer') },
     ],
     [onEdit],
   );
@@ -195,14 +195,14 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
     <section className="pv-card" aria-label="account and data">
       <div className="pv-card-head" style={{ marginBottom: 0 }}>
         <h2 className="pv-title">
-          <UserCog /> account &amp; data
+          <IconUserCog /> account &amp; data
         </h2>
       </div>
       <div className="ac-rows">
         <div className="ac-row">
           <div>
             <div className="t">
-              <FileUp /> import solves
+              <IconFileUpload /> import solves
             </div>
             <div className="d">
               a cubetype export, or any file csTimer can import: csTimer (<span className="text">export -&gt; export to file</span>), Twisty Timer, Cubic Timer,
@@ -212,14 +212,14 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
           <div className="ac-actions">
             <input ref={fileRef} type="file" hidden onChange={(e) => void onFile(e.target.files?.[0])} />
             <button className="btn" onClick={pickFile} disabled={reading}>
-              {reading ? <Spinner size={16} /> : <Upload />} choose file
+              {reading ? <Spinner size={16} /> : <IconUpload />} choose file
             </button>
           </div>
         </div>
         <div className="ac-row">
           <div>
             <div className="t">
-              <Download /> export
+              <IconDownload /> export
             </div>
             <div className="d">
               every session and solve. json re-imports here or on another cubetype server; the csTimer file goes into csTimer with{' '}
@@ -228,17 +228,17 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
           </div>
           <div className="ac-actions">
             <button className="btn" onClick={() => void doExport('json')} disabled={exporting !== null}>
-              {exporting === 'json' ? <Spinner size={16} /> : <Download />} export json
+              {exporting === 'json' ? <Spinner size={16} /> : <IconDownload />} export json
             </button>
             <button className="btn" onClick={() => void doExport('cstimer')} disabled={exporting !== null}>
-              {exporting === 'cstimer' ? <Spinner size={16} /> : <Download />} export for csTimer
+              {exporting === 'cstimer' ? <Spinner size={16} /> : <IconDownload />} export for csTimer
             </button>
           </div>
         </div>
         <div className="ac-row">
           <div>
             <div className="t">
-              <UserCog /> account
+              <IconUserCog /> account
             </div>
             <div className="d">
               signed in as <span className="text">{user.username}</span> - {user.email}
@@ -246,10 +246,10 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
           </div>
           <div className="ac-actions">
             <button className="btn" onClick={onEdit}>
-              <Pencil /> edit profile
+              <IconPencil /> edit profile
             </button>
             <button className="btn danger-text" onClick={doLogout}>
-              <LogOut /> log out
+              <IconLogout2 /> log out
             </button>
           </div>
         </div>

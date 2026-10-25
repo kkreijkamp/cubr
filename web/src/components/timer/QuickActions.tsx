@@ -1,4 +1,4 @@
-import { MessageSquare, Trash2 } from 'lucide-react';
+import { IconMessage, IconTrash } from '@tabler/icons-react';
 import type { Penalty } from '@cubetype/cubestats';
 import type { Solve } from '../../lib/types';
 import { noFocus } from './ConfigBar';
@@ -42,10 +42,10 @@ export function QuickActions({ last, onPenalty, onComment, onDelete }: Props) {
         data-tip={last?.comment ? `"${last.comment.slice(0, 40)}${last.comment.length > 40 ? '...' : ''}"` : 'comment (alt+c)'}
         {...noFocus}
       >
-        <MessageSquare size={16} />
+        <IconMessage size={16} />
       </button>
       <button className="btn-text danger" onClick={onDelete} disabled={!last} aria-label="delete the latest solve" data-tip="delete (alt+backspace)" {...noFocus}>
-        <Trash2 size={16} />
+        <IconTrash size={16} />
       </button>
     </div>
   );

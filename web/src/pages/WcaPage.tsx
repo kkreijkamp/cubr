@@ -3,7 +3,7 @@
 // so results are shareable and other pages can deep-link (e.g. /wca?person=2009ZEMD01).
 import { useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Globe, Medal, Search, Users } from 'lucide-react';
+import { IconMedal, IconSearch, IconUsers, IconWorld } from '@tabler/icons-react';
 import { EVENTS } from '@cubetype/cubestats';
 import { api } from '../lib/api';
 import { formatDate } from '../lib/format';
@@ -83,9 +83,9 @@ export default function WcaPage() {
   useRegisterCommands(
     'wca',
     () => [
-      { id: 'wca-rank', label: 'WCA: where would I rank?', icon: <Medal />, run: () => setTab('rank') },
-      { id: 'wca-records', label: 'WCA: world records', icon: <Globe />, run: () => setTab('records') },
-      { id: 'wca-people', label: 'WCA: search competitors', icon: <Search />, run: () => setTab('people') },
+      { id: 'wca-rank', label: 'WCA: where would I rank?', icon: <IconMedal />, run: () => setTab('rank') },
+      { id: 'wca-records', label: 'WCA: world records', icon: <IconWorld />, run: () => setTab('records') },
+      { id: 'wca-people', label: 'WCA: search competitors', icon: <IconSearch />, run: () => setTab('people') },
     ],
     [],
   );
@@ -95,7 +95,7 @@ export default function WcaPage() {
       <div className="live-head">
         <div className="titles">
           <h1 className="h2">
-            <Globe /> wca rankings
+            <IconWorld /> wca rankings
           </h1>
           <div className="subtitle">official World Cube Association results - see how your times compare with every competitor.</div>
         </div>
@@ -127,7 +127,7 @@ export default function WcaPage() {
         ) : (
           <section aria-label="people search" className="stack">
             <div className="h3" style={{ margin: 0 }}>
-              <Users /> competitors
+              <IconUsers /> competitors
             </div>
             <PeopleSearch initialQuery={sp.get('q') ?? ''} onQuery={(q) => update({ q })} onPerson={openPerson} />
           </section>

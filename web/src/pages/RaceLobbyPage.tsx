@@ -1,7 +1,7 @@
 // Race lobby: public rooms (polled every 5 s), create a room, join by code / invite link.
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, DoorOpen, Hash, Plus, RefreshCw, Swords, User } from 'lucide-react';
+import { IconArrowRight, IconDoorEnter, IconHash, IconPlus, IconRefresh, IconSwords, IconUser } from '@tabler/icons-react';
 import { EVENTS, getEvent } from '@cubetype/cubestats';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -49,10 +49,10 @@ function RoomsTable({ onJoin }: { onJoin: (id: string) => void }) {
     <section className="card race-rooms" aria-labelledby="rooms-title">
       <div className="live-section-title">
         <h3 className="h3" id="rooms-title">
-          <Swords /> public rooms
+          <IconSwords /> public rooms
         </h3>
         <button className="btn-text small" onClick={load} aria-label="refresh" style={{ padding: 0 }}>
-          {loading ? <Spinner size={14} /> : <RefreshCw size={14} />} {rooms ? `${rooms.length} open` : ''}
+          {loading ? <Spinner size={14} /> : <IconRefresh size={14} />} {rooms ? `${rooms.length} open` : ''}
         </button>
       </div>
       {error && !rooms ? (
@@ -85,7 +85,7 @@ function RoomsTable({ onJoin }: { onJoin: (id: string) => void }) {
                   </td>
                   <td className="secondary hide-sm">{timeAgo(r.createdAt)}</td>
                   <td className="hide-sm">
-                    <ArrowRight size={16} aria-label="join" />
+                    <IconArrowRight size={16} aria-label="join" />
                   </td>
                 </tr>
               ))}
@@ -142,8 +142,8 @@ export default function RaceLobbyPage() {
   useRegisterCommands(
     'race-lobby',
     () => [
-      { id: 'race-create', label: 'Create race room', icon: <Plus />, run: () => nameRef.current?.focus() },
-      { id: 'race-join-code', label: 'Join race room by code', icon: <Hash />, run: () => codeRef.current?.focus() },
+      { id: 'race-create', label: 'Create race room', icon: <IconPlus />, run: () => nameRef.current?.focus() },
+      { id: 'race-join-code', label: 'Join race room by code', icon: <IconHash />, run: () => codeRef.current?.focus() },
     ],
     [],
   );
@@ -153,7 +153,7 @@ export default function RaceLobbyPage() {
       <div className="live-head">
         <div className="titles">
           <h1 className="h2">
-            <Swords /> race
+            <IconSwords /> race
           </h1>
           <div className="subtitle">
             real-time races with friends - same scramble, live status, results per round. rooms live in redis and websockets are spread across all
@@ -169,7 +169,7 @@ export default function RaceLobbyPage() {
           <section className="card race-card" aria-labelledby="you-title">
             <div className="live-section-title">
               <h3 className="h3" id="you-title">
-                <User /> you
+                <IconUser /> you
               </h3>
             </div>
             {status === 'authed' && user ? (
@@ -195,7 +195,7 @@ export default function RaceLobbyPage() {
           <section className="card race-card" aria-labelledby="create-title">
             <div className="live-section-title">
               <h3 className="h3" id="create-title">
-                <Plus /> create room
+                <IconPlus /> create room
               </h3>
             </div>
             <form
@@ -225,7 +225,7 @@ export default function RaceLobbyPage() {
               </label>
               {createError && <div className="small error">{createError}</div>}
               <button className="btn primary block" type="submit" disabled={creating}>
-                {creating ? <Spinner size={16} /> : <DoorOpen />} create &amp; join
+                {creating ? <Spinner size={16} /> : <IconDoorEnter />} create &amp; join
               </button>
             </form>
           </section>
@@ -233,7 +233,7 @@ export default function RaceLobbyPage() {
           <section className="card race-card" aria-labelledby="join-title">
             <div className="live-section-title">
               <h3 className="h3" id="join-title">
-                <Hash /> join by code
+                <IconHash /> join by code
               </h3>
             </div>
             <form

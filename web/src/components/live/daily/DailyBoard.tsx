@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Crown, Trophy } from 'lucide-react';
+import { IconCrown, IconTrophy } from '@tabler/icons-react';
 import { formatTime, fromApiValue, type Precision } from '@cubetype/cubestats';
 import { api, ApiError } from '../../../lib/api';
 import { flagEmoji, formatNumber } from '../../../lib/format';
@@ -46,7 +46,7 @@ export function DailyBoard({
     <section className="card daily-board" aria-labelledby="dboard-title">
       <div className="live-section-title">
         <h3 className="h3" id="dboard-title">
-          <Trophy /> leaderboard
+          <IconTrophy /> leaderboard
         </h3>
         <span className="meta">
           {lb.loading && data ? <Spinner size={12} /> : null} {data ? `${formatNumber(data.total)} ranked` : ''}
@@ -74,7 +74,7 @@ export function DailyBoard({
             <tbody>
               {shown.map((e) => (
                 <tr key={e.userId} className={e.userId === userId ? 'me' : ''}>
-                  <td className="center">{e.rank === 1 ? <Crown size={14} aria-label="1st" className="crown" /> : e.rank}</td>
+                  <td className="center">{e.rank === 1 ? <IconCrown size={14} aria-label="1st" className="crown" /> : e.rank}</td>
                   <td className="left name">
                     {e.country && <span className="flag">{flagEmoji(e.country)}</span>}
                     <Link to={`/profile/${encodeURIComponent(e.username)}`}>{e.username}</Link>

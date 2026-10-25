@@ -1,32 +1,32 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowUpRight,
-  Bell,
-  Box,
-  ChartLine,
-  Database,
-  Download,
-  Eye,
-  Gauge,
-  Hand,
-  Hash,
-  Keyboard,
-  List,
-  Maximize2,
-  Palette,
-  Play,
-  RotateCcw,
-  Search,
-  Shuffle,
-  Sigma,
-  Timer,
-  Trash2,
-  TriangleAlert,
-  Type,
-  Upload,
-  Volume2,
-} from 'lucide-react';
+  IconAlertTriangle,
+  IconArrowUpRight,
+  IconArrowsDiagonal,
+  IconArrowsShuffle,
+  IconBell,
+  IconChartLine,
+  IconCube,
+  IconDatabase,
+  IconDownload,
+  IconEye,
+  IconGauge,
+  IconHandStop,
+  IconHash,
+  IconKeyboard,
+  IconList,
+  IconPalette,
+  IconPlayerPlay,
+  IconRotate,
+  IconSearch,
+  IconStopwatch,
+  IconSum,
+  IconTrash,
+  IconTypography,
+  IconUpload,
+  IconVolume,
+} from '@tabler/icons-react';
 import { CsTimerFormatError, EVENTS, parseTimerFile, toCsTimerExport, type TimerImport } from '@cubetype/cubestats';
 import { csTimerFileName, skippedNotes } from '../components/social/util';
 import { ConfirmModal } from '../components/timer/Dialogs';
@@ -41,14 +41,14 @@ import { applyTheme, isLightTheme, randomTheme, THEMES, themeLabel, type Theme }
 import { toast } from '../lib/toast';
 
 const SECTIONS = [
-  { id: 'timer', label: 'timer', icon: Timer },
-  { id: 'inspection', label: 'inspection', icon: Eye },
-  { id: 'display', label: 'display', icon: Maximize2 },
-  { id: 'stats', label: 'stats', icon: Sigma },
-  { id: 'theme', label: 'theme', icon: Palette },
-  { id: 'data', label: 'data', icon: Database },
-  { id: 'shortcuts', label: 'shortcuts', icon: Keyboard },
-  { id: 'danger', label: 'danger zone', icon: TriangleAlert },
+  { id: 'timer', label: 'timer', icon: IconStopwatch },
+  { id: 'inspection', label: 'inspection', icon: IconEye },
+  { id: 'display', label: 'display', icon: IconArrowsDiagonal },
+  { id: 'stats', label: 'stats', icon: IconSum },
+  { id: 'theme', label: 'theme', icon: IconPalette },
+  { id: 'data', label: 'data', icon: IconDatabase },
+  { id: 'shortcuts', label: 'shortcuts', icon: IconKeyboard },
+  { id: 'danger', label: 'danger zone', icon: IconAlertTriangle },
 ] as const;
 
 interface RowProps {
@@ -190,10 +190,10 @@ export default function SettingsPage() {
       </nav>
 
       <Section id="timer" title="timer">
-        <SettingRow icon={<Hand size={16} />} title="hold to start" description="How long space (or your finger) must be held before the timer turns green and is ready to start. Stops accidental starts.">
+        <SettingRow icon={<IconHandStop size={16} />} title="hold to start" description="How long space (or your finger) must be held before the timer turns green and is ready to start. Stops accidental starts.">
           <Options value={s.holdMs} options={[0, 300, 550, 1000].map((v) => ({ value: v, label: v === 0 ? 'off' : `${v / 1000}s` }))} onChange={set('holdMs')} />
         </SettingRow>
-        <SettingRow icon={<Gauge size={16} />} title="timer update" description="What the timer shows while you solve. Hiding the time helps you stay relaxed instead of watching the clock.">
+        <SettingRow icon={<IconGauge size={16} />} title="timer update" description="What the timer shows while you solve. Hiding the time helps you stay relaxed instead of watching the clock.">
           <Options
             value={s.timerUpdate}
             options={[
@@ -205,7 +205,7 @@ export default function SettingsPage() {
             onChange={set('timerUpdate')}
           />
         </SettingRow>
-        <SettingRow icon={<Hash size={16} />} title="precision" description="Decimal places for times and averages. Singles are truncated, averages rounded like the WCA.">
+        <SettingRow icon={<IconHash size={16} />} title="precision" description="Decimal places for times and averages. Singles are truncated, averages rounded like the WCA.">
           <Options
             value={s.precision}
             options={[
@@ -215,7 +215,7 @@ export default function SettingsPage() {
             onChange={set('precision')}
           />
         </SettingRow>
-        <SettingRow icon={<Maximize2 size={16} />} title="timer size" description="Size of the big timer on the timer page.">
+        <SettingRow icon={<IconArrowsDiagonal size={16} />} title="timer size" description="Size of the big timer on the timer page.">
           <div className="st-size">
             <Options
               value={s.timerSize}
@@ -232,13 +232,13 @@ export default function SettingsPage() {
             </div>
           </div>
         </SettingRow>
-        <SettingRow icon={<Eye size={16} />} title="focus mode" description="Fade out everything except the timer while you inspect and solve.">
+        <SettingRow icon={<IconEye size={16} />} title="focus mode" description="Fade out everything except the timer while you inspect and solve.">
           <Options value={s.focusMode} options={onOff} onChange={set('focusMode')} />
         </SettingRow>
       </Section>
 
       <Section id="inspection" title="inspection">
-        <SettingRow icon={<Timer size={16} />} title="WCA inspection" description="15 seconds of inspection before each solve. Starting after 15 s adds +2, after 17 s the solve is a DNF (WCA A4d).">
+        <SettingRow icon={<IconStopwatch size={16} />} title="WCA inspection" description="15 seconds of inspection before each solve. Starting after 15 s adds +2, after 17 s the solve is a DNF (WCA A4d).">
           <Options
             value={s.inspection}
             options={[
@@ -248,7 +248,7 @@ export default function SettingsPage() {
             onChange={set('inspection')}
           />
         </SettingRow>
-        <SettingRow icon={<Bell size={16} />} title="inspection alerts" description="Called out at 8 and 12 seconds, like a judge at a competition.">
+        <SettingRow icon={<IconBell size={16} />} title="inspection alerts" description="Called out at 8 and 12 seconds, like a judge at a competition.">
           <Options
             value={s.inspectionAlerts}
             options={[
@@ -262,7 +262,7 @@ export default function SettingsPage() {
       </Section>
 
       <Section id="display" title="display">
-        <SettingRow icon={<Eye size={16} />} title="scramble preview" description="Draw the scrambled puzzle next to your stats so you can check you scrambled correctly.">
+        <SettingRow icon={<IconEye size={16} />} title="scramble preview" description="Draw the scrambled puzzle next to your stats so you can check you scrambled correctly.">
           <Options
             value={s.scramblePreview}
             options={[
@@ -273,13 +273,13 @@ export default function SettingsPage() {
             onChange={set('scramblePreview')}
           />
         </SettingRow>
-        <SettingRow icon={<List size={16} />} title="solve list" description="Show the list of solves in the current session on the timer page.">
+        <SettingRow icon={<IconList size={16} />} title="solve list" description="Show the list of solves in the current session on the timer page.">
           <Options value={s.showSolveList} options={onOff} onChange={set('showSolveList')} />
         </SettingRow>
-        <SettingRow icon={<ChartLine size={16} />} title="charts" description="Show the trend and distribution charts below your solves.">
+        <SettingRow icon={<IconChartLine size={16} />} title="charts" description="Show the trend and distribution charts below your solves.">
           <Options value={s.showCharts} options={onOff} onChange={set('showCharts')} />
         </SettingRow>
-        <SettingRow icon={<Type size={16} />} title="font" description="One font for the whole app. Hover to preview." wide>
+        <SettingRow icon={<IconTypography size={16} />} title="font" description="One font for the whole app. Hover to preview." wide>
           <div className="option-group wide st-fonts" onMouseLeave={() => applyVisualSettings()}>
             {FONTS.map((f) => (
               <button
@@ -297,7 +297,7 @@ export default function SettingsPage() {
       </Section>
 
       <Section id="stats" title="stats">
-        <SettingRow icon={<Sigma size={16} />} title="averages shown" description="Which averages appear in the stats panel. Averages trim the best and worst 5 % (at least one each side); mo3 is a plain mean.">
+        <SettingRow icon={<IconSum size={16} />} title="averages shown" description="Which averages appear in the stats panel. Averages trim the best and worst 5 % (at least one each side); mo3 is a plain mean.">
           <div className="st-chips">
             {AVG_CHOICES.map((k) => {
               const on = s.statsShown.includes(k);
@@ -317,17 +317,17 @@ export default function SettingsPage() {
             })}
           </div>
         </SettingRow>
-        <SettingRow icon={<Trash2 size={16} />} title="confirm delete" description="Ask before deleting a solve with alt+backspace or from the solve window.">
+        <SettingRow icon={<IconTrash size={16} />} title="confirm delete" description="Ask before deleting a solve with alt+backspace or from the solve window.">
           <Options value={s.confirmDelete} options={onOff} onChange={set('confirmDelete')} />
         </SettingRow>
         <SettingRow
-          icon={<Volume2 size={16} />}
+          icon={<IconVolume size={16} />}
           title="pb sound"
           description={
             <>
               Play a short chime when you set a new personal best.{' '}
               <button className="btn-text st-inline" onClick={playPbSound}>
-                <Play size={12} /> preview
+                <IconPlayerPlay size={12} /> preview
               </button>
             </>
           }
@@ -357,7 +357,7 @@ export default function SettingsPage() {
 
       <Section id="danger" title="danger zone">
         <SettingRow
-          icon={<Trash2 size={16} />}
+          icon={<IconTrash size={16} />}
           title="clear guest data"
           description={
             <>
@@ -378,7 +378,7 @@ export default function SettingsPage() {
             clear guest data
           </button>
         </SettingRow>
-        <SettingRow icon={<RotateCcw size={16} />} title="reset settings" description="Put every setting on this page back to its default (your solves are kept).">
+        <SettingRow icon={<IconRotate size={16} />} title="reset settings" description="Put every setting on this page back to its default (your solves are kept).">
           <button className="btn danger" onClick={() => setConfirm('reset')}>
             reset settings
           </button>
@@ -463,19 +463,19 @@ function ThemeGrid({ current }: { current: string }) {
     <div className="st-theme-picker">
       <div className="st-theme-tools">
         <label className="st-theme-search">
-          <Search size={14} aria-hidden="true" />
+          <IconSearch size={14} aria-hidden="true" />
           <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="search themes" aria-label="search themes" />
         </label>
         <div className="st-theme-filters">
           {THEME_FILTERS.map((f) => (
             <button key={f.value} className={`btn${f.value === filter ? ' active' : ''}`} onClick={() => setFilter(f.value)} aria-pressed={f.value === filter}>
-              {f.value === 'originals' && <Box size={14} />}
+              {f.value === 'originals' && <IconCube size={14} />}
               {f.label}
             </button>
           ))}
         </div>
         <button className="btn" onClick={shuffle} data-tip="pick a random theme from this list">
-          <Shuffle size={14} /> random
+          <IconArrowsShuffle size={14} /> random
         </button>
         <span className="st-theme-count">
           {shown.length} / {THEMES.length}
@@ -507,7 +507,7 @@ function ThemeGrid({ current }: { current: string }) {
               }}
             >
               <span className="st-theme-name">
-                {t.original && <Box size={11} className="st-theme-original" style={{ color: t.main }} aria-label="cubetype original" />}
+                {t.original && <IconCube size={11} className="st-theme-original" style={{ color: t.main }} aria-label="cubetype original" />}
                 {themeLabel(t.name)}
               </span>
               <span className="st-theme-dots" aria-hidden="true">
@@ -583,7 +583,7 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
   return (
     <>
       <SettingRow
-        icon={<Upload size={16} />}
+        icon={<IconUpload size={16} />}
         title="import solves"
         description={
           <>
@@ -597,7 +597,7 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
           <input ref={fileRef} type="file" hidden onChange={(e) => void onFile(e.target.files?.[0])} />
           {!parsed ? (
             <button className="btn" onClick={() => fileRef.current?.click()} disabled={busy !== null}>
-              <Upload size={16} /> choose file
+              <IconUpload size={16} /> choose file
             </button>
           ) : (
             <div className="st-import-preview">
@@ -627,7 +627,7 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
         </div>
       </SettingRow>
       <SettingRow
-        icon={<Download size={16} />}
+        icon={<IconDownload size={16} />}
         title="export"
         description={
           <>
@@ -638,20 +638,20 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
       >
         <div className="row">
           <button className="btn" onClick={() => void doExport('json')} disabled={busy !== null}>
-            <Download size={16} /> {busy === 'export' ? 'exporting...' : 'export json'}
+            <IconDownload size={16} /> {busy === 'export' ? 'exporting...' : 'export json'}
           </button>
           <button className="btn" onClick={() => void doExport('cstimer')} disabled={busy !== null}>
-            <Download size={16} /> {busy === 'export-cstimer' ? 'exporting...' : 'export for csTimer'}
+            <IconDownload size={16} /> {busy === 'export-cstimer' ? 'exporting...' : 'export for csTimer'}
           </button>
         </div>
       </SettingRow>
       <SettingRow
-        icon={<Database size={16} />}
+        icon={<IconDatabase size={16} />}
         title="account"
         description={loggedIn ? 'Profile, PB history, activity and more data tools live on your account page.' : 'Sign in to sync your solves across devices, get on the leaderboards and race others.'}
       >
         <Link className="btn" to={loggedIn ? '/account' : '/login'}>
-          {loggedIn ? 'open account' : 'sign in'} <ArrowUpRight size={16} />
+          {loggedIn ? 'open account' : 'sign in'} <IconArrowUpRight size={16} />
         </Link>
       </SettingRow>
     </>

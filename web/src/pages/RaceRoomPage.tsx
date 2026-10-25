@@ -2,7 +2,7 @@
 // player - room state lives in Redis and the Redis adapter relays broadcasts between pods.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Link2, LogOut, Pencil, Radio, SkipForward, Swords, WifiOff } from 'lucide-react';
+import { IconArrowLeft, IconBroadcast, IconLink, IconLogout2, IconPencil, IconPlayerSkipForward, IconSwords, IconWifiOff } from '@tabler/icons-react';
 import { getEvent, formatTime, type Penalty } from '@cubetype/cubestats';
 import { useAuth } from '../lib/auth';
 import { useSettings } from '../lib/settings';
@@ -208,10 +208,10 @@ export default function RaceRoomPage() {
   useRegisterCommands(
     'race-room',
     () => [
-      ...(isHost ? [{ id: 'race-next', label: 'Next race round', icon: <SkipForward />, run: () => void nextRound() }] : []),
-      { id: 'race-invite', label: 'Copy race invite link', icon: <Link2 />, run: () => void copyInvite() },
-      { id: 'race-leave', label: 'Leave race room', icon: <LogOut />, run: () => void leave() },
-      ...(authStatus !== 'authed' ? [{ id: 'race-nick', label: 'Change race nickname', icon: <Pencil />, run: () => setNickOpen(true) }] : []),
+      ...(isHost ? [{ id: 'race-next', label: 'Next race round', icon: <IconPlayerSkipForward />, run: () => void nextRound() }] : []),
+      { id: 'race-invite', label: 'Copy race invite link', icon: <IconLink />, run: () => void copyInvite() },
+      { id: 'race-leave', label: 'Leave race room', icon: <IconLogout2 />, run: () => void leave() },
+      ...(authStatus !== 'authed' ? [{ id: 'race-nick', label: 'Change race nickname', icon: <IconPencil />, run: () => setNickOpen(true) }] : []),
     ],
     [isHost, nextRound, copyInvite, leave, authStatus],
   );
@@ -221,11 +221,11 @@ export default function RaceRoomPage() {
     const notFound = state.joinError.code === 'NOT_FOUND' || state.joinError.code === 'BAD_REQUEST';
     return (
       <div className="empty stack race-gone" style={{ justifyItems: 'center', paddingTop: '3rem' }}>
-        <Swords size={40} className="sub" />
+        <IconSwords size={40} className="sub" />
         <div className="h2">{notFound ? 'room not found' : 'cannot join this room'}</div>
         <div className="sub">{notFound ? 'it may have expired (rooms close after 2 hours without activity).' : state.joinError.message}</div>
         <Link to="/race" className="btn">
-          <ArrowLeft size={16} /> back to the lobby
+          <IconArrowLeft size={16} /> back to the lobby
         </Link>
       </div>
     );
@@ -238,7 +238,7 @@ export default function RaceRoomPage() {
         ) : (
           <Notice
             tone="error"
-            icon={<WifiOff />}
+            icon={<IconWifiOff />}
             action={
               <Link to="/race" className="btn small">
                 lobby
@@ -273,7 +273,7 @@ export default function RaceRoomPage() {
       <div className="live-head fade-on-focus">
         <div className="titles">
           <Link to="/race" className="btn-text race-back">
-            <ArrowLeft size={14} /> race lobby
+            <IconArrowLeft size={14} /> race lobby
           </Link>
           <h1 className="h2 race-title">
             {room.name}
@@ -291,7 +291,7 @@ export default function RaceRoomPage() {
               playing as <b>{myName}</b>
               {authStatus !== 'authed' && (
                 <button className="btn-text inline" onClick={() => setNickOpen(true)} aria-label="change nickname">
-                  <Pencil size={12} />
+                  <IconPencil size={12} />
                 </button>
               )}
             </span>
@@ -299,16 +299,16 @@ export default function RaceRoomPage() {
         </div>
         <div className="tools">
           <button className="btn small" onClick={() => void copyInvite()}>
-            <Link2 /> copy invite link
+            <IconLink /> copy invite link
           </button>
           <button className="btn small" onClick={() => void leave()}>
-            <LogOut /> leave
+            <IconLogout2 /> leave
           </button>
         </div>
       </div>
 
       {!connected && (
-        <Notice tone="error" icon={<Radio />}>
+        <Notice tone="error" icon={<IconBroadcast />}>
           connection lost - reconnecting{state.attempt ? ` (attempt ${state.attempt})` : ''}...{pending ? ' your time is saved and will be sent once you are back.' : ' the room keeps going without you.'}
         </Notice>
       )}
@@ -363,7 +363,7 @@ export default function RaceRoomPage() {
                 }}
                 disabled={!connected || busy || phase !== 'idle'}
               >
-                {busy ? <Spinner size={16} /> : <SkipForward />}
+                {busy ? <Spinner size={16} /> : <IconPlayerSkipForward />}
                 {!round ? 'start round 1' : room.status === 'running' && waitingFor > 0 ? 'skip to next round' : 'next round'}
                 <kbd>n</kbd>
               </button>

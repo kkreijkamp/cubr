@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { AlertCircle } from 'lucide-react';
+import { IconAlertCircle } from '@tabler/icons-react';
 import { AvatarEditor } from './AvatarEditor';
 import { CountrySelect } from './CountrySelect';
 import { friendlyError } from './util';
@@ -155,7 +155,7 @@ export function EditProfileModal({ user, onClose }: { user: PrivateUser; onClose
         )}
         {error && (
           <div className="ep-error" role="alert">
-            <AlertCircle size={15} /> {error}
+            <IconAlertCircle size={15} /> {error}
           </div>
         )}
         <div className="ep-actions">

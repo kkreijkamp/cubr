@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { List, MessageSquareText } from 'lucide-react';
+import { IconList, IconMessage } from '@tabler/icons-react';
 import type { Precision } from '@cubetype/cubestats';
 import type { Solve } from '../../lib/types';
 import { fmtAvg, fmtSolveShort } from './statsUtil';
@@ -65,7 +65,7 @@ export const SolveList = memo(function SolveList({ solves, ao5, ao12, bestIndex,
         <span className="idx">{i + 1}</span>
         <span className={`time${s.penalty === 'DNF' ? ' dnf' : ''}`}>
           {fmtSolveShort(s, precision)}
-          {s.comment && <MessageSquareText size={11} className="tp-comment-mark" aria-label="has comment" />}
+          {s.comment && <IconMessage size={11} className="tp-comment-mark" aria-label="has comment" />}
         </span>
         <span>{fmtAvg(ao5[i], precision)}</span>
         <span>{fmtAvg(ao12[i], precision)}</span>
@@ -76,7 +76,7 @@ export const SolveList = memo(function SolveList({ solves, ao5, ao12, bestIndex,
   return (
     <section className="tp-panel tp-solves" aria-label="solves">
       <div className="tp-panel-title">
-        <List size={14} /> solves
+        <IconList size={14} /> solves
       </div>
       {loading && n === 0 ? (
         <Loading />

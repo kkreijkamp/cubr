@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
-import { CalendarDays } from 'lucide-react';
+import { IconCalendarEvent } from '@tabler/icons-react';
 import { WidgetError } from './Widget';
 import { addDaysKey, formatDayKey, monthShort, plural } from './util';
 import { api } from '../../lib/api';
@@ -125,7 +125,7 @@ export function ActivityHeatmap({ userId, joinedAt }: { userId: string; joinedAt
     <section className="pv-card" aria-label="activity">
       <div className="pv-card-head">
         <h2 className="pv-title">
-          <CalendarDays />
+          <IconCalendarEvent />
           <span>
             {activity.error && !activity.data ? (
               'activity'

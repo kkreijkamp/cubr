@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Network, Play } from 'lucide-react';
+import { IconPlayerPlay, IconSitemap } from '@tabler/icons-react';
 import { api, SERVICE_INFO_PATHS } from '../../../lib/api';
 import { useStoredState } from '../hooks';
 import { Segmented } from '../ui';
@@ -98,7 +98,7 @@ export function LoadBalanceTest({ vc, onLog }: { vc: (v: string) => string; onLo
     <section className="card status-panel" aria-labelledby="lb-title">
       <div className="live-section-title">
         <h3 className="h3" id="lb-title">
-          <Network /> load balancing test
+          <IconSitemap /> load balancing test
         </h3>
         <span className="meta">parallel GET .../_info</span>
       </div>
@@ -110,7 +110,7 @@ export function LoadBalanceTest({ vc, onLog }: { vc: (v: string) => string; onLo
         <div className="row wrap" style={{ gap: '0.5rem' }}>
           <Segmented label="requests" value={n} onChange={setN} options={SIZES.map((v) => ({ value: v, label: `${v}x` }))} />
           <button className="btn primary" onClick={() => void run()} disabled={running}>
-            <Play /> {running ? 'firing...' : 'fire'}
+            <IconPlayerPlay /> {running ? 'firing...' : 'fire'}
           </button>
         </div>
       </div>

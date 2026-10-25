@@ -1,6 +1,6 @@
 import { useEffect, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { X } from 'lucide-react';
+import { IconX } from '@tabler/icons-react';
 
 interface ModalProps {
   title?: ReactNode;
@@ -36,7 +36,7 @@ export function Modal({ title, onClose, children, wide, center }: ModalProps) {
           <div className="modal-title">
             <span>{title}</span>
             <button className="btn-text" onClick={onClose} aria-label="Close">
-              <X />
+              <IconX />
             </button>
           </div>
         )}
