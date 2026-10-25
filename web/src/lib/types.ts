@@ -64,6 +64,8 @@ export interface StatsSummary {
     activeDays: number;
     currentStreak: number;
     longestStreak: number;
+    /** years with solves, newest first (the cuber's timezone); absent from an older stats service */
+    activeYears?: number[];
   };
   events: {
     event: string;

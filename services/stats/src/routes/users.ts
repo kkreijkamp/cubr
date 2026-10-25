@@ -3,7 +3,7 @@ import { EVENT_IDS, isEventId } from '@cubetype/cubestats';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { PB_KINDS, type PbKind } from '../domain/pbs.js';
-import { addDays, computeStreaks, dayNumber, dayString } from '../domain/streaks.js';
+import { activeYears, addDays, computeStreaks, dayNumber, dayString } from '../domain/streaks.js';
 
 const userParams = z.object({ userId: z.string().uuid('userId must be a UUID') });
 
@@ -59,7 +59,8 @@ export async function registerUserRoutes(app: FastifyInstance, pool: Pool): Prom
     ]);
     const t = totals.rows[0];
     const today = dayKey(new Date(), t?.tz ?? 'UTC');
-    const streaks = computeStreaks(days.rows.map((r) => r.day), today);
+    const dayKeys = days.rows.map((r) => r.day);
+    const streaks = computeStreaks(dayKeys, today);
 
     type EventLine = { event: string; solves: number; totalMs: number; meanMs: number | null; pbs: Record<PbKind, PB | null> };
     const byEvent = new Map<string, EventLine>();
@@ -88,6 +89,8 @@ export async function registerUserRoutes(app: FastifyInstance, pool: Pool): Prom
         firstSolveAt: iso(t?.first_solve_at ?? null),
         lastSolveAt: iso(t?.last_solve_at ?? null),
         ...streaks,
+        // the years the activity heatmap can show
+        activeYears: activeYears(dayKeys),
       },
       events,
     };

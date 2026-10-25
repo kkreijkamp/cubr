@@ -22,6 +22,11 @@ export interface Streaks {
   longestStreak: number;
 }
 
+/** The calendar years that have an active day ('YYYY-MM-DD', the user's timezone), newest first. */
+export function activeYears(days: Iterable<string>): number[] {
+  return [...new Set([...days].map((d) => Number(d.slice(0, 4))))].sort((a, b) => b - a);
+}
+
 /**
  * Streaks over the set of active days (each 'YYYY-MM-DD', bucketed in the user's timezone).
  * currentStreak = run of consecutive days ending today or yesterday (a day "ahead" of `today` -

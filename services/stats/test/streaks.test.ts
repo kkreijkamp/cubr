@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addDays, computeStreaks, dayNumber, dayString } from '../src/domain/streaks.js';
+import { activeYears, addDays, computeStreaks, dayNumber, dayString } from '../src/domain/streaks.js';
 
 describe('day arithmetic', () => {
   it('round-trips and crosses month / leap-year boundaries', () => {
@@ -8,6 +8,16 @@ describe('day arithmetic', () => {
     expect(addDays('2024-02-29', 1)).toBe('2024-03-01');
     expect(addDays('2026-01-01', -1)).toBe('2025-12-31');
     expect(dayNumber('1970-01-02')).toBe(1);
+  });
+});
+
+describe('activeYears', () => {
+  it('lists each year with an active day once, newest first', () => {
+    expect(activeYears([])).toEqual([]);
+    expect(activeYears(['2024-03-01', '2026-01-01', '2024-12-31', '2025-12-31', '2026-10-14'])).toEqual([2026, 2025, 2024]);
+  });
+  it('skips years with no activity in between', () => {
+    expect(activeYears(['2022-06-01', '2026-02-02'])).toEqual([2026, 2022]);
   });
 });
 

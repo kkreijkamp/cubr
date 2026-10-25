@@ -46,7 +46,7 @@ export function ProfileView({ user, own, onEdit, children }: Props) {
       <ProfileHeader user={user} summary={summary} own={own} onEdit={onEdit} />
       <RanksCard userId={user.id} own={own} precision={precision} />
       <PbCards summary={summary} own={own} precision={precision} />
-      <ActivityHeatmap userId={user.id} joinedAt={user.createdAt} />
+      <ActivityHeatmap key={`act-${user.id}`} userId={user.id} years={summary.data?.totals.activeYears} />
       {!noSolves && (
         <>
           <SolveHistoryChart key={`hist-${user.id}-${defaultEvent}`} userId={user.id} events={events} defaultEvent={defaultEvent} precision={precision} />
