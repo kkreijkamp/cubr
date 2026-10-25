@@ -124,11 +124,16 @@ h4 {
 }
 
 /* header / nav */
+/* logo | page links (centred on the page: the side columns are equal) | status + account */
 .header {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 0.75rem;
   transition: opacity 0.25s;
+}
+.logo {
+  justify-self: start;
 }
 .logo {
   display: flex;
@@ -164,10 +169,15 @@ h4 {
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  width: 100%;
 }
-.nav .spacer {
-  flex: 1;
+.nav-side {
+  justify-content: flex-end;
+}
+/* no room to centre without crowding the logo: the links follow it */
+@media (max-width: 900px) {
+  .header {
+    grid-template-columns: auto auto 1fr;
+  }
 }
 .nav .btn-text {
   padding: 0.5rem;

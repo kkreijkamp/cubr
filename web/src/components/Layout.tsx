@@ -34,7 +34,7 @@ function Header() {
           <span className="logo-text">cubetype</span>
         </span>
       </Link>
-      <nav className="nav">
+      <nav className="nav nav-main">
         {NAV.map(({ to, icon: Icon, label, end, hideMobile }) => (
           <NavLink
             key={to}
@@ -48,7 +48,8 @@ function Header() {
             <Icon size={20} />
           </NavLink>
         ))}
-        <div className="spacer" />
+      </nav>
+      <div className="nav nav-side">
         <NavLink to="/status" className={({ isActive }) => `btn-text hide-mobile${isActive ? ' active' : ''}`} data-tip="cluster status" data-tip-pos="down" aria-label="cluster status">
           <Activity size={20} />
         </NavLink>
@@ -62,7 +63,7 @@ function Header() {
             <User size={20} />
           </NavLink>
         )}
-      </nav>
+      </div>
     </header>
   );
 }
