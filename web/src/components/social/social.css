@@ -413,7 +413,8 @@
 }
 
 /* ---------------------------------------------------------------- activity heatmap */
-/* the title's range picker: subtle text + chevron, with the native select invisible on top */
+/* the title's range picker: subtle text + chevron, with the native select invisible on top.
+   Focus (mouse or keyboard) only brightens the label - no ring. */
 .hm-range {
   position: relative;
   display: inline-flex;
@@ -426,9 +427,6 @@
 .hm-range:hover,
 .hm-range:focus-within {
   color: var(--text-color);
-}
-.hm-range:has(select:focus-visible) {
-  box-shadow: 0 0 0 0.1rem var(--bg-color), 0 0 0 0.2rem var(--text-color);
 }
 .pv-title .hm-range svg {
   width: 0.75em;
@@ -444,6 +442,11 @@
   appearance: none;
   font: inherit;
   cursor: pointer;
+}
+.hm-range select:focus,
+.hm-range select:focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 .hm-wrap {
   position: relative;
