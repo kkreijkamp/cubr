@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   CalendarDaysIcon,
   ClockIcon,
+  CodeBracketIcon,
   Cog6ToothIcon,
   CommandLineIcon,
   FlagIcon,
@@ -77,6 +78,9 @@ function Header() {
   );
 }
 
+/** The source code (a private repository: it opens for the people who have access). */
+const REPO_URL = 'https://github.com/kkreijkamp/cubetype';
+
 function Footer() {
   const settings = useSettings();
   const [info, setInfo] = useState<{ version: string; pod: string } | null>(null);
@@ -98,6 +102,9 @@ function Footer() {
         <Link to="/about" className="btn-text">
           <InformationCircleIcon width={14} height={14} /> about
         </Link>
+        <a href={REPO_URL} className="btn-text" target="_blank" rel="noreferrer noopener" data-tip="source code (private repo)">
+          <CodeBracketIcon width={14} height={14} /> github
+        </a>
       </div>
       <div className="footer-right">
         <button className="btn-text" onClick={() => openPalette('theme')} data-tip="change theme" aria-label="change theme">
