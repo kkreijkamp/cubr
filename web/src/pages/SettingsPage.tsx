@@ -203,10 +203,19 @@ function download(name: string, text: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/** One of the rail's sections in the list. */
+function Pane({ id, children }: { id: PaneId; children: ReactNode }) {
+  return (
+    <div className="st-pane" id={`settings-${id}`}>
+      {children}
+    </div>
+  );
+}
+
 /**
- * Settings: a rail of sections on the left and one section at a time beside it (kept in the
- * address as ?tab= so a link opens on it). No cards - groups are set apart by space and small
- * labels, and every choice is text with the chosen one in the accent colour.
+ * Settings: one list of every section, with a rail beside it that jumps to a section and lights
+ * the one in view (?tab= opens the page on a section). No cards - groups are set apart by space
+ * and small labels, and every choice is text with the chosen one in the accent colour.
  */
 export default function SettingsPage() {
   const s = useSettings();
@@ -215,39 +224,83 @@ export default function SettingsPage() {
   const solveState = useSolveState();
   const [confirm, setConfirm] = useState<'clear' | 'reset' | 'account' | null>(null);
   const [local, setLocal] = useState(() => localDataSummary());
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
+  const asked = PANES.find((p) => p.id === params.get('tab'))?.id;
+  // the section in view, lit in the rail
+  const [active, setActive] = useState<PaneId>(asked ?? 'timer');
+  // while a jump scrolls, the rail keeps the section it jumped to
+  const jumping = useRef(false);
+  const railRef = useRef<HTMLElement>(null);
 
   useEffect(() => setLocal(localDataSummary()), [solveState.sessions, solveState.solves]);
   // never leave a hover preview applied when navigating away
   useEffect(() => () => applyVisualSettings(), []);
 
-  const asked = params.get('tab');
-  const pane: PaneId = PANES.find((p) => p.id === asked)?.id ?? 'timer';
-  const open = (id: PaneId) => {
-    setParams(
-      (p) => {
-        const next = new URLSearchParams(p);
-        if (id === 'timer') next.delete('tab');
-        else next.set('tab', id);
-        return next;
-      },
-      { replace: true },
-    );
-    // a section starts at its top (the theme list is long)
-    if (window.scrollY > 0) window.scrollTo({ top: 0 });
+  const jump = (id: PaneId, smooth = true) => {
+    const el = document.getElementById(`settings-${id}`);
+    if (!el) return;
+    setActive(id);
+    jumping.current = true;
+    const done = () => {
+      jumping.current = false;
+      window.removeEventListener('scrollend', done);
+      clearTimeout(timer);
+    };
+    const timer = window.setTimeout(done, 1500);
+    window.addEventListener('scrollend', done);
+    el.scrollIntoView({ behavior: smooth && !matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'auto', block: 'start' });
   };
+
+  useEffect(() => {
+    let frame = 0;
+    const spy = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        if (jumping.current) return;
+        // the last section whose top has passed the top third of the window; at the very bottom
+        // the last one, which is too short to get there
+        const line = window.innerHeight / 3;
+        let current: PaneId = PANES[0].id;
+        for (const p of PANES) if ((document.getElementById(`settings-${p.id}`)?.getBoundingClientRect().top ?? Infinity) <= line) current = p.id;
+        if (window.scrollY > 0 && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2) current = PANES[PANES.length - 1].id;
+        setActive(current);
+      });
+    };
+    window.addEventListener('scroll', spy, { passive: true });
+    window.addEventListener('resize', spy);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', spy);
+      window.removeEventListener('resize', spy);
+    };
+  }, []);
+
+  // a link to a section opens on it - a frame late, after the layout's scroll to the top of a new page
+  useEffect(() => {
+    if (!asked) return;
+    const frame = requestAnimationFrame(() => jump(asked, false));
+    return () => cancelAnimationFrame(frame);
+  }, []); // only on arriving
+
+  // on phones the rail is a row of tabs that scrolls sideways: keep the lit one in sight
+  useEffect(() => {
+    const rail = railRef.current;
+    const item = rail?.querySelector<HTMLElement>('.st-rail-item.active');
+    if (!rail || !item || rail.scrollWidth <= rail.clientWidth) return;
+    rail.scrollTo({ left: item.offsetLeft - (rail.clientWidth - item.offsetWidth) / 2, behavior: 'smooth' });
+  }, [active]);
 
   return (
     <div className="settings-page">
       <aside className="st-side">
         <h1 className="st-label">settings</h1>
-        <nav className="st-rail" aria-label="settings sections">
+        <nav className="st-rail" aria-label="settings sections" ref={railRef}>
           {PANES.map((p) => (
             <button
               key={p.id}
-              className={`st-rail-item${p.id === pane ? ' active' : ''}${p.id === 'danger' ? ' danger' : ''}`}
-              aria-current={p.id === pane ? 'page' : undefined}
-              onClick={() => open(p.id)}
+              className={`st-rail-item${p.id === active ? ' active' : ''}${p.id === 'danger' ? ' danger' : ''}`}
+              aria-current={p.id === active ? 'true' : undefined}
+              onClick={() => jump(p.id)}
             >
               {p.label}
             </button>
@@ -255,189 +308,185 @@ export default function SettingsPage() {
         </nav>
       </aside>
 
-      <div className="st-pane" key={pane}>
-        {pane === 'timer' && (
-          <>
-            <Group title="timer">
-              <SettingRow title="hold to start" description="How long space (or your finger) is held before the timer turns green. Stops accidental starts.">
-                <Options value={s.holdMs} options={[0, 300, 550, 1000].map((v) => ({ value: v, label: v === 0 ? 'off' : `${v / 1000}s` }))} onChange={set('holdMs')} />
-              </SettingRow>
-              <SettingRow title="timer update" description="What the timer shows while you solve. Hiding it keeps your eyes off the clock.">
-                <Options
-                  value={s.timerUpdate}
-                  options={[
-                    { value: 'realtime', label: 'realtime' },
-                    { value: 'tenths', label: '0.1s' },
-                    { value: 'seconds', label: 'seconds' },
-                    { value: 'hidden', label: 'hidden' },
-                  ]}
-                  onChange={set('timerUpdate')}
-                />
-              </SettingRow>
-              <SettingRow title="precision" description="Decimal places for times. Singles are truncated, averages rounded like the WCA.">
-                <Options
-                  value={s.precision}
-                  options={[
-                    { value: 2, label: '0.01' },
-                    { value: 3, label: '0.001' },
-                  ]}
-                  onChange={set('precision')}
-                />
-              </SettingRow>
-            </Group>
-            <Group title="inspection">
-              <SettingRow title="WCA inspection" description="15 seconds to inspect before each solve. Starting after 15 s adds +2, after 17 s the solve is a DNF (WCA A4d).">
-                <Options value={s.inspection} options={onOff} onChange={set('inspection')} />
-              </SettingRow>
-              <SettingRow title="inspection alerts" description="Called out at 8 and 12 seconds, like a judge at a competition.">
-                <Options
-                  value={s.inspectionAlerts}
-                  options={[
-                    { value: 'off', label: 'off' },
-                    { value: 'beep', label: 'beep' },
-                    { value: 'voice', label: 'voice' },
-                  ]}
-                  onChange={set('inspectionAlerts')}
-                />
-              </SettingRow>
-            </Group>
-          </>
-        )}
+      <div className="st-list">
+        <Pane id="timer">
+          <Group title="timer">
+            <SettingRow title="hold to start" description="How long space (or your finger) is held before the timer turns green. Stops accidental starts.">
+              <Options value={s.holdMs} options={[0, 300, 550, 1000].map((v) => ({ value: v, label: v === 0 ? 'off' : `${v / 1000}s` }))} onChange={set('holdMs')} />
+            </SettingRow>
+            <SettingRow title="timer update" description="What the timer shows while you solve. Hiding it keeps your eyes off the clock.">
+              <Options
+                value={s.timerUpdate}
+                options={[
+                  { value: 'realtime', label: 'realtime' },
+                  { value: 'tenths', label: '0.1s' },
+                  { value: 'seconds', label: 'seconds' },
+                  { value: 'hidden', label: 'hidden' },
+                ]}
+                onChange={set('timerUpdate')}
+              />
+            </SettingRow>
+            <SettingRow title="precision" description="Decimal places for times. Singles are truncated, averages rounded like the WCA.">
+              <Options
+                value={s.precision}
+                options={[
+                  { value: 2, label: '0.01' },
+                  { value: 3, label: '0.001' },
+                ]}
+                onChange={set('precision')}
+              />
+            </SettingRow>
+          </Group>
+          <Group title="inspection">
+            <SettingRow title="WCA inspection" description="15 seconds to inspect before each solve. Starting after 15 s adds +2, after 17 s the solve is a DNF (WCA A4d).">
+              <Options value={s.inspection} options={onOff} onChange={set('inspection')} />
+            </SettingRow>
+            <SettingRow title="inspection alerts" description="Called out at 8 and 12 seconds, like a judge at a competition.">
+              <Options
+                value={s.inspectionAlerts}
+                options={[
+                  { value: 'off', label: 'off' },
+                  { value: 'beep', label: 'beep' },
+                  { value: 'voice', label: 'voice' },
+                ]}
+                onChange={set('inspectionAlerts')}
+              />
+            </SettingRow>
+          </Group>
+        </Pane>
 
-        {pane === 'display' && (
-          <>
-            <Group title="timer page">
-              <SettingRow title="timer size" description="Size of the big timer.">
-                <span className="st-size-preview" style={{ fontSize: `${s.timerSize * 0.24}rem` }} aria-hidden="true">
-                  12.34
-                </span>
-                <Options
-                  value={s.timerSize}
-                  options={[
-                    { value: 5, label: 's' },
-                    { value: 7, label: 'm' },
-                    { value: 9, label: 'l' },
-                    { value: 11, label: 'xl' },
-                  ]}
-                  onChange={set('timerSize')}
-                />
-              </SettingRow>
-              <SettingRow title="focus mode" description="Fade out everything but the timer while you inspect and solve.">
-                <Options value={s.focusMode} options={onOff} onChange={set('focusMode')} />
-              </SettingRow>
-              <SettingRow title="solve list" description="The current session's solves under the timer.">
-                <Options value={s.showSolveList} options={onOff} onChange={set('showSolveList')} />
-              </SettingRow>
-            </Group>
-            <Group title="scramble preview">
-              <SettingRow title="preview" description="Draw the scrambled puzzle so you can check you scrambled it right.">
-                <Options
-                  value={s.scramblePreview}
-                  options={[
-                    { value: 'off', label: 'off' },
-                    { value: '2D', label: '2D' },
-                    { value: '3D', label: '3D' },
-                  ]}
-                  onChange={set('scramblePreview')}
-                />
-              </SettingRow>
-              <SettingRow title="sticker colours" description="The 2D preview's colours: the standard scheme, or your own colour for each face of each puzzle. 3D always uses the standard colours.">
-                <Options
-                  value={s.stickerColours}
-                  options={[
-                    { value: 'default', label: 'default' },
-                    { value: 'custom', label: 'custom' },
-                  ]}
-                  onChange={set('stickerColours')}
-                />
-              </SettingRow>
-              {s.stickerColours === 'custom' && <StickerColours custom={s.customStickers} />}
-            </Group>
-            <Group title="app">
-              <SettingRow title="font" description="One font for the whole app." wide>
-                <div className="st-options">
-                  {FONTS.map((f) => (
+        <Pane id="display">
+          <Group title="display">
+            <SettingRow title="timer size" description="Size of the big timer.">
+              <span className="st-size-preview" style={{ fontSize: `${s.timerSize * 0.24}rem` }} aria-hidden="true">
+                12.34
+              </span>
+              <Options
+                value={s.timerSize}
+                options={[
+                  { value: 5, label: 's' },
+                  { value: 7, label: 'm' },
+                  { value: 9, label: 'l' },
+                  { value: 11, label: 'xl' },
+                ]}
+                onChange={set('timerSize')}
+              />
+            </SettingRow>
+            <SettingRow title="focus mode" description="Fade out everything but the timer while you inspect and solve.">
+              <Options value={s.focusMode} options={onOff} onChange={set('focusMode')} />
+            </SettingRow>
+            <SettingRow title="solve list" description="The current session's solves under the timer.">
+              <Options value={s.showSolveList} options={onOff} onChange={set('showSolveList')} />
+            </SettingRow>
+          </Group>
+          <Group title="scramble preview">
+            <SettingRow title="preview" description="Draw the scrambled puzzle so you can check you scrambled it right.">
+              <Options
+                value={s.scramblePreview}
+                options={[
+                  { value: 'off', label: 'off' },
+                  { value: '2D', label: '2D' },
+                  { value: '3D', label: '3D' },
+                ]}
+                onChange={set('scramblePreview')}
+              />
+            </SettingRow>
+            <SettingRow title="sticker colours" description="The 2D preview's colours: the standard scheme, or your own colour for each face of each puzzle. 3D always uses the standard colours.">
+              <Options
+                value={s.stickerColours}
+                options={[
+                  { value: 'default', label: 'default' },
+                  { value: 'custom', label: 'custom' },
+                ]}
+                onChange={set('stickerColours')}
+              />
+            </SettingRow>
+            {s.stickerColours === 'custom' && <StickerColours custom={s.customStickers} />}
+          </Group>
+          <Group title="app">
+            <SettingRow title="font" description="One font for the whole app." wide>
+              <div className="st-options">
+                {FONTS.map((f) => (
+                  <button
+                    key={f.name}
+                    className={`btn-text${s.font === f.name ? ' active' : ''}`}
+                    style={{ fontFamily: f.css }}
+                    aria-pressed={s.font === f.name}
+                    onClick={() => updateSettings({ font: f.name })}
+                  >
+                    {f.name.toLowerCase()}
+                  </button>
+                ))}
+              </div>
+            </SettingRow>
+          </Group>
+        </Pane>
+
+        <Pane id="stats">
+          <Group title="stats">
+            <SettingRow title="averages shown" description="Which averages the stats panel shows. Averages trim the best and worst 5 % (at least one each side); mo3 is a plain mean." wide>
+              <div className="st-options">
+                {AVG_CHOICES.map((k) => {
+                  const on = s.statsShown.includes(k);
+                  return (
                     <button
-                      key={f.name}
-                      className={`btn-text${s.font === f.name ? ' active' : ''}`}
-                      style={{ fontFamily: f.css }}
-                      aria-pressed={s.font === f.name}
-                      onClick={() => updateSettings({ font: f.name })}
+                      key={k}
+                      className={`btn-text${on ? ' active' : ''}`}
+                      aria-pressed={on}
+                      onClick={() => {
+                        const next = on ? s.statsShown.filter((x) => x !== k) : [...s.statsShown, k];
+                        updateSettings({ statsShown: next.sort((a, b) => (parseAvgKey(a) ?? 0) - (parseAvgKey(b) ?? 0)) });
+                      }}
                     >
-                      {f.name.toLowerCase()}
+                      {k}
                     </button>
-                  ))}
-                </div>
-              </SettingRow>
-            </Group>
-          </>
-        )}
+                  );
+                })}
+              </div>
+            </SettingRow>
+          </Group>
+          <Group title="solves">
+            <SettingRow title="confirm delete" description="Ask before deleting a solve with alt+z (or ctrl+z, alt+backspace) or from the solve window.">
+              <Options value={s.confirmDelete} options={onOff} onChange={set('confirmDelete')} />
+            </SettingRow>
+            <SettingRow
+              title="pb sound"
+              description={
+                <>
+                  A short chime when you set a new personal best.{' '}
+                  <button className="btn-text st-inline" onClick={playPbSound}>
+                    <PlayIcon width={12} height={12} /> preview
+                  </button>
+                </>
+              }
+            >
+              <Options value={s.pbSound} options={onOff} onChange={set('pbSound')} />
+            </SettingRow>
+          </Group>
+        </Pane>
 
-        {pane === 'stats' && (
-          <>
-            <Group title="averages">
-              <SettingRow title="averages shown" description="Which averages the stats panel shows. Averages trim the best and worst 5 % (at least one each side); mo3 is a plain mean." wide>
-                <div className="st-options">
-                  {AVG_CHOICES.map((k) => {
-                    const on = s.statsShown.includes(k);
-                    return (
-                      <button
-                        key={k}
-                        className={`btn-text${on ? ' active' : ''}`}
-                        aria-pressed={on}
-                        onClick={() => {
-                          const next = on ? s.statsShown.filter((x) => x !== k) : [...s.statsShown, k];
-                          updateSettings({ statsShown: next.sort((a, b) => (parseAvgKey(a) ?? 0) - (parseAvgKey(b) ?? 0)) });
-                        }}
-                      >
-                        {k}
-                      </button>
-                    );
-                  })}
-                </div>
-              </SettingRow>
-            </Group>
-            <Group title="solves">
-              <SettingRow title="confirm delete" description="Ask before deleting a solve with alt+z (or ctrl+z, alt+backspace) or from the solve window.">
-                <Options value={s.confirmDelete} options={onOff} onChange={set('confirmDelete')} />
-              </SettingRow>
-              <SettingRow
-                title="pb sound"
-                description={
-                  <>
-                    A short chime when you set a new personal best.{' '}
-                    <button className="btn-text st-inline" onClick={playPbSound}>
-                      <PlayIcon width={12} height={12} /> preview
-                    </button>
-                  </>
-                }
-              >
-                <Options value={s.pbSound} options={onOff} onChange={set('pbSound')} />
-              </SettingRow>
-            </Group>
-          </>
-        )}
+        <Pane id="theme">
+          <ThemePicker current={s.theme} />
+        </Pane>
 
-        {pane === 'theme' && <ThemePicker current={s.theme} />}
+        <Pane id="data">
+          <DataTools loggedIn={status === 'authed'} />
+        </Pane>
 
-        {pane === 'data' && <DataTools loggedIn={status === 'authed'} />}
+        <Pane id="shortcuts">
+          <Group title="shortcuts">
+            <p className="st-note">
+              All of csTimer's shortcuts work the same here, so your habits carry over. Some browsers use ctrl+1/2/3 to switch tabs and don't pass them on; the penalty buttons under the
+              timer do the same job.
+            </p>
+            <KeyList keys={CSTIMER_KEYS} />
+          </Group>
+          <Group title="cubetype's own">
+            <KeyList keys={OWN_KEYS} />
+          </Group>
+        </Pane>
 
-        {pane === 'shortcuts' && (
-          <>
-            <Group title="from csTimer">
-              <p className="st-note">
-                All of csTimer's shortcuts work the same here, so your habits carry over. Some browsers use ctrl+1/2/3 to switch tabs and don't pass them on; the penalty buttons under the
-                timer do the same job.
-              </p>
-              <KeyList keys={CSTIMER_KEYS} />
-            </Group>
-            <Group title="cubetype's own">
-              <KeyList keys={OWN_KEYS} />
-            </Group>
-          </>
-        )}
-
-        {pane === 'danger' && (
+        <Pane id="danger">
           <Group title="danger zone">
             <SettingRow
               title="clear guest data"
@@ -481,7 +530,7 @@ export default function SettingsPage() {
               </SettingRow>
             )}
           </Group>
-        )}
+        </Pane>
       </div>
 
       {confirm === 'account' && user && (
@@ -797,7 +846,7 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
 
   return (
     <>
-      <Group title="your solves">
+      <Group title="data">
         <SettingRow
           title="import"
           wide={parsed !== null}

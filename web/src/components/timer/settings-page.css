@@ -1,6 +1,7 @@
-/* Settings: a quiet rail of sections on the left, one section at a time beside it. No cards -
-   groups are set apart by space and small lowercase labels, rows by a hairline, and the choices
-   are text like the timer's config bar (the chosen one in the accent colour). */
+/* Settings: one list of every section, with a quiet rail on the left that jumps to a section and
+   lights the one in view. No cards - groups are set apart by space and small lowercase labels,
+   rows by a hairline, and the choices are text like the timer's config bar (the chosen one in the
+   accent colour). */
 .settings-page {
   display: grid;
   grid-template-columns: 10rem minmax(0, 1fr);
@@ -29,6 +30,7 @@
   gap: 1rem;
 }
 .st-rail {
+  position: relative;
   display: grid;
   justify-items: start;
   gap: 0.1rem;
@@ -81,13 +83,19 @@
   background: var(--error-color);
 }
 
-/* the open section */
+/* the sections, further apart than the groups in them; a jump lands a section level with the rail */
+.st-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 5.5rem;
+  min-width: 0;
+}
 .st-pane {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 3.25rem;
   min-width: 0;
-  animation: fadeIn 0.25s ease-out;
+  scroll-margin-top: 1.5rem;
 }
 .st-group {
   display: grid;
@@ -423,7 +431,8 @@
   color: var(--text-color);
 }
 
-/* narrow: the rail becomes a row of tabs over the section (like the profile's events) */
+/* narrow: the rail becomes a row of tabs held at the top of the window (sideways scroll when
+   they don't fit), like the profile's events */
 @media (max-width: 860px) {
   .settings-page {
     grid-template-columns: minmax(0, 1fr);
@@ -431,24 +440,43 @@
     padding-top: 0;
   }
   .st-side {
-    position: static;
-    gap: 0.75rem;
+    top: 0;
+    z-index: 20;
+    margin: 0 calc(var(--pad) * -1);
+    padding: 0 var(--pad);
+    background: var(--bg-color);
+  }
+  /* the page heading stays for screen readers only */
+  .st-side > .st-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
   .st-rail {
     display: flex;
-    flex-wrap: wrap;
     gap: 0 1.35rem;
-    border-bottom: 1px solid var(--sub-alt-color);
+    overflow-x: auto;
+    scrollbar-width: none;
+    /* the line under the tabs, drawn inside so the scroller doesn't clip the lit tab's bar over it */
+    box-shadow: inset 0 -1px 0 var(--sub-alt-color);
+  }
+  .st-rail::-webkit-scrollbar {
+    display: none;
   }
   .st-rail-item {
+    flex-shrink: 0;
     margin: 0;
-    padding: 0.4rem 0 0.8rem;
+    padding: 0.85rem 0 0.75rem;
     border-radius: 0;
+    white-space: nowrap;
   }
   .st-rail-item::before {
     top: auto;
     right: 0;
-    bottom: -1px;
+    bottom: 0;
     width: auto;
     height: 2px;
     transform: scaleX(0);
@@ -458,6 +486,12 @@
   }
   .st-rail-item.danger {
     margin-top: 0;
+  }
+  .st-list {
+    gap: 4rem;
+  }
+  .st-pane {
+    scroll-margin-top: 4rem;
   }
   .st-row {
     grid-template-columns: minmax(0, 1fr);
