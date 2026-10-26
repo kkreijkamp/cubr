@@ -1,9 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { ChartConfiguration } from 'chart.js';
-import { PresentationChartLineIcon } from '@heroicons/react/24/outline';
 import { rollingAverage } from '@cubetype/cubestats';
-import { EventSelect } from './Charts';
-import { WidgetError } from './Widget';
+import { Section, WidgetError } from './Widget';
 import { eventLabel } from './util';
 import { api } from '../../lib/api';
 import { formatDateTime, formatNumber, formatTime } from '../../lib/format';
@@ -132,8 +130,7 @@ function prepare(rows: [number, number, number | null, number?][]): Prepared {
   return { n, t, raw, eff, isPb, pb, avgs };
 }
 
-export function SolveHistoryChart({ userId, events, defaultEvent, precision }: { userId: string; events: string[]; defaultEvent: string; precision: 2 | 3 }) {
-  const [event, setEvent] = useState(defaultEvent);
+export function SolveHistoryChart({ userId, event, precision }: { userId: string; event: string; precision: 2 | 3 }) {
   const [range, setRange] = useState<Range>('all');
   const [xMode, setXMode] = useState<XMode>('solves');
   const [shown, setShown] = useState<Set<ToggleKey>>(() => new Set(DEFAULT_SHOWN));
@@ -332,17 +329,19 @@ export function SolveHistoryChart({ userId, events, defaultEvent, precision }: {
                   return span < 120 * 86_400_000 ? `${String(d.getDate()).padStart(2, '0')} ${mon}` : `${mon} '${String(d.getFullYear()).slice(2)}`;
                 },
               },
-              title: { display: true, text: xMode === 'solves' ? 'solve' : 'date' },
+
             },
             y: (() => {
               const b = niceBounds(view.lo, view.hi);
               return { min: b.min, max: b.max, ticks: { stepSize: b.step, maxTicksLimit: 12, callback: (v: number | string) => formatTime(Number(v), 2) } };
             })(),
           });
+          // on the page background: faint horizontal lines only
           for (const axis of Object.values(s)) {
-            axis.grid = { ...axis.grid, color: c.bg, tickColor: 'transparent' };
+            axis.grid = { ...axis.grid, color: c.subAlt, tickColor: 'transparent' };
             axis.border = { display: false };
           }
+          s.x.grid = { display: false };
           return s;
         })(),
       },
@@ -367,20 +366,8 @@ export function SolveHistoryChart({ userId, events, defaultEvent, precision }: {
       ? `${trend < 0 ? 'improving' : 'slowing'} ${formatTime(Math.abs(trend), 2)} s per ${formatNumber(view.trendUnit)} solves`
       : null;
 
-  return (
-    <section className="pv-card pv-history" aria-label="solve history">
-      <div className="pv-card-head">
-        <h2 className="pv-title">
-          <PresentationChartLineIcon /> solve history
-          {series.data && (
-            <span className="sub">
-              - {session >= 0 && prep ? `${formatNumber(prep.n)} of ` : ''}
-              {formatNumber(series.data.total)} solves
-            </span>
-          )}
-          {series.loading && series.data && <Spinner size={14} />}
-        </h2>
-        <div className="pv-head-tools">
+  const tools = (
+    <>
           <div className="pv-seg" role="group" aria-label="range">
             {(['all', '1000', '100'] as Range[]).map((r) => (
               <button key={r} className={`btn-text${range === r ? ' active' : ''}`} onClick={() => setRange(r)} disabled={!!prep && r !== 'all' && prep.n <= Number(r)}>
@@ -413,18 +400,27 @@ export function SolveHistoryChart({ userId, events, defaultEvent, precision }: {
               ))}
             </select>
           )}
-          <EventSelect
-            events={events}
-            value={event}
-            onChange={(e) => {
-              setEvent(e);
-              setSession(-1);
-              setRange('all');
-            }}
-            label="solve history event"
-          />
-        </div>
-      </div>
+    </>
+  );
+
+  return (
+    <Section
+      label="solve history"
+      className="pf-history"
+      title="progress"
+      extra={
+        <>
+          {series.data && (
+            <>
+              {session >= 0 && prep ? `${formatNumber(prep.n)} of ` : ''}
+              {formatNumber(series.data.total)} solves
+            </>
+          )}
+          {series.loading && series.data && <Spinner size={12} />}
+        </>
+      }
+      tools={tools}
+    >
       {series.error && !series.data ? (
         <WidgetError error={series.error} what="the solve history" onRetry={series.reload} />
       ) : !prep ? (
@@ -464,6 +460,6 @@ export function SolveHistoryChart({ userId, events, defaultEvent, precision }: {
           </div>
         </>
       )}
-    </section>
+    </Section>
   );
 }

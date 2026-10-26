@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
-import { CalendarDaysIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
-import { WidgetError } from './Widget';
+import { ChevronDownIcon } from '@heroicons/react/24/outline';
+import { Section, WidgetError } from './Widget';
 import { addDaysKey, formatDayKey, monthShort, plural } from './util';
 import { api } from '../../lib/api';
 import { formatNumber, localDateKey } from '../../lib/format';
@@ -125,10 +125,12 @@ export function ActivityHeatmap({ userId, years = [] }: { userId: string; years?
   const label = `in ${rangeLabel}`;
 
   return (
-    <section className="pv-card" aria-label="activity">
-      <div className="pv-card-head">
-        <h2 className="pv-title">
-          <CalendarDaysIcon />
+    <Section
+      label="activity"
+      className="pf-activity"
+      title="activity"
+      extra={
+        <span className="pv-title">
           <span>
             {activity.error && !data ? 'activity' : <span className="text">{data ? plural(model.total, 'solve') : '...'}</span>} in{' '}
             {years.length > 0 ? (
@@ -149,9 +151,10 @@ export function ActivityHeatmap({ userId, years = [] }: { userId: string; years?
               rangeLabel
             )}
           </span>
-          {activity.loading && activity.data && <Spinner size={14} />}
-        </h2>
-      </div>
+          {activity.loading && activity.data && <Spinner size={12} />}
+        </span>
+      }
+    >
 
       {activity.error && !data ? (
         <WidgetError error={activity.error} what="activity data" onRetry={activity.reload} />
@@ -213,6 +216,6 @@ export function ActivityHeatmap({ userId, years = [] }: { userId: string; years?
           </div>
         </div>
       )}
-    </section>
+    </Section>
   );
 }

@@ -10,6 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { parseTimerFile, toCsTimerExport, TimerFormatError, type ImportedSession, type TimerImport } from '@cubetype/cubestats';
 import { csTimerFileName, downloadFile, eventLabel, friendlyError, plural, skippedNotes } from './util';
+import { Section } from './Widget';
 import { useAuth } from '../../lib/auth';
 import { useRegisterCommands } from '../../lib/commands';
 import { formatDate, formatNumber, localDateKey } from '../../lib/format';
@@ -199,12 +200,7 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
   );
 
   return (
-    <section className="pv-card" aria-label="account and data">
-      <div className="pv-card-head" style={{ marginBottom: 0 }}>
-        <h2 className="pv-title">
-          <UserCircleIcon /> account &amp; data
-        </h2>
-      </div>
+    <Section label="account and data" className="pf-account" title="account & data">
       <div className="ac-rows">
         <div className="ac-row">
           <div>
@@ -262,6 +258,6 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
         </div>
       </div>
       {preview && <ImportPreview fileName={preview.fileName} parsed={preview.parsed} onClose={() => setPreview(null)} />}
-    </section>
+    </Section>
   );
 }

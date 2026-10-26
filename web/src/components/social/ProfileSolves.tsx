@@ -1,8 +1,6 @@
 import { useMemo, useState } from 'react';
-import { ListBulletIcon } from '@heroicons/react/24/outline';
 import { rollingAverage, type Penalty } from '@cubetype/cubestats';
-import { EventSelect } from './Charts';
-import { WidgetEmpty, WidgetError } from './Widget';
+import { Section, WidgetEmpty, WidgetError } from './Widget';
 import { eventLabel } from './util';
 import { fmtAvg, fmtSolveLong } from '../timer/statsUtil';
 import { api } from '../../lib/api';
@@ -22,8 +20,7 @@ const MAX_LIMIT = 50_000;
  * like the history chart) and "load more". Served from the stats read model, so it works on any
  * public profile.
  */
-export function ProfileSolves({ userId, events, defaultEvent, precision }: { userId: string; events: string[]; defaultEvent: string; precision: 2 | 3 }) {
-  const [event, setEvent] = useState(defaultEvent);
+export function ProfileSolves({ userId, event, precision }: { userId: string; event: string; precision: 2 | 3 }) {
   const [listed, setListed] = useState(PAGE);
   const series = useAsync((signal) => api.stats.solves(userId, event, signal, { limit: listed + CONTEXT }), [userId, event, listed]);
   // useAsync keeps the previous event's rows while the next one loads
@@ -111,27 +108,8 @@ export function ProfileSolves({ userId, events, defaultEvent, precision }: { use
     );
 
   return (
-    <section className="ps" aria-label="solves">
-      <div className="pv-section-head">
-        <h2 className="pv-title">
-          <ListBulletIcon /> solves
-          {data && data.total > 0 && (
-            <span className="sub">
-              - {formatNumber(rows.length)} of {formatNumber(data.total)}
-            </span>
-          )}
-        </h2>
-        <EventSelect
-          events={events}
-          value={event}
-          onChange={(e) => {
-            setEvent(e);
-            setListed(PAGE);
-          }}
-          label="solves event"
-        />
-      </div>
+    <Section label="solves" className="ps" title="solves" extra={data && data.total > 0 && `${formatNumber(rows.length)} of ${formatNumber(data.total)}`}>
       {body}
-    </section>
+    </Section>
   );
 }
