@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowPathIcon,
@@ -70,6 +70,32 @@ type ModalState =
 
 const GUEST_HINT_KEY = 'cubetype.guestHintDismissed';
 const PB_KINDS_NS = [5, 12, 100];
+
+/**
+ * The scramble preview is drawn as tall as its box: on wide screens the bottom panels share the
+ * height left under the timer, so the page fits the window without scrolling.
+ */
+function usePreviewHeight(ref: RefObject<HTMLDivElement>, on: boolean): number {
+  const [h, setH] = useState(200);
+  useEffect(() => {
+    const el = ref.current;
+    if (!on || !el) return;
+    const measure = () => {
+      const cs = getComputedStyle(el);
+      const inner = el.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+      // whole pixels, and only real changes, so the preview never resizes in a loop
+      setH((prev) => {
+        const next = Math.max(110, Math.min(320, Math.floor(inner)));
+        return Math.abs(next - prev) >= 2 ? next : prev;
+      });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref, on]);
+  return h;
+}
 
 function isTyping(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
@@ -415,6 +441,8 @@ export default function TimerPage() {
 
   const showPreview = settings.scramblePreview !== 'off';
   const previewScramble = useDeferredValue(scr.current?.text ?? null);
+  const previewBoxRef = useRef<HTMLDivElement>(null);
+  const previewHeight = usePreviewHeight(previewBoxRef, showPreview);
   const cols = 1 + (showPreview ? 1 : 0) + (settings.showSolveList ? 1 : 0);
   const pb = !!last && last.id === pbSolveId;
   const pbKinds = pb ? 'new pb' : null;
@@ -503,9 +531,9 @@ export default function TimerPage() {
             <div className="tp-panel-title">
               <EyeIcon width={14} height={14} /> scramble preview
             </div>
-            <div className="tp-preview-box">
+            <div className="tp-preview-box" ref={previewBoxRef}>
               {previewScramble ? (
-                <TwistyPreview puzzle={eventInfo.puzzle} scramble={previewScramble} visualization={settings.scramblePreview === '3D' ? '3D' : '2D'} height={200} />
+                <TwistyPreview puzzle={eventInfo.puzzle} scramble={previewScramble} visualization={settings.scramblePreview === '3D' ? '3D' : '2D'} height={previewHeight} />
               ) : null}
             </div>
           </section>
@@ -515,10 +543,6 @@ export default function TimerPage() {
         )}
       </div>
 
-      <div className="keytips tp-keytips fade-on-focus">
-        <kbd>space</kbd> start / stop - <kbd>tab</kbd> new scramble - <kbd>ctrl</kbd>+<kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd> ok / +2 / dnf -{' '}
-        <kbd>alt</kbd>+<kbd>z</kbd> delete last - <kbd>esc</kbd> command line
-      </div>
       {guest && (
         <div className="tp-guest fade-on-focus">
           <span>

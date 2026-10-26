@@ -43,10 +43,10 @@ function TwistyPlayerPreview({ puzzle, scramble, visualization = '2D', height = 
           player.setAttribute('hint-facelets', 'none');
           player.setAttribute('back-view', 'none');
           player.style.width = '100%';
-          player.style.height = `${height}px`;
           hostRef.current.appendChild(player);
           playerRef.current = player;
         }
+        player.style.height = `${height}px`;
         player.setAttribute('puzzle', puzzle);
         player.setAttribute('visualization', visualization);
         player.setAttribute('experimental-setup-alg', scramble);
