@@ -41,8 +41,8 @@ function EventTabs({ events, counts, value, onChange }: { events: string[]; coun
 }
 
 /**
- * Shared profile layout for /account and /profile/:username: who and how much on top, the
- * activity calendar, then one event at a time (bests, progress, time of day, wca, solves). Every
+ * Shared profile layout for /account and /profile/:username: who and how much on top, then one
+ * event at a time (bests, progress, activity and time of day, wca, solves). Every
  * widget fetches its own data with its own loading/error state, so a down microservice only blanks
  * its widget. The event is kept in the address (?event=) so a link opens on it.
  */
@@ -77,7 +77,6 @@ export function ProfileView({ user, own, onEdit, children }: Props) {
   return (
     <div className="pf">
       <ProfileHeader user={user} summary={summary} own={own} onEdit={onEdit} />
-      <ActivityHeatmap key={`act-${user.id}`} userId={user.id} years={summary.data?.totals.activeYears} />
       {noSolves ? (
         <p className="pf-empty">
           {own ? (
@@ -96,10 +95,12 @@ export function ProfileView({ user, own, onEdit, children }: Props) {
             <EventTabs events={events} counts={counts} value={event} onChange={pick} />
             <EventBests key={event} userId={user.id} event={event} summary={summary} precision={precision} />
             <SolveHistoryChart key={`hist-${user.id}-${event}`} userId={user.id} event={event} precision={precision} />
-            <div className="pf-split">
+            {/* when they cube: days (the calendar keeps its range across events) and hours */}
+            <div className="pf-habits">
+              <ActivityHeatmap key={`act-${user.id}`} userId={user.id} event={event} years={summary.data?.totals.activeYears} />
               <HourlyChart key={`hr-${user.id}-${event}`} userId={user.id} event={event} precision={precision} />
-              <WcaComparison key={`wca-${event}`} summary={summary} event={event} wcaId={user.wcaId} country={user.country} own={own} onEdit={onEdit} precision={precision} />
             </div>
+            <WcaComparison key={`wca-${event}`} summary={summary} event={event} wcaId={user.wcaId} country={user.country} own={own} onEdit={onEdit} precision={precision} />
             <ProfileSolves key={`solves-${user.id}-${event}`} userId={user.id} event={event} precision={precision} />
           </div>
         )

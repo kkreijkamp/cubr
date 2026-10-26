@@ -256,8 +256,8 @@ export const api = {
   },
   stats: {
     summary: (userId: string, signal?: AbortSignal) => get<StatsSummary>(`/api/stats/users/${enc(userId)}/summary`, signal),
-    activity: (userId: string, from?: string, to?: string, signal?: AbortSignal) =>
-      get<{ from: string; to: string; days: ActivityDay[] }>(`/api/stats/users/${enc(userId)}/activity${qs({ from, to })}`, signal),
+    activity: (userId: string, from?: string, to?: string, signal?: AbortSignal, event?: string) =>
+      get<{ from: string; to: string; days: ActivityDay[] }>(`/api/stats/users/${enc(userId)}/activity${qs({ from, to, event })}`, signal),
     pbHistory: (userId: string, event: string, signal?: AbortSignal) =>
       get<{ history: { kind: PbKind; valueMs: number; achievedAt: string }[] }>(`/api/stats/users/${enc(userId)}/pb-history${qs({ event })}`, signal),
     /** chronological solve series: rows are [unixSeconds, timeMs, effectiveMs | null (DNF), sessionIndex] */

@@ -325,12 +325,32 @@
   font-size: 0.8rem;
 }
 
-/* time of day and wca side by side (one fills the row when the other has nothing to show) */
-.pf-split {
+/* when they cube: the activity calendar (days) beside time of day (hours) */
+.pf-habits {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   align-items: start;
-  gap: 4rem 4.5rem;
+  gap: 3.5rem;
+  min-width: 0;
+}
+.pf-habits .hm-grid {
+  min-width: 560px;
+}
+/* wca: the place on the left, the distribution it sits in on the right */
+.wc-body {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  align-items: center;
+  gap: 1.5rem 3.5rem;
+  min-width: 0;
+}
+.wc-side {
+  display: grid;
+  align-content: center;
+  gap: 1rem;
+  min-width: 0;
+}
+.wc-chart {
   min-width: 0;
 }
 
@@ -914,7 +934,19 @@ table.ps-table td.dnf {
   background: var(--sub-alt-color);
 }
 .pf .hm-cell {
-  border-radius: 0.25em;
+  border-radius: 2px;
+}
+.pf .hm-foot {
+  font-size: 0.75rem;
+}
+.pf .hm-foot b {
+  color: var(--text-color);
+  font-weight: 400;
+}
+/* the two summary lines in the habits row read as a pair */
+.pf-habits .pv-insight {
+  text-align: left;
+  font-size: 0.75rem;
 }
 .pf .pv-title {
   font-size: inherit;
@@ -925,9 +957,10 @@ table.ps-table td.dnf {
   stroke-width: 1;
 }
 .pf .wc-headline {
+  flex-wrap: wrap;
   align-items: flex-end;
   gap: 0.5rem 1.25rem;
-  margin: 0.25rem 0 1rem;
+  margin: 0;
 }
 .pf .wc-headline .big {
   color: var(--text-color);
@@ -943,7 +976,7 @@ table.ps-table td.dnf {
   color: var(--text-color);
 }
 .wc-source {
-  margin-top: 0.25rem;
+  margin-top: 0.5rem;
 }
 /* the solve list: plain rows on hairlines instead of zebra stripes */
 .pf table.ps-table tbody tr:nth-child(odd) td {
@@ -977,6 +1010,13 @@ table.ps-table td.dnf {
   .pf-bests {
     grid-template-columns: minmax(0, 1fr);
     gap: 2.25rem;
+  }
+  .pf-habits,
+  .wc-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pf-habits {
+    gap: 3rem;
   }
 }
 @media (max-width: 720px) {

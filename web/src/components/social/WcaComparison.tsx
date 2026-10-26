@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ClockIcon } from '@heroicons/react/24/outline';
 import { EVENT_IDS } from '@cubetype/cubestats';
@@ -174,56 +174,78 @@ function DistributionChart({ dist, value, official, precision }: ChartProps) {
 }
 
 /** Where one PB places among official results: world (and country) rank over the distribution. */
-function Placement({ row, kind, official, country, precision }: { row: Row; kind: WcaKind; official: number | null; country: string | null; precision: 2 | 3 }) {
+function Placement({
+  row,
+  kind,
+  official,
+  country,
+  precision,
+  intro,
+  source,
+}: {
+  row: Row;
+  kind: WcaKind;
+  official: number | null;
+  country: string | null;
+  precision: 2 | 3;
+  intro: ReactNode;
+  source: ReactNode;
+}) {
   const value = (kind === 'single' ? row.single : row.average)!;
   const dist = useAsync(() => getDistribution(row.event, kind), [row.event, kind]);
   const rank = useAsync(() => getRank(row.event, kind, value, country), [row.event, kind, value, country]);
 
   return (
-    <>
-      {rank.data ? (
-        <div className="wc-headline">
-          <span className="big">#{formatNumber(rank.data.world.rank)}</span>
-          <span className="wc-headline-meta">
-            <span>
-              in the world - faster than <span className="text">{formatPercent(rank.data.world.percentile)}</span> of {formatNumber(rank.data.world.total)}
-            </span>
-            {rank.data.country && (
+    <div className="wc-body">
+      <div className="wc-side">
+        {intro}
+        {rank.data ? (
+          <div className="wc-headline">
+            <span className="big">#{formatNumber(rank.data.world.rank)}</span>
+            <span className="wc-headline-meta">
               <span>
-                #{formatNumber(rank.data.country.rank)} in {flagEmoji(rank.data.country.countryIso2 ?? country)}{' '}
-                {(countryName(rank.data.country.countryIso2 ?? country) || rank.data.country.countryId).toLowerCase()}
+                in the world - faster than <span className="text">{formatPercent(rank.data.world.percentile)}</span> of {formatNumber(rank.data.world.total)}
               </span>
-            )}
-          </span>
-        </div>
-      ) : rank.error ? (
-        <WidgetError error={rank.error} what="the wca ranks" onRetry={rank.reload} compact />
-      ) : (
-        <div className="wc-headline">
-          <span className="big dim">#-</span>
-        </div>
-      )}
-      {dist.error && !dist.data ? (
-        <WidgetError error={dist.error} what="the wca distribution" onRetry={dist.reload} compact />
-      ) : !dist.data ? (
-        <Loading />
-      ) : dist.data.buckets.length === 0 ? (
-        <WidgetEmpty compact>no official results for this event yet</WidgetEmpty>
-      ) : (
-        <>
-          <DistributionChart dist={dist.data} value={value} official={official} precision={precision} />
-          <div className="wc-legend" aria-hidden="true">
-            <span>
-              <i className="beat" /> cubers you beat
+              {rank.data.country && (
+                <span>
+                  #{formatNumber(rank.data.country.rank)} in {flagEmoji(rank.data.country.countryIso2 ?? country)}{' '}
+                  {(countryName(rank.data.country.countryIso2 ?? country) || rank.data.country.countryId).toLowerCase()}
+                </span>
+              )}
             </span>
-            <span>
-              <i className="faster" /> faster than you
-            </span>
-            <span>median {formatTime(dist.data.p50, precision)}</span>
           </div>
-        </>
-      )}
-    </>
+        ) : rank.error ? (
+          <WidgetError error={rank.error} what="the wca ranks" onRetry={rank.reload} compact />
+        ) : (
+          <div className="wc-headline">
+            <span className="big dim">#-</span>
+          </div>
+        )}
+        {source}
+      </div>
+      <div className="wc-chart">
+        {dist.error && !dist.data ? (
+          <WidgetError error={dist.error} what="the wca distribution" onRetry={dist.reload} compact />
+        ) : !dist.data ? (
+          <Loading />
+        ) : dist.data.buckets.length === 0 ? (
+          <WidgetEmpty compact>no official results for this event yet</WidgetEmpty>
+        ) : (
+          <>
+            <DistributionChart dist={dist.data} value={value} official={official} precision={precision} />
+            <div className="wc-legend" aria-hidden="true">
+              <span>
+                <i className="beat" /> cubers you beat
+              </span>
+              <span>
+                <i className="faster" /> faster than you
+              </span>
+              <span>median {formatTime(dist.data.p50, precision)}</span>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -266,26 +288,34 @@ export function WcaComparison({ summary, event, wcaId, country, own, onEdit, pre
   else if (!meta.data) body = <Loading />;
   else
     body = (
-      <>
-        <p className="wc-sub">
-          where {own ? 'your' : 'this'} {kindLabel} of <span className="text">{formatTime((kind === 'single' ? row.single : row.average)!, precision)}</span> would place among
-          official {eventLabel(event)} {kind === 'single' ? 'singles' : 'averages'}
-          {officialPb && (
-            <>
-              {' '}
-              - official pb <span className="text">{formatTime(officialPb.value, precision)}</span> (wr #{formatNumber(officialPb.worldRank)})
-            </>
-          )}
-        </p>
-        <Placement row={row} kind={kind} official={wcaId ? (officialPb?.value ?? null) : null} country={country} precision={precision} />
-        <p className="wc-sub wc-source">
-          based on results owned and maintained by the World Cube Association,{' '}
-          <a href="https://www.worldcubeassociation.org/results" target="_blank" rel="noreferrer noopener">
-            worldcubeassociation.org/results
-          </a>{' '}
-          ({formatDate(meta.data.exportDate)})
-        </p>
-      </>
+      <Placement
+        row={row}
+        kind={kind}
+        official={wcaId ? (officialPb?.value ?? null) : null}
+        country={country}
+        precision={precision}
+        intro={
+          <p className="wc-sub">
+            where {own ? 'your' : 'this'} {kindLabel} of <span className="text">{formatTime((kind === 'single' ? row.single : row.average)!, precision)}</span>{' '}
+            would place among official {eventLabel(event)} {kind === 'single' ? 'singles' : 'averages'}
+            {officialPb && (
+              <>
+                {' '}
+                - official pb <span className="text">{formatTime(officialPb.value, precision)}</span> (wr #{formatNumber(officialPb.worldRank)})
+              </>
+            )}
+          </p>
+        }
+        source={
+          <p className="wc-sub wc-source">
+            based on results owned and maintained by the World Cube Association,{' '}
+            <a href="https://www.worldcubeassociation.org/results" target="_blank" rel="noreferrer noopener">
+              worldcubeassociation.org/results
+            </a>{' '}
+            ({formatDate(meta.data.exportDate)})
+          </p>
+        }
+      />
     );
 
   return (
@@ -311,7 +341,13 @@ export function WcaComparison({ summary, event, wcaId, country, own, onEdit, pre
       tools={
         <div className="pv-seg" role="group" aria-label="single or average">
           {(['single', 'average'] as const).map((k) => (
-            <button key={k} className={`btn-text${kind === k ? ' active' : ''}`} aria-pressed={kind === k} disabled={(k === 'single' ? row.single : row.average) === null} onClick={() => setAsked(k)}>
+            <button
+              key={k}
+              className={`btn-text${kind === k ? ' active' : ''}`}
+              aria-pressed={kind === k}
+              disabled={(k === 'single' ? row.single : row.average) === null}
+              onClick={() => setAsked(k)}
+            >
               {k === 'single' ? 'single' : row.avgKind}
             </button>
           ))}

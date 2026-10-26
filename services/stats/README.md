@@ -9,7 +9,7 @@ for personal bests (emits `pb.updated`, consumed by leaderboard).
 | Route | Notes |
 |---|---|
 | `GET /api/stats/users/:userId/summary` | totals + streaks + per-event solves/totalMs/meanMs + 6 PB kinds, plus the user's `username`. Unknown user -> zeros (not 404). |
-| `GET /api/stats/users/:userId/activity?from=&to=` | days with solves; default = the 365 days ending today (user's tz). The response echoes `from` and `to`. |
+| `GET /api/stats/users/:userId/activity?from=&to=&event=` | days with solves; default = the 365 days ending today (user's tz), all events (`event` narrows it to one). The response echoes `from` and `to`. |
 | `GET /api/stats/users/:userId/pb-history?event=333` | PB progression, ascending (`event` defaults to 333). |
 | `GET /api/stats/users/:userId/hourly?event=333` | 24 entries; `solves` = all attempts, `meanMs` over non-DNF (null if none), plus `dnfs`. No `event` = all events combined. |
 | `GET /api/stats/users/:userId/solves?event=333&limit=20000` | Chronological solve series from `solve_ledger` for the profile history chart: `{event, total, truncated, sessions: [{id, name, solves, firstAt, lastAt}], solves: [[unixSeconds, timeMs, effectiveMs\|null, sessionIndex]]}` (newest `limit` <= 50 000; compact arrays keep 20k solves at ~450 KB). `sessionIndex` points into `sessions`, so the web client filters by session without another request. |

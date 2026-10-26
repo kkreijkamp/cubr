@@ -8,7 +8,7 @@ import { useAsync } from '../../lib/useAsync';
 import { ChartCanvas, themedScales, useThemeColors, type ThemeColors } from '../ChartCanvas';
 import { Loading, Spinner } from '../Spinner';
 
-const HEIGHT = 200;
+const HEIGHT = 120;
 
 /** Tooltip styled like the app's balloon tooltips (sub background, bg text). */
 function tooltipStyle(c: ThemeColors) {
@@ -145,11 +145,11 @@ export function HourlyChart({ userId, event, precision }: { userId: string; even
           <ChartCanvas config={config} height={HEIGHT} />
           {insight && (
             <div className="pv-insight">
-              most solves around <b>{hh(insight.busiest.hour)}</b>
+              busiest <b>{hh(insight.busiest.hour)}</b>
               {insight.fastest && (
                 <>
                   {' '}
-                  - fastest around <b>{hh(insight.fastest.hour)}</b> (mean {formatTime(insight.fastest.meanMs!, precision)})
+                  - fastest <b>{hh(insight.fastest.hour)}</b> (mean {formatTime(insight.fastest.meanMs!, precision)})
                 </>
               )}
             </div>

@@ -85,12 +85,12 @@ function buildCalendar(from: string, to: string, today: string, days: ActivityDa
  * GitHub/Monkeytype-style activity calendar of solves per day. The title's range ("the last 12 months")
  * doubles as a picker for the calendar years in `years` (the ones with solves, newest first).
  */
-export function ActivityHeatmap({ userId, years = [] }: { userId: string; years?: number[] }) {
+export function ActivityHeatmap({ userId, event, years = [] }: { userId: string; event?: string; years?: number[] }) {
   const today = localDateKey();
   const [range, setRange] = useState('last');
   const { from, to } = range === 'last' ? { from: addDaysKey(today, -364), to: today } : { from: `${range}-01-01`, to: `${range}-12-31` };
 
-  const activity = useAsync((signal) => api.stats.activity(userId, from, to, signal), [userId, from, to]);
+  const activity = useAsync((signal) => api.stats.activity(userId, from, to, signal, event), [userId, from, to, event]);
   // useAsync keeps the previous range's days while the next one loads: only use days for this range
   const data = activity.data?.from === from && activity.data.to === to ? activity.data : undefined;
   const model = useMemo(() => buildCalendar(from, to, today, data?.days ?? []), [from, to, today, data]);
@@ -120,6 +120,13 @@ export function ActivityHeatmap({ userId, years = [] }: { userId: string; years?
       top: r.top - w.top,
     });
   };
+
+  // the line under the calendar: how many days had solves, and the biggest one
+  const summary = useMemo(() => {
+    const days = (data?.days ?? []).filter((d) => d.solves > 0 && d.date >= from && d.date <= to);
+    const busiest = days.reduce<(typeof days)[number] | null>((a, d) => (!a || d.solves > a.solves ? d : a), null);
+    return { active: days.length, busiest };
+  }, [data, from, to]);
 
   const rangeLabel = range === 'last' ? 'the last 12 months' : range;
   const label = `in ${rangeLabel}`;
@@ -205,7 +212,16 @@ export function ActivityHeatmap({ userId, years = [] }: { userId: string; years?
             </div>
           )}
           <div className="hm-foot">
-            <span>days use the cuber&apos;s local time zone</span>
+            <span data-tip="days use the cuber's local time zone">
+              {data && summary.busiest ? (
+                <>
+                  <b>{formatNumber(summary.active)}</b> active {summary.active === 1 ? 'day' : 'days'} - busiest <b>{formatDayKey(summary.busiest.date, false)}</b> (
+                  {plural(summary.busiest.solves, 'solve')})
+                </>
+              ) : (
+                'days use the cuber\'s local time zone'
+              )}
+            </span>
             <span className="hm-legend" aria-hidden="true">
               <span>less</span>
               {[0, 1, 2, 3, 4].map((l) => (

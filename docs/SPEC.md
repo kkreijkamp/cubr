@@ -414,7 +414,7 @@ Published rows older than a day are deleted.
 | Method & path | Response |
 |---|---|
 | GET `/api/stats/users/:userId/summary` | `{userId, username, totals: {solves, totalMs, firstSolveAt, lastSolveAt, activeDays, currentStreak, longestStreak, activeYears: number[] (newest first)}, events: [{event, solves, totalMs, meanMs, pbs: {single: PB\|null, mo3: PB\|null, ao5: PB\|null, ao12: PB\|null, ao50: PB\|null, ao100: PB\|null}}]}` (unknown user -> zeros) |
-| GET `/api/stats/users/:userId/activity?from=&to=` (default the 365 days ending today in the user's tz) | `{from, to, days: [{date: "YYYY-MM-DD", solves, totalMs}]}` (only days with solves) |
+| GET `/api/stats/users/:userId/activity?from=&to=&event=` (default the 365 days ending today in the user's tz, all events) | `{from, to, days: [{date: "YYYY-MM-DD", solves, totalMs}]}` (only days with solves; `event` counts that event's solves only) |
 | GET `/api/stats/users/:userId/pb-history?event=333` | `{history: [{kind, valueMs, achievedAt}]}` asc |
 | GET `/api/stats/users/:userId/hourly?event=333` | `{hours: [{hour, solves, dnfs, meanMs}]}` 24 entries; `solves` counts every attempt, `meanMs` is the mean of the non-DNF ones (null if none); no `event` = all events |
 | GET `/api/stats/users/:userId/solves?event=333&limit=20000` | `{event, total, truncated, sessions: [{id, name\|null, solves, firstAt, lastAt}], solves: [[unixSeconds, timeMs, effectiveMs \| null, sessionIndex], ...]}` - chronological solve series (newest `limit`, max 50 000) from the read model, for the profile history chart (session filter) |
