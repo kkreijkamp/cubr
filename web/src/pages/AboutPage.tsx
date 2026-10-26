@@ -230,7 +230,7 @@ export default function AboutPage() {
             <CommandLineIcon /> keyboard shortcuts
           </h2>
           <p className="ab-p">
-            The same keys as csTimer, so your habits carry over. The everyday ones are below; <Link to="/settings">settings</Link> lists them all.
+            The same keys as csTimer, so your habits carry over. The everyday ones are below; <Link to="/settings?tab=shortcuts">settings</Link> lists them all.
           </p>
           <div className="ab-keys">
             {KEYS.map(([keys, label]) => (

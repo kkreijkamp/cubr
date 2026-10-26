@@ -1,67 +1,151 @@
-/* Settings page - Monkeytype settings layout. */
+/* Settings: a quiet rail of sections on the left, one section at a time beside it. No cards -
+   groups are set apart by space and small lowercase labels, rows by a hairline, and the choices
+   are text like the timer's config bar (the chosen one in the accent colour). */
 .settings-page {
   display: grid;
-  gap: 3.5rem;
+  grid-template-columns: 10rem minmax(0, 1fr);
+  gap: 1.5rem 5rem;
+  align-items: start;
   max-width: 1100px;
   margin: 0 auto;
   width: 100%;
+  padding-top: 1.5rem;
 }
 
-.st-quicknav {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.15rem 0.25rem;
-  background: var(--sub-alt-color);
-  border-radius: var(--roundness);
-  padding: 0.25rem 0.5rem;
-  font-size: 0.8rem;
-  position: sticky;
-  top: 0.75rem;
-  z-index: 20;
-}
-.st-quicknav .btn-text {
-  padding: 0.55rem 0.6rem;
-  gap: 0.4em;
-}
-
-.st-section {
-  display: grid;
-  gap: 2rem;
-  scroll-margin-top: 4.5rem;
-}
-.st-section-title {
-  font-size: 2.25rem;
+.st-label {
+  margin: 0;
   color: var(--sub-color);
-  line-height: 1;
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
 }
-.st-section-body {
+
+/* the rail: the section names, the open one in the text colour with an accent bar beside it */
+.st-side {
+  position: sticky;
+  top: 1.5rem;
   display: grid;
-  gap: 2.25rem;
+  gap: 1rem;
+}
+.st-rail {
+  display: grid;
+  justify-items: start;
+  gap: 0.1rem;
+}
+.st-rail-item {
+  position: relative;
+  padding: 0.4rem 0.5rem 0.4rem 0.9rem;
+  margin-left: -0.9rem;
+  border: 0;
+  border-radius: var(--roundness);
+  background: none;
+  color: var(--sub-color);
+  font: inherit;
+  font-size: 1rem;
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--dur);
+}
+.st-rail-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.5rem;
+  bottom: 0.5rem;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--main-color);
+  transform: scaleY(0);
+  transition: transform var(--dur);
+}
+.st-rail-item:hover,
+.st-rail-item.active {
+  color: var(--text-color);
+}
+.st-rail-item.active::before {
+  transform: scaleY(1);
+}
+.st-rail-item:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 0.1rem var(--bg-color), 0 0 0 0.2rem var(--text-color);
+}
+.st-rail-item.danger {
+  margin-top: 1.25rem;
+}
+.st-rail-item.danger:hover,
+.st-rail-item.danger.active {
+  color: var(--error-color);
+}
+.st-rail-item.danger::before {
+  background: var(--error-color);
+}
+
+/* the open section */
+.st-pane {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 3.25rem;
+  min-width: 0;
+  animation: fadeIn 0.25s ease-out;
+}
+.st-group {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+.st-group > .st-label {
+  margin-bottom: 0.4rem;
+}
+.st-note {
+  max-width: 40rem;
+  margin: 0.6rem 0 0.9rem;
+  color: var(--sub-color);
+  font-size: 0.8rem;
+  line-height: 1.6;
 }
 
 .st-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  gap: 0.5rem 2.5rem;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
+  gap: 0.85rem 3rem;
+  padding: 1.1rem 0;
+}
+.st-row + .st-row,
+.st-stickers + .st-row {
+  border-top: 1px solid var(--sub-alt-color);
 }
 .st-row.wide {
   grid-template-columns: minmax(0, 1fr);
 }
-.st-row .h3 {
-  margin-bottom: 0.4rem;
+.st-title {
+  margin: 0;
+  color: var(--text-color);
+  font-size: 0.95rem;
+  font-weight: 400;
+  line-height: 1.3;
 }
 .st-desc {
-  color: var(--text-color);
-  font-size: 0.85rem;
+  max-width: 34rem;
+  margin-top: 0.3rem;
+  color: var(--sub-color);
+  font-size: 0.8rem;
   line-height: 1.55;
 }
 .st-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem 0.75rem;
   min-width: 0;
 }
-.st-controls > .btn {
-  width: 100%;
+.st-controls .btn {
+  font-size: 0.85rem;
+}
+.st-row.wide .st-controls {
+  justify-content: flex-start;
 }
 .st-inline {
   display: inline-flex;
@@ -70,49 +154,46 @@
   vertical-align: baseline;
 }
 
-.st-size {
-  display: grid;
-  gap: 0.75rem;
+/* text choices; pulled out by their padding so the words line up with the edges */
+.st-options {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-right: -0.5em;
+  font-size: 0.9rem;
 }
+.st-options .btn-text {
+  padding: 0.4em 0.5em;
+}
+.st-row.wide .st-options,
+.st-theme-tools .st-options {
+  justify-content: flex-start;
+  margin: 0 0 0 -0.5em;
+}
+
 .st-size-preview {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 5.5rem;
+  height: 2.75rem;
   color: var(--main-color);
   font-variant-numeric: tabular-nums;
   line-height: 1;
-  padding: 0.75rem;
-  border-radius: var(--roundness);
-  box-shadow: inset 0 0 0 2px var(--sub-alt-color);
   transition: font-size var(--dur);
-  overflow: hidden;
-}
-
-.st-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-.st-chips .btn {
-  flex: 1 0 4.25rem;
-}
-
-.st-fonts .btn {
-  font-size: 0.95rem;
 }
 
 /* sticker colours: per puzzle, a swatch per face (each a hidden colour picker) */
 .st-stickers {
   display: grid;
-  gap: 0.5rem;
-  margin-top: -1.25rem;
+  gap: 0.4rem;
+  padding: 0 0 1.1rem;
 }
 .st-sticker-row {
   display: grid;
   grid-template-columns: 6.5rem minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.5rem 0.5rem 0.5rem 0.9rem;
-  border-radius: var(--roundness);
-  background: var(--sub-alt-color);
 }
 .st-sticker-label {
   color: var(--sub-color);
@@ -121,15 +202,15 @@
 .st-swatches {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
+  gap: 0.35rem;
 }
 .st-swatch {
-  /* a faint edge, so a swatch as light (or dark) as the row behind it still shows */
+  /* a faint edge, so a swatch as light (or dark) as the page behind it still shows */
   --edge: inset 0 0 0 1px color-mix(in srgb, var(--text-color) 20%, transparent);
   position: relative;
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: calc(var(--roundness) * 0.75);
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: calc(var(--roundness) * 0.6);
   box-shadow: var(--edge);
   cursor: pointer;
   transition: box-shadow var(--dur);
@@ -151,27 +232,82 @@
   cursor: pointer;
 }
 
-/* theme tiles */
-.st-theme-picker {
+/* theme: the one in use, the filters, then every theme as a swatch and a name */
+.st-theme-swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  gap: 0.2rem;
+  width: 2.5rem;
+  height: 1.5rem;
+  border-radius: calc(var(--roundness) * 0.75);
+  /* a faint edge for a theme as dark (or light) as the page */
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-color) 14%, transparent);
+  transition: box-shadow var(--dur);
+}
+.st-theme-swatch i {
+  display: block;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+}
+.st-theme-swatch.big {
+  width: 4.5rem;
+  height: 2.75rem;
+  gap: 0.35rem;
+}
+.st-theme-swatch.big i {
+  width: 0.6rem;
+  height: 0.6rem;
+}
+.st-theme-now {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  padding: 0.9rem 0 1.6rem;
+}
+.st-theme-now-text {
   display: grid;
-  gap: 1rem;
+  gap: 0.25rem;
+  min-width: 0;
+  margin-right: auto;
+}
+.st-theme-now-text .name {
+  overflow: hidden;
+  color: var(--text-color);
+  font-size: 1.75rem;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.st-random {
+  font-size: 0.9rem;
+}
+.st-theme-now-text .meta {
+  color: var(--sub-color);
+  font-size: 0.8rem;
 }
 .st-theme-tools {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.5rem 1.25rem;
+  padding-bottom: 0.9rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid var(--sub-alt-color);
 }
 .st-theme-search {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  flex: 1 1 12rem;
-  max-width: 18rem;
+  flex: 0 1 15rem;
+  margin-left: auto;
   padding-left: 0.75em;
   border-radius: var(--roundness);
   background: var(--sub-alt-color);
   color: var(--sub-color);
+  font-size: 0.85rem;
 }
 .st-theme-search input {
   flex: 1;
@@ -182,72 +318,59 @@
 .st-theme-search:focus-within {
   box-shadow: 0 0 0 2px var(--main-color);
 }
-.st-theme-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-.st-theme-tools .btn {
-  white-space: nowrap;
-}
-.st-theme-tools .btn svg {
-  vertical-align: -2px;
-}
 .st-theme-count {
-  margin-left: auto;
   color: var(--sub-color);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
 }
 .st-theme-empty {
   padding: 2rem 0;
-  text-align: center;
   color: var(--sub-color);
-}
-.st-theme-original {
-  margin-right: 0.35rem;
-  vertical-align: -1px;
+  text-align: center;
 }
 .st-themes {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr));
-  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: 0.15rem 1rem;
+  margin: 0 -0.5rem;
 }
 .st-theme {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.85rem 0.9rem;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.45rem 0.5rem;
   border: 0;
   border-radius: var(--roundness);
+  background: none;
+  color: var(--sub-color);
   font: inherit;
-  font-size: 0.8rem;
-  cursor: pointer;
+  font-size: 0.85rem;
   text-align: left;
-  box-shadow: inset 0 0 0 2px transparent;
-  transition: box-shadow var(--dur);
+  cursor: pointer;
+  transition: color var(--dur), background var(--dur);
 }
-.st-theme:hover {
-  box-shadow: 0 0 0 2px var(--text-color);
+.st-theme:hover,
+.st-theme:focus-visible {
+  outline: none;
+  background: var(--sub-alt-color);
+  color: var(--text-color);
 }
 .st-theme.active {
-  box-shadow: 0 0 0 2px var(--bg-color), 0 0 0 4px var(--main-color);
+  color: var(--main-color);
+}
+.st-theme.active .st-theme-swatch {
+  box-shadow: 0 0 0 2px var(--bg-color), 0 0 0 3.5px var(--main-color);
 }
 .st-theme-name {
   overflow: hidden;
+  min-width: 0;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.st-theme-dots {
-  display: inline-flex;
-  gap: 0.25rem;
+.st-theme-original {
   flex-shrink: 0;
-}
-.st-theme-dots i {
-  display: block;
-  width: 0.65rem;
-  height: 0.65rem;
-  border-radius: 50%;
+  opacity: 0.7;
 }
 
 /* data */
@@ -255,62 +378,105 @@
   display: grid;
   gap: 0.6rem;
 }
-.st-import > .btn {
-  width: 100%;
-}
 .st-import-preview {
   display: grid;
-  gap: 0.6rem;
-  padding: 0.75rem 0.9rem;
-  border-radius: var(--roundness);
-  box-shadow: inset 0 0 0 2px var(--sub-alt-color);
-  line-height: 1.6;
+  justify-items: start;
+  gap: 0.75rem;
+  padding-left: 0.9rem;
+  border-left: 2px solid var(--sub-alt-color);
   color: var(--sub-color);
+  font-size: 0.85rem;
+  line-height: 1.6;
 }
-.st-import-preview .row {
-  justify-content: flex-end;
+
+/* danger zone: a quiet button that only turns red when you reach for it */
+.btn.st-danger {
+  color: var(--error-color);
+}
+.btn.st-danger:hover {
+  background: var(--error-color);
+  color: var(--bg-color);
 }
 
 /* shortcuts */
-.st-shortcuts {
+.st-keys {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.25rem 2rem;
+  margin: 0;
 }
-.st-shortcut {
+.st-keys > div {
   display: grid;
-  grid-template-columns: minmax(9.5rem, auto) minmax(0, 1fr);
-  gap: 1rem;
+  grid-template-columns: 13rem minmax(0, 1fr);
   align-items: baseline;
-  padding: 0.55rem 0.75rem;
-  border-radius: var(--roundness);
-  font-size: 0.8rem;
+  gap: 1.5rem;
+  padding: 0.7rem 0;
+  font-size: 0.85rem;
 }
-.st-shortcut:nth-child(4n + 1),
-.st-shortcut:nth-child(4n + 2) {
-  background: var(--sub-alt-color);
+.st-keys > div + div {
+  border-top: 1px solid var(--sub-alt-color);
 }
-.st-shortcut .keys {
+.st-keys dt {
   color: var(--sub-color);
   white-space: nowrap;
 }
-.st-shortcut .what {
+.st-keys dd {
+  margin: 0;
   color: var(--text-color);
 }
 
+/* narrow: the rail becomes a row of tabs over the section (like the profile's events) */
 @media (max-width: 860px) {
+  .settings-page {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2rem;
+    padding-top: 0;
+  }
+  .st-side {
+    position: static;
+    gap: 0.75rem;
+  }
+  .st-rail {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 1.35rem;
+    border-bottom: 1px solid var(--sub-alt-color);
+  }
+  .st-rail-item {
+    margin: 0;
+    padding: 0.4rem 0 0.8rem;
+    border-radius: 0;
+  }
+  .st-rail-item::before {
+    top: auto;
+    right: 0;
+    bottom: -1px;
+    width: auto;
+    height: 2px;
+    transform: scaleX(0);
+  }
+  .st-rail-item.active::before {
+    transform: scaleX(1);
+  }
+  .st-rail-item.danger {
+    margin-top: 0;
+  }
   .st-row {
     grid-template-columns: minmax(0, 1fr);
-    gap: 0.9rem;
+    gap: 0.6rem;
   }
-  .st-shortcuts {
+  .st-controls {
+    justify-content: flex-start;
+  }
+  .st-options {
+    justify-content: flex-start;
+    margin: 0 0 0 -0.5em;
+  }
+  .st-size-preview {
+    order: 1;
+    justify-content: flex-start;
+  }
+  .st-keys > div {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .st-shortcut:nth-child(n) {
-    background: transparent;
-  }
-  .st-shortcut:nth-child(odd) {
-    background: var(--sub-alt-color);
+    gap: 0.35rem;
   }
 }
 @media (max-width: 560px) {
@@ -327,31 +493,23 @@
   .st-swatches {
     grid-column: 1 / -1;
   }
-  /* two theme tiles per row on phones (180 tiles in one column is a long scroll) */
+  /* two themes a row on phones (180 in one column is a long scroll) */
   .st-themes {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.5rem;
+    gap: 0.1rem 0.5rem;
   }
   .st-theme {
-    padding: 0.75rem 0.65rem;
+    gap: 0.5rem;
+    padding: 0.45rem 0.4rem;
   }
-  .st-theme-dots i:not(:first-child) {
-    display: none;
+  .st-theme-swatch:not(.big) {
+    width: 1.9rem;
   }
   .st-theme-search {
-    max-width: none;
+    flex-basis: 100%;
+    margin-left: 0;
   }
-  .settings-page {
-    gap: 2.5rem;
-  }
-  .st-section-title {
-    font-size: 1.75rem;
-  }
-  .st-quicknav {
-    position: static;
-  }
-  .st-shortcut {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0.25rem;
+  .st-theme-now-text .name {
+    font-size: 1.4rem;
   }
 }

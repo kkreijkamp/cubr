@@ -1,32 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import {
-  AdjustmentsHorizontalIcon,
-  ArrowDownTrayIcon,
-  ArrowUpRightIcon,
-  ArrowUpTrayIcon,
-  ArrowUturnLeftIcon,
-  ArrowsPointingOutIcon,
-  ArrowsRightLeftIcon,
-  BellIcon,
-  BoldIcon,
-  CalculatorIcon,
-  CircleStackIcon,
-  ClockIcon,
-  CommandLineIcon,
-  CubeIcon,
-  ExclamationTriangleIcon,
-  EyeIcon,
-  HandRaisedIcon,
-  HashtagIcon,
-  ListBulletIcon,
-  MagnifyingGlassIcon,
-  PlayIcon,
-  SpeakerWaveIcon,
-  SwatchIcon,
-  TrashIcon,
-  UserMinusIcon,
-} from '@heroicons/react/24/outline';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowDownTrayIcon, ArrowUpRightIcon, ArrowUpTrayIcon, ArrowUturnLeftIcon, ArrowsRightLeftIcon, CubeIcon, MagnifyingGlassIcon, PlayIcon } from '@heroicons/react/24/outline';
 import { CsTimerFormatError, EVENTS, parseTimerFile, toCsTimerExport, type TimerImport } from '@cubetype/cubestats';
 import { Modal } from '../components/Modal';
 import { csTimerFileName, skippedNotes } from '../components/social/util';
@@ -43,46 +17,62 @@ import { clearLocalData, exportAll, forgetUser, importSessions, localDataSummary
 import { applyTheme, isLightTheme, randomTheme, THEMES, themeLabel, type Theme } from '../lib/themes';
 import { toast } from '../lib/toast';
 
-const SECTIONS = [
-  { id: 'timer', label: 'timer', icon: ClockIcon },
-  { id: 'inspection', label: 'inspection', icon: EyeIcon },
-  { id: 'display', label: 'display', icon: ArrowsPointingOutIcon },
-  { id: 'stats', label: 'stats', icon: CalculatorIcon },
-  { id: 'theme', label: 'theme', icon: SwatchIcon },
-  { id: 'data', label: 'data', icon: CircleStackIcon },
-  { id: 'shortcuts', label: 'shortcuts', icon: CommandLineIcon },
-  { id: 'danger', label: 'danger zone', icon: ExclamationTriangleIcon },
+const PANES = [
+  { id: 'timer', label: 'timer' },
+  { id: 'display', label: 'display' },
+  { id: 'stats', label: 'stats' },
+  { id: 'theme', label: 'theme' },
+  { id: 'data', label: 'data' },
+  { id: 'shortcuts', label: 'shortcuts' },
+  { id: 'danger', label: 'danger zone' },
 ] as const;
+type PaneId = (typeof PANES)[number]['id'];
 
 interface RowProps {
-  icon: ReactNode;
   title: string;
   children: ReactNode;
   description: ReactNode;
+  /** the controls go under the text instead of beside it (long lists of choices) */
   wide?: boolean;
 }
 
-/** Monkeytype setting row: title + description on the left, controls on the right. */
-function SettingRow({ icon, title, description, children, wide }: RowProps) {
+/** One setting: its name and a line on what it does, the choices on the right. */
+function SettingRow({ title, description, children, wide }: RowProps) {
+  const id = useId();
   return (
     <div className={`st-row${wide ? ' wide' : ''}`}>
       <div className="st-text">
-        <h3 className="h3">
-          {icon}
+        <h3 className="st-title" id={id}>
           {title}
         </h3>
         <div className="st-desc">{description}</div>
       </div>
-      <div className="st-controls">{children}</div>
+      <div className="st-controls" role="group" aria-labelledby={id}>
+        {children}
+      </div>
     </div>
   );
 }
 
+/** A few settings that belong together, under a quiet lowercase label. */
+function Group({ title, children }: { title: string; children: ReactNode }) {
+  const id = useId();
+  return (
+    <section className="st-group" aria-labelledby={id}>
+      <h2 className="st-label" id={id}>
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+/** The choices as text, like the timer's config bar: the chosen one in the accent colour. */
 function Options<T extends string | number | boolean>({ value, options, onChange }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
   return (
-    <div className="option-group">
+    <div className="st-options">
       {options.map((o) => (
-        <button key={String(o.value)} className={`btn${o.value === value ? ' active' : ''}`} onClick={() => onChange(o.value)} aria-pressed={o.value === value}>
+        <button key={String(o.value)} className={`btn-text${o.value === value ? ' active' : ''}`} onClick={() => onChange(o.value)} aria-pressed={o.value === value}>
           {o.label}
         </button>
       ))}
@@ -99,8 +89,8 @@ function set<K extends keyof Settings>(key: K) {
   return (v: Settings[K]) => updateSettings({ [key]: v } as Partial<Settings>);
 }
 
-// csTimer's shortcuts (all of them), then cubetype's own on keys csTimer leaves free
-const SHORTCUTS: [ReactNode, string][] = [
+// csTimer's shortcuts (all of them)
+const CSTIMER_KEYS: [ReactNode, string][] = [
   [<kbd key="s">space</kbd>, 'hold to get ready, release to start, any key stops'],
   [<kbd key="e">esc</kbd>, 'cancel inspection - stop as DNF while running - command line when idle'],
   [
@@ -157,6 +147,10 @@ const SHORTCUTS: [ReactNode, string][] = [
     </>,
     'time with the timer / type times in',
   ],
+];
+
+// cubetype's own, on keys csTimer leaves free
+const OWN_KEYS: [ReactNode, string][] = [
   [
     <>
       <kbd>ctrl</kbd>+<kbd>k</kbd>
@@ -184,6 +178,19 @@ const SHORTCUTS: [ReactNode, string][] = [
   ],
 ];
 
+function KeyList({ keys }: { keys: [ReactNode, string][] }) {
+  return (
+    <dl className="st-keys">
+      {keys.map(([k, what], i) => (
+        <div key={i}>
+          <dt>{k}</dt>
+          <dd>{what}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 function download(name: string, text: string) {
   const blob = new Blob([text], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -196,6 +203,11 @@ function download(name: string, text: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/**
+ * Settings: a rail of sections on the left and one section at a time beside it (kept in the
+ * address as ?tab= so a link opens on it). No cards - groups are set apart by space and small
+ * labels, and every choice is text with the chosen one in the accent colour.
+ */
 export default function SettingsPage() {
   const s = useSettings();
   const { status, user } = useAuth();
@@ -203,246 +215,274 @@ export default function SettingsPage() {
   const solveState = useSolveState();
   const [confirm, setConfirm] = useState<'clear' | 'reset' | 'account' | null>(null);
   const [local, setLocal] = useState(() => localDataSummary());
+  const [params, setParams] = useSearchParams();
 
   useEffect(() => setLocal(localDataSummary()), [solveState.sessions, solveState.solves]);
   // never leave a hover preview applied when navigating away
   useEffect(() => () => applyVisualSettings(), []);
 
+  const asked = params.get('tab');
+  const pane: PaneId = PANES.find((p) => p.id === asked)?.id ?? 'timer';
+  const open = (id: PaneId) => {
+    setParams(
+      (p) => {
+        const next = new URLSearchParams(p);
+        if (id === 'timer') next.delete('tab');
+        else next.set('tab', id);
+        return next;
+      },
+      { replace: true },
+    );
+    // a section starts at its top (the theme list is long)
+    if (window.scrollY > 0) window.scrollTo({ top: 0 });
+  };
+
   return (
     <div className="settings-page">
-      <nav className="st-quicknav" aria-label="settings sections">
-        {SECTIONS.map(({ id, label, icon: Icon }) => (
-          <button key={id} className="btn-text" onClick={() => document.getElementById(`settings-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-            <Icon width={14} height={14} /> {label}
-          </button>
-        ))}
-      </nav>
-
-      <Section id="timer" title="timer">
-        <SettingRow icon={<HandRaisedIcon width={16} height={16} />} title="hold to start" description="How long space (or your finger) must be held before the timer turns green and is ready to start. Stops accidental starts.">
-          <Options value={s.holdMs} options={[0, 300, 550, 1000].map((v) => ({ value: v, label: v === 0 ? 'off' : `${v / 1000}s` }))} onChange={set('holdMs')} />
-        </SettingRow>
-        <SettingRow icon={<AdjustmentsHorizontalIcon width={16} height={16} />} title="timer update" description="What the timer shows while you solve. Hiding the time helps you stay relaxed instead of watching the clock.">
-          <Options
-            value={s.timerUpdate}
-            options={[
-              { value: 'realtime', label: 'realtime' },
-              { value: 'tenths', label: '0.1s' },
-              { value: 'seconds', label: 'seconds' },
-              { value: 'hidden', label: 'hidden' },
-            ]}
-            onChange={set('timerUpdate')}
-          />
-        </SettingRow>
-        <SettingRow icon={<HashtagIcon width={16} height={16} />} title="precision" description="Decimal places for times and averages. Singles are truncated, averages rounded like the WCA.">
-          <Options
-            value={s.precision}
-            options={[
-              { value: 2, label: '0.01' },
-              { value: 3, label: '0.001' },
-            ]}
-            onChange={set('precision')}
-          />
-        </SettingRow>
-        <SettingRow icon={<ArrowsPointingOutIcon width={16} height={16} />} title="timer size" description="Size of the big timer on the timer page.">
-          <div className="st-size">
-            <Options
-              value={s.timerSize}
-              options={[
-                { value: 5, label: 's' },
-                { value: 7, label: 'm' },
-                { value: 9, label: 'l' },
-                { value: 11, label: 'xl' },
-              ]}
-              onChange={set('timerSize')}
-            />
-            <div className="st-size-preview" style={{ fontSize: `${s.timerSize * 0.38}rem` }}>
-              12.34
-            </div>
-          </div>
-        </SettingRow>
-        <SettingRow icon={<EyeIcon width={16} height={16} />} title="focus mode" description="Fade out everything except the timer while you inspect and solve.">
-          <Options value={s.focusMode} options={onOff} onChange={set('focusMode')} />
-        </SettingRow>
-      </Section>
-
-      <Section id="inspection" title="inspection">
-        <SettingRow icon={<ClockIcon width={16} height={16} />} title="WCA inspection" description="15 seconds of inspection before each solve. Starting after 15 s adds +2, after 17 s the solve is a DNF (WCA A4d).">
-          <Options
-            value={s.inspection}
-            options={[
-              { value: true, label: 'on' },
-              { value: false, label: 'off' },
-            ]}
-            onChange={set('inspection')}
-          />
-        </SettingRow>
-        <SettingRow icon={<BellIcon width={16} height={16} />} title="inspection alerts" description="Called out at 8 and 12 seconds, like a judge at a competition.">
-          <Options
-            value={s.inspectionAlerts}
-            options={[
-              { value: 'off', label: 'off' },
-              { value: 'beep', label: 'beep' },
-              { value: 'voice', label: 'voice' },
-            ]}
-            onChange={set('inspectionAlerts')}
-          />
-        </SettingRow>
-      </Section>
-
-      <Section id="display" title="display">
-        <SettingRow icon={<EyeIcon width={16} height={16} />} title="scramble preview" description="Draw the scrambled puzzle next to your stats so you can check you scrambled correctly.">
-          <Options
-            value={s.scramblePreview}
-            options={[
-              { value: 'off', label: 'off' },
-              { value: '2D', label: '2D' },
-              { value: '3D', label: '3D' },
-            ]}
-            onChange={set('scramblePreview')}
-          />
-        </SettingRow>
-        <SettingRow
-          icon={<SwatchIcon width={16} height={16} />}
-          title="sticker colours"
-          description="The colours of the 2D scramble preview: the standard colour scheme, or your own colour for each face of each puzzle. The 3D preview always uses the standard colours."
-        >
-          <Options
-            value={s.stickerColours}
-            options={[
-              { value: 'default', label: 'default' },
-              { value: 'custom', label: 'custom' },
-            ]}
-            onChange={set('stickerColours')}
-          />
-        </SettingRow>
-        {s.stickerColours === 'custom' && <StickerColours custom={s.customStickers} />}
-        <SettingRow icon={<ListBulletIcon width={16} height={16} />} title="solve list" description="Show the list of solves in the current session on the timer page.">
-          <Options value={s.showSolveList} options={onOff} onChange={set('showSolveList')} />
-        </SettingRow>
-        <SettingRow icon={<BoldIcon width={16} height={16} />} title="font" description="One font for the whole app." wide>
-          <div className="option-group wide st-fonts">
-            {FONTS.map((f) => (
-              <button
-                key={f.name}
-                className={`btn${s.font === f.name ? ' active' : ''}`}
-                style={{ fontFamily: f.css }}
-                onClick={() => updateSettings({ font: f.name })}
-              >
-                {f.name.toLowerCase()}
-              </button>
-            ))}
-          </div>
-        </SettingRow>
-      </Section>
-
-      <Section id="stats" title="stats">
-        <SettingRow icon={<CalculatorIcon width={16} height={16} />} title="averages shown" description="Which averages appear in the stats panel. Averages trim the best and worst 5 % (at least one each side); mo3 is a plain mean.">
-          <div className="st-chips">
-            {AVG_CHOICES.map((k) => {
-              const on = s.statsShown.includes(k);
-              return (
-                <button
-                  key={k}
-                  className={`btn${on ? ' active' : ''}`}
-                  aria-pressed={on}
-                  onClick={() => {
-                    const next = on ? s.statsShown.filter((x) => x !== k) : [...s.statsShown, k];
-                    updateSettings({ statsShown: next.sort((a, b) => (parseAvgKey(a) ?? 0) - (parseAvgKey(b) ?? 0)) });
-                  }}
-                >
-                  {k}
-                </button>
-              );
-            })}
-          </div>
-        </SettingRow>
-        <SettingRow icon={<TrashIcon width={16} height={16} />} title="confirm delete" description="Ask before deleting a solve with alt+z (or ctrl+z, alt+backspace) or from the solve window.">
-          <Options value={s.confirmDelete} options={onOff} onChange={set('confirmDelete')} />
-        </SettingRow>
-        <SettingRow
-          icon={<SpeakerWaveIcon width={16} height={16} />}
-          title="pb sound"
-          description={
-            <>
-              Play a short chime when you set a new personal best.{' '}
-              <button className="btn-text st-inline" onClick={playPbSound}>
-                <PlayIcon width={12} height={12} /> preview
-              </button>
-            </>
-          }
-        >
-          <Options value={s.pbSound} options={onOff} onChange={set('pbSound')} />
-        </SettingRow>
-      </Section>
-
-      <Section id="theme" title="theme">
-        <ThemeGrid current={s.theme} />
-      </Section>
-
-      <Section id="data" title="data">
-        <DataTools loggedIn={status === 'authed'} />
-      </Section>
-
-      <Section id="shortcuts" title="keyboard shortcuts">
-        <div className="st-desc">
-          All of csTimer's shortcuts work the same here, so your habits carry over. The last five are cubetype's own. Some browsers use ctrl+1/2/3 to switch tabs and don't pass them on; the penalty buttons under the timer do the same job.
-        </div>
-        <div className="st-shortcuts">
-          {SHORTCUTS.map(([keys, label], i) => (
-            <div key={i} className="st-shortcut">
-              <span className="keys">{keys}</span>
-              <span className="what">{label}</span>
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      <Section id="danger" title="danger zone">
-        <SettingRow
-          icon={<TrashIcon width={16} height={16} />}
-          title="clear guest data"
-          description={
-            <>
-              Delete every session and solve stored in this browser while signed out
-              {local.solves > 0 ? (
-                <>
-                  {' '}
-                  (<span className="main">{formatNumber(local.solves)} solves</span> in {local.sessions} session{local.sessions === 1 ? '' : 's'})
-                </>
-              ) : (
-                ' (there are none right now)'
-              )}
-              . Solves in your account are not affected. <span className="error">You can't undo this.</span>
-            </>
-          }
-        >
-          <button className="btn danger" onClick={() => setConfirm('clear')} disabled={local.solves === 0 && local.sessions <= 1}>
-            clear guest data
-          </button>
-        </SettingRow>
-        <SettingRow icon={<ArrowUturnLeftIcon width={16} height={16} />} title="reset settings" description="Put every setting on this page back to its default (your solves are kept).">
-          <button className="btn danger" onClick={() => setConfirm('reset')}>
-            reset settings
-          </button>
-        </SettingRow>
-        {status === 'authed' && user && (
-          <SettingRow
-            icon={<UserMinusIcon width={16} height={16} />}
-            title="delete account"
-            description={
-              <>
-                Delete <span className="main">{user.username}</span> and everything in it: your solves and sessions, stats, leaderboard places, profile and settings. Export your
-                solves first (data, above) if you want to keep them. Guest data in this browser is not affected. <span className="error">You can't undo this.</span>
-              </>
-            }
-          >
-            <button className="btn danger" onClick={() => setConfirm('account')}>
-              delete account
+      <aside className="st-side">
+        <h1 className="st-label">settings</h1>
+        <nav className="st-rail" aria-label="settings sections">
+          {PANES.map((p) => (
+            <button
+              key={p.id}
+              className={`st-rail-item${p.id === pane ? ' active' : ''}${p.id === 'danger' ? ' danger' : ''}`}
+              aria-current={p.id === pane ? 'page' : undefined}
+              onClick={() => open(p.id)}
+            >
+              {p.label}
             </button>
-          </SettingRow>
+          ))}
+        </nav>
+      </aside>
+
+      <div className="st-pane" key={pane}>
+        {pane === 'timer' && (
+          <>
+            <Group title="timer">
+              <SettingRow title="hold to start" description="How long space (or your finger) is held before the timer turns green. Stops accidental starts.">
+                <Options value={s.holdMs} options={[0, 300, 550, 1000].map((v) => ({ value: v, label: v === 0 ? 'off' : `${v / 1000}s` }))} onChange={set('holdMs')} />
+              </SettingRow>
+              <SettingRow title="timer update" description="What the timer shows while you solve. Hiding it keeps your eyes off the clock.">
+                <Options
+                  value={s.timerUpdate}
+                  options={[
+                    { value: 'realtime', label: 'realtime' },
+                    { value: 'tenths', label: '0.1s' },
+                    { value: 'seconds', label: 'seconds' },
+                    { value: 'hidden', label: 'hidden' },
+                  ]}
+                  onChange={set('timerUpdate')}
+                />
+              </SettingRow>
+              <SettingRow title="precision" description="Decimal places for times. Singles are truncated, averages rounded like the WCA.">
+                <Options
+                  value={s.precision}
+                  options={[
+                    { value: 2, label: '0.01' },
+                    { value: 3, label: '0.001' },
+                  ]}
+                  onChange={set('precision')}
+                />
+              </SettingRow>
+            </Group>
+            <Group title="inspection">
+              <SettingRow title="WCA inspection" description="15 seconds to inspect before each solve. Starting after 15 s adds +2, after 17 s the solve is a DNF (WCA A4d).">
+                <Options value={s.inspection} options={onOff} onChange={set('inspection')} />
+              </SettingRow>
+              <SettingRow title="inspection alerts" description="Called out at 8 and 12 seconds, like a judge at a competition.">
+                <Options
+                  value={s.inspectionAlerts}
+                  options={[
+                    { value: 'off', label: 'off' },
+                    { value: 'beep', label: 'beep' },
+                    { value: 'voice', label: 'voice' },
+                  ]}
+                  onChange={set('inspectionAlerts')}
+                />
+              </SettingRow>
+            </Group>
+          </>
         )}
-      </Section>
+
+        {pane === 'display' && (
+          <>
+            <Group title="timer page">
+              <SettingRow title="timer size" description="Size of the big timer.">
+                <span className="st-size-preview" style={{ fontSize: `${s.timerSize * 0.24}rem` }} aria-hidden="true">
+                  12.34
+                </span>
+                <Options
+                  value={s.timerSize}
+                  options={[
+                    { value: 5, label: 's' },
+                    { value: 7, label: 'm' },
+                    { value: 9, label: 'l' },
+                    { value: 11, label: 'xl' },
+                  ]}
+                  onChange={set('timerSize')}
+                />
+              </SettingRow>
+              <SettingRow title="focus mode" description="Fade out everything but the timer while you inspect and solve.">
+                <Options value={s.focusMode} options={onOff} onChange={set('focusMode')} />
+              </SettingRow>
+              <SettingRow title="solve list" description="The current session's solves under the timer.">
+                <Options value={s.showSolveList} options={onOff} onChange={set('showSolveList')} />
+              </SettingRow>
+            </Group>
+            <Group title="scramble preview">
+              <SettingRow title="preview" description="Draw the scrambled puzzle so you can check you scrambled it right.">
+                <Options
+                  value={s.scramblePreview}
+                  options={[
+                    { value: 'off', label: 'off' },
+                    { value: '2D', label: '2D' },
+                    { value: '3D', label: '3D' },
+                  ]}
+                  onChange={set('scramblePreview')}
+                />
+              </SettingRow>
+              <SettingRow title="sticker colours" description="The 2D preview's colours: the standard scheme, or your own colour for each face of each puzzle. 3D always uses the standard colours.">
+                <Options
+                  value={s.stickerColours}
+                  options={[
+                    { value: 'default', label: 'default' },
+                    { value: 'custom', label: 'custom' },
+                  ]}
+                  onChange={set('stickerColours')}
+                />
+              </SettingRow>
+              {s.stickerColours === 'custom' && <StickerColours custom={s.customStickers} />}
+            </Group>
+            <Group title="app">
+              <SettingRow title="font" description="One font for the whole app." wide>
+                <div className="st-options">
+                  {FONTS.map((f) => (
+                    <button
+                      key={f.name}
+                      className={`btn-text${s.font === f.name ? ' active' : ''}`}
+                      style={{ fontFamily: f.css }}
+                      aria-pressed={s.font === f.name}
+                      onClick={() => updateSettings({ font: f.name })}
+                    >
+                      {f.name.toLowerCase()}
+                    </button>
+                  ))}
+                </div>
+              </SettingRow>
+            </Group>
+          </>
+        )}
+
+        {pane === 'stats' && (
+          <>
+            <Group title="averages">
+              <SettingRow title="averages shown" description="Which averages the stats panel shows. Averages trim the best and worst 5 % (at least one each side); mo3 is a plain mean." wide>
+                <div className="st-options">
+                  {AVG_CHOICES.map((k) => {
+                    const on = s.statsShown.includes(k);
+                    return (
+                      <button
+                        key={k}
+                        className={`btn-text${on ? ' active' : ''}`}
+                        aria-pressed={on}
+                        onClick={() => {
+                          const next = on ? s.statsShown.filter((x) => x !== k) : [...s.statsShown, k];
+                          updateSettings({ statsShown: next.sort((a, b) => (parseAvgKey(a) ?? 0) - (parseAvgKey(b) ?? 0)) });
+                        }}
+                      >
+                        {k}
+                      </button>
+                    );
+                  })}
+                </div>
+              </SettingRow>
+            </Group>
+            <Group title="solves">
+              <SettingRow title="confirm delete" description="Ask before deleting a solve with alt+z (or ctrl+z, alt+backspace) or from the solve window.">
+                <Options value={s.confirmDelete} options={onOff} onChange={set('confirmDelete')} />
+              </SettingRow>
+              <SettingRow
+                title="pb sound"
+                description={
+                  <>
+                    A short chime when you set a new personal best.{' '}
+                    <button className="btn-text st-inline" onClick={playPbSound}>
+                      <PlayIcon width={12} height={12} /> preview
+                    </button>
+                  </>
+                }
+              >
+                <Options value={s.pbSound} options={onOff} onChange={set('pbSound')} />
+              </SettingRow>
+            </Group>
+          </>
+        )}
+
+        {pane === 'theme' && <ThemePicker current={s.theme} />}
+
+        {pane === 'data' && <DataTools loggedIn={status === 'authed'} />}
+
+        {pane === 'shortcuts' && (
+          <>
+            <Group title="from csTimer">
+              <p className="st-note">
+                All of csTimer's shortcuts work the same here, so your habits carry over. Some browsers use ctrl+1/2/3 to switch tabs and don't pass them on; the penalty buttons under the
+                timer do the same job.
+              </p>
+              <KeyList keys={CSTIMER_KEYS} />
+            </Group>
+            <Group title="cubetype's own">
+              <KeyList keys={OWN_KEYS} />
+            </Group>
+          </>
+        )}
+
+        {pane === 'danger' && (
+          <Group title="danger zone">
+            <SettingRow
+              title="clear guest data"
+              description={
+                <>
+                  Delete every session and solve stored in this browser while signed out
+                  {local.solves > 0 ? (
+                    <>
+                      {' '}
+                      (<span className="main">{formatNumber(local.solves)} solves</span> in {local.sessions} session{local.sessions === 1 ? '' : 's'})
+                    </>
+                  ) : (
+                    ' (there are none right now)'
+                  )}
+                  . Solves in your account are not affected. <span className="error">You can't undo this.</span>
+                </>
+              }
+            >
+              <button className="btn st-danger" onClick={() => setConfirm('clear')} disabled={local.solves === 0 && local.sessions <= 1}>
+                clear guest data
+              </button>
+            </SettingRow>
+            <SettingRow title="reset settings" description="Put every setting back to its default (your solves are kept).">
+              <button className="btn st-danger" onClick={() => setConfirm('reset')}>
+                reset settings
+              </button>
+            </SettingRow>
+            {status === 'authed' && user && (
+              <SettingRow
+                title="delete account"
+                description={
+                  <>
+                    Delete <span className="main">{user.username}</span> and everything in it: your solves and sessions, stats, leaderboard places, profile and settings. Export your
+                    solves first (data) if you want to keep them. Guest data in this browser is not affected. <span className="error">You can't undo this.</span>
+                  </>
+                }
+              >
+                <button className="btn st-danger" onClick={() => setConfirm('account')}>
+                  delete account
+                </button>
+              </SettingRow>
+            )}
+          </Group>
+        )}
+      </div>
 
       {confirm === 'account' && user && (
         <DeleteAccountModal
@@ -486,17 +526,6 @@ export default function SettingsPage() {
         />
       )}
     </div>
-  );
-}
-
-function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
-  return (
-    <section className="st-section" id={`settings-${id}`} aria-labelledby={`settings-${id}-title`}>
-      <h2 className="st-section-title" id={`settings-${id}-title`}>
-        {title}
-      </h2>
-      <div className="st-section-body">{children}</div>
-    </section>
   );
 }
 
@@ -610,7 +639,19 @@ const THEME_FILTERS: { value: ThemeFilter; label: string; test: (t: Theme) => bo
   { value: 'originals', label: 'originals', test: (t) => Boolean(t.original) },
 ];
 
-function ThemeGrid({ current }: { current: string }) {
+/** a theme in miniature: its background with its accent, sub and text colours as dots */
+function ThemeSwatch({ theme, big }: { theme: Theme; big?: boolean }) {
+  return (
+    <span className={`st-theme-swatch${big ? ' big' : ''}`} style={{ background: theme.bg }} aria-hidden="true">
+      <i style={{ background: theme.main }} />
+      <i style={{ background: theme.sub }} />
+      <i style={{ background: theme.text }} />
+    </span>
+  );
+}
+
+/** The theme in use on top, then every theme as a name with its swatch; hovering one previews it on the whole page. */
+function ThemePicker({ current }: { current: string }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<ThemeFilter>('all');
   const previewing = useRef(false);
@@ -618,11 +659,16 @@ function ThemeGrid({ current }: { current: string }) {
     if (previewing.current) applyTheme(current, false);
     previewing.current = false;
   };
+  const preview = (t: Theme) => {
+    previewing.current = true;
+    applyTheme(t.name, false);
+  };
   const shown = useMemo(() => {
     const test = THEME_FILTERS.find((f) => f.value === filter)!.test;
     const q = query.trim().toLowerCase().replace(/[\s-]+/g, '_');
     return THEMES.filter((t) => test(t) && t.name.includes(q));
   }, [query, filter]);
+  const now = THEMES.find((t) => t.name === current);
   const shuffle = () => {
     // random within the current filter when it has more than the active theme
     const pool = shown.filter((t) => t.name !== current);
@@ -631,23 +677,34 @@ function ThemeGrid({ current }: { current: string }) {
     updateSettings({ theme: next.name });
   };
   return (
-    <div className="st-theme-picker">
+    <Group title="theme">
+      {now && (
+        <div className="st-theme-now">
+          <ThemeSwatch theme={now} big />
+          <div className="st-theme-now-text">
+            <span className="name">{themeLabel(now.name)}</span>
+            <span className="meta">
+              {isLightTheme(now) ? 'light' : 'dark'}
+              {now.original && ' - a cubetype original'}
+            </span>
+          </div>
+          <button className="btn-text st-random" onClick={shuffle} data-tip="a random theme from the list below">
+            <ArrowsRightLeftIcon width={16} height={16} /> random
+          </button>
+        </div>
+      )}
       <div className="st-theme-tools">
-        <label className="st-theme-search">
-          <MagnifyingGlassIcon width={14} height={14} aria-hidden="true" />
-          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="search themes" aria-label="search themes" />
-        </label>
-        <div className="st-theme-filters">
+        <div className="st-options" role="group" aria-label="show">
           {THEME_FILTERS.map((f) => (
-            <button key={f.value} className={`btn${f.value === filter ? ' active' : ''}`} onClick={() => setFilter(f.value)} aria-pressed={f.value === filter}>
-              {f.value === 'originals' && <CubeIcon width={14} height={14} />}
+            <button key={f.value} className={`btn-text${f.value === filter ? ' active' : ''}`} onClick={() => setFilter(f.value)} aria-pressed={f.value === filter}>
               {f.label}
             </button>
           ))}
         </div>
-        <button className="btn" onClick={shuffle} data-tip="pick a random theme from this list">
-          <ArrowsRightLeftIcon width={14} height={14} /> random
-        </button>
+        <label className="st-theme-search">
+          <MagnifyingGlassIcon width={14} height={14} aria-hidden="true" />
+          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="search themes" aria-label="search themes" />
+        </label>
         <span className="st-theme-count">
           {shown.length} / {THEMES.length}
         </span>
@@ -662,35 +719,22 @@ function ThemeGrid({ current }: { current: string }) {
               role="radio"
               aria-checked={t.name === current}
               className={`st-theme${t.name === current ? ' active' : ''}`}
-              style={{ background: t.bg, color: t.text }}
-              onMouseEnter={() => {
-                previewing.current = true;
-                applyTheme(t.name, false);
-              }}
-              onFocus={() => {
-                previewing.current = true;
-                applyTheme(t.name, false);
-              }}
+              onMouseEnter={() => preview(t)}
+              onFocus={() => preview(t)}
               onBlur={restore}
               onClick={() => {
                 previewing.current = false;
                 updateSettings({ theme: t.name });
               }}
             >
-              <span className="st-theme-name">
-                {t.original && <CubeIcon width={11} height={11} className="st-theme-original" style={{ color: t.main }} aria-label="cubetype original" aria-hidden={false} />}
-                {themeLabel(t.name)}
-              </span>
-              <span className="st-theme-dots" aria-hidden="true">
-                <i style={{ background: t.main }} />
-                <i style={{ background: t.sub }} />
-                <i style={{ background: t.text }} />
-              </span>
+              <ThemeSwatch theme={t} />
+              <span className="st-theme-name">{themeLabel(t.name)}</span>
+              {t.original && <CubeIcon width={12} height={12} className="st-theme-original" aria-label="cubetype original" aria-hidden={false} />}
             </button>
           ))}
         </div>
       )}
-    </div>
+    </Group>
   );
 }
 
@@ -753,78 +797,77 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
 
   return (
     <>
-      <SettingRow
-        icon={<ArrowUpTrayIcon width={16} height={16} />}
-        title="import solves"
-        description={
-          <>
-            A cubetype export, or any file csTimer can import: csTimer (<span className="text">export -&gt; export to file</span>), Twisty Timer, Cubic Timer,
-            Block Keeper, CubeDesk, DCTimer, mateus Cubetimer or GAN CubeStation. Each session becomes a cubetype session{' '}
-            {loggedIn ? 'in your account' : 'in this browser'}.
-          </>
-        }
-      >
-        <div className="st-import">
-          <input ref={fileRef} type="file" hidden onChange={(e) => void onFile(e.target.files?.[0])} />
-          {!parsed ? (
-            <button className="btn" onClick={() => fileRef.current?.click()} disabled={busy !== null}>
-              <ArrowUpTrayIcon width={16} height={16} /> choose file
-            </button>
-          ) : (
-            <div className="st-import-preview">
-              <div className="small">
-                <span className="text">{parsed.file}</span> ({parsed.format})
-                <br />
-                <span className="main">{formatNumber(summary?.solves ?? 0)} solves</span> - {parsed.sessions.length} session{parsed.sessions.length === 1 ? '' : 's'} -{' '}
-                {summary?.events.join(', ')}
-                {skippedNotes(parsed.skipped).map((note) => (
-                  <span key={note}>
-                    <br />
-                    {note}
-                  </span>
-                ))}
+      <Group title="your solves">
+        <SettingRow
+          title="import"
+          wide={parsed !== null}
+          description={
+            <>
+              A cubetype export, or any file csTimer can import: csTimer (<span className="text">export -&gt; export to file</span>), Twisty Timer, Cubic Timer, Block Keeper,
+              CubeDesk, DCTimer, mateus Cubetimer or GAN CubeStation. Each session becomes a cubetype session {loggedIn ? 'in your account' : 'in this browser'}.
+            </>
+          }
+        >
+          <div className="st-import">
+            <input ref={fileRef} type="file" hidden onChange={(e) => void onFile(e.target.files?.[0])} />
+            {!parsed ? (
+              <button className="btn" onClick={() => fileRef.current?.click()} disabled={busy !== null}>
+                <ArrowUpTrayIcon width={16} height={16} /> choose file
+              </button>
+            ) : (
+              <div className="st-import-preview">
+                <div>
+                  <span className="text">{parsed.file}</span> ({parsed.format})
+                  <br />
+                  <span className="main">{formatNumber(summary?.solves ?? 0)} solves</span> - {parsed.sessions.length} session{parsed.sessions.length === 1 ? '' : 's'} -{' '}
+                  {summary?.events.join(', ')}
+                  {skippedNotes(parsed.skipped).map((note) => (
+                    <span key={note}>
+                      <br />
+                      {note}
+                    </span>
+                  ))}
+                </div>
+                <div className="row">
+                  <button className="btn" onClick={() => setParsed(null)} disabled={busy !== null}>
+                    cancel
+                  </button>
+                  <button className="btn primary" onClick={doImport} disabled={busy !== null}>
+                    {busy === 'import' ? 'importing...' : 'import'}
+                  </button>
+                </div>
               </div>
-              <div className="row">
-                <button className="btn" onClick={() => setParsed(null)} disabled={busy !== null}>
-                  cancel
-                </button>
-                <button className="btn primary" onClick={doImport} disabled={busy !== null}>
-                  {busy === 'import' ? 'importing...' : 'import'}
-                </button>
-              </div>
-            </div>
-          )}
-          {error && <div className="error small">{error}</div>}
-        </div>
-      </SettingRow>
-      <SettingRow
-        icon={<ArrowDownTrayIcon width={16} height={16} />}
-        title="export"
-        description={
-          <>
-            Every session and solve. JSON re-imports here or on another cubetype server; the csTimer file goes into csTimer with{' '}
-            <span className="text">export -&gt; import session(s) from other timers</span>, which adds sessions without replacing yours.
-          </>
-        }
-      >
-        <div className="row">
+            )}
+            {error && <div className="error small">{error}</div>}
+          </div>
+        </SettingRow>
+        <SettingRow
+          title="export"
+          description={
+            <>
+              Every session and solve. JSON re-imports here or on another cubetype server; the csTimer file goes into csTimer with{' '}
+              <span className="text">export -&gt; import session(s) from other timers</span>, which adds sessions without replacing yours.
+            </>
+          }
+        >
           <button className="btn" onClick={() => void doExport('json')} disabled={busy !== null}>
-            <ArrowDownTrayIcon width={16} height={16} /> {busy === 'export' ? 'exporting...' : 'export json'}
+            <ArrowDownTrayIcon width={16} height={16} /> {busy === 'export' ? 'exporting...' : 'json'}
           </button>
           <button className="btn" onClick={() => void doExport('cstimer')} disabled={busy !== null}>
-            <ArrowDownTrayIcon width={16} height={16} /> {busy === 'export-cstimer' ? 'exporting...' : 'export for csTimer'}
+            <ArrowDownTrayIcon width={16} height={16} /> {busy === 'export-cstimer' ? 'exporting...' : 'csTimer'}
           </button>
-        </div>
-      </SettingRow>
-      <SettingRow
-        icon={<CircleStackIcon width={16} height={16} />}
-        title="account"
-        description={loggedIn ? 'Profile, PB history, activity and more data tools live on your account page.' : 'Sign in to sync your solves across devices, get on the leaderboards and race others.'}
-      >
-        <Link className="btn" to={loggedIn ? '/account' : '/login'}>
-          {loggedIn ? 'open account' : 'sign in'} <ArrowUpRightIcon width={16} height={16} />
-        </Link>
-      </SettingRow>
+        </SettingRow>
+      </Group>
+      <Group title="account">
+        <SettingRow
+          title={loggedIn ? 'account page' : 'sync and leaderboards'}
+          description={loggedIn ? 'Profile, PB history, activity and more data tools live on your account page.' : 'Sync your solves across devices, get on the leaderboards and race others.'}
+        >
+          <Link className="btn" to={loggedIn ? '/account' : '/login'}>
+            {loggedIn ? 'open account' : 'sign in'} <ArrowUpRightIcon width={16} height={16} />
+          </Link>
+        </SettingRow>
+      </Group>
     </>
   );
 }
