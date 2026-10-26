@@ -556,73 +556,6 @@
   opacity: 0.7;
 }
 
-/* ------------------------------------------------------------ charts */
-.tp-charts {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-  gap: 2rem;
-  margin-top: 2.25rem;
-}
-.tp-chart-empty {
-  height: 220px;
-  align-content: center;
-}
-.tp-chart-fallback {
-  height: calc(220px + 2.1rem);
-}
-.tp-chart .tp-panel-title {
-  justify-content: flex-start;
-}
-.tp-legend {
-  margin-left: auto;
-  display: flex;
-  gap: 0.25rem;
-}
-.tp-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4em;
-  background: none;
-  border: 0;
-  color: var(--sub-color);
-  font: inherit;
-  font-size: 0.72rem;
-  padding: 0.2rem 0.45rem;
-  border-radius: calc(var(--roundness) / 2);
-  cursor: pointer;
-  transition: color var(--dur), background var(--dur), opacity var(--dur);
-}
-.tp-legend-item:hover {
-  background: var(--sub-alt-color);
-  color: var(--text-color);
-}
-.tp-legend-item i {
-  display: inline-block;
-  width: 0.9em;
-  height: 3px;
-  border-radius: 2px;
-  background: var(--main-color);
-}
-.tp-legend-item.ao5 i {
-  height: 2px;
-  background: color-mix(in srgb, var(--main-color) 60%, transparent);
-}
-.tp-legend-item.single i {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--sub-color);
-}
-.tp-legend-item.off {
-  opacity: 0.45;
-  text-decoration: line-through;
-}
-.tp-charts-toggle {
-  display: flex;
-  justify-content: center;
-  margin-top: 1.5rem;
-}
-
 /* ------------------------------------------------------------ footer bits */
 .tp-keytips {
   margin-top: 2.5rem;
@@ -775,9 +708,6 @@
   .tp-bottom .tp-preview {
     grid-column: 1 / -1;
     order: 3;
-  }
-  .tp-charts {
-    grid-template-columns: minmax(0, 1fr);
   }
 }
 @media (max-width: 720px) {

@@ -1,8 +1,7 @@
-import { lazy, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowPathIcon,
-  ArrowTrendingUpIcon,
   ArrowsPointingInIcon,
   ChatBubbleLeftIcon,
   ClockIcon,
@@ -68,11 +67,6 @@ type ModalState =
   | { kind: 'deleteLast' }
   | { kind: 'comment'; solveId: string }
   | null;
-
-// Chart.js is only needed below the fold: keep it out of the first-paint bundle.
-const TrendChart = lazy(() => import('../components/timer/Charts').then((m) => ({ default: m.TrendChart })));
-const HistogramChart = lazy(() => import('../components/timer/Charts').then((m) => ({ default: m.HistogramChart })));
-const chartFallback = <div className="tp-chart-fallback" />;
 
 const GUEST_HINT_KEY = 'cubetype.guestHintDismissed';
 const PB_KINDS_NS = [5, 12, 100];
@@ -384,14 +378,13 @@ export default function TimerPage() {
         );
       }
       cmds.push(
-        { id: 'timer-toggle-charts', label: settings.showCharts ? 'Hide charts' : 'Show charts', icon: <ArrowTrendingUpIcon />, keywords: ['toggle'], run: () => updateSettings({ showCharts: !settings.showCharts }) },
         { id: 'timer-toggle-list', label: settings.showSolveList ? 'Hide solve list' : 'Show solve list', icon: <ListBulletIcon />, keywords: ['toggle'], run: () => updateSettings({ showSolveList: !settings.showSolveList }) },
         { id: 'timer-manual', label: manual ? 'Use the timer (leave manual entry)' : 'Manual entry (type times)', icon: <CommandLineIcon />, keywords: ['typing', 'toggle'], run: () => setManual((m) => !m) },
         { id: 'timer-inspection-toggle', label: settings.inspection ? 'Turn inspection off' : 'Turn inspection on', icon: <EyeIcon />, keywords: ['toggle', 'wca'], run: () => updateSettings({ inspection: !settings.inspection }) },
       );
       return cmds;
     },
-    [st.sessions, event, session?.id, last?.id, last?.penalty, settings.showCharts, settings.showSolveList, settings.inspection, manual, deleteLast],
+    [st.sessions, event, session?.id, last?.id, last?.penalty, settings.showSolveList, settings.inspection, manual, deleteLast],
   );
 
 
@@ -522,28 +515,9 @@ export default function TimerPage() {
         )}
       </div>
 
-      {settings.showCharts ? (
-        solves.length >= 2 ? (
-          <div className="tp-charts fade-on-focus">
-            <Suspense fallback={chartFallback}>
-              <TrendChart times={times} ao5={ao5} ao12={ao12} precision={settings.precision} onOpenSolve={openSolve} />
-            </Suspense>
-            <Suspense fallback={chartFallback}>
-              <HistogramChart times={times} latest={solves.length ? effectiveMs(solves[solves.length - 1]) : null} />
-            </Suspense>
-          </div>
-        ) : null
-      ) : (
-        <div className="tp-charts-toggle fade-on-focus">
-          <button className="btn-text small" onClick={() => updateSettings({ showCharts: true })} {...noFocus}>
-            <ArrowTrendingUpIcon width={14} height={14} /> show charts
-          </button>
-        </div>
-      )}
-
       <div className="keytips tp-keytips fade-on-focus">
-        <kbd>space</kbd> start / stop - <kbd>tab</kbd> new scramble - <kbd>alt</kbd>+<kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd> ok / +2 / dnf -{' '}
-        <kbd>alt</kbd>+<kbd>backspace</kbd> delete last - <kbd>esc</kbd> command line
+        <kbd>space</kbd> start / stop - <kbd>tab</kbd> new scramble - <kbd>ctrl</kbd>+<kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd> ok / +2 / dnf -{' '}
+        <kbd>alt</kbd>+<kbd>z</kbd> delete last - <kbd>esc</kbd> command line
       </div>
       {guest && (
         <div className="tp-guest fade-on-focus">

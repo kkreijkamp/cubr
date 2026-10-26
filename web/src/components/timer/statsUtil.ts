@@ -44,18 +44,6 @@ export function fmtSolveLong(s: Pick<Solve, 'timeMs' | 'penalty'>, precision: Pr
   return formatSolve(s.timeMs, s.penalty, precision);
 }
 
-/** Axis tick label: 12.5 -> "12.5", 75 s -> "1:15". */
-export function shortTime(ms: number): string {
-  if (!Number.isFinite(ms)) return '';
-  const s = ms / 1000;
-  if (s >= 60) {
-    const m = Math.floor(s / 60);
-    const rest = Math.round(s - m * 60);
-    return `${m}:${String(rest).padStart(2, '0')}`;
-  }
-  return Number.isInteger(s) ? String(s) : s.toFixed(s < 10 ? 2 : 1).replace(/0+$/, '').replace(/\.$/, '');
-}
-
 export interface AverageWindow {
   n: number;
   /** index (in the session) of the first solve of the window */
@@ -126,42 +114,6 @@ export function pbFlags(values: readonly (number | null)[]): boolean[] {
     best = v;
   }
   return out;
-}
-
-/** Evenly thins a series to at most `max` points (keeps first & last). */
-export function strideIndices(length: number, max: number): number[] {
-  if (length <= max) return Array.from({ length }, (_, i) => i);
-  const step = (length - 1) / (max - 1);
-  const out: number[] = [];
-  for (let k = 0; k < max; k++) out.push(Math.round(k * step));
-  return out;
-}
-
-export interface Bucket {
-  from: number;
-  to: number;
-  count: number;
-}
-
-const NICE_STEPS = [10, 20, 50, 100, 200, 250, 500, 1000, 2000, 5000, 10_000, 15_000, 30_000, 60_000, 120_000, 300_000, 600_000];
-
-/** Histogram of finite times; range clipped to the 1st-99th percentile, outliers go to the edges. */
-export function histogram(times: number[], targetBuckets = 24): Bucket[] {
-  const xs = times.filter((t) => Number.isFinite(t)).sort((a, b) => a - b);
-  if (xs.length === 0) return [];
-  const q = (p: number) => xs[Math.min(xs.length - 1, Math.max(0, Math.floor(p * (xs.length - 1))))];
-  const lo = xs.length >= 50 ? q(0.01) : xs[0];
-  const hi = xs.length >= 50 ? q(0.99) : xs[xs.length - 1];
-  const span = Math.max(1, hi - lo);
-  const step = NICE_STEPS.find((s) => span / s <= targetBuckets) ?? NICE_STEPS[NICE_STEPS.length - 1];
-  const start = Math.floor(lo / step) * step;
-  const count = Math.max(1, Math.floor((hi - start) / step) + 1);
-  const buckets: Bucket[] = Array.from({ length: count }, (_, i) => ({ from: start + i * step, to: start + (i + 1) * step, count: 0 }));
-  for (const t of xs) {
-    const i = Math.min(count - 1, Math.max(0, Math.floor((t - start) / step)));
-    buckets[i].count++;
-  }
-  return buckets;
 }
 
 /**

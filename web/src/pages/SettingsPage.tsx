@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import {
   AdjustmentsHorizontalIcon,
   ArrowDownTrayIcon,
-  ArrowTrendingUpIcon,
   ArrowUpRightIcon,
   ArrowUpTrayIcon,
   ArrowUturnLeftIcon,
@@ -316,9 +315,6 @@ export default function SettingsPage() {
         {s.stickerColours === 'custom' && <StickerColours custom={s.customStickers} />}
         <SettingRow icon={<ListBulletIcon width={16} height={16} />} title="solve list" description="Show the list of solves in the current session on the timer page.">
           <Options value={s.showSolveList} options={onOff} onChange={set('showSolveList')} />
-        </SettingRow>
-        <SettingRow icon={<ArrowTrendingUpIcon width={16} height={16} />} title="charts" description="Show the trend and distribution charts below your solves.">
-          <Options value={s.showCharts} options={onOff} onChange={set('showCharts')} />
         </SettingRow>
         <SettingRow icon={<BoldIcon width={16} height={16} />} title="font" description="One font for the whole app." wide>
           <div className="option-group wide st-fonts">

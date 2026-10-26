@@ -31,7 +31,6 @@ export interface Settings {
   statsShown: string[];
   confirmDelete: boolean;
   showSolveList: boolean;
-  showCharts: boolean;
   /** play a sound when you set a PB */
   pbSound: boolean;
   /** last used event (timer page) */
@@ -54,7 +53,6 @@ export const DEFAULT_SETTINGS: Settings = {
   statsShown: ['mo3', 'ao5', 'ao12', 'ao100'],
   confirmDelete: true,
   showSolveList: true,
-  showCharts: true,
   pbSound: true,
   lastEvent: '333',
 };

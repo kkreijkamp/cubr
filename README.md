@@ -15,7 +15,7 @@ INFS3208 Cloud Computing - Individual Project (Type I: scalable & available web 
 
 - **Timer** - WCA-compliant: hold-to-start (space or touch), 15 s inspection with 8/12 s alerts and automatic +2/DNF, penalties, sessions per event (create, rename, merge), manual entry, focus mode.
 - **Scrambles** - official random-state scrambles for all 16 WCA events (cubing.js), with 2D/3D previews.
-- **Statistics** - mo3/ao5/ao12/ao50/ao100/ao1000 (current & best, WCA trimming rules), mean, standard deviation, trend & histogram charts, PB detection.
+- **Statistics** - mo3/ao5/ao12/ao50/ao100/ao1000 (current & best, WCA trimming rules), mean, standard deviation, PB detection.
 - **Accounts & sync** - solves stored in the cloud with offline-tolerant optimistic sync; import and export compatible with csTimer and most others; settings follow you across devices; profile pictures.
 - **Leaderboards** - all-time / weekly / daily per event (single, ao5, ao12), WCA-record anti-cheat.
 - **Daily challenge** - everyone gets the same 5 scrambles each UTC day; one attempt per scramble, ranked by ao5.
