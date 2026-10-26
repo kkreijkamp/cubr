@@ -144,7 +144,7 @@ h4 {
 .logo {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.5rem;
   font-family: var(--logo-font);
   color: var(--text-color);
   white-space: nowrap;
@@ -153,13 +153,13 @@ h4 {
   color: var(--text-color);
 }
 .logo .logo-icon {
-  width: 2rem;
-  height: 2rem;
+  width: 1.7rem;
+  height: 1.7rem;
   color: var(--main-color);
   transition: color 0.25s;
 }
 .logo .logo-text {
-  font-size: 2.3rem;
+  font-size: 1.95rem;
   line-height: 1;
   letter-spacing: -0.02em;
   transition: color 0.25s;
@@ -191,8 +191,12 @@ h4 {
   font-size: 0.875rem;
 }
 @media (max-width: 720px) {
+  .logo .logo-icon {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
   .logo .logo-text {
-    font-size: 1.6rem;
+    font-size: 1.4rem;
   }
   .nav .btn-text {
     padding: 0.35rem;
@@ -209,11 +213,11 @@ h4 {
 }
 @media (max-width: 400px) {
   .logo .logo-icon {
-    width: 1.6rem;
-    height: 1.6rem;
+    width: 1.35rem;
+    height: 1.35rem;
   }
   .logo .logo-text {
-    font-size: 1.3rem;
+    font-size: 1.2rem;
   }
   .nav .btn-text {
     padding: 0.3rem 0.25rem;
