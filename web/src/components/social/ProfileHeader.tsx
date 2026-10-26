@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { CameraIcon, LinkIcon, PencilIcon } from '@heroicons/react/24/outline';
 import { formatDuration } from '@cubetype/cubestats';
 import { AvatarEditor } from './AvatarEditor';
+import { EventDonut } from './EventDonut';
 import { countryName } from './countries';
 import { WidgetError } from './Widget';
 import { plural } from './util';
@@ -18,6 +19,9 @@ interface Props {
   summary: AsyncState<StatsSummary>;
   own: boolean;
   onEdit?: () => void;
+  /** the profile's selected event (the donut highlights it and picks another) */
+  event: string;
+  onEvent: (event: string) => void;
 }
 
 async function copyProfileLink(username: string) {
@@ -36,8 +40,8 @@ function monthYear(iso: string): string {
   return Number.isNaN(d.getTime()) ? '-' : d.toLocaleString('en-US', { month: 'short', year: 'numeric' }).toLowerCase();
 }
 
-/** The top of the profile: who it is, then the lifetime totals as a row of big numbers. */
-export function ProfileHeader({ user, summary, own, onEdit }: Props) {
+/** The top of the profile: who it is (and their events as a ring), then the lifetime totals as a row of big numbers. */
+export function ProfileHeader({ user, summary, own, onEdit, event, onEvent }: Props) {
   const name = user.displayName?.trim() || user.username;
   const totals = summary.data?.totals;
   const flag = flagEmoji(user.country);
@@ -101,6 +105,16 @@ export function ProfileHeader({ user, summary, own, onEdit }: Props) {
               </Link>
             )}
             {own && <span className="pill">you</span>}
+            <span className="pf-actions">
+              {own && onEdit && (
+                <button className="btn-text" onClick={onEdit} data-tip="edit profile" aria-label="edit profile">
+                  <PencilIcon />
+                </button>
+              )}
+              <button className="btn-text" onClick={() => copyProfileLink(user.username)} data-tip="copy profile link" aria-label="copy profile link">
+                <LinkIcon />
+              </button>
+            </span>
           </div>
           {user.bio ? (
             <p className="pf-bio">{user.bio}</p>
@@ -111,16 +125,7 @@ export function ProfileHeader({ user, summary, own, onEdit }: Props) {
           ) : null}
         </div>
 
-        <div className="pf-actions">
-          {own && onEdit && (
-            <button className="btn-text" onClick={onEdit} data-tip="edit profile" aria-label="edit profile">
-              <PencilIcon />
-            </button>
-          )}
-          <button className="btn-text" onClick={() => copyProfileLink(user.username)} data-tip="copy profile link" aria-label="copy profile link">
-            <LinkIcon />
-          </button>
-        </div>
+        {summary.data && <EventDonut events={summary.data.events} selected={event} onSelect={onEvent} />}
       </div>
 
       {summary.error && !totals ? (

@@ -76,7 +76,7 @@ export function ProfileView({ user, own, onEdit, children }: Props) {
 
   return (
     <div className="pf">
-      <ProfileHeader user={user} summary={summary} own={own} onEdit={onEdit} />
+      <ProfileHeader user={user} summary={summary} own={own} onEdit={onEdit} event={event} onEvent={pick} />
       {noSolves ? (
         <p className="pf-empty">
           {own ? (
