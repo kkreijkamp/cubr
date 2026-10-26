@@ -13,6 +13,7 @@ schema `auth` (`users`, `user_settings`, `avatars`), migrated at startup. Fastif
 | `PUT /api/auth/me/settings` | req | `{settings: object}`; > 16 KB JSON -> 413 `PAYLOAD_TOO_LARGE` |
 | `PUT /api/auth/me/avatar` | req | raw image body (`image/webp`, `image/jpeg` or `image/png`, <= 300 KB, magic bytes must match the Content-Type) -> `{user}`; 10/hour/user; publishes `user.updated` |
 | `DELETE /api/auth/me/avatar` | req | removes the picture -> `{user}`; publishes `user.updated` |
+| `DELETE /api/auth/me` | req | `{password}` -> 204: deletes the account (settings and picture cascade), revokes all its tokens (`auth:revoked-user:<id>`) and publishes `user.deleted` in one transaction - if Redis can't take either, nothing is deleted (503). 403 wrong password, 5 tries/10 min/user |
 | `GET /api/users/:idOrUsername/avatar` | - | the image; `?v=<version>` matching the current picture -> `Cache-Control: immutable` (1 year), else 5 min; ETag/304; `nosniff` + sandbox CSP |
 | `GET /api/users/:username` | - | `{user: PublicUser}` (case-insensitive), 404 |
 | `GET /api/users?ids=a,b` | - | <= 100 ids (400 above), invalid uuids ignored, order preserved |
@@ -21,13 +22,15 @@ schema `auth` (`users`, `user_settings`, `avatars`), migrated at startup. Fastif
 - Passwords: bcryptjs cost 10 (async). Unknown logins still run a bcrypt compare against a dummy hash
   so response time doesn't reveal whether an account exists.
 - Tokens: HS256 JWTs from `@cubetype/common` (`sub` = user id, `username`, `jti`), valid for 30 days.
-  Every service verifies them with `makeAuth`, which also rejects revoked `jti`s.
+  Every service verifies them with `makeAuth`, which also rejects revoked `jti`s and every token of a deleted
+  account (issued at or before `auth:revoked-user:<id>`).
 - Profile pictures: the browser crops/resizes to a 256x256 WebP/JPEG (~20-40 KB) before uploading, so the server
   never decodes images (no native image libraries in the bundle): it checks the declared type against the file's
   magic bytes, caps the size and stores the bytes in `auth.avatars` (bytea, migration `002_avatars`).
   `users.avatar_version` (first 12 hex chars of the SHA-256) is part of `avatarUrl`, so every new picture gets a new
   URL that browsers and caches can keep forever.
-- Events published: `user.registered`, `user.updated` (SPEC section 8 fields incl. `avatarUrl`, eventId `auth-<uuid>`).
+- Events published: `user.registered`, `user.updated` (SPEC section 8 fields incl. `avatarUrl`, eventId `auth-<uuid>`),
+  `user.deleted` (`userId, username`: solve, stats and leaderboard delete the account's data).
 - Readiness gates on Postgres + migrations. Redis is soft: when it is down, register/login/profile
   still work (rate limits fail open after 500 ms, revocation checks fail open, event publishing is
   skipped with a warning after 1.5 s); only logout returns 503 because the revocation could not be stored.

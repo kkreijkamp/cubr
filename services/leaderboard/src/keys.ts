@@ -14,6 +14,7 @@ import { isEventId } from '@cubetype/cubestats';
 //   lb:users                         hash  userId -> JSON {username, country, avatarUrl}
 //   lb:flagged                       list  rejected (anti-cheat) entries, newest first, capped
 //   lb:meta:built / lb:rebuild-lock  string
+//   lb:deleted-users                 set   deleted accounts (their events are ignored)
 // ---------------------------------------------------------------------------------------------
 
 export const KINDS = ['single', 'ao5', 'ao12'] as const;
@@ -34,6 +35,26 @@ export const FLAGGED_KEY = 'lb:flagged';
 export const FLAGGED_MAX = 1000;
 export const META_BUILT_KEY = 'lb:meta:built';
 export const REBUILD_LOCK_KEY = 'lb:rebuild-lock';
+export const DELETED_USERS_KEY = 'lb:deleted-users';
+
+/**
+ * What removing a deleted account takes for each lb:* key: HDEL from the per-board :at / :ts
+ * hashes, ZREM from the boards; the bookkeeping keys are left alone (lb:users and lb:flagged are
+ * cleaned separately).
+ */
+export function purgePlan(keys: string[]): { op: 'zrem' | 'hdel'; key: string }[] {
+  const skip = new Set([USERS_KEY, FLAGGED_KEY, META_BUILT_KEY, REBUILD_LOCK_KEY, DELETED_USERS_KEY]);
+  return keys.filter((k) => !skip.has(k)).map((key) => ({ op: key.endsWith(':at') || key.endsWith(':ts') ? 'hdel' : 'zrem', key }));
+}
+
+/** Whether an lb:flagged entry (JSON) is about this user. */
+export function flaggedBy(entry: string, userId: string): boolean {
+  try {
+    return (JSON.parse(entry) as { userId?: unknown }).userId === userId;
+  } catch {
+    return false;
+  }
+}
 
 export const DAILY_TTL_SEC = 3 * 86_400;
 export const WEEKLY_TTL_SEC = 15 * 86_400;

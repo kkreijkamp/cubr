@@ -268,7 +268,8 @@ Two later migrations add the bookkeeping that keeps the read model exact (detail
 projection, tombstones for deleted solves, the tail for incremental mo3/ao50/ao100),
 `deleted_sessions`, `pb_outbox` (transactional outbox for `pb.updated`), `user_totals.tz` (last
 timezone seen) and `hourly.dnfs`; `003_session_names` - `sessions` (display name per session for
-the history chart).
+the history chart); `004_deleted_users` - `deleted_users` (tombstones of deleted accounts: their rows
+are gone and later events for them are ignored).
 
 ### 7.4 `scramble` schema (scramble-service)
 ```sql
@@ -291,9 +292,10 @@ trigram/lower index on person name for search.
 ### 7.6 Redis keyspace
 | Key | Type | Owner | Purpose |
 |---|---|---|---|
-| `cubetype:events` | Stream (MAXLEN ~200000) | solve/auth/stats publish | domain event bus, consumer groups `stats`, `leaderboard` |
+| `cubetype:events` | Stream (MAXLEN ~200000) | solve/auth/stats publish | domain event bus, consumer groups `stats`, `leaderboard`, `solve` (user.deleted only) |
 | `cubetype:events:dlq` | Stream | consumers | dead letters: entries a consumer group could not handle |
 | `auth:revoked:<jti>` | string, TTL = token remaining life | auth | logout / revocation |
+| `auth:revoked-user:<userId>` | string (unix seconds), TTL 30 d | auth | account deleted: every token issued at or before then is revoked |
 | `rl:<scope>:<key>` | counter, TTL | any | rate limiting |
 | `scramble:pool:<event>` | list | scramble | pre-generated scrambles |
 | `lb:<event>:<kind>:all` | zset (score=ms, member=userId) | leaderboard | all-time boards |
@@ -303,6 +305,7 @@ trigram/lower index on person name for search.
 | `lb:users` | hash userId -> JSON {username,country,avatarUrl} | leaderboard | display info |
 | `lb:flagged` | list | leaderboard | results rejected by the anti-cheat check |
 | `lb:meta:built` / `lb:rebuild-lock` | string | leaderboard | marks boards as rebuilt after Redis loss / one rebuilding replica |
+| `lb:deleted-users` | set | leaderboard | deleted accounts: removed from every board, later events for them ignored |
 | `race:room:<id>` (+ `:conns`, `:chat`) | string JSON, hash, list | race | room state, connected sockets per pod, last 50 chat messages (shared across replicas) |
 | `race:rooms`, `race:pods`, `race:lock:<id>` | zset, zset, string | race | public lobby, pod heartbeats, per-room lock |
 | `cache:stats:global` | string JSON, TTL 10 s | stats | global counters |
@@ -321,6 +324,7 @@ to `cubetype:events:dlq`. Use `publishEvent()` / `consumeEvents()` from common.
 |---|---|---|
 | `user.registered` | auth | `userId, username, displayName, country, wcaId, createdAt, avatarUrl` |
 | `user.updated` | auth | same as above |
+| `user.deleted` | auth | `userId, username` - the account is gone: solve deletes its sessions, solves and daily attempts; stats and leaderboard delete its rows and ignore later events for it (tombstones) |
 | `solve.created` | solve | `userId, username, event, sessionId, sessionName, solveId, timeMs, penalty, effectiveMs (int or null=DNF), createdAt, tz, source, rolling: {ao5, ao12}` (rolling = session's current ao5/ao12 *including* this solve; ms, -1 DNF, null n/a); daily-challenge solves also carry `dailyDate, dailyIndex` |
 | `solve.updated` | solve | same fields as created (new values) |
 | `solve.deleted` | solve | `userId, username, event, sessionId, solveId, timeMs, penalty, createdAt, tz, source` |
@@ -355,6 +359,7 @@ type PB = { valueMs: number; solveId: string|null; achievedAt: string };
 | PUT `/api/auth/me/settings` | req | `{settings: object}` (<= 16 KB JSON) | `{settings}` |
 | PUT `/api/auth/me/avatar` | req | raw image body, `Content-Type: image/webp\|image/jpeg\|image/png`, <= 300 KB (magic bytes must match) | `{user: PrivateUser}`; 400, 413, 429 (10/h) (+ `user.updated`) |
 | DELETE `/api/auth/me/avatar` | req | - | `{user: PrivateUser}` (+ `user.updated`) |
+| DELETE `/api/auth/me` | req | `{password}` | 204: the account is deleted and every token of it revoked (+ `user.deleted`, which makes the other services delete its data); 403 wrong password; 429 after 5 tries/10 min; 503 when Redis can't take the revocation or the event (then nothing is deleted) |
 | GET `/api/users/:idOrUsername/avatar` | - | `?v=` version | image bytes (immutable cache when `v` matches, ETag/304); 404 |
 | GET `/api/users/:username` | - | - | `{user: PublicUser}`; 404 |
 | GET `/api/users?ids=a,b,c` | - | <= 100 ids | `{users: PublicUser[]}` |

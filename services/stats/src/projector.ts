@@ -9,10 +9,20 @@ import {
   solveChangedSchema,
   solveCreatedSchema,
   solvesImportedSchema,
+  userDeletedSchema,
   userEventSchema,
   type SolveCreated, sessionRenamedSchema, sessionsMergedSchema} from './eventSchemas.js';
 import { recomputeEvent, type RecomputeDeps } from './recompute.js';
+import { CACHE_KEY as GLOBAL_CACHE_KEY } from './routes/global.js';
 import { ensureUser, loadPbs, lockUser, markProcessed, queuePbUpdated, refreshTotals, upsertPb } from './store.js';
+
+/** Every stats table with a user_id column (all of a deleted account's rows go). */
+export const USER_TABLES = ['user_totals', 'personal_bests', 'pb_history', 'daily_activity', 'hourly', 'solve_ledger', 'deleted_sessions', 'sessions'] as const;
+
+async function isDeletedUser(c: PoolClient, userId: string): Promise<boolean> {
+  const { rowCount } = await c.query('SELECT 1 FROM stats.deleted_users WHERE user_id = $1', [userId]);
+  return (rowCount ?? 0) > 0;
+}
 
 export interface ProjectorDeps {
   pool: Pool;
@@ -52,6 +62,10 @@ export function createProjector(deps: ProjectorDeps) {
       await lockUser(c, userId);
       if (!(await markProcessed(c, eventId))) {
         log.debug({ eventId }, 'duplicate event skipped');
+        return 0;
+      }
+      if (await isDeletedUser(c, userId)) {
+        log.debug({ eventId, userId }, 'event for a deleted account skipped');
         return 0;
       }
       return (await fn(c)) ?? 0;
@@ -282,8 +296,27 @@ export function createProjector(deps: ProjectorDeps) {
     });
   }
 
+  // ---- user.deleted: the account is gone - drop every row of it and keep a tombstone, so events
+  //      for it still on the way (a late solve.created, a queued pb.updated) are ignored
+  async function onUserDeleted(evt: EventEnvelope) {
+    const d = await payload(userDeletedSchema, evt);
+    if (!d) return;
+    await withTx(pool, async (c) => {
+      await lockUser(c, d.userId);
+      if (!(await markProcessed(c, d.eventId))) return;
+      await c.query('INSERT INTO stats.deleted_users (user_id) VALUES ($1) ON CONFLICT DO NOTHING', [d.userId]);
+      for (const table of USER_TABLES) await c.query(`DELETE FROM stats.${table} WHERE user_id = $1`, [d.userId]);
+      await c.query(`DELETE FROM stats.pb_outbox WHERE payload->>'userId' = $1`, [d.userId]);
+    });
+    // the global counters include the account's solves until their 10 s cache runs out
+    await deps.redis.del(GLOBAL_CACHE_KEY).catch(() => 0);
+    log.info({ userId: d.userId }, 'deleted the stats of a deleted account');
+  }
+
   return async function handle(evt: EventEnvelope): Promise<void> {
     switch (evt.type) {
+      case 'user.deleted':
+        return onUserDeleted(evt);
       case 'user.registered':
       case 'user.updated':
         return onUser(evt);

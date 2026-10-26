@@ -210,6 +210,8 @@ export const api = {
     /** PUT the raw image bytes (image/webp | image/jpeg | image/png, <= 300 KB) -> user with the new avatarUrl. */
     uploadAvatar: (blob: Blob) => request<{ user: PrivateUser }>('PUT', '/api/auth/me/avatar', blob, { timeoutMs: 30_000 }),
     removeAvatar: () => request<{ user: PrivateUser }>('DELETE', '/api/auth/me/avatar'),
+    /** Deletes the account and everything in it; the password is asked again (403 if wrong). */
+    deleteMe: (password: string) => request<void>('DELETE', '/api/auth/me', { password }),
     user: (username: string, signal?: AbortSignal) => get<{ user: PublicUser }>(`/api/users/${enc(username)}`, signal),
     users: (ids: string[]) => get<{ users: PublicUser[] }>(`/api/users${qs({ ids: ids.join(',') })}`),
   },

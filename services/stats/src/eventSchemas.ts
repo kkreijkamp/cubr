@@ -18,6 +18,7 @@ export const CONSUMED_TYPES = [
   'session.renamed',
   'sessions.merged',
   'solves.imported',
+  'user.deleted',
 ] as const;
 
 export const userEventSchema = z.object({
@@ -25,6 +26,11 @@ export const userEventSchema = z.object({
   userId: uuid,
   username: z.string().min(1).max(64),
   createdAt: isoDate.nullish(),
+});
+
+export const userDeletedSchema = z.object({
+  eventId: z.string().min(1),
+  userId: uuid,
 });
 
 export const solveCreatedSchema = z.object({

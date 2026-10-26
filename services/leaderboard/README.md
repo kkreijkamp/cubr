@@ -14,7 +14,9 @@ Readiness gates on Redis. Fastify on :8080.
 **Events consumed** (group `leaderboard`, consumer = pod name): `pb.updated` -> all-time boards (exact
 ZADD, ZREM when null/-1; stale events are dropped via a per-user occurredAt guard in `<board>:ts`);
 `solve.created` -> daily + weekly boards for the single and rolling ao5 (`ZADD LT`, DNF skipped);
-`daily.completed` -> `lb:dc:<date>:<event>`; `user.*` and every payload with a `username` -> `lb:users`.
+`daily.completed` -> `lb:dc:<date>:<event>`; `user.*` and every payload with a `username` -> `lb:users`;
+`user.deleted` -> the user leaves every board (SCAN `lb:*`: ZREM / HDEL `:at` `:ts`), `lb:users` and `lb:flagged`, and
+goes into `lb:deleted-users`, so later events for them are ignored.
 Score + achievedAt (`<board>:at` hash) are written atomically by small Lua scripts (`src/scripts.ts`).
 
 Decisions / simplifications:

@@ -1,18 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DELETED_USERS_KEY,
+  FLAGGED_KEY,
+  META_BUILT_KEY,
   PERIOD_KINDS,
+  REBUILD_LOCK_KEY,
+  USERS_KEY,
   allTimeKey,
   atKey,
   boardKey,
   challengeKey,
   currentPeriodKey,
   dailyKey,
+  flaggedBy,
   hasBoards,
   isKind,
   isValidDay,
   isValidWeek,
   isoWeeksInYear,
   pageRange,
+  purgePlan,
   rankAt,
   tsKey,
   weeklyKey,
@@ -81,5 +88,25 @@ describe('paging / ranks', () => {
   it('rank = absolute position + 1', () => {
     expect(rankAt(0, 0)).toBe(1);
     expect(rankAt(20, 4)).toBe(25);
+  });
+});
+
+describe('deleting an account', () => {
+  const U = '00000000-0000-4000-8000-000000000001';
+  it('removes the user from boards (ZREM) and their :at / :ts hashes (HDEL), not from the bookkeeping keys', () => {
+    const board = allTimeKey('333', 'single');
+    const keys = [board, atKey(board), tsKey(board), dailyKey('333', 'ao5', '2026-10-26'), challengeKey('2026-10-26', '333'), USERS_KEY, FLAGGED_KEY, META_BUILT_KEY, REBUILD_LOCK_KEY, DELETED_USERS_KEY];
+    expect(purgePlan(keys)).toEqual([
+      { op: 'zrem', key: board },
+      { op: 'hdel', key: atKey(board) },
+      { op: 'hdel', key: tsKey(board) },
+      { op: 'zrem', key: dailyKey('333', 'ao5', '2026-10-26') },
+      { op: 'zrem', key: challengeKey('2026-10-26', '333') },
+    ]);
+  });
+  it('finds their anti-cheat entries', () => {
+    expect(flaggedBy(JSON.stringify({ userId: U, valueMs: 1000 }), U)).toBe(true);
+    expect(flaggedBy(JSON.stringify({ userId: 'someone-else' }), U)).toBe(false);
+    expect(flaggedBy('not json', U)).toBe(false);
   });
 });

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   AdjustmentsHorizontalIcon,
   ArrowDownTrayIcon,
@@ -25,18 +25,21 @@ import {
   SpeakerWaveIcon,
   SwatchIcon,
   TrashIcon,
+  UserMinusIcon,
 } from '@heroicons/react/24/outline';
 import { CsTimerFormatError, EVENTS, parseTimerFile, toCsTimerExport, type TimerImport } from '@cubetype/cubestats';
+import { Modal } from '../components/Modal';
 import { csTimerFileName, skippedNotes } from '../components/social/util';
 import { ConfirmModal } from '../components/timer/Dialogs';
 import { playPbSound } from '../components/timer/feedback';
 import { AVG_CHOICES, parseAvgKey } from '../components/timer/statsUtil';
 import '../components/timer/settings-page.css';
+import { ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { formatNumber } from '../lib/format';
 import { applyVisualSettings, DEFAULT_SETTINGS, FONTS, updateSettings, useSettings, type Settings } from '../lib/settings';
 import { SCHEMES, stickerColour, type Scheme } from '../lib/scrambleNet';
-import { clearLocalData, exportAll, importSessions, localDataSummary, useSolveState } from '../lib/solves';
+import { clearLocalData, exportAll, forgetUser, importSessions, localDataSummary, useSolveState } from '../lib/solves';
 import { applyTheme, isLightTheme, randomTheme, THEMES, themeLabel, type Theme } from '../lib/themes';
 import { toast } from '../lib/toast';
 
@@ -195,9 +198,10 @@ function download(name: string, text: string) {
 
 export default function SettingsPage() {
   const s = useSettings();
-  const { status } = useAuth();
+  const { status, user } = useAuth();
+  const navigate = useNavigate();
   const solveState = useSolveState();
-  const [confirm, setConfirm] = useState<'clear' | 'reset' | null>(null);
+  const [confirm, setConfirm] = useState<'clear' | 'reset' | 'account' | null>(null);
   const [local, setLocal] = useState(() => localDataSummary());
 
   useEffect(() => setLocal(localDataSummary()), [solveState.sessions, solveState.solves]);
@@ -422,8 +426,35 @@ export default function SettingsPage() {
             reset settings
           </button>
         </SettingRow>
+        {status === 'authed' && user && (
+          <SettingRow
+            icon={<UserMinusIcon width={16} height={16} />}
+            title="delete account"
+            description={
+              <>
+                Delete <span className="main">{user.username}</span> and everything in it: your solves and sessions, stats, leaderboard places, profile and settings. Export your
+                solves first (data, above) if you want to keep them. Guest data in this browser is not affected. <span className="error">You can't undo this.</span>
+              </>
+            }
+          >
+            <button className="btn danger" onClick={() => setConfirm('account')}>
+              delete account
+            </button>
+          </SettingRow>
+        )}
       </Section>
 
+      {confirm === 'account' && user && (
+        <DeleteAccountModal
+          username={user.username}
+          onDeleted={() => {
+            forgetUser(user.id);
+            toast.notice('your account has been deleted');
+            navigate('/');
+          }}
+          onClose={() => setConfirm(null)}
+        />
+      )}
       {confirm === 'clear' && (
         <ConfirmModal
           title="clear guest data"
@@ -466,6 +497,65 @@ function Section({ id, title, children }: { id: string; title: string; children:
       </h2>
       <div className="st-section-body">{children}</div>
     </section>
+  );
+}
+
+/** Deleting the account: the password is asked again, then it's gone for good. */
+function DeleteAccountModal({ username, onDeleted, onClose }: { username: string; onDeleted: () => void; onClose: () => void }) {
+  const { deleteAccount } = useAuth();
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    if (!password || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteAccount(password);
+      onDeleted();
+    } catch (e) {
+      setError(e instanceof ApiError && e.status === 403 ? 'wrong password' : (e as Error).message || "couldn't delete the account, try again");
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal title="delete account" onClose={onClose} center>
+      <form
+        className="stack"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void submit();
+        }}
+      >
+        <div className="dialog-message">
+          Delete <span className="main">{username}</span> with all its solves, sessions, stats and leaderboard places? <span className="error">This can't be undone.</span>
+        </div>
+        <div className="field">
+          <label htmlFor="delete-account-password">type your password to confirm</label>
+          <input
+            id="delete-account-password"
+            type="password"
+            autoComplete="current-password"
+            autoFocus
+            maxLength={128}
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setError(null);
+            }}
+          />
+          {error && <div className="error-text">{error}</div>}
+        </div>
+        <div className="dialog-actions">
+          <button type="button" className="btn" onClick={onClose}>
+            cancel
+          </button>
+          <button type="submit" className="btn danger" disabled={!password || busy}>
+            {busy ? 'deleting...' : 'delete account'}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 

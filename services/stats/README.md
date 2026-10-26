@@ -20,7 +20,11 @@ for personal bests (emits `pb.updated`, consumed by leaderboard).
 ## Events
 Consumes (group `stats`, consumer = `POD_NAME`): `user.registered`, `user.updated`, `solve.created`,
 `solve.updated`, `solve.deleted`, `session.deleted`, `session.renamed`, `sessions.merged`,
-`solves.imported`. Produces: `pb.updated`.
+`solves.imported`, `user.deleted`. Produces: `pb.updated`.
+
+`user.deleted` removes every row of the account (all tables with a `user_id`, plus its queued
+`pb.updated`) and leaves a tombstone in `deleted_users`; any later event for that user (a late
+`solve.created`, a re-delivery) is skipped.
 
 * **solve.created** - incremental fast path: user_totals (+raw `timeMs` = time spent cubing),
   daily_activity (day in the event's `tz`), hourly, PBs: single (effective time), ao5/ao12 from the

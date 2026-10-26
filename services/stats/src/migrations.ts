@@ -96,4 +96,14 @@ CREATE TABLE stats.sessions (
 CREATE INDEX sessions_user ON stats.sessions (user_id);
 `,
   },
+  {
+    // Tombstones for deleted accounts (user.deleted): their rows are removed and any later
+    // event for them (a late solve.created, a pb.updated already in flight) is ignored.
+    id: '004_deleted_users',
+    sql: `
+CREATE TABLE stats.deleted_users (
+  user_id uuid PRIMARY KEY, deleted_at timestamptz NOT NULL DEFAULT now()
+);
+`,
+  },
 ];

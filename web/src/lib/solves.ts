@@ -1216,6 +1216,25 @@ export function localDataSummary(): { sessions: number; solves: number } {
   return countLocal(readLocal(true));
 }
 
+/** Forgets what this browser keeps for an account (after deleting it): its offline copy and unsent changes. */
+export function forgetUser(uid: string): void {
+  queue = queue.filter((q) => q.userId !== uid);
+  saveQueue();
+  if (loadJson<{ userId?: unknown } | null>(CLOUD_CACHE_KEY, null)?.userId === uid) {
+    try {
+      localStorage.removeItem(CLOUD_CACHE_KEY);
+    } catch {
+      /* ignore */
+    }
+  }
+  const last = loadJson<Record<string, unknown>>(LAST_SESSION_KEY, {});
+  if (last && typeof last === 'object' && uid in last) {
+    const { [uid]: _gone, ...rest } = last;
+    saveJson(LAST_SESSION_KEY, rest);
+  }
+  publish();
+}
+
 /** Deletes every guest session/solve stored in this browser (does not touch cloud data). */
 export function clearLocalData(): void {
   try {

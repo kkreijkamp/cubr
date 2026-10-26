@@ -25,6 +25,10 @@ Users only ever see their own rows; foreign ids return 404. A solve always gets 
 `X-Timezone` (valid IANA name, else `UTC`) is copied into events as `tz`. Tokens revoked by logout are rejected
 (Redis lookup via common's `makeAuth`; fails open while Redis is down).
 
+## Events consumed
+Group `solve`: only `user.deleted` (from auth) - deletes the account's sessions, solves, daily attempts and its
+events still waiting in the outbox (`src/purge.ts`).
+
 ## Events produced (stream `cubetype:events`, `eventId = solve-<outboxId>`)
 `solve.created` (with `rolling` = session's current ao5/ao12 incl. this solve, and `sessionName`), `solve.updated`,
 `solve.deleted`, `session.deleted`, `session.renamed`, `sessions.merged`, `solves.imported`, `daily.completed`. Each is inserted into `solve.outbox` **in the same
