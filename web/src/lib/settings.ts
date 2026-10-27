@@ -42,6 +42,8 @@ export interface Settings {
   virtualView: 'UF' | 'URF';
   /** virtual (and smart) cube: how far the stickers float off a hollow cube, as csTimer draws it (0-100; 0 = a solid cube) */
   virtualFloat: number;
+  /** virtual (and smart) cube: the dark edge round each sticker (0-100; 50 = the cube's own, 0 = none) */
+  virtualOutline: number;
   /** virtual puzzle: your own keys, per puzzle (input/virtual/keymap); none = csTimer's layout */
   virtualKeys: KeyMaps;
   /** smart cube: when a scramble counts as done (csTimer "mark scrambled after"): matching the scramble, n seconds without a move, or never */
@@ -81,6 +83,7 @@ export const DEFAULT_SETTINGS: Settings = {
   virtualSpeed: 100,
   virtualView: 'UF',
   virtualFloat: 30,
+  virtualOutline: 50,
   virtualKeys: {},
   smartScrambled: 'scramble',
   smartSpace: true,
@@ -119,6 +122,8 @@ function sanitize(raw: Partial<Settings> | null | undefined): Settings {
   oneOf('virtualView', ['UF', 'URF']);
   if (typeof s.virtualFloat !== 'number' || !Number.isFinite(s.virtualFloat)) s.virtualFloat = DEFAULT_SETTINGS.virtualFloat;
   s.virtualFloat = Math.round(Math.max(0, Math.min(100, s.virtualFloat)));
+  if (typeof s.virtualOutline !== 'number' || !Number.isFinite(s.virtualOutline)) s.virtualOutline = DEFAULT_SETTINGS.virtualOutline;
+  s.virtualOutline = Math.round(Math.max(0, Math.min(100, s.virtualOutline)));
   oneOf('smartScrambled', ['scramble', '2', '3', '4', '5', 'never']);
   oneOf('smartView', ['3D', '2D', 'off']);
   oneOf('smartTurnMark', ['off', 'x4', 'xi2']);

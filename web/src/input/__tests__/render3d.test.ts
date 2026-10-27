@@ -38,15 +38,36 @@ describe('floating stickers (csTimer’s hollow cube)', () => {
     expect(fills.filter((f) => f.color === '#000000').length).toBe(27);
   });
 
-  it('floating: every sticker, no plastic, the far side first and in the shade', () => {
+  it('floating: every sticker, the far side first and in the shade', () => {
     const { ctx, fills } = recorder();
-    drawPoly(ctx, 400, 400, cube.twisty.puzzle, cube.solved(), cam, palette, [], { float: 0.3 });
+    drawPoly(ctx, 400, 400, cube.twisty.puzzle, cube.solved(), cam, palette, [], { float: 0.3, outline: 0 });
     expect(fills.length).toBe(54);
     expect(fills.some((f) => f.color === '#000000')).toBe(false);
     const own = new Set(palette.faces);
     // the 27 far stickers, shaded, then the 27 near ones in their own colours
     expect(fills.slice(0, 27).every((f) => !own.has(f.color))).toBe(true);
     expect(fills.slice(27).every((f) => own.has(f.color))).toBe(true);
+  });
+
+  it('outlines each sticker with a plate of its own (none at 0)', () => {
+    const at = (float: number, outline: number) => {
+      const { ctx, fills } = recorder();
+      drawPoly(ctx, 400, 400, cube.twisty.puzzle, cube.solved(), cam, palette, [], { float, outline });
+      return { plates: fills.filter((f) => f.color === '#000000'), stickers: fills.filter((f) => f.color !== '#000000') };
+    };
+    // floating: a plate under every sticker, near and far
+    const floating = at(0.3, 1);
+    expect(floating.plates.length).toBe(54);
+    expect(floating.stickers.length).toBe(54);
+    // the thicker the outline, the smaller the sticker on its plate
+    for (const float of [0, 0.3]) {
+      const thin = at(float, 0.5);
+      const thick = at(float, 2);
+      expect(width(thick.plates)).toBeCloseTo(width(thin.plates), 6);
+      expect(width(thick.stickers)).toBeLessThan(width(thin.stickers));
+      // no outline: the sticker covers its plate
+      expect(width(at(float, 0).stickers)).toBeCloseTo(width(thin.plates), 6);
+    }
   });
 
   it('floats further apart the further it goes, still inside the view', () => {
@@ -68,6 +89,6 @@ describe('floating stickers (csTimer’s hollow cube)', () => {
     const { ctx, fills } = recorder();
     const mv = cube.parse('R')![0];
     drawPoly(ctx, 400, 400, cube.twisty.puzzle, cube.solved(), cam, palette, [{ move: mv, angle: cube.twisty.puzzle.angle(mv) / 2 }], { float: 0.3 });
-    expect(fills.length).toBe(54);
+    expect(fills.length).toBe(108);
   });
 });

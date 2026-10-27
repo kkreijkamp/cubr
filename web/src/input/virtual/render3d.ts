@@ -101,18 +101,33 @@ function mix(a: string, b: string, t: number): string {
   return '#' + [0, 1, 2].map((i) => Math.round(ch(ca, i) * (1 - t) + ch(cb, i) * t).toString(16).padStart(2, '0')).join('');
 }
 
-/** the stickers alone, off a hollow puzzle: the far side's seen from inside, in the shade. Far ones
- * first; at rest the puzzle is convex, so the far side all goes first */
-function drawFloating(ctx: CanvasRenderingContext2D, pc: Projected, puzzle: PolyPuzzle, palette: Palette, turning: Turning[], color: (slot: number) => string, round: number, float: number) {
+// the stickers for an outline other than the puzzle's own: the last asked for, per puzzle
+const outlined = new WeakMap<PolyPuzzle, { gap: number; stickers: Vec[][] }>();
+
+/** each slot's sticker, `gap` in from its edges */
+function stickersAt(puzzle: PolyPuzzle, gap: number): Vec[][] {
+  if (Math.abs(gap - puzzle.gap) < 1e-9) return puzzle.slots.map((s) => s.sticker);
+  const kept = outlined.get(puzzle);
+  if (kept && Math.abs(kept.gap - gap) < 1e-9) return kept.stickers;
+  const stickers = puzzle.slots.map((s) => (gap <= 1e-9 ? s.poly : inset(s.poly, gap, s.normal)));
+  outlined.set(puzzle, { gap, stickers });
+  return stickers;
+}
+
+/** the stickers alone, off a hollow puzzle, each on a plate as wide as its outline: the far side's
+ * seen from inside, in the shade. Far ones first; at rest the puzzle is convex, so the far side all
+ * goes first */
+function drawFloating(ctx: CanvasRenderingContext2D, pc: Projected, puzzle: PolyPuzzle, stickers: Vec[][], palette: Palette, turning: Turning[], color: (slot: number) => string, round: number, float: number) {
   const k = 1 - FLOAT_SHRINK * float;
+  const plates = stickers.some((st, i) => st !== puzzle.slots[i].poly);
   const shade = new Map<string, string>();
   const drawn = puzzle.slots.map((s, i) => {
     const t = turning.find((tt) => puzzle.selects(tt.move, s.center));
     const m = t ? rotation(puzzle.axes[t.move.axis].n, t.angle) : IDENTITY;
     const lift = scale(s.normal, FLOAT_LIFT * float * dot(s.center, s.normal));
-    const pts = s.sticker.map((v) => apply(m, add(add(s.center, scale(sub(v, s.center), k)), lift)));
+    const place = (v: Vec) => apply(m, add(add(s.center, scale(sub(v, s.center), k)), lift));
     const center = apply(m, add(s.center, lift));
-    return { i, pts, depth: apply(pc.view, center)[2], front: facing(pc.eye, apply(m, s.normal), center) };
+    return { i, plate: plates ? s.poly.map(place) : null, pts: stickers[i].map(place), depth: apply(pc.view, center)[2], front: facing(pc.eye, apply(m, s.normal), center) };
   });
   const still = turning.length === 0;
   drawn.sort((a, b) => (still && a.front !== b.front ? (a.front ? 1 : -1) : a.depth - b.depth));
@@ -122,6 +137,7 @@ function drawFloating(ctx: CanvasRenderingContext2D, pc: Projected, puzzle: Poly
       if (!shade.has(c)) shade.set(c, mix(c, palette.body, 0.35));
       c = shade.get(c)!;
     }
+    if (d.plate) plate(ctx, d.plate.map(pc.project), palette.body);
     sticker(ctx, d.pts.map(pc.project), c, round);
   }
 }
@@ -131,6 +147,8 @@ export interface PolyOptions {
   colorOf?: (slot: number) => string;
   /** 0: a solid puzzle; up to 1: the stickers float off a hollow one, smaller and further out */
   float?: number;
+  /** the dark edge round each sticker, as a share of the puzzle's own (1, the default); 0: none */
+  outline?: number;
 }
 
 /**
@@ -143,9 +161,10 @@ export function drawPoly(ctx: CanvasRenderingContext2D, width: number, height: n
   const pc = camera(float > 0 ? { ...cam, radius: cam.radius * (1 + FLOAT_LIFT * float) } : cam, width, height);
   const round = Math.max(1, Math.min(width, height) / 160);
   const color = opts.colorOf ?? ((slot: number) => palette.faces[puzzle.slots[state[slot]].face] ?? palette.body);
+  const stickers = stickersAt(puzzle, puzzle.gap * Math.max(0, opts.outline ?? 1));
 
   if (float > 0) {
-    drawFloating(ctx, pc, puzzle, palette, turning, color, round, float);
+    drawFloating(ctx, pc, puzzle, stickers, palette, turning, color, round, float);
     return;
   }
 
@@ -153,7 +172,7 @@ export function drawPoly(ctx: CanvasRenderingContext2D, width: number, height: n
     puzzle.slots.forEach((s, i) => {
       if (!facing(pc.eye, s.normal, s.center)) return;
       plate(ctx, s.poly.map(pc.project), palette.body);
-      sticker(ctx, s.sticker.map(pc.project), color(i), round);
+      sticker(ctx, stickers[i].map(pc.project), color(i), round);
     });
     return;
   }
@@ -213,7 +232,7 @@ export function drawPoly(ctx: CanvasRenderingContext2D, width: number, height: n
       );
       sticker(
         ctx,
-        slot.sticker.map((v) => pc.project(apply(s.m, v))),
+        stickers[k].map((v) => pc.project(apply(s.m, v))),
         color(k),
         round,
       );

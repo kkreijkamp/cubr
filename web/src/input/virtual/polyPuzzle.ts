@@ -50,6 +50,8 @@ export class PolyPuzzle {
   readonly slots: Slot[];
   readonly axes: Axis[];
   readonly faces: { plane: Plane; color: number }[];
+  /** gap between a sticker and the edge of its slot (PolyDef.gap) */
+  readonly gap: number;
   /** each face's outline */
   readonly facePolys: (Vec[] | null)[];
   /** the cross-section of the solid at each cut, per axis (dark caps drawn while a layer turns) */
@@ -59,6 +61,7 @@ export class PolyPuzzle {
   constructor(def: PolyDef) {
     this.axes = def.axes;
     this.faces = def.faces;
+    this.gap = def.gap;
     const planes = def.faces.map((f) => f.plane);
     // every distinct cut plane (an axis and its opposite share theirs)
     const cuts: Plane[] = [];

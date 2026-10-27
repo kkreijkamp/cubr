@@ -634,19 +634,12 @@ function InputGroup() {
           />
         </SettingRow>
         <SettingRow title="floating stickers" description="The virtual and smart cubes drawn as csTimer draws them: stickers floating off a hollow cube, the far side seen through the gaps. Further right they float further apart; all the way left, a solid cube.">
-          <FloatPreview settings={s} />
-          <input
-            className="st-range"
-            type="range"
-            min={0}
-            max={100}
-            step={5}
-            value={s.virtualFloat}
-            onChange={(e) => updateSettings({ virtualFloat: Number(e.target.value) })}
-            aria-label="floating stickers"
-            aria-valuetext={s.virtualFloat === 0 ? 'solid' : `${s.virtualFloat}%`}
-          />
-          <span className="st-range-value">{s.virtualFloat === 0 ? 'solid' : `${s.virtualFloat}%`}</span>
+          <CubePreview settings={s} />
+          <Slider label="floating stickers" value={s.virtualFloat} zero="solid" onChange={set('virtualFloat')} />
+        </SettingRow>
+        <SettingRow title="sticker outline" description="The dark edge round each sticker of the virtual and smart cubes. Halfway is the cube's own; further right it's thicker, all the way left there's none.">
+          <CubePreview settings={s} />
+          <Slider label="sticker outline" value={s.virtualOutline} zero="none" onChange={set('virtualOutline')} />
         </SettingRow>
       </Group>
       <Group title="smart cube">
@@ -708,8 +701,19 @@ function InputGroup() {
   );
 }
 
-/** a solved cube drawn as the virtual cube is, to see the floating stickers while setting them */
-function FloatPreview({ settings: s }: { settings: Settings }) {
+/** 0 to 100 in fives, the value beside it (`zero` names 0) */
+function Slider({ label, value, zero, onChange }: { label: string; value: number; zero: string; onChange: (v: number) => void }) {
+  const text = value === 0 ? zero : `${value}%`;
+  return (
+    <>
+      <input className="st-range" type="range" min={0} max={100} step={5} value={value} onChange={(e) => onChange(Number(e.target.value))} aria-label={label} aria-valuetext={text} />
+      <span className="st-range-value">{text}</span>
+    </>
+  );
+}
+
+/** a solved cube drawn as the virtual cube is, to see its look while setting it */
+function CubePreview({ settings: s }: { settings: Settings }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const canvas = ref.current;
@@ -721,7 +725,7 @@ function FloatPreview({ settings: s }: { settings: Settings }) {
     const ctx = canvas.getContext('2d')!;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, size, size);
-    drawPoly(ctx, size, size, model.twisty.puzzle, model.solved(), baseCamera(model, s.virtualView), puzzlePalette('cube', s), [], { float: s.virtualFloat / 100 });
+    drawPoly(ctx, size, size, model.twisty.puzzle, model.solved(), baseCamera(model, s.virtualView), puzzlePalette('cube', s), [], { float: s.virtualFloat / 100, outline: s.virtualOutline / 50 });
   }, [s]);
   return <canvas ref={ref} className="st-float-preview" aria-hidden="true" />;
 }

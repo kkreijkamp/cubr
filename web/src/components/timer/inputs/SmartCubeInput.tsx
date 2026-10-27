@@ -30,7 +30,7 @@ interface Props {
   timerUpdate: TimerUpdate;
   sizeRem: number;
   pb: boolean;
-  settings: Pick<Settings, 'stickerColours' | 'customStickers' | 'virtualSpeed' | 'virtualView' | 'virtualFloat' | 'smartScrambled' | 'smartSpace' | 'smartBeep' | 'smartView' | 'smartTurnMark' | 'smartReset'>;
+  settings: Pick<Settings, 'stickerColours' | 'customStickers' | 'virtualSpeed' | 'virtualView' | 'virtualFloat' | 'virtualOutline' | 'smartScrambled' | 'smartSpace' | 'smartBeep' | 'smartView' | 'smartTurnMark' | 'smartReset'>;
   onState: (s: TimerState) => void;
   /** a solve; `scramble`: the one worked out from a cube scrambled by hand */
   onSolve: (r: { timeMs: number; penalty: Penalty }, scramble?: string) => void;
@@ -400,7 +400,8 @@ export function SmartCubeInput(p: Props) {
         dirty.current = false;
         const ctx = canvas.getContext('2d')!;
         ctx.clearRect(0, 0, size.w, size.h);
-        paint(ctx, size.w, size.h, v, flat, cam.current ?? baseCamera(v.model, 'UF'), palette, props.current.settings.virtualFloat / 100);
+        const look = { float: props.current.settings.virtualFloat / 100, outline: props.current.settings.virtualOutline / 50 };
+        paint(ctx, size.w, size.h, v, flat, cam.current ?? baseCamera(v.model, 'UF'), palette, look);
       }
       raf = requestAnimationFrame(frame);
     };
@@ -524,7 +525,7 @@ export function SmartCubeInput(p: Props) {
   );
 }
 
-function paint(ctx: CanvasRenderingContext2D, w: number, h: number, v: CubeView, flat: boolean, cam: Camera, palette: Palette, float: number) {
+function paint(ctx: CanvasRenderingContext2D, w: number, h: number, v: CubeView, flat: boolean, cam: Camera, palette: Palette, look: { float: number; outline: number }) {
   const puzzle = v.model.twisty.puzzle;
   if (flat) {
     const colors: string[] = [];
@@ -536,5 +537,5 @@ function paint(ctx: CanvasRenderingContext2D, w: number, h: number, v: CubeView,
     const mv = v.model.canonical(a.move);
     return { move: mv, angle: puzzle.angle(mv) * smooth(a.progress) };
   });
-  drawPoly(ctx, w, h, puzzle, v.shown, cam, palette, turning, { float });
+  drawPoly(ctx, w, h, puzzle, v.shown, cam, palette, turning, look);
 }
