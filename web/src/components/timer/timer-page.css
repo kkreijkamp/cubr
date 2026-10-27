@@ -392,6 +392,12 @@
 .tp-virtual-canvas canvas {
   display: block;
 }
+/* a virtual puzzle is what's being solved: it gets the room (the page scrolls to the stats) */
+.input-virtual .tp-virtual-canvas,
+.input-qcube .tp-virtual-canvas {
+  width: clamp(22rem, 42vw, 46rem);
+  height: clamp(18rem, 54vh, 40rem);
+}
 .tp-virtual-side {
   position: relative;
   justify-self: start;
@@ -453,6 +459,11 @@
   .tp-virtual-canvas {
     width: min(100%, 30rem);
     height: clamp(12rem, 36vh, 20rem);
+  }
+  .input-virtual .tp-virtual-canvas,
+  .input-qcube .tp-virtual-canvas {
+    width: 100%;
+    height: clamp(16rem, 50vh, 32rem);
   }
   .tp-virtual-bar {
     flex-direction: row;
