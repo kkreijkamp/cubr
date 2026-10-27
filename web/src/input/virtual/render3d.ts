@@ -28,6 +28,8 @@ export interface Camera {
 interface Projected {
   view: Mat;
   eye: Vec;
+  /** pixels to a puzzle unit at the centre of the puzzle */
+  unit: number;
   project(v: Vec): [number, number];
 }
 
@@ -41,6 +43,7 @@ function camera(cam: Camera, width: number, height: number): Projected {
   return {
     view,
     eye,
+    unit: fit / d,
     project(v) {
       const q = apply(view, v);
       const s = fit / (d - q[2]);
@@ -101,25 +104,61 @@ function mix(a: string, b: string, t: number): string {
   return '#' + [0, 1, 2].map((i) => Math.round(ch(ca, i) * (1 - t) + ch(cb, i) * t).toString(16).padStart(2, '0')).join('');
 }
 
-// the stickers for an outline other than the puzzle's own: the last asked for, per puzzle
-const outlined = new WeakMap<PolyPuzzle, { gap: number; stickers: Vec[][] }>();
-
-/** each slot's sticker, `gap` in from its edges */
-function stickersAt(puzzle: PolyPuzzle, gap: number): Vec[][] {
-  if (Math.abs(gap - puzzle.gap) < 1e-9) return puzzle.slots.map((s) => s.sticker);
-  const kept = outlined.get(puzzle);
-  if (kept && Math.abs(kept.gap - gap) < 1e-9) return kept.stickers;
-  const stickers = puzzle.slots.map((s) => (gap <= 1e-9 ? s.poly : inset(s.poly, gap, s.normal)));
-  outlined.set(puzzle, { gap, stickers });
-  return stickers;
+/** a convex polygon on screen, `w` pixels in from every edge (null when that leaves nothing) */
+export function insetOnScreen(pts: [number, number][], w: number): [number, number][] | null {
+  const p = pts.filter((q, i) => Math.hypot(q[0] - pts[(i + 1) % pts.length][0], q[1] - pts[(i + 1) % pts.length][1]) > 1e-6);
+  const n = p.length;
+  if (n < 3) return null;
+  let area = 0;
+  for (let i = 0; i < n; i++) area += p[i][0] * p[(i + 1) % n][1] - p[(i + 1) % n][0] * p[i][1];
+  if (Math.abs(area) < 1e-9) return null;
+  const side = area > 0 ? 1 : -1;
+  // each edge moved in by w, as a point and a direction
+  const lines = p.map((a, i) => {
+    const b = p[(i + 1) % n];
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const d: [number, number] = [(b[0] - a[0]) / len, (b[1] - a[1]) / len];
+    return { o: [a[0] - side * d[1] * w, a[1] + side * d[0] * w] as [number, number], d };
+  });
+  const out: [number, number][] = [];
+  for (let i = 0; i < n; i++) {
+    const l1 = lines[(i + n - 1) % n];
+    const l2 = lines[i];
+    const det = l1.d[0] * l2.d[1] - l1.d[1] * l2.d[0];
+    if (Math.abs(det) < 1e-9) {
+      out.push(l2.o);
+      continue;
+    }
+    const t = ((l2.o[0] - l1.o[0]) * l2.d[1] - (l2.o[1] - l1.o[1]) * l2.d[0]) / det;
+    out.push([l1.o[0] + l1.d[0] * t, l1.o[1] + l1.d[1] * t]);
+  }
+  // gone too far: an edge turned round
+  for (let i = 0; i < n; i++) {
+    const a = out[i];
+    const b = out[(i + 1) % n];
+    if ((b[0] - a[0]) * lines[i].d[0] + (b[1] - a[1]) * lines[i].d[1] <= 0) return null;
+  }
+  return out;
 }
 
-/** the stickers alone, off a hollow puzzle, each on a plate as wide as its outline: the far side's
- * seen from inside, in the shade. Far ones first; at rest the puzzle is convex, so the far side all
- * goes first */
-function drawFloating(ctx: CanvasRenderingContext2D, pc: Projected, puzzle: PolyPuzzle, stickers: Vec[][], palette: Palette, turning: Turning[], color: (slot: number) => string, round: number, float: number) {
+/** the outline in pixels: `outline` times what the puzzle's own gap shows at the centre (`gap` px less the
+ * sticker's rounding), a little less, as it showed on the slant of a face in view (before it was the
+ * same all round) */
+const edgeWidth = (gap: number, outline: number, round: number) => Math.max(0, outline * (0.8 * gap - round / 2));
+
+/** a sticker on its plate (drawn already), `w` pixels in from the plate's edges however the plate is turned */
+function onPlate(ctx: CanvasRenderingContext2D, plateAt: [number, number][], color: string, round: number, w: number) {
+  // the rounding stroke reaches half its width out again
+  const pts = insetOnScreen(plateAt, w + round / 2);
+  if (pts) sticker(ctx, pts, color, round);
+}
+
+/** the stickers alone, off a hollow puzzle, each on a plate of its own (when there's an outline):
+ * the far side's seen from inside, in the shade. Far ones first; at rest the puzzle is convex, so
+ * the far side all goes first */
+function drawFloating(ctx: CanvasRenderingContext2D, pc: Projected, puzzle: PolyPuzzle, palette: Palette, turning: Turning[], color: (slot: number) => string, round: number, float: number, outline: number) {
   const k = 1 - FLOAT_SHRINK * float;
-  const plates = stickers.some((st, i) => st !== puzzle.slots[i].poly);
+  const w = edgeWidth(puzzle.gap * k * pc.unit, outline, round);
   const shade = new Map<string, string>();
   const drawn = puzzle.slots.map((s, i) => {
     const t = turning.find((tt) => puzzle.selects(tt.move, s.center));
@@ -127,7 +166,7 @@ function drawFloating(ctx: CanvasRenderingContext2D, pc: Projected, puzzle: Poly
     const lift = scale(s.normal, FLOAT_LIFT * float * dot(s.center, s.normal));
     const place = (v: Vec) => apply(m, add(add(s.center, scale(sub(v, s.center), k)), lift));
     const center = apply(m, add(s.center, lift));
-    return { i, plate: plates ? s.poly.map(place) : null, pts: stickers[i].map(place), depth: apply(pc.view, center)[2], front: facing(pc.eye, apply(m, s.normal), center) };
+    return { i, pts: s.poly.map(place), depth: apply(pc.view, center)[2], front: facing(pc.eye, apply(m, s.normal), center) };
   });
   const still = turning.length === 0;
   drawn.sort((a, b) => (still && a.front !== b.front ? (a.front ? 1 : -1) : a.depth - b.depth));
@@ -137,8 +176,9 @@ function drawFloating(ctx: CanvasRenderingContext2D, pc: Projected, puzzle: Poly
       if (!shade.has(c)) shade.set(c, mix(c, palette.body, 0.35));
       c = shade.get(c)!;
     }
-    if (d.plate) plate(ctx, d.plate.map(pc.project), palette.body);
-    sticker(ctx, d.pts.map(pc.project), c, round);
+    const at = d.pts.map(pc.project);
+    if (w > 0) plate(ctx, at, palette.body);
+    onPlate(ctx, at, c, round, w);
   }
 }
 
@@ -147,7 +187,8 @@ export interface PolyOptions {
   colorOf?: (slot: number) => string;
   /** 0: a solid puzzle; up to 1: the stickers float off a hollow one, smaller and further out */
   float?: number;
-  /** the dark edge round each sticker, as a share of the puzzle's own (1, the default); 0: none */
+  /** the dark edge round each sticker, as a share of the puzzle's own (1, the default); 0: none. As
+   * wide on screen all the way round a sticker, however it's turned */
   outline?: number;
 }
 
@@ -161,18 +202,20 @@ export function drawPoly(ctx: CanvasRenderingContext2D, width: number, height: n
   const pc = camera(float > 0 ? { ...cam, radius: cam.radius * (1 + FLOAT_LIFT * float) } : cam, width, height);
   const round = Math.max(1, Math.min(width, height) / 160);
   const color = opts.colorOf ?? ((slot: number) => palette.faces[puzzle.slots[state[slot]].face] ?? palette.body);
-  const stickers = stickersAt(puzzle, puzzle.gap * Math.max(0, opts.outline ?? 1));
+  const outline = Math.max(0, opts.outline ?? 1);
 
   if (float > 0) {
-    drawFloating(ctx, pc, puzzle, stickers, palette, turning, color, round, float);
+    drawFloating(ctx, pc, puzzle, palette, turning, color, round, float, outline);
     return;
   }
 
+  const w = edgeWidth(puzzle.gap * pc.unit, outline, round);
   if (turning.length === 0) {
     puzzle.slots.forEach((s, i) => {
       if (!facing(pc.eye, s.normal, s.center)) return;
-      plate(ctx, s.poly.map(pc.project), palette.body);
-      sticker(ctx, stickers[i].map(pc.project), color(i), round);
+      const at = s.poly.map(pc.project);
+      plate(ctx, at, palette.body);
+      onPlate(ctx, at, color(i), round, w);
     });
     return;
   }
@@ -225,17 +268,9 @@ export function drawPoly(ctx: CanvasRenderingContext2D, width: number, height: n
       const normal = apply(s.m, slot.normal);
       const center = apply(s.m, slot.center);
       if (!facing(pc.eye, normal, center)) return;
-      plate(
-        ctx,
-        slot.poly.map((v) => pc.project(apply(s.m, v))),
-        palette.body,
-      );
-      sticker(
-        ctx,
-        stickers[k].map((v) => pc.project(apply(s.m, v))),
-        color(k),
-        round,
-      );
+      const at = slot.poly.map((v) => pc.project(apply(s.m, v)));
+      plate(ctx, at, palette.body);
+      onPlate(ctx, at, color(k), round, w);
     });
     void i;
   }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { modelFor, type PolyModel } from '../virtual/models';
-import { drawPoly, type Camera, type Palette } from '../virtual/render3d';
+import { drawPoly, insetOnScreen, type Camera, type Palette } from '../virtual/render3d';
 
 /** a canvas that only remembers what it filled, in order */
 function recorder() {
@@ -65,9 +65,64 @@ describe('floating stickers (csTimer’s hollow cube)', () => {
       const thick = at(float, 2);
       expect(width(thick.plates)).toBeCloseTo(width(thin.plates), 6);
       expect(width(thick.stickers)).toBeLessThan(width(thin.stickers));
-      // no outline: the sticker covers its plate
-      expect(width(at(float, 0).stickers)).toBeCloseTo(width(thin.plates), 6);
+      expect(width(at(float, 0).stickers)).toBeGreaterThan(width(thin.stickers));
     }
+  });
+
+  it('keeps the outline as wide all round, however a sticker is turned on screen', () => {
+    const near = (a: [number, number][] | null, b: [number, number][]) => {
+      expect(a).not.toBeNull();
+      a!.forEach((p, i) => {
+        expect(p[0]).toBeCloseTo(b[i][0], 9);
+        expect(p[1]).toBeCloseTo(b[i][1], 9);
+      });
+    };
+    const square: [number, number][] = [
+      [0, 0],
+      [10, 0],
+      [10, 10],
+      [0, 10],
+    ];
+    near(insetOnScreen(square, 2), [
+      [2, 2],
+      [8, 2],
+      [8, 8],
+      [2, 8],
+    ]);
+    // the other way round, the same
+    near(insetOnScreen([...square].reverse(), 2), [
+      [2, 8],
+      [8, 8],
+      [8, 2],
+      [2, 2],
+    ]);
+    // a plate seen at a slant: every edge of the sticker 1.5 px in from its plate's
+    const slanted: [number, number][] = [
+      [0, 0],
+      [40, 8],
+      [44, 30],
+      [3, 20],
+    ];
+    const pts = insetOnScreen(slanted, 1.5)!;
+    pts.forEach((p, i) => {
+      const [a, b] = [slanted[i], slanted[(i + 1) % 4]];
+      const q = pts[(i + 1) % 4];
+      const dist = (v: [number, number]) => Math.abs((b[0] - a[0]) * (a[1] - v[1]) - (a[0] - v[0]) * (b[1] - a[1])) / Math.hypot(b[0] - a[0], b[1] - a[1]);
+      expect(dist(p)).toBeCloseTo(1.5, 9);
+      expect(dist(q)).toBeCloseTo(1.5, 9);
+    });
+    // seen edge on: nothing left inside the outline
+    expect(
+      insetOnScreen(
+        [
+          [0, 0],
+          [30, 0],
+          [30, 2],
+          [0, 2],
+        ],
+        1.5,
+      ),
+    ).toBeNull();
   });
 
   it('floats further apart the further it goes, still inside the view', () => {
@@ -89,6 +144,8 @@ describe('floating stickers (csTimer’s hollow cube)', () => {
     const { ctx, fills } = recorder();
     const mv = cube.parse('R')![0];
     drawPoly(ctx, 400, 400, cube.twisty.puzzle, cube.solved(), cam, palette, [{ move: mv, angle: cube.twisty.puzzle.angle(mv) / 2 }], { float: 0.3 });
-    expect(fills.length).toBe(108);
+    // a plate turned edge on is all outline
+    expect(fills.filter((f) => f.color === '#000000').length).toBe(54);
+    expect(fills.length).toBeGreaterThan(54 + 45);
   });
 });
