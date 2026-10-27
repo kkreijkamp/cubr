@@ -184,6 +184,12 @@
   color: var(--sub-color);
   font-variant-numeric: tabular-nums;
 }
+.tp-menu-hint {
+  grid-column: 2 / 4;
+  margin-top: -0.2rem;
+  color: var(--sub-color);
+  font-size: 0.7rem;
+}
 .tp-menu-sep {
   height: 2px;
   background: var(--sub-alt-color);
