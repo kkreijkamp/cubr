@@ -38,15 +38,18 @@ describe('floating stickers (csTimer’s hollow cube)', () => {
     expect(fills.filter((f) => f.color === '#000000').length).toBe(27);
   });
 
-  it('floating: every sticker, the far side first and in the shade', () => {
+  it('floating: every sticker in its own colour, the far side first', () => {
+    const solid = recorder();
+    drawPoly(solid.ctx, 400, 400, cube.twisty.puzzle, cube.solved(), cam, palette, []);
+    const near = new Set(solid.fills.map((f) => f.color).filter((c) => c !== '#000000'));
+    expect(near.size).toBe(3);
     const { ctx, fills } = recorder();
     drawPoly(ctx, 400, 400, cube.twisty.puzzle, cube.solved(), cam, palette, [], { float: 0.3, outline: 0 });
     expect(fills.length).toBe(54);
-    expect(fills.some((f) => f.color === '#000000')).toBe(false);
-    const own = new Set(palette.faces);
-    // the 27 far stickers, shaded, then the 27 near ones in their own colours
-    expect(fills.slice(0, 27).every((f) => !own.has(f.color))).toBe(true);
-    expect(fills.slice(27).every((f) => own.has(f.color))).toBe(true);
+    expect(fills.every((f) => palette.faces.includes(f.color))).toBe(true);
+    // the 27 far stickers, then the 27 in sight
+    expect(fills.slice(0, 27).every((f) => !near.has(f.color))).toBe(true);
+    expect(fills.slice(27).every((f) => near.has(f.color))).toBe(true);
   });
 
   it('outlines each sticker with a plate of its own (none at 0)', () => {

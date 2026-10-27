@@ -95,15 +95,6 @@ export interface Turning {
 const FLOAT_SHRINK = 0.4;
 const FLOAT_LIFT = 0.25;
 
-/** a hex colour this part of the way to another */
-function mix(a: string, b: string, t: number): string {
-  const ca = /^#[0-9a-f]{6}$/i.test(a) ? a : null;
-  const cb = /^#[0-9a-f]{6}$/i.test(b) ? b : null;
-  if (!ca || !cb) return a;
-  const ch = (c: string, i: number) => parseInt(c.slice(1 + 2 * i, 3 + 2 * i), 16);
-  return '#' + [0, 1, 2].map((i) => Math.round(ch(ca, i) * (1 - t) + ch(cb, i) * t).toString(16).padStart(2, '0')).join('');
-}
-
 /** a convex polygon on screen, `w` pixels in from every edge (null when that leaves nothing) */
 export function insetOnScreen(pts: [number, number][], w: number): [number, number][] | null {
   const p = pts.filter((q, i) => Math.hypot(q[0] - pts[(i + 1) % pts.length][0], q[1] - pts[(i + 1) % pts.length][1]) > 1e-6);
@@ -154,12 +145,11 @@ function onPlate(ctx: CanvasRenderingContext2D, plateAt: [number, number][], col
 }
 
 /** the stickers alone, off a hollow puzzle, each on a plate of its own (when there's an outline):
- * the far side's seen from inside, in the shade. Far ones first; at rest the puzzle is convex, so
- * the far side all goes first */
+ * the far side's seen from inside, in its own colours. Far ones first; at rest the puzzle is convex,
+ * so the far side all goes first */
 function drawFloating(ctx: CanvasRenderingContext2D, pc: Projected, puzzle: PolyPuzzle, palette: Palette, turning: Turning[], color: (slot: number) => string, round: number, float: number, outline: number) {
   const k = 1 - FLOAT_SHRINK * float;
   const w = edgeWidth(puzzle.gap * k * pc.unit, outline, round);
-  const shade = new Map<string, string>();
   const drawn = puzzle.slots.map((s, i) => {
     const t = turning.find((tt) => puzzle.selects(tt.move, s.center));
     const m = t ? rotation(puzzle.axes[t.move.axis].n, t.angle) : IDENTITY;
@@ -171,14 +161,9 @@ function drawFloating(ctx: CanvasRenderingContext2D, pc: Projected, puzzle: Poly
   const still = turning.length === 0;
   drawn.sort((a, b) => (still && a.front !== b.front ? (a.front ? 1 : -1) : a.depth - b.depth));
   for (const d of drawn) {
-    let c = color(d.i);
-    if (!d.front) {
-      if (!shade.has(c)) shade.set(c, mix(c, palette.body, 0.35));
-      c = shade.get(c)!;
-    }
     const at = d.pts.map(pc.project);
     if (w > 0) plate(ctx, at, palette.body);
-    onPlate(ctx, at, c, round, w);
+    onPlate(ctx, at, color(d.i), round, w);
   }
 }
 
