@@ -449,6 +449,35 @@
     transform: translateX(-50%);
   }
 }
+/* hardware timers and cubes: the timer as usual, a quiet status line under it */
+.tp-hardware {
+  display: grid;
+  justify-items: center;
+  gap: 0.6rem;
+  width: 100%;
+}
+.tp-hardware-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem 0.9rem;
+  min-height: 1.75rem;
+  font-size: 0.8rem;
+  text-align: center;
+}
+.tp-hardware-bar .btn-text {
+  padding: 0.3rem 0.5rem;
+}
+.tp-hardware-select {
+  max-width: 16rem;
+  padding: 0.25rem 0.5rem;
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--sub-color);
+  background: var(--sub-alt-color);
+  border-radius: var(--roundness);
+}
 .tp-input-note {
   color: var(--sub-color);
   font-size: 0.9rem;

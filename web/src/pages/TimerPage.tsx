@@ -31,6 +31,7 @@ import { AverageModal } from '../components/timer/AverageModal';
 import { QuickActions } from '../components/timer/QuickActions';
 import { ManualEntry } from '../components/timer/ManualEntry';
 import { VirtualInput } from '../components/timer/inputs/VirtualInput';
+import { StackmatInput } from '../components/timer/inputs/StackmatInput';
 import { AVAILABLE_INPUTS, INPUT_MODES, modeInfo, updateInput, useInputState, type InputMode } from '../input/inputMode';
 import { ConfirmModal, PromptModal } from '../components/timer/Dialogs';
 import { MergeSessionsModal } from '../components/timer/MergeSessionsModal';
@@ -515,6 +516,25 @@ export default function TimerPage() {
       <div className={`tp-timer-area input-${input}`} {...(input === 'timer' ? engine.touchHandlers : {})} aria-label={input !== 'timer' ? undefined : touch ? 'timer: hold to get ready, release to start' : 'timer'}>
         {manual ? (
           <ManualEntry onSubmit={(r) => record(r, 'manual')} disabled={modal !== null || paletteOpen} />
+        ) : input === 'stackmat' || input === 'moyu' ? (
+          <StackmatInput
+            key={input}
+            kind={input}
+            enabled={inputsEnabled}
+            inspection={settings.inspection && eventInfo.inspection}
+            alerts={settings.inspectionAlerts}
+            useStatus={settings.stackmatStatus}
+            last={lastResult}
+            precision={settings.precision}
+            timerUpdate={settings.timerUpdate}
+            sizeRem={settings.timerSize}
+            pb={pb && isIdle}
+            onState={setAltState}
+            onSolve={(r) => {
+              lastStopAt.current = performance.now();
+              record(r, 'timer');
+            }}
+          />
         ) : input === 'virtual' || input === 'qcube' ? (
           <VirtualInput
             key={input}

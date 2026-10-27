@@ -593,6 +593,9 @@ function InputGroup() {
           onChange={(mode) => updateInput({ mode })}
         />
       </SettingRow>
+      <SettingRow title="stackmat status" description="Use the stackmat's status signals: hands on the mat, the green light. Off, a solve is the time counting up and stopping (csTimer's option, for timers that send no status).">
+        <Options value={s.stackmatStatus} options={onOff} onChange={set('stackmatStatus')} />
+      </SettingRow>
       <SettingRow title="virtual turn speed" description="How long each turn of the virtual puzzle takes to animate (csTimer's base speed). Queued turns go quicker.">
         <Options
           value={s.virtualSpeed}

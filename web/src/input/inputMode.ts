@@ -25,7 +25,7 @@ export const INPUT_MODES: InputModeInfo[] = [
 ];
 
 /** the ways of entering times the timer page has so far */
-export const AVAILABLE_INPUTS: InputMode[] = ['timer', 'typing', 'virtual', 'qcube'];
+export const AVAILABLE_INPUTS: InputMode[] = ['timer', 'typing', 'stackmat', 'moyu', 'virtual', 'qcube'];
 
 export interface DeviceInputState {
   mode: InputMode;
