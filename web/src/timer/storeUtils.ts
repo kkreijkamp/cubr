@@ -65,6 +65,8 @@ interface LocalSessionRow {
   id: string;
   name: string;
   event: string;
+  /** only stored when true */
+  practice?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -158,7 +160,15 @@ export function decodeLocalDb(raw: unknown, isEvent: (id: string) => boolean): {
       }
     }
     const sorted = sortChrono(list);
-    db.sessions.push({ id: row.id, name, event, createdAt, updatedAt: validIso(row.updatedAt, createdAt), solveCount: sorted.length });
+    db.sessions.push({
+      id: row.id,
+      name,
+      event,
+      ...(row.practice === true ? { practice: true } : {}),
+      createdAt,
+      updatedAt: validIso(row.updatedAt, createdAt),
+      solveCount: sorted.length,
+    });
     db.solves.set(row.id, sorted);
   }
   db.current = isStr(file.current) && seen.has(file.current) ? file.current : null;
@@ -171,7 +181,7 @@ export function decodeLocalDb(raw: unknown, isEvent: (id: string) => boolean): {
 export function encodeLocalDb(db: LocalDb): string {
   const file: LocalDbFile = {
     v: 1,
-    sessions: db.sessions.map(({ id, name, event, createdAt, updatedAt }) => ({ id, name, event, createdAt, updatedAt })),
+    sessions: db.sessions.map(({ id, name, event, practice, createdAt, updatedAt }) => ({ id, name, event, ...(practice ? { practice } : {}), createdAt, updatedAt })),
     solves: {},
     current: db.current,
     lastByEvent: db.lastByEvent,
@@ -186,8 +196,9 @@ export const QUEUE_KEY = 'cubetype.queue.v1';
 
 export type SyncOp =
   /** keepCreatedAt: send createdAt too (a cleared session's replacement keeps the old one's place) */
-  | { kind: 'createSession'; session: { id: string; name: string; event: string; createdAt: string }; keepCreatedAt?: boolean }
+  | { kind: 'createSession'; session: { id: string; name: string; event: string; practice?: boolean; createdAt: string }; keepCreatedAt?: boolean }
   | { kind: 'renameSession'; id: string; name: string }
+  | { kind: 'setPractice'; id: string; practice: boolean }
   | { kind: 'deleteSession'; id: string }
   | { kind: 'createSolve'; solve: NewSolve & { event: string; createdAt: string } }
   | { kind: 'updateSolve'; id: string; sessionId: string; patch: { penalty?: Penalty; comment?: string | null } }
@@ -201,7 +212,7 @@ export interface QueuedOp {
   createdAt: number;
 }
 
-const OP_KINDS = new Set(['createSession', 'renameSession', 'deleteSession', 'createSolve', 'updateSolve', 'deleteSolve']);
+const OP_KINDS = new Set(['createSession', 'renameSession', 'setPractice', 'deleteSession', 'createSolve', 'updateSolve', 'deleteSolve']);
 
 export function decodeQueue(raw: unknown): QueuedOp[] {
   if (!Array.isArray(raw)) return [];
@@ -216,7 +227,7 @@ const solveIdOf = (op: SyncOp): string | null =>
 const sessionIdOf = (op: SyncOp): string | null =>
   op.kind === 'createSession'
     ? op.session.id
-    : op.kind === 'renameSession' || op.kind === 'deleteSession'
+    : op.kind === 'renameSession' || op.kind === 'setPractice' || op.kind === 'deleteSession'
       ? op.id
       : op.kind === 'createSolve'
         ? op.solve.sessionId
@@ -260,6 +271,16 @@ export function coalesce(queue: QueuedOp[], next: QueuedOp, inflightOpId: string
     const rest = queue.filter((q) => !(editable(q) && q.op.kind === 'renameSession' && q.op.id === op.id));
     return [...rest, next];
   }
+  if (op.kind === 'setPractice') {
+    const i = queue.findIndex((q) => editable(q) && q.op.kind === 'createSession' && q.op.session.id === op.id);
+    if (i >= 0) {
+      const create = queue[i].op as Extract<SyncOp, { kind: 'createSession' }>;
+      const merged: QueuedOp = { ...queue[i], op: { ...create, session: { ...create.session, practice: op.practice } } };
+      return queue.map((q, k) => (k === i ? merged : q));
+    }
+    const rest = queue.filter((q) => !(editable(q) && q.op.kind === 'setPractice' && q.op.id === op.id));
+    return [...rest, next];
+  }
   if (op.kind === 'deleteSession') {
     const created = queue.some((q) => editable(q) && q.op.kind === 'createSession' && q.op.session.id === op.id);
     const rest = queue.filter((q) => !(editable(q) && sessionIdOf(q.op) === op.id));
@@ -286,6 +307,8 @@ export function overlaySessions(server: Session[], ops: SyncOp[]): Session[] {
       }
     } else if (op.kind === 'renameSession') {
       out = out.map((s) => (s.id === op.id ? { ...s, name: op.name } : s));
+    } else if (op.kind === 'setPractice') {
+      out = out.map((s) => (s.id === op.id ? { ...s, practice: op.practice } : s));
     } else if (op.kind === 'deleteSession') {
       out = out.filter((s) => s.id !== op.id);
     }

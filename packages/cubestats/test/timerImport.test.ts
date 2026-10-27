@@ -17,7 +17,7 @@ describe('cubetype export', () => {
           { id: '2', sessionId: 'a', event: '333', timeMs: 12000, penalty: 'DNF', scramble: 'F2', comment: 'oops', source: 'timer', createdAt: '2026-10-03T00:00:00.000Z' },
         ],
       },
-      { id: 'b', name: 'pyra', event: 'pyram', createdAt: '', updatedAt: '', solveCount: 1, solves: [{ id: '3', timeMs: 3100, penalty: '+2', scramble: "U L' b", comment: '', createdAt: '2026-10-04T00:00:00.000Z' }] },
+      { id: 'b', name: 'pyra', event: 'pyram', practice: true, createdAt: '', updatedAt: '', solveCount: 1, solves: [{ id: '3', timeMs: 3100, penalty: '+2', scramble: "U L' b", comment: '', createdAt: '2026-10-04T00:00:00.000Z' }] },
     ],
   };
 
@@ -28,6 +28,8 @@ describe('cubetype export', () => {
     expect(r.sessions[0].solves[0]).toEqual({ timeMs: 9876, penalty: 'OK', scramble: "R U R'", comment: null, createdAt: '2026-10-02T03:04:05.678Z' });
     expect(r.sessions[0].solves[1]).toMatchObject({ penalty: 'DNF', comment: 'oops' });
     expect(r.sessions[1].solves[0].penalty).toBe('+2');
+    // a practice session stays one
+    expect(r.sessions.map((s) => s.practice ?? false)).toEqual([false, true]);
   });
 
   it('exports to a csTimer file that reads back the same', () => {

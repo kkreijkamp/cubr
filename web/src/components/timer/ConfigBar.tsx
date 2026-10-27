@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import {
   ArrowPathIcon,
   ArrowsPointingInIcon,
+  BeakerIcon,
   CheckIcon,
   ChevronDownIcon,
   CloudIcon,
@@ -41,6 +42,8 @@ interface Props {
   onSession: (id: string) => void;
   onNewSession: () => void;
   onRenameSession: () => void;
+  /** a practice session counts for no pb or leaderboard (optional so older callers keep working) */
+  onTogglePractice?: () => void;
   onDeleteSession: () => void;
   /** "merge sessions..." (optional so older callers keep working) */
   onMergeSessions?: () => void;
@@ -84,6 +87,7 @@ export function ConfigBar(p: Props) {
           onSession={p.onSession}
           onNew={p.onNewSession}
           onRename={p.onRenameSession}
+          onTogglePractice={p.onTogglePractice}
           onDelete={p.onDeleteSession}
           onMerge={p.onMergeSessions}
         />
@@ -207,11 +211,14 @@ interface MenuProps {
   onSession: (id: string) => void;
   onNew: () => void;
   onRename: () => void;
+  onTogglePractice?: () => void;
   onDelete: () => void;
   onMerge?: () => void;
 }
 
-function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, onNew, onRename, onDelete, onMerge }: MenuProps) {
+const PRACTICE_TIP = 'practice session: no pbs or leaderboards';
+
+function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, onNew, onRename, onTogglePractice, onDelete, onMerge }: MenuProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useDismiss(open, setOpen, ref);
@@ -228,10 +235,12 @@ function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, 
         onClick={() => setOpen(!open)}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={`session: ${current?.name ?? 'none'}`}
+        aria-label={`session: ${current?.name ?? 'none'}${current?.practice ? ' (practice)' : ''}`}
+        data-tip={current?.practice && !open ? PRACTICE_TIP : undefined}
+        data-tip-pos="down"
         {...noFocus}
       >
-        <Square3Stack3DIcon width={14} height={14} />
+        {current?.practice ? <BeakerIcon width={14} height={14} /> : <Square3Stack3DIcon width={14} height={14} />}
         <span className="tp-session-name">{current?.name ?? '...'}</span>
         <ChevronDownIcon width={14} height={14} className="tp-chevron" />
       </button>
@@ -249,7 +258,10 @@ function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, 
                 {...noFocus}
               >
                 <span className="tp-menu-check">{s.id === current?.id && <CheckIcon width={14} height={14} />}</span>
-                <span className="tp-menu-label">{s.name}</span>
+                <span className="tp-menu-label">
+                  {s.name}
+                  {s.practice && <span className="tp-menu-tag">practice</span>}
+                </span>
                 <span className="tp-menu-count">{formatNumber(s.solveCount)}</span>
               </button>
             ))}
@@ -267,6 +279,22 @@ function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, 
             </span>
             <span className="tp-menu-label">rename</span>
           </button>
+          {onTogglePractice && (
+            <button
+              role="menuitemcheckbox"
+              aria-checked={!!current?.practice}
+              className={`tp-menu-item${current?.practice ? ' active' : ''}`}
+              onClick={act(onTogglePractice)}
+              disabled={!current}
+              {...noFocus}
+            >
+              <span className="tp-menu-check">
+                <BeakerIcon width={14} height={14} />
+              </span>
+              <span className="tp-menu-label">practice session</span>
+              <span className="tp-menu-hint">no pbs or leaderboards</span>
+            </button>
+          )}
           {onMerge && (
             <button
               role="menuitem"

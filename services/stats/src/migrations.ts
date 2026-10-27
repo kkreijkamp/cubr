@@ -106,4 +106,13 @@ CREATE TABLE stats.deleted_users (
 );
 `,
   },
+  {
+    // Practice sessions (their solves count for no PB): the flag rides on the session names, fed by
+    // solve.created / session.updated, every recompute (the internal solve list) and the backfill.
+    // The profile's history chart leaves these sessions out of its PB line.
+    id: '005_practice_sessions',
+    sql: `
+ALTER TABLE stats.sessions ADD COLUMN practice boolean NOT NULL DEFAULT false;
+`,
+  },
 ];

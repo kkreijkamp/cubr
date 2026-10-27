@@ -29,10 +29,10 @@ export function registerSessionRoutes(app: FastifyInstance, { pool, auth }: Rout
     const body = parse(createSessionBody, req.body ?? {});
     const id = body.id ?? randomUUID();
     const ins = await pool.query<SessionRow>(
-      `INSERT INTO solve.sessions (id, user_id, name, event, created_at) VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO solve.sessions (id, user_id, name, event, practice, created_at) VALUES ($1, $2, $3, $4, $5, $6)
        ON CONFLICT (id) DO NOTHING
-       RETURNING id, name, event, created_at, updated_at, 0 AS solve_count`,
-      [id, user.id, body.name, body.event, resolveCreatedAt(body.createdAt)],
+       RETURNING id, name, event, practice, created_at, updated_at, 0 AS solve_count`,
+      [id, user.id, body.name, body.event, body.practice, resolveCreatedAt(body.createdAt)],
     );
     if (ins.rowCount) return reply.code(201).send({ session: toSession(ins.rows[0]) });
     const existing = await getSession(pool, user.id, id);
@@ -40,23 +40,40 @@ export function registerSessionRoutes(app: FastifyInstance, { pool, auth }: Rout
     return reply.code(200).send({ session: toSession(existing) });
   });
 
+  // Rename and/or mark as practice. The row lock makes "did practice change?" exact under
+  // concurrent PATCHes, so session.updated is emitted once per real change.
   app.patch('/api/sessions/:id', authed, async (req) => {
     const user = currentUser(req);
     const { id } = parse(idParams, req.params);
-    const { name } = parse(patchSessionBody, req.body ?? {});
+    const { name, practice } = parse(patchSessionBody, req.body ?? {});
+    const tz = tzFrom(req);
     const row = await withTx(pool, async (client) => {
-      const { rows } = await client.query<SessionRow>(
-        `UPDATE solve.sessions s SET name = $3, updated_at = now() WHERE s.id = $1 AND s.user_id = $2
-         RETURNING s.id, s.name, s.event, s.created_at, s.updated_at,
-                   (SELECT count(*) FROM solve.solves v WHERE v.session_id = s.id) AS solve_count`,
-        [id, user.id, name],
+      const before = await client.query<{ practice: boolean }>(
+        'SELECT practice FROM solve.sessions WHERE id = $1 AND user_id = $2 FOR UPDATE',
+        [id, user.id],
       );
-      if (!rows[0]) throw notFound('session not found');
+      if (!before.rows[0]) throw notFound('session not found');
+      const { rows } = await client.query<SessionRow>(
+        `UPDATE solve.sessions s SET name = coalesce($3, s.name), practice = coalesce($4, s.practice), updated_at = now()
+          WHERE s.id = $1 AND s.user_id = $2
+         RETURNING s.id, s.name, s.event, s.practice, s.created_at, s.updated_at,
+                   (SELECT count(*) FROM solve.solves v WHERE v.session_id = s.id) AS solve_count`,
+        [id, user.id, name ?? null, practice ?? null],
+      );
+      const r = rows[0];
       // read models that show session names (stats) learn about the rename via the outbox
-      await enqueue(client, 'session.renamed', {
-        userId: user.id, username: user.username, sessionId: rows[0].id, event: rows[0].event, name: rows[0].name,
-      });
-      return rows[0];
+      if (name !== undefined) {
+        await enqueue(client, 'session.renamed', {
+          userId: user.id, username: user.username, sessionId: r.id, event: r.event, name: r.name,
+        });
+      }
+      // its solves now count for PBs, or no longer do: stats recomputes the event
+      if (practice !== undefined && practice !== before.rows[0].practice) {
+        await enqueue(client, 'session.updated', {
+          userId: user.id, username: user.username, sessionId: r.id, event: r.event, name: r.name, practice: r.practice, tz,
+        });
+      }
+      return r;
     });
     return { session: toSession(row) };
   });
@@ -82,7 +99,8 @@ export function registerSessionRoutes(app: FastifyInstance, { pool, auth }: Rout
   // Merge: move every solve of the source sessions into the target session, then delete the
   // (now empty) sources - all in one transaction. Only sessions of the same event can be merged
   // (a solve's event is its session's event). sessions.merged makes stats recompute the event's
-  // PBs, because combining sessions changes the within-session ao5/ao12 windows.
+  // PBs, because combining sessions changes the within-session ao5/ao12 windows. The target keeps
+  // its own practice flag, so merged-in solves count (or don't) as the target's do.
   app.post('/api/sessions/:id/merge', authed, async (req) => {
     const user = currentUser(req);
     const { id } = parse(idParams, req.params);
@@ -111,7 +129,7 @@ export function registerSessionRoutes(app: FastifyInstance, { pool, auth }: Rout
       await client.query('DELETE FROM solve.sessions WHERE user_id = $1 AND id = ANY($2::uuid[])', [user.id, sourceIds]);
       const { rows: updated } = await client.query<SessionRow>(
         `UPDATE solve.sessions s SET updated_at = now() WHERE s.id = $1
-         RETURNING s.id, s.name, s.event, s.created_at, s.updated_at,
+         RETURNING s.id, s.name, s.event, s.practice, s.created_at, s.updated_at,
                    (SELECT count(*) FROM solve.solves v WHERE v.session_id = s.id) AS solve_count`,
         [targetId],
       );

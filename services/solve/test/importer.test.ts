@@ -28,23 +28,24 @@ describe('planImport', () => {
       {
         name: 'main',
         event: '333',
+        practice: false,
         solves: [
           { timeMs: 9000, penalty: 'OK', scramble: 'R', createdAt: '2020-01-01T00:00:00.000Z' },
           { timeMs: 9500, penalty: 'DNF', scramble: 'U', comment: 'oops', createdAt: '2020-01-01T00:01:00.000Z' },
         ],
       },
-      { name: 'empty', event: '444', solves: [] },
-      { name: 'two', event: '222', solves: [{ timeMs: 3000, penalty: '+2', scramble: '', createdAt: '2020-01-02T00:00:00.000Z' }] },
+      { name: 'empty', event: '444', practice: false, solves: [] },
+      { name: 'two', event: '222', practice: true, solves: [{ timeMs: 3000, penalty: '+2', scramble: '', createdAt: '2020-01-02T00:00:00.000Z' }] },
     ],
   };
 
   it('assigns ids, links solves to their new session, collects events with solves', () => {
     let n = 0;
     const plan = planImport(body, () => `id-${n++}`);
-    expect(plan.sessions.map((s) => [s.id, s.name, s.event])).toEqual([
-      ['id-0', 'main', '333'],
-      ['id-3', 'empty', '444'],
-      ['id-4', 'two', '222'],
+    expect(plan.sessions.map((s) => [s.id, s.name, s.event, s.practice])).toEqual([
+      ['id-0', 'main', '333', false],
+      ['id-3', 'empty', '444', false],
+      ['id-4', 'two', '222', true],
     ]);
     expect(plan.rows.map((r) => [r.id, r.sessionId, r.event])).toEqual([
       ['id-1', 'id-0', '333'],
@@ -70,6 +71,7 @@ describe('toColumns', () => {
         {
           name: 's',
           event: '333',
+          practice: false,
           solves: [
             { timeMs: 1, penalty: 'OK', scramble: 'a"b\\c', createdAt: 'T1' },
             { timeMs: 2, penalty: '+2', scramble: '', comment: 'x', createdAt: 'T2' },

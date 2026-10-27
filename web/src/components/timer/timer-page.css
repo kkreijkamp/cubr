@@ -190,6 +190,11 @@
   color: var(--sub-color);
   font-size: 0.7rem;
 }
+.tp-menu-tag {
+  margin-left: 0.5em;
+  color: var(--sub-color);
+  font-size: 0.7rem;
+}
 .tp-menu-sep {
   height: 2px;
   background: var(--sub-alt-color);

@@ -131,7 +131,7 @@ export default function RaceRoomPage() {
     submit({ round: n, timeMs: r.timeMs, penalty: r.penalty });
     if (saveSolves && round && room) {
       const scramble = round.scramble;
-      ensureSession(room.event)
+      ensureSession(room.event, { counts: true })
         .then((s) => addSolve({ timeMs: r.timeMs, penalty: r.penalty, scramble, source: 'race', sessionId: s.id }))
         .catch(() => {
           if (!saveWarned.current) toast.error('could not save the race solve to your session');

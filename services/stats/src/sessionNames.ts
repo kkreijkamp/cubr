@@ -42,9 +42,9 @@ export function startSessionNameBackfill(deps: { pool: Pool; solveUrl: string; i
           );
           for (const s of res.sessions) {
             await c.query(
-              `INSERT INTO stats.sessions (session_id, user_id, event, name) VALUES ($1, $2, $3, $4)
+              `INSERT INTO stats.sessions (session_id, user_id, event, name, practice) VALUES ($1, $2, $3, $4, $5)
                ON CONFLICT (session_id) DO NOTHING`,
-              [s.id, userId, s.event, s.name],
+              [s.id, userId, s.event, s.name, s.practice === true],
             );
           }
           // ledger sessions solve-service no longer has: remember them as unnamed so we don't loop

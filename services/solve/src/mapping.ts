@@ -7,6 +7,7 @@ export interface SessionRow {
   id: string;
   name: string;
   event: string;
+  practice: boolean;
   created_at: Date;
   updated_at: Date;
   /** count(*) - the common pg type parser turns int8 into a JS number */
@@ -33,6 +34,8 @@ export interface Session {
   id: string;
   name: string;
   event: string;
+  /** its solves count for no personal best and no leaderboard */
+  practice: boolean;
   createdAt: string;
   updatedAt: string;
   solveCount: number;
@@ -66,6 +69,7 @@ export function toSession(row: SessionRow): Session {
     id: row.id,
     name: row.name,
     event: row.event,
+    practice: row.practice === true,
     createdAt: iso(row.created_at),
     updatedAt: iso(row.updated_at),
     solveCount: Number(row.solve_count ?? 0),

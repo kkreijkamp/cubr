@@ -23,6 +23,8 @@ export interface Session {
   id: string;
   name: string;
   event: string;
+  /** a practice session: its solves count for no personal best and no leaderboard (absent = no) */
+  practice?: boolean;
   createdAt: string;
   updatedAt: string;
   solveCount: number;

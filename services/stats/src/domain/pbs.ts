@@ -16,7 +16,12 @@ export interface ListSolve {
   timeMs: number;
   penalty: Penalty;
   createdAt: string;
+  /** in a practice session: counts for no PB */
+  practice?: boolean;
 }
+
+/** The solves that count for personal bests (a practice session's don't). */
+export const countsForPbs = (solves: ListSolve[]): ListSolve[] => (solves.some((s) => s.practice) ? solves.filter((s) => !s.practice) : solves);
 
 export interface PbValue {
   valueMs: number;
@@ -69,7 +74,8 @@ export function isImprovement(candidate: number | null | undefined, current: num
 /**
  * Personal bests from a user's full solve list for one event:
  *   single = best effective time; mo3/aoN = best rolling value within one session (bestRolling),
- *   min across sessions. DNF results never count as a PB. Ties keep the earliest achievement.
+ *   min across sessions. DNF results never count as a PB, nor do practice sessions. Ties keep the
+ *   earliest achievement.
  */
 export function computePbs(solves: ListSolve[]): PbSet {
   const pbs: PbSet = {};
@@ -80,7 +86,7 @@ export function computePbs(solves: ListSolve[]): PbSet {
       pbs[kind] = { valueMs: value, solveId: p.solve.id, achievedAt: iso(p) };
     }
   };
-  for (const session of groupBySession(solves)) {
+  for (const session of groupBySession(countsForPbs(solves))) {
     for (const p of session) consider('single', p.eff, p);
     const times = session.map((p) => p.eff);
     for (const kind of ROLLING_KINDS) {
@@ -94,12 +100,13 @@ export function computePbs(solves: ListSolve[]): PbSet {
 
 /**
  * PB progression: replays all solves chronologically (across sessions) and records every time a
- * kind's best improves. Used to rebuild pb_history after a full recompute / import.
+ * kind's best improves (practice sessions left out). Used to rebuild pb_history after a full
+ * recompute / import.
  */
 export function replayHistory(solves: ListSolve[]): HistoryEntry[] {
   interface Candidate { at: number; order: number; kind: PbKind; value: number }
   const candidates: Candidate[] = [];
-  for (const session of groupBySession(solves)) {
+  for (const session of groupBySession(countsForPbs(solves))) {
     const times = session.map((p) => p.eff);
     session.forEach((p) => {
       if (Number.isFinite(p.eff)) candidates.push({ at: p.at, order: p.order, kind: 'single', value: p.eff });

@@ -79,7 +79,7 @@ async function submitDaily(event: string, date: string, index: number, r: TimerR
   const body = { timeMs: r.timeMs, penalty: r.penalty, scramble, source: 'daily' as const, daily: { date, index } };
   if (solveStore.get().mode === 'cloud') {
     try {
-      const session = await ensureSession(event);
+      const session = await ensureSession(event, { counts: true });
       await addSolve({ ...body, sessionId: session.id });
       return;
     } catch (e) {

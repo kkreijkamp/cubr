@@ -146,13 +146,13 @@ export async function registerUserRoutes(app: FastifyInstance, pool: Pool): Prom
          ORDER BY created_at, seq`,
         [userId, event, limit],
       ),
-      pool.query<{ session_id: string; name: string | null; solves: number; first_at: Date; last_at: Date }>(
-        `SELECT l.session_id, nullif(s.name, '') AS name, count(*)::int AS solves,
+      pool.query<{ session_id: string; name: string | null; practice: boolean | null; solves: number; first_at: Date; last_at: Date }>(
+        `SELECT l.session_id, nullif(s.name, '') AS name, s.practice, count(*)::int AS solves,
                 min(l.created_at) AS first_at, max(l.created_at) AS last_at
            FROM stats.solve_ledger l
            LEFT JOIN stats.sessions s ON s.session_id = l.session_id
           WHERE l.user_id = $1 AND l.event = $2 AND NOT l.deleted
-          GROUP BY l.session_id, s.name
+          GROUP BY l.session_id, s.name, s.practice
           ORDER BY min(l.created_at)`,
         [userId, event],
       ),
@@ -166,6 +166,8 @@ export async function registerUserRoutes(app: FastifyInstance, pool: Pool): Prom
       sessions: sessions.rows.map((r) => ({
         id: r.session_id,
         name: r.name,
+        // its solves are no personal bests (the chart's PB line across sessions skips them)
+        ...(r.practice ? { practice: true } : {}),
         solves: r.solves,
         firstAt: r.first_at.toISOString(),
         lastAt: r.last_at.toISOString(),

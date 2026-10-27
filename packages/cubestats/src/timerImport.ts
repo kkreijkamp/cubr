@@ -180,12 +180,13 @@ const str = (v: unknown): string => (typeof v === 'string' ? v : v === null || v
 
 function cubetype(sessions: unknown[]): RawSession[] {
   return sessions.map((raw) => {
-    const s = raw as { name?: unknown; event?: unknown; solves: Record<string, unknown>[] };
+    const s = raw as { name?: unknown; event?: unknown; practice?: unknown; solves: Record<string, unknown>[] };
     const event = typeof s.event === 'string' && isEventId(s.event) ? s.event : '333';
     return {
       name: s.name,
       event,
       sourceType: event,
+      practice: s.practice === true,
       solves: s.solves.map((x) => ({
         timeMs: Number(x.timeMs),
         penalty: x.penalty === '+2' || x.penalty === 'DNF' ? x.penalty : 'OK',

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   ArrowPathIcon,
   ArrowsPointingInIcon,
+  BeakerIcon,
   ChatBubbleLeftIcon,
   ClockIcon,
   CommandLineIcon,
@@ -54,6 +55,7 @@ import {
   renameSession,
   setComment,
   setPenalty,
+  setSessionPractice,
   suggestSessionName,
   switchEvent,
   switchSession,
@@ -359,6 +361,14 @@ export default function TimerPage() {
     return () => window.removeEventListener('keydown', onKey);
   }, [penaltyLast, deleteLast, commentLast, cycleSession, changeEvent, event, session, settings.inspection, setInput]);
 
+  // a practice session: its solves count for no pb on the profile and no leaderboard
+  const togglePractice = useCallback(() => {
+    if (!session) return;
+    const on = !session.practice;
+    void setSessionPractice(session.id, on);
+    toast.notice(on ? `${session.name} is a practice session: no pbs or leaderboards` : `${session.name} counts for pbs and leaderboards again`, { durationMs: 2500 });
+  }, [session]);
+
   // ---------------------------------------------------------------- palette commands
   useRegisterCommands(
     'timer',
@@ -393,6 +403,13 @@ export default function TimerPage() {
         },
         { id: 'timer-new-session', label: 'New session', icon: <PlusIcon />, run: () => setModal({ kind: 'newSession' }) },
         { id: 'timer-rename-session', label: 'Rename session', icon: <PencilIcon />, run: () => setModal({ kind: 'renameSession' }) },
+        {
+          id: 'timer-practice-session',
+          label: session?.practice ? 'Count session for pbs and leaderboards' : 'Make session a practice session',
+          icon: <BeakerIcon />,
+          keywords: ['practice', 'pb', 'leaderboard', 'unranked', 'casual', 'session'],
+          run: togglePractice,
+        },
         {
           id: 'timer-merge-sessions',
           label: 'Merge sessions...',
@@ -444,7 +461,7 @@ export default function TimerPage() {
       );
       return cmds;
     },
-    [st.sessions, event, session?.id, last?.id, last?.penalty, settings.showSolveList, settings.inspection, input, deleteLast],
+    [st.sessions, event, session?.id, session?.practice, togglePractice, last?.id, last?.penalty, settings.showSolveList, settings.inspection, input, deleteLast],
   );
 
 
@@ -495,6 +512,7 @@ export default function TimerPage() {
         onSession={(id) => void switchSession(id)}
         onNewSession={() => setModal({ kind: 'newSession' })}
         onRenameSession={() => setModal({ kind: 'renameSession' })}
+        onTogglePractice={togglePractice}
         onDeleteSession={() => setModal({ kind: 'deleteSession' })}
         onMergeSessions={() => setModal({ kind: 'mergeSessions' })}
         inspection={settings.inspection}

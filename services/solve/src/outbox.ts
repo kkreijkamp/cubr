@@ -17,6 +17,7 @@ export type OutboxType =
   | 'solve.deleted'
   | 'session.deleted'
   | 'session.renamed'
+  | 'session.updated'
   | 'sessions.merged'
   | 'solves.imported'
   | 'daily.completed';

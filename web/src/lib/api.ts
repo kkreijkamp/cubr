@@ -193,6 +193,7 @@ export interface ImportPayload {
   sessions: {
     name: string;
     event: string;
+    practice?: boolean;
     solves: { timeMs: number; penalty: Penalty; scramble: string; comment?: string | null; createdAt: string }[];
   }[];
 }
@@ -228,8 +229,10 @@ export const api = {
   },
   sessions: {
     list: (signal?: AbortSignal) => get<{ sessions: Session[] }>('/api/sessions', signal),
-    create: (body: { id?: string; name: string; event: string; createdAt?: string }) => request<{ session: Session }>('POST', '/api/sessions', body),
+    create: (body: { id?: string; name: string; event: string; practice?: boolean; createdAt?: string }) => request<{ session: Session }>('POST', '/api/sessions', body),
     rename: (id: string, name: string) => request<{ session: Session }>('PATCH', `/api/sessions/${enc(id)}`, { name }),
+    /** practice: its solves count for no personal best and no leaderboard */
+    setPractice: (id: string, practice: boolean) => request<{ session: Session }>('PATCH', `/api/sessions/${enc(id)}`, { practice }),
     remove: (id: string) => request<void>('DELETE', `/api/sessions/${enc(id)}`),
     solves: (id: string, signal?: AbortSignal) =>
       request<{ solves: Solve[] }>('GET', `/api/sessions/${enc(id)}/solves`, undefined, { signal, timeoutMs: 60_000 }),
@@ -266,7 +269,7 @@ export const api = {
         event: string;
         total: number;
         truncated: boolean;
-        sessions?: { id: string; name: string | null; solves: number; firstAt: string; lastAt: string }[];
+        sessions?: { id: string; name: string | null; practice?: boolean; solves: number; firstAt: string; lastAt: string }[];
         solves: [number, number, number | null, number?][];
       }>(
         `/api/stats/users/${enc(userId)}/solves${qs({ event, limit: opts.limit })}`,

@@ -11,7 +11,7 @@ import {
   solvesImportedSchema,
   userDeletedSchema,
   userEventSchema,
-  type SolveCreated, sessionRenamedSchema, sessionsMergedSchema} from './eventSchemas.js';
+  type SolveCreated, sessionRenamedSchema, sessionsMergedSchema, sessionUpdatedSchema} from './eventSchemas.js';
 import { recomputeEvent, type RecomputeDeps } from './recompute.js';
 import { CACHE_KEY as GLOBAL_CACHE_KEY } from './routes/global.js';
 import { ensureUser, loadPbs, lockUser, markProcessed, queuePbUpdated, refreshTotals, upsertPb } from './store.js';
@@ -40,12 +40,16 @@ export interface ProjectorDeps {
  * takes the per-user lock, records the event id in processed_events (duplicate deliveries are
  * skipped) and writes resulting pb.updated events to the outbox table.
  */
-/** Upserts a session's display name (from solve.created and session.renamed). */
-export async function upsertSessionName(c: PoolClient | Pool, sessionId: string, userId: string, event: string, name: string): Promise<void> {
+/**
+ * Upserts a session's display name (from solve.created, session.renamed and session.updated), and
+ * its practice flag where the event carries one.
+ */
+export async function upsertSessionName(c: PoolClient | Pool, sessionId: string, userId: string, event: string, name: string, practice?: boolean | null): Promise<void> {
   await c.query(
-    `INSERT INTO stats.sessions (session_id, user_id, event, name) VALUES ($1, $2, $3, $4)
-     ON CONFLICT (session_id) DO UPDATE SET name = excluded.name, event = excluded.event, updated_at = now()`,
-    [sessionId, userId, event, name],
+    `INSERT INTO stats.sessions (session_id, user_id, event, name, practice) VALUES ($1, $2, $3, $4, coalesce($5, false))
+     ON CONFLICT (session_id) DO UPDATE
+       SET name = excluded.name, event = excluded.event, practice = coalesce($5, stats.sessions.practice), updated_at = now()`,
+    [sessionId, userId, event, name, practice ?? null],
   );
 }
 
@@ -120,7 +124,7 @@ export function createProjector(deps: ProjectorDeps) {
       [d.solveId, d.userId, d.event, d.sessionId, d.timeMs, effDb, d.createdAt],
     );
     if (!ins.rowCount) return 0;
-    if (d.sessionName) await upsertSessionName(c, d.sessionId, d.userId, d.event, d.sessionName);
+    if (d.sessionName) await upsertSessionName(c, d.sessionId, d.userId, d.event, d.sessionName, d.practice);
 
     // A back-dated solve lands in the middle of its session and shifts the rolling windows, so an
     // incremental compare would be wrong: rebuild the event from solve-service instead (rare).
@@ -158,6 +162,8 @@ export function createProjector(deps: ProjectorDeps) {
              dnfs = stats.hourly.dnfs + EXCLUDED.dnfs`,
       [d.userId, d.event, hour, effDb === null ? 0 : 1, effDb ?? 0, effDb === null ? 1 : 0],
     );
+    // a practice session's solve counts as cubing, never as a personal best
+    if (d.practice) return 0;
 
     // PB candidates: single from this solve; ao5/ao12 from the payload's rolling values (computed
     // by solve-service over the session); mo3/ao50/ao100 from the session's last 100 solves in
@@ -256,6 +262,19 @@ export function createProjector(deps: ProjectorDeps) {
     });
   }
 
+  // ---- session.updated: marked as practice (or no longer): its solves leave (or rejoin) the PBs
+  async function onSessionUpdated(evt: EventEnvelope) {
+    const d = await payload(sessionUpdatedSchema, evt);
+    if (!d) return;
+    await inUserTx(d.eventId, d.userId, async (c) => {
+      const user = await ensureUser(c, d.userId, d.username, validTz(d.tz));
+      await upsertSessionName(c, d.sessionId, d.userId, d.event, d.name, d.practice);
+      const { pbChanges } = await recomputeEvent(c, rdeps, { userId: d.userId, username: user.username, event: d.event, tz: user.tz });
+      await refreshTotals(c, d.userId);
+      return pbChanges;
+    });
+  }
+
   // ---- sessions.merged: sources are gone (tombstone + drop names), recompute the event -
   //      merging interleaves solves, so within-session rolling PBs (ao5, ao12, ...) change
   async function onSessionsMerged(evt: EventEnvelope) {
@@ -329,6 +348,8 @@ export function createProjector(deps: ProjectorDeps) {
         return onSessionDeleted(evt);
       case 'session.renamed':
         return onSessionRenamed(evt);
+      case 'session.updated':
+        return onSessionUpdated(evt);
       case 'sessions.merged':
         return onSessionsMerged(evt);
       case 'solves.imported':

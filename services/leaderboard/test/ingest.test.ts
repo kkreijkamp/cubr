@@ -118,6 +118,11 @@ describe('planSolveCreated', () => {
     expect(planSolveCreated({ ...base, effectiveMs: null, rolling: { ao5: null } }, NOW)).toEqual([]);
     expect(planSolveCreated({ ...base, effectiveMs: 9000 }, NOW)).toHaveLength(2);
   });
+  it('skips a practice session\'s solves', () => {
+    const solve = { ...base, effectiveMs: 6000, rolling: { ao5: 7000, ao12: null } };
+    expect(planSolveCreated({ ...solve, practice: true }, NOW)).toEqual([]);
+    expect(planSolveCreated({ ...solve, practice: false }, NOW)).toHaveLength(4);
+  });
   it('skips solves older than the board lifetime', () => {
     const fiveDaysAgo = new Date(NOW - 5 * 86400_000).toISOString();
     const w = planSolveCreated({ ...base, createdAt: fiveDaysAgo, effectiveMs: 9000 }, NOW);

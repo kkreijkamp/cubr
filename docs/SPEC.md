@@ -187,6 +187,7 @@ CREATE TABLE solve.sessions (
   user_id    uuid NOT NULL,
   name       text NOT NULL,
   event      text NOT NULL,
+  practice   boolean NOT NULL DEFAULT false,  -- migration 003: its solves count for no PB / leaderboard
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -269,7 +270,8 @@ projection, tombstones for deleted solves, the tail for incremental mo3/ao50/ao1
 `deleted_sessions`, `pb_outbox` (transactional outbox for `pb.updated`), `user_totals.tz` (last
 timezone seen) and `hourly.dnfs`; `003_session_names` - `sessions` (display name per session for
 the history chart); `004_deleted_users` - `deleted_users` (tombstones of deleted accounts: their rows
-are gone and later events for them are ignored).
+are gone and later events for them are ignored); `005_practice_sessions` - `sessions.practice` (the
+history chart's PB line leaves practice sessions out).
 
 ### 7.4 `scramble` schema (scramble-service)
 ```sql
@@ -325,11 +327,12 @@ to `cubetype:events:dlq`. Use `publishEvent()` / `consumeEvents()` from common.
 | `user.registered` | auth | `userId, username, displayName, country, wcaId, createdAt, avatarUrl` |
 | `user.updated` | auth | same as above |
 | `user.deleted` | auth | `userId, username` - the account is gone: solve deletes its sessions, solves and daily attempts; stats and leaderboard delete its rows and ignore later events for it (tombstones) |
-| `solve.created` | solve | `userId, username, event, sessionId, sessionName, solveId, timeMs, penalty, effectiveMs (int or null=DNF), createdAt, tz, source, rolling: {ao5, ao12}` (rolling = session's current ao5/ao12 *including* this solve; ms, -1 DNF, null n/a); daily-challenge solves also carry `dailyDate, dailyIndex` |
+| `solve.created` | solve | `userId, username, event, sessionId, sessionName, practice, solveId, timeMs, penalty, effectiveMs (int or null=DNF), createdAt, tz, source, rolling: {ao5, ao12}` (rolling = session's current ao5/ao12 *including* this solve; ms, -1 DNF, null n/a; `practice` = the session is a practice one: stats counts the solve but never as a PB, leaderboard skips it); daily-challenge solves also carry `dailyDate, dailyIndex` |
 | `solve.updated` | solve | same fields as created (new values) |
 | `solve.deleted` | solve | `userId, username, event, sessionId, solveId, timeMs, penalty, createdAt, tz, source` |
 | `session.deleted` | solve | `userId, username, sessionId, event, tz` |
 | `session.renamed` | solve | `userId, username, sessionId, event, name` (stats keeps session display names) |
+| `session.updated` | solve | `userId, username, sessionId, event, name, practice, tz` - the session became a practice one or stopped being one (stats recomputes the event's PBs; the all-time boards follow via `pb.updated`) |
 | `sessions.merged` | solve | `userId, username, event, targetId, sourceIds, solves, tz` (stats tombstones the sources and recomputes the event) |
 | `solves.imported` | solve | `userId, username, events: string[], count, tz` (bulk import: consumers recompute that user's events) |
 | `daily.completed` | solve | `userId, username, date, event, ao5 (ms or -1), times: number[], tz` (the five attempts as submitted) |
@@ -382,21 +385,21 @@ Pool: keep `scramble:pool:<event>` topped up (333/222/pyram/skewb: 200; 444/sq1/
 ### 9.3 solve (`/api/sessions`, `/api/solves`) - all routes require auth
 | Method & path | Body / query | Response |
 |---|---|---|
-| GET `/api/sessions` | - | `{sessions: Session[]}` (created_at asc). If the user has none, create a default "3x3" session (event 333) first. |
-| POST `/api/sessions` | `{id?, name, event, createdAt?}` | 201 `{session}` (idempotent on id: same id again -> 200; an id of another user -> 409). `createdAt` (ISO 8601, future values clamped to now) lets the empty session that replaces a cleared one keep its place in the list. |
-| PATCH `/api/sessions/:id` | `{name}` | `{session}` (+ `session.renamed`) |
+| GET `/api/sessions` | - | `{sessions: Session[]}` (created_at asc; `Session = {id, name, event, practice, createdAt, updatedAt, solveCount}`). If the user has none, create a default "3x3" session (event 333) first. |
+| POST `/api/sessions` | `{id?, name, event, practice?, createdAt?}` | 201 `{session}` (idempotent on id: same id again -> 200; an id of another user -> 409). `createdAt` (ISO 8601, future values clamped to now) lets the empty session that replaces a cleared one keep its place in the list. |
+| PATCH `/api/sessions/:id` | `{name?, practice?}` (at least one) | `{session}` (+ `session.renamed` for a name, `session.updated` when `practice` changes). A practice session's solves count for no personal best and no leaderboard; its own session stats are unchanged. |
 | DELETE `/api/sessions/:id` | - | 204 (+ `session.deleted`) |
-| POST `/api/sessions/:id/merge` | `{sourceIds: uuid[]}` (1-50, != `:id`) | `{session, merged: {sessions, solves}}` - moves all solves of the source sessions into `:id` and deletes the sources in one transaction; 404 unknown session, 409 different event (+ `sessions.merged`) |
+| POST `/api/sessions/:id/merge` | `{sourceIds: uuid[]}` (1-50, != `:id`) | `{session, merged: {sessions, solves}}` - moves all solves of the source sessions into `:id` and deletes the sources in one transaction; 404 unknown session, 409 different event (+ `sessions.merged`). The merged solves take the target's `practice`. |
 | GET `/api/sessions/:id/solves` | - | `{solves: Solve[], truncated: boolean}` all solves, created_at asc (capped at the latest 50 000) |
 | POST `/api/solves` | `{id, sessionId, timeMs, penalty, scramble, comment?, source?, createdAt?, daily?: {date, index}}` | 201 `{solve, rolling: {ao5, ao12}}`; if `id` already exists for this user -> 200 same shape (idempotent). A `createdAt` in the future (fast device clock) is clamped to the server time. `daily` solves: see below. |
 | PATCH `/api/solves/:id` | `{penalty?, comment?}` | `{solve}` (+ `solve.updated`) |
 | DELETE `/api/solves/:id` | - | 204 (+ `solve.deleted`) |
-| POST `/api/sessions/import` | `{sessions: [{name, event, solves: [{timeMs, penalty, scramble, comment?, createdAt}]}]}` (<= 1 000 sessions, <= 100 000 solves, body <= 25 MB) | `{imported: {sessions, solves}}` (+ one `solves.imported`) - bulk insert in batches inside a transaction |
+| POST `/api/sessions/import` | `{sessions: [{name, event, practice?, solves: [{timeMs, penalty, scramble, comment?, createdAt}]}]}` (<= 1 000 sessions, <= 100 000 solves, body <= 25 MB) | `{imported: {sessions, solves}}` (+ one `solves.imported`) - bulk insert in batches inside a transaction |
 | GET `/api/solves/export` | - | `{exportedAt, sessions: [Session & {solves: Solve[]}]}` |
 | GET `/api/solves/daily?date=` | - | `{date, events: {"333": {solves: Solve[], ao5: number\|-1\|null}, ...}}` (only events with >=1 attempt; ao5 = the official result of the five attempts as submitted) |
 | GET `/api/solves/_info`, `/api/sessions/_info` | - | info (+ outbox backlog and relay state) |
-| GET `/internal/users/:userId/solves?event=` | - | `{solves: [{id, sessionId, timeMs, penalty, createdAt}]}` ordered by session_id, created_at (for stats recompute) |
-| GET `/internal/users/:userId/sessions` | - | `{sessions: [{id, name, event}]}` (stats backfills session display names) |
+| GET `/internal/users/:userId/solves?event=` | - | `{solves: [{id, sessionId, timeMs, penalty, createdAt, practice?}]}` ordered by session_id, created_at (for stats recompute; `practice: true` on a practice session's solves) |
+| GET `/internal/users/:userId/sessions` | - | `{sessions: [{id, name, event, practice}]}` (stats backfills session display names) |
 
 Daily challenge: a `daily: {date, index 0..4}` solve gets `source: 'daily'`; its session's event must
 be a daily-challenge event and `date` the UTC date of yesterday, today or tomorrow (today somewhere
@@ -417,16 +420,17 @@ Published rows older than a day are deleted.
 | GET `/api/stats/users/:userId/activity?from=&to=&event=` (default the 365 days ending today in the user's tz, all events) | `{from, to, days: [{date: "YYYY-MM-DD", solves, totalMs}]}` (only days with solves; `event` counts that event's solves only) |
 | GET `/api/stats/users/:userId/pb-history?event=333` | `{history: [{kind, valueMs, achievedAt}]}` asc |
 | GET `/api/stats/users/:userId/hourly?event=333` | `{hours: [{hour, solves, dnfs, meanMs}]}` 24 entries; `solves` counts every attempt, `meanMs` is the mean of the non-DNF ones (null if none); no `event` = all events |
-| GET `/api/stats/users/:userId/solves?event=333&limit=20000` | `{event, total, truncated, sessions: [{id, name\|null, solves, firstAt, lastAt}], solves: [[unixSeconds, timeMs, effectiveMs \| null, sessionIndex], ...]}` - chronological solve series (newest `limit`, max 50 000) from the read model, for the profile history chart (session filter) |
+| GET `/api/stats/users/:userId/solves?event=333&limit=20000` | `{event, total, truncated, sessions: [{id, name\|null, practice?, solves, firstAt, lastAt}], solves: [[unixSeconds, timeMs, effectiveMs \| null, sessionIndex], ...]}` - chronological solve series (newest `limit`, max 50 000) from the read model, for the profile history chart (session filter) |
 | GET `/api/stats/global` | `{users, solves, totalMs, solvesToday, activeUsersToday}` ("today" = UTC day; cached 10 s) |
 | GET `/api/stats/_info` | info |
 | GET `/internal/pbs?event=&kind=` | `{pbs: [{userId, username, event, kind, valueMs, achievedAt}]}` |
 
 Streak = consecutive days (in the user's tz as bucketed) with >= 1 solve, ending today or yesterday.
 PB rules: single = best effective time; mo3/aoN = best rolling value within a single session
-(chronological), using `@cubetype/cubestats`. On `solve.created` compare incrementally (single +
-rolling ao5/ao12 from the payload; recompute others cheaply if needed). On `solve.updated`,
-`solve.deleted`, `session.deleted`, `sessions.merged`, `solves.imported`: recompute that user's
+(chronological), using `@cubetype/cubestats`; practice sessions never count. On `solve.created`
+compare incrementally (single + rolling ao5/ao12 from the payload; recompute others cheaply if
+needed; a `practice` solve only updates the counters). On `solve.updated`, `solve.deleted`,
+`session.deleted`, `session.updated`, `sessions.merged`, `solves.imported`: recompute that user's
 PBs for the affected event(s) from `GET solve /internal/users/:id/solves` and rebuild that user's
 daily_activity/hourly rows for the event. Emit `pb.updated` whenever a PB row changes (improves,
 worsens or disappears).

@@ -82,11 +82,12 @@ export function planPbUpdated(d: Data, nowMs = Date.now()): PbWrite | null {
 /**
  * solve.created -> daily + weekly boards for the single (effectiveMs; null = DNF -> skipped) and the
  * session's rolling ao5. Buckets are UTC days / ISO weeks of the solve's createdAt. Solves older
- * than a board's lifetime (3 d / 15 d) are skipped so replays don't resurrect expired boards.
+ * than a board's lifetime (3 d / 15 d) are skipped so replays don't resurrect expired boards, and
+ * so are a practice session's (the all-time boards follow stats' PBs, which leave them out too).
  */
 export function planSolveCreated(d: Data, nowMs = Date.now()): BestWrite[] {
   const event = String(d.event ?? '');
-  if (!hasBoards(event)) return [];
+  if (!hasBoards(event) || d.practice === true) return [];
   const createdMs = parseTime(d.createdAt) ?? parseTime(d.occurredAt) ?? nowMs;
   const created = new Date(createdMs);
   const achievedAt = created.toISOString();

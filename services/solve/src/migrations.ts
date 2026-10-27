@@ -71,4 +71,12 @@ SELECT user_id, daily_date, event, daily_index, id, time_ms, penalty, inserted_a
 ON CONFLICT DO NOTHING;
 `,
   },
+  {
+    id: '003_practice_sessions',
+    sql: `
+-- A practice session's solves count for no personal best and no leaderboard. The flag travels in
+-- solve.created and the internal solve list; changing it emits session.updated.
+ALTER TABLE solve.sessions ADD COLUMN practice boolean NOT NULL DEFAULT false;
+`,
+  },
 ];

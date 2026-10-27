@@ -15,6 +15,8 @@ export interface ImportedSession {
   event: string;
   /** The source timer's own puzzle / scramble type, e.g. "444wca" or "pyra". */
   sourceType: string;
+  /** a cubetype practice session (its solves count for no PB or leaderboard) */
+  practice?: boolean;
   solves: ImportedSolve[];
 }
 
@@ -33,6 +35,7 @@ export interface RawSession {
   sourceType: string;
   /** Sort key where the source has one (csTimer rank, CubeDesk order). */
   rank?: number;
+  practice?: boolean;
   solves: RawSolve[];
 }
 
@@ -90,7 +93,13 @@ export function finishImport(raw: RawSession[]): { sessions: ImportedSession[]; 
     }
     if (!solves.length) continue;
     const name = text(session.name).trim().slice(0, MAX_NAME) || `import ${index + 1}`;
-    sessions.push({ name, event: isEventId(session.event) ? session.event : '333', sourceType: session.sourceType, solves });
+    sessions.push({
+      name,
+      event: isEventId(session.event) ? session.event : '333',
+      sourceType: session.sourceType,
+      ...(session.practice ? { practice: true } : {}),
+      solves,
+    });
   }
   return { sessions, skipped };
 }

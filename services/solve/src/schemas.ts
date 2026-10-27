@@ -30,11 +30,14 @@ export const createSessionBody = z.object({
   id: uuid.optional(),
   name: sessionName,
   event: eventId,
+  practice: z.boolean().default(false),
   // sessions are listed oldest first: a cleared session's empty replacement keeps its place
   createdAt: isoDateTime.optional(),
 });
 
-export const patchSessionBody = z.object({ name: sessionName });
+export const patchSessionBody = z
+  .object({ name: sessionName.optional(), practice: z.boolean().optional() })
+  .refine((b) => b.name !== undefined || b.practice !== undefined, { message: 'nothing to update (name or practice)' });
 
 /** POST /api/sessions/:id/merge - the sessions whose solves move into :id (then deleted). */
 export const mergeSessionsBody = z.object({
@@ -80,7 +83,9 @@ export type ImportSolve = z.infer<typeof importSolve>;
 export const importBody = z
   .object({
     sessions: z
-      .array(z.object({ name: sessionName, event: eventId, solves: z.array(importSolve).max(MAX_IMPORT_SOLVES) }))
+      .array(
+        z.object({ name: sessionName, event: eventId, practice: z.boolean().default(false), solves: z.array(importSolve).max(MAX_IMPORT_SOLVES) }),
+      )
       .min(1)
       .max(MAX_IMPORT_SESSIONS),
   })
