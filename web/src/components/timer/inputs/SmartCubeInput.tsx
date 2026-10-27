@@ -7,7 +7,7 @@ import { bluetoothAvailable } from '../../../input/bluetooth/device';
 import { cubeGroup } from '../../../input/bluetooth/cubes';
 import type { CubeCtx } from '../../../input/bluetooth/cubes/context';
 import { CubeView } from '../../../input/bluetooth/cubeView';
-import { cubeKey, SmartCubeSession, type ScrambleHint, type SmartEvent, type SmartPuzzle } from '../../../input/bluetooth/smartSession';
+import { cubeKey, SmartCubeSession, type ScrambleHint, type SmartEvent, type SmartPuzzle, type SmartSolve } from '../../../input/bluetooth/smartSession';
 import { movesBetween, scrambleFor, warmSolver } from '../../../input/cube/solverClient';
 import { SOLVED_FACELET } from '../../../input/cube/cubie';
 import { inputStore, updateInput } from '../../../input/inputMode';
@@ -32,7 +32,8 @@ interface Props {
   pb: boolean;
   settings: Pick<Settings, 'stickerColours' | 'customStickers' | 'virtualSpeed' | 'virtualView' | 'smartScrambled' | 'smartSpace' | 'smartBeep' | 'smartView' | 'smartTurnMark' | 'smartReset'>;
   onState: (s: TimerState) => void;
-  onSolve: (r: { timeMs: number; penalty: Penalty }) => void;
+  /** a solve; `scramble`: the one worked out from a cube scrambled by hand */
+  onSolve: (r: { timeMs: number; penalty: Penalty }, scramble?: string) => void;
   /** the cube was scrambled by hand: a scramble that gives its state */
   onScramble: (text: string) => void;
   /** the cube's progress along the scramble, for the scramble line */
@@ -83,6 +84,10 @@ export function SmartCubeInput(p: Props) {
   const view = useRef<CubeView>(new CubeView(3));
   const dirty = useRef(true);
   const fixAsked = useRef(false);
+  /** counts the times the cube was marked scrambled */
+  const attempts = useRef(0);
+  /** the scramble being worked out for a cube scrambled by hand, saved with its solve */
+  const ownScramble = useRef<Promise<string | null> | null>(null);
   const lastHint = useRef<string>('null');
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -140,10 +145,14 @@ export function SmartCubeInput(p: Props) {
       if (!session.markScrambled(now)) return;
       const p = props.current;
       // scrambled by hand: the scramble saved with the solve is one that gives this state
+      const attempt = ++attempts.current;
+      ownScramble.current = null;
       if (!session.matchesScramble() && session.puzzle === '333' && eventPuzzle(p.event) === '333') {
-        const facelet = session.facelet;
-        void scrambleFor(facelet).then((text) => {
-          if (text && session.facelet !== SOLVED_FACELET) props.current.onScramble(text);
+        const found = scrambleFor(session.facelet);
+        ownScramble.current = found;
+        void found.then((text) => {
+          // the scramble line too, while this attempt lasts (not once the next scramble is up)
+          if (text && attempt === attempts.current && session.phase !== 'idle') props.current.onScramble(text);
         });
       }
       if (p.settings.smartBeep) beep(880);
@@ -156,12 +165,20 @@ export function SmartCubeInput(p: Props) {
     [session],
   );
 
+  /** a solve (or a DNF) to save, with the scramble worked out from the cube if it was scrambled by hand */
+  const finish = useCallback((r: SmartSolve) => {
+    const own = ownScramble.current;
+    ownScramble.current = null;
+    if (!own) props.current.onSolve(r);
+    else void own.then((text) => props.current.onSolve(r, text ?? undefined));
+  }, []);
+
   const handle = useCallback(
     (ev: SmartEvent) => {
       if (ev.started) clearAlerts();
       if (ev.solved) {
         clearAlerts();
-        props.current.onSolve(ev.solved);
+        finish(ev.solved);
       }
       if (ev.markIn !== undefined) {
         const at = session.lastTime;
@@ -169,7 +186,7 @@ export function SmartCubeInput(p: Props) {
         else markTimer.current = setTimeout(() => markScrambled(at), ev.markIn);
       }
     },
-    [session, markScrambled],
+    [session, markScrambled, finish],
   );
 
   /** the cube as it is now counts as solved (csTimer's "reset (mark solved)"), remembered for this cube */
@@ -300,7 +317,8 @@ export function SmartCubeInput(p: Props) {
         e.stopPropagation();
         clearAlerts();
         const r = session.escape();
-        if (r) props.current.onSolve(r);
+        if (r) finish(r);
+        else ownScramble.current = null;
         refreshHint();
         setTick((t) => t + 1);
       } else if (e.key.startsWith('Arrow') && cam.current) {
@@ -324,7 +342,7 @@ export function SmartCubeInput(p: Props) {
       window.removeEventListener('keydown', down, true);
       window.removeEventListener('keyup', up, true);
     };
-  }, [p.enabled, session, group, connect, conn.status, markScrambled, refreshHint]);
+  }, [p.enabled, session, group, connect, conn.status, markScrambled, refreshHint, finish]);
 
   // what the timer shows, by value (the page hands over a fresh `last` object on every render)
   const lastMs = p.last?.timeMs;
@@ -397,7 +415,8 @@ export function SmartCubeInput(p: Props) {
   const giveUp = () => {
     clearAlerts();
     const r = session.escape();
-    if (r) p.onSolve(r);
+    if (r) finish(r);
+    else ownScramble.current = null;
     refreshHint();
     setTick((t) => t + 1);
   };

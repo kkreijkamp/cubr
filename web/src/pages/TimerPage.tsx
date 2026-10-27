@@ -168,8 +168,8 @@ export default function TimerPage() {
   const lastStopAt = useRef(0);
 
   // ---------------------------------------------------------------- recording solves
-  const record = useCallback((r: { timeMs: number; penalty: Penalty }, source: 'timer' | 'manual') => {
-    const scramble = scrRef.current.current?.text ?? '';
+  const record = useCallback((r: { timeMs: number; penalty: Penalty }, source: 'timer' | 'manual', own?: string) => {
+    const scramble = own ?? scrRef.current.current?.text ?? '';
     pendingPb.current = true;
     addSolve({ timeMs: r.timeMs, penalty: r.penalty, scramble, source }).catch((e: Error) => {
       pendingPb.current = false;
@@ -571,9 +571,9 @@ export default function TimerPage() {
             pb={pb && isIdle}
             settings={settings}
             onState={setAltState}
-            onSolve={(r) => {
+            onSolve={(r, own) => {
               lastStopAt.current = performance.now();
-              record(r, 'timer');
+              record(r, 'timer', own);
             }}
             onScramble={scr.setFromCube}
             onHint={setSmartHint}
