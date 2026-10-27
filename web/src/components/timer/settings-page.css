@@ -191,6 +191,73 @@
   transition: font-size var(--dur);
 }
 
+/* a slider (floating stickers): a quiet track, the thumb in the accent colour; its value and a
+   small cube drawn at it beside */
+.st-range {
+  width: 9rem;
+  height: 1.25rem;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.st-range::-webkit-slider-runnable-track {
+  height: 0.35rem;
+  border-radius: 999px;
+  background: var(--sub-alt-color);
+}
+.st-range::-moz-range-track {
+  height: 0.35rem;
+  border-radius: 999px;
+  background: var(--sub-alt-color);
+}
+.st-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 1rem;
+  height: 1rem;
+  margin-top: -0.325rem;
+  border: 0;
+  border-radius: 50%;
+  background: var(--main-color);
+  transition: background var(--dur);
+}
+.st-range::-moz-range-thumb {
+  width: 1rem;
+  height: 1rem;
+  border: 0;
+  border-radius: 50%;
+  background: var(--main-color);
+  transition: background var(--dur);
+}
+.st-range:hover::-webkit-slider-thumb {
+  background: var(--text-color);
+}
+.st-range:hover::-moz-range-thumb {
+  background: var(--text-color);
+}
+.st-range:focus-visible {
+  box-shadow: none;
+}
+.st-range:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 0.1rem var(--bg-color), 0 0 0 0.2rem var(--text-color);
+}
+.st-range:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 0.1rem var(--bg-color), 0 0 0 0.2rem var(--text-color);
+}
+.st-range-value {
+  min-width: 2.75rem;
+  color: var(--main-color);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+.st-float-preview {
+  width: 5rem;
+  height: 5rem;
+}
+
 /* sticker colours: per puzzle, a swatch per face (each a hidden colour picker) */
 .st-stickers {
   display: grid;

@@ -19,7 +19,10 @@ import { applyTheme, isLightTheme, randomTheme, THEMES, themeLabel, type Theme }
 import { toast } from '../lib/toast';
 import { AVAILABLE_INPUTS, INPUT_MODES, updateInput, useInputState } from '../input/inputMode';
 import { actionOf, bind, BINDABLE, controls, KEY_PUZZLES, keyLabel, keyOf, type KeyPuzzle } from '../input/virtual/keymap';
-import { newModel } from '../input/virtual/models';
+import { modelFor, newModel, type PolyModel } from '../input/virtual/models';
+import { puzzlePalette } from '../input/virtual/palette';
+import { drawPoly } from '../input/virtual/render3d';
+import { baseCamera } from '../components/timer/inputs/VirtualInput';
 
 const PANES = [
   { id: 'timer', label: 'timer' },
@@ -630,6 +633,21 @@ function InputGroup() {
             onChange={set('virtualView')}
           />
         </SettingRow>
+        <SettingRow title="floating stickers" description="The virtual and smart cubes drawn as csTimer draws them: stickers floating off a hollow cube, the far side seen through the gaps. Further right they float further apart; all the way left, a solid cube.">
+          <FloatPreview settings={s} />
+          <input
+            className="st-range"
+            type="range"
+            min={0}
+            max={100}
+            step={5}
+            value={s.virtualFloat}
+            onChange={(e) => updateSettings({ virtualFloat: Number(e.target.value) })}
+            aria-label="floating stickers"
+            aria-valuetext={s.virtualFloat === 0 ? 'solid' : `${s.virtualFloat}%`}
+          />
+          <span className="st-range-value">{s.virtualFloat === 0 ? 'solid' : `${s.virtualFloat}%`}</span>
+        </SettingRow>
       </Group>
       <Group title="smart cube">
         <SettingRow title="mark scrambled" description="When the solve is ready to start: as soon as the cube matches the scramble, or that long after the last turn (scrambling it your own way), or only by key. Then the first turn starts the timer.">
@@ -688,6 +706,24 @@ function InputGroup() {
       </Group>
     </>
   );
+}
+
+/** a solved cube drawn as the virtual cube is, to see the floating stickers while setting them */
+function FloatPreview({ settings: s }: { settings: Settings }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    const model = modelFor('333') as PolyModel;
+    if (!canvas) return;
+    const size = canvas.clientWidth;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = canvas.height = size * dpr;
+    const ctx = canvas.getContext('2d')!;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, size, size);
+    drawPoly(ctx, size, size, model.twisty.puzzle, model.solved(), baseCamera(model, s.virtualView), puzzlePalette('cube', s), [], { float: s.virtualFloat / 100 });
+  }, [s]);
+  return <canvas ref={ref} className="st-float-preview" aria-hidden="true" />;
 }
 
 /** The virtual puzzles' keys, a puzzle at a time: click a move's key, then press the one you want. */

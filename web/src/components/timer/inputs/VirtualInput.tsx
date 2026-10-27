@@ -33,7 +33,7 @@ interface Props {
   timerUpdate: TimerUpdate;
   sizeRem: number;
   pb: boolean;
-  settings: Pick<Settings, 'stickerColours' | 'customStickers' | 'virtualSpeed' | 'virtualView' | 'virtualKeys'>;
+  settings: Pick<Settings, 'stickerColours' | 'customStickers' | 'virtualSpeed' | 'virtualView' | 'virtualKeys' | 'virtualFloat'>;
   onState: (s: TimerState) => void;
   onSolve: (r: { timeMs: number; penalty: Penalty }) => void;
 }
@@ -282,7 +282,7 @@ export function VirtualInput(p: Props) {
         dirty.current = false;
         const ctx = canvas.getContext('2d')!;
         ctx.clearRect(0, 0, size.w, size.h);
-        paint(ctx, size.w, size.h, session, props.current.flat, cam.current!, palette, facelets, clockDials);
+        paint(ctx, size.w, size.h, session, props.current.flat, cam.current!, palette, facelets, clockDials, props.current.settings.virtualFloat / 100);
       }
       raf = requestAnimationFrame(frame);
     };
@@ -379,7 +379,7 @@ export function VirtualInput(p: Props) {
   );
 }
 
-function paint(ctx: CanvasRenderingContext2D, w: number, h: number, session: VirtualSession, flat: boolean, cam: Camera, palette: Palette, facelets: Map<number, number[]>, clockDials: number[]) {
+function paint(ctx: CanvasRenderingContext2D, w: number, h: number, session: VirtualSession, flat: boolean, cam: Camera, palette: Palette, facelets: Map<number, number[]>, clockDials: number[], float: number) {
   const model = session.model;
   const hidden = session.hidden;
   if (model.kind === 'clock') {
@@ -418,7 +418,8 @@ function paint(ctx: CanvasRenderingContext2D, w: number, h: number, session: Vir
     const mv = model.canonical(a.move as Move);
     return { move: mv, angle: puzzle.angle(mv) * smooth(a.progress) };
   });
-  drawPoly(ctx, w, h, puzzle, state, cam, palette, turning, hidden ? () => palette.hidden! : undefined);
+  // the cubes float their stickers, as csTimer's do
+  drawPoly(ctx, w, h, puzzle, state, cam, palette, turning, { colorOf: hidden ? () => palette.hidden! : undefined, float: model.twisty.id.startsWith('cube') ? float : 0 });
 }
 
 /** ease in and out */

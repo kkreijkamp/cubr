@@ -1,8 +1,9 @@
 // Drawing the virtual puzzles in 3D on a 2D canvas: our own perspective projection, back-face culling
 // and painter's order. A convex puzzle needs no depth sorting within a piece of it, so a turning
 // puzzle is drawn as the slabs its moving layers cut it into, far ones first, with a dark cap where a
-// layer is cut open.
-import { apply, centroid, dot, inset, mulMat, rotation, sub, IDENTITY, type Mat, type Vec } from './geometry';
+// layer is cut open. Or, as csTimer draws its cubes, as the stickers alone floating off a hollow
+// puzzle, the far side seen through the gaps: every sticker, far ones first.
+import { add, apply, centroid, dot, inset, mulMat, rotation, scale, sub, IDENTITY, type Mat, type Vec } from './geometry';
 import type { Move, PolyPuzzle } from './polyPuzzle';
 import { cornerFaces, middleFaces, partnerOf, rightMiddle, SLICE_AXIS, wedgeFaces, type Sq1Face, type Sq1Move, type Sq1State } from './square1';
 
@@ -87,14 +88,66 @@ export interface Turning {
   angle: number;
 }
 
+/** floating stickers at their most (float 1): this much smaller, and lifted this part of the way out again */
+const FLOAT_SHRINK = 0.4;
+const FLOAT_LIFT = 0.25;
+
+/** a hex colour this part of the way to another */
+function mix(a: string, b: string, t: number): string {
+  const ca = /^#[0-9a-f]{6}$/i.test(a) ? a : null;
+  const cb = /^#[0-9a-f]{6}$/i.test(b) ? b : null;
+  if (!ca || !cb) return a;
+  const ch = (c: string, i: number) => parseInt(c.slice(1 + 2 * i, 3 + 2 * i), 16);
+  return '#' + [0, 1, 2].map((i) => Math.round(ch(ca, i) * (1 - t) + ch(cb, i) * t).toString(16).padStart(2, '0')).join('');
+}
+
+/** the stickers alone, off a hollow puzzle: the far side's seen from inside, in the shade. Far ones
+ * first; at rest the puzzle is convex, so the far side all goes first */
+function drawFloating(ctx: CanvasRenderingContext2D, pc: Projected, puzzle: PolyPuzzle, palette: Palette, turning: Turning[], color: (slot: number) => string, round: number, float: number) {
+  const k = 1 - FLOAT_SHRINK * float;
+  const shade = new Map<string, string>();
+  const drawn = puzzle.slots.map((s, i) => {
+    const t = turning.find((tt) => puzzle.selects(tt.move, s.center));
+    const m = t ? rotation(puzzle.axes[t.move.axis].n, t.angle) : IDENTITY;
+    const lift = scale(s.normal, FLOAT_LIFT * float * dot(s.center, s.normal));
+    const pts = s.sticker.map((v) => apply(m, add(add(s.center, scale(sub(v, s.center), k)), lift)));
+    const center = apply(m, add(s.center, lift));
+    return { i, pts, depth: apply(pc.view, center)[2], front: facing(pc.eye, apply(m, s.normal), center) };
+  });
+  const still = turning.length === 0;
+  drawn.sort((a, b) => (still && a.front !== b.front ? (a.front ? 1 : -1) : a.depth - b.depth));
+  for (const d of drawn) {
+    let c = color(d.i);
+    if (!d.front) {
+      if (!shade.has(c)) shade.set(c, mix(c, palette.body, 0.35));
+      c = shade.get(c)!;
+    }
+    sticker(ctx, d.pts.map(pc.project), c, round);
+  }
+}
+
+export interface PolyOptions {
+  /** each slot's colour instead of its sticker's (a blindfolded solve) */
+  colorOf?: (slot: number) => string;
+  /** 0: a solid puzzle; up to 1: the stickers float off a hollow one, smaller and further out */
+  float?: number;
+}
+
 /**
  * A polyhedral puzzle. `turning` are moves being animated: all about one axis (they are only animated
  * together when parallel), each on its own layers.
  */
-export function drawPoly(ctx: CanvasRenderingContext2D, width: number, height: number, puzzle: PolyPuzzle, state: Int16Array, cam: Camera, palette: Palette, turning: Turning[], colorOf?: (slot: number) => string) {
-  const pc = camera(cam, width, height);
+export function drawPoly(ctx: CanvasRenderingContext2D, width: number, height: number, puzzle: PolyPuzzle, state: Int16Array, cam: Camera, palette: Palette, turning: Turning[], opts: PolyOptions = {}) {
+  const float = Math.max(0, Math.min(1, opts.float ?? 0));
+  // lifted stickers reach further out: the view takes them in
+  const pc = camera(float > 0 ? { ...cam, radius: cam.radius * (1 + FLOAT_LIFT * float) } : cam, width, height);
   const round = Math.max(1, Math.min(width, height) / 160);
-  const color = colorOf ?? ((slot: number) => palette.faces[puzzle.slots[state[slot]].face] ?? palette.body);
+  const color = opts.colorOf ?? ((slot: number) => palette.faces[puzzle.slots[state[slot]].face] ?? palette.body);
+
+  if (float > 0) {
+    drawFloating(ctx, pc, puzzle, palette, turning, color, round, float);
+    return;
+  }
 
   if (turning.length === 0) {
     puzzle.slots.forEach((s, i) => {
