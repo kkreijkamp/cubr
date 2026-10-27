@@ -16,6 +16,7 @@ import { SCHEMES, stickerColour, type Scheme } from '../lib/scrambleNet';
 import { clearLocalData, exportAll, forgetUser, importSessions, localDataSummary, useSolveState } from '../lib/solves';
 import { applyTheme, isLightTheme, randomTheme, THEMES, themeLabel, type Theme } from '../lib/themes';
 import { toast } from '../lib/toast';
+import { AVAILABLE_INPUTS, INPUT_MODES, updateInput, useInputState } from '../input/inputMode';
 
 const PANES = [
   { id: 'timer', label: 'timer' },
@@ -337,6 +338,7 @@ export default function SettingsPage() {
               />
             </SettingRow>
           </Group>
+          <InputGroup />
           <Group title="inspection">
             <SettingRow title="WCA inspection" description="15 seconds to inspect before each solve. Starting after 15 s adds +2, after 17 s the solve is a DNF (WCA A4d).">
               <Options value={s.inspection} options={onOff} onChange={set('inspection')} />
@@ -575,6 +577,46 @@ export default function SettingsPage() {
         />
       )}
     </div>
+  );
+}
+
+/** How times are entered (kept on this device), and the virtual puzzle's options. */
+function InputGroup() {
+  const s = useSettings();
+  const device = useInputState();
+  return (
+    <Group title="input">
+      <SettingRow title="enter times with" description="Kept on this device: a stackmat or a bluetooth cube belongs to one computer. Ctrl+alt and a letter switches on the timer page, as on csTimer." wide>
+        <Options
+          value={AVAILABLE_INPUTS.includes(device.mode) ? device.mode : 'timer'}
+          options={INPUT_MODES.filter((m) => AVAILABLE_INPUTS.includes(m.id)).map((m) => ({ value: m.id, label: m.label }))}
+          onChange={(mode) => updateInput({ mode })}
+        />
+      </SettingRow>
+      <SettingRow title="virtual turn speed" description="How long each turn of the virtual puzzle takes to animate (csTimer's base speed). Queued turns go quicker.">
+        <Options
+          value={s.virtualSpeed}
+          options={[
+            { value: 0, label: 'instant' },
+            { value: 50, label: '20 tps' },
+            { value: 100, label: '10 tps' },
+            { value: 200, label: '5 tps' },
+            { value: 500, label: '2 tps' },
+          ]}
+          onChange={set('virtualSpeed')}
+        />
+      </SettingRow>
+      <SettingRow title="virtual cube view" description="Look at the top and front faces, or at the top front right corner. The arrow keys turn the view while you solve.">
+        <Options
+          value={s.virtualView}
+          options={[
+            { value: 'UF', label: 'top, front' },
+            { value: 'URF', label: 'corner' },
+          ]}
+          onChange={set('virtualView')}
+        />
+      </SettingRow>
+    </Group>
   );
 }
 

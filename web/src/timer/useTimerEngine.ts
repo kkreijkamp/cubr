@@ -49,7 +49,7 @@ export function inspectionPenalty(elapsedMs: number): Penalty {
 
 // ---- inspection alerts (8 s / 12 s) ------------------------------------------------------------
 let audioCtx: AudioContext | null = null;
-function beep(freq: number) {
+export function beep(freq: number) {
   try {
     audioCtx ??= new AudioContext();
     const osc = audioCtx.createOscillator();
@@ -64,7 +64,8 @@ function beep(freq: number) {
     /* audio not available */
   }
 }
-function alertAt(seconds: 8 | 12, mode: TimerEngineOptions['alerts']) {
+/** the judge's "8 seconds" / "12 seconds" call during inspection (every input mode uses it) */
+export function alertAt(seconds: 8 | 12, mode: TimerEngineOptions['alerts']) {
   if (mode === 'beep') beep(seconds === 8 ? 660 : 880);
   else if (mode === 'voice' && 'speechSynthesis' in window) {
     const u = new SpeechSynthesisUtterance(seconds === 8 ? 'eight seconds' : 'twelve seconds');

@@ -35,6 +35,20 @@ export interface Settings {
   pbSound: boolean;
   /** last used event (timer page) */
   lastEvent: string;
+  /** virtual puzzle: ms per animated turn (0 = no animation), csTimer's "VRC base speed" */
+  virtualSpeed: number;
+  /** virtual cube camera: csTimer's orientation option (looking at the top and front, or the top front right corner) */
+  virtualView: 'UF' | 'URF';
+  /** smart cube: when a scramble counts as done (csTimer "mark scrambled after"): matching the scramble, n seconds without a move, or never */
+  smartScrambled: 'scramble' | '2' | '3' | '4' | '5' | 'never';
+  /** smart cube: space marks the cube as scrambled */
+  smartSpace: boolean;
+  /** smart cube: beep when the cube is marked scrambled */
+  smartBeep: boolean;
+  /** smart cube: show the cube on screen */
+  smartView: '3D' | '2D' | 'off';
+  /** stackmat: use the timer's status signals (hands on, green light) */
+  stackmatStatus: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -55,6 +69,13 @@ export const DEFAULT_SETTINGS: Settings = {
   showSolveList: true,
   pbSound: true,
   lastEvent: '333',
+  virtualSpeed: 100,
+  virtualView: 'UF',
+  smartScrambled: 'scramble',
+  smartSpace: true,
+  smartBeep: true,
+  smartView: '3D',
+  stackmatStatus: true,
 };
 
 export interface FontOption {
@@ -77,6 +98,14 @@ const KEY = 'cubetype.settings';
 
 function sanitize(raw: Partial<Settings> | null | undefined): Settings {
   const s = { ...DEFAULT_SETTINGS, ...(raw && typeof raw === 'object' ? raw : {}) };
+  // choices from another version (or a hand-edited store) fall back to the default
+  const oneOf = <K extends keyof Settings>(key: K, allowed: readonly Settings[K][]) => {
+    if (!allowed.includes(s[key])) s[key] = DEFAULT_SETTINGS[key];
+  };
+  oneOf('virtualSpeed', [0, 50, 100, 200, 500, 1000]);
+  oneOf('virtualView', ['UF', 'URF']);
+  oneOf('smartScrambled', ['scramble', '2', '3', '4', '5', 'never']);
+  oneOf('smartView', ['3D', '2D', 'off']);
   // read by puzzle, so it has to be an object (each colour in it is checked where it is used)
   if (!s.customStickers || typeof s.customStickers !== 'object' || Array.isArray(s.customStickers)) s.customStickers = {};
   return s;

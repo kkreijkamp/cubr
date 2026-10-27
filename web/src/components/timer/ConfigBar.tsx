@@ -15,6 +15,7 @@ import {
   TrashIcon,
 } from '@heroicons/react/24/outline';
 import { EVENTS, getEvent, type EventInfo } from '@cubetype/cubestats';
+import { INPUT_MODES, modeInfo, type InputMode } from '../../input/inputMode';
 import type { Session } from '../../lib/types';
 import { formatNumber } from '../../lib/format';
 
@@ -45,8 +46,10 @@ interface Props {
   onMergeSessions?: () => void;
   inspection: boolean;
   onToggleInspection: () => void;
-  manual: boolean;
-  onToggleManual: () => void;
+  /** how times are entered, and the ways this page offers */
+  input: InputMode;
+  inputs: InputMode[];
+  onInput: (m: InputMode) => void;
   /** a popover/menu is open (the timer is paused meanwhile) */
   onOverlayChange: (open: boolean) => void;
   mode: 'local' | 'cloud';
@@ -57,13 +60,14 @@ interface Props {
 export function ConfigBar(p: Props) {
   const [eventsOpen, setEventsOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [inputOpen, setInputOpen] = useState(false);
   const current = p.sessions.find((s) => s.id === p.currentSessionId) ?? null;
   const eventSessions = p.sessions.filter((s) => s.event === p.event);
   const { onOverlayChange } = p;
 
   useEffect(() => {
-    onOverlayChange(eventsOpen || menuOpen);
-  }, [eventsOpen, menuOpen, onOverlayChange]);
+    onOverlayChange(eventsOpen || menuOpen || inputOpen);
+  }, [eventsOpen, menuOpen, inputOpen, onOverlayChange]);
 
   return (
     <div className="config-bar tp-config fade-on-focus">
@@ -96,17 +100,7 @@ export function ConfigBar(p: Props) {
           <EyeIcon width={14} height={14} />
           <span className="tp-hide-narrow">inspection</span>
         </button>
-        <button
-          className={`btn-text${p.manual ? ' active' : ''}`}
-          onClick={p.onToggleManual}
-          aria-pressed={p.manual}
-          data-tip={p.manual ? 'typing times in - ctrl+alt+t for the timer' : 'type times in (ctrl+alt+i)'}
-          data-tip-pos="down"
-          {...noFocus}
-        >
-          <CommandLineIcon width={14} height={14} />
-          <span className="tp-hide-narrow">typing</span>
-        </button>
+        <InputMenu open={inputOpen} setOpen={setInputOpen} value={p.input} options={p.inputs} onChange={p.onInput} />
 
         <div className="divider" />
         <SyncStatus mode={p.mode} pending={p.pending} syncError={p.syncError} />
@@ -295,6 +289,58 @@ function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, 
             </span>
             <span className="tp-menu-label">delete</span>
           </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** How times are entered: the timer, typing, or a stackmat / bluetooth / virtual puzzle (csTimer's inputs). */
+function InputMenu({ open, setOpen, value, options, onChange }: { open: boolean; setOpen: (o: boolean) => void; value: InputMode; options: InputMode[]; onChange: (m: InputMode) => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useDismiss(open, setOpen, ref);
+  const info = modeInfo(value);
+  return (
+    <div className="tp-session tp-input" ref={ref}>
+      <button
+        className={`btn-text tp-session-btn${value !== 'timer' ? ' active' : ''}${open ? ' open' : ''}`}
+        onClick={() => setOpen(!open)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`input: ${info.label}`}
+        data-tip={open ? undefined : 'how times are entered'}
+        data-tip-pos="down"
+        {...noFocus}
+      >
+        <CommandLineIcon width={14} height={14} />
+        <span className="tp-hide-narrow">{info.label}</span>
+        <ChevronDownIcon width={14} height={14} className="tp-chevron" />
+      </button>
+      {open && (
+        <div className="tp-menu tp-input-menu" role="menu" aria-label="input">
+          <div className="tp-menu-title">enter times with</div>
+          {INPUT_MODES.filter((m) => options.includes(m.id)).map((m) => (
+            <button
+              key={m.id}
+              role="menuitemradio"
+              aria-checked={m.id === value}
+              className={`tp-menu-item${m.id === value ? ' active' : ''}`}
+              onClick={() => {
+                setOpen(false);
+                if (m.id !== value) onChange(m.id);
+              }}
+              {...noFocus}
+            >
+              <span className="tp-menu-check">{m.id === value && <CheckIcon width={14} height={14} />}</span>
+              <span className="tp-menu-label">
+                {m.label}
+                <span className="tp-menu-hint">{m.hint}</span>
+              </span>
+              <span className="tp-menu-count">
+                <kbd>ctrl</kbd>+<kbd>alt</kbd>+<kbd>{m.key}</kbd>
+              </span>
+            </button>
+          ))}
         </div>
       )}
     </div>

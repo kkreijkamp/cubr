@@ -191,6 +191,23 @@
   border-radius: 2px;
 }
 
+/* input dropdown: each way of entering times with a line on it and its csTimer key */
+.tp-input-menu {
+  min-width: 21rem;
+}
+.tp-input-menu .tp-menu-label {
+  display: grid;
+  gap: 0.1rem;
+  white-space: normal;
+}
+.tp-input-menu .tp-menu-hint {
+  margin: 0;
+}
+.tp-input-menu .tp-menu-count kbd {
+  font-size: 0.62rem;
+  padding: 0.1em 0.35em;
+}
+
 /* ------------------------------------------------------------ scramble */
 .tp-scramble-wrap {
   display: grid;
@@ -335,6 +352,107 @@
 }
 .tp-manual-hint.error {
   color: var(--error-color);
+}
+
+/* virtual puzzle (virtual cube / qcube): the time, the puzzle and its actions side by side on wide
+   screens (about as tall as the timer, so the page still fits the window), stacked on narrow ones */
+.tp-virtual {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0 2rem;
+  width: 100%;
+}
+.tp-virtual .timer-display {
+  justify-self: end;
+  line-height: 1;
+}
+.tp-virtual-canvas {
+  position: relative;
+  width: clamp(14rem, 34vw, 30rem);
+  height: clamp(8.5rem, 21vh, 16rem);
+  touch-action: none;
+}
+.tp-virtual-canvas canvas {
+  display: block;
+}
+.tp-virtual-side {
+  position: relative;
+  justify-self: start;
+  display: grid;
+  justify-items: start;
+}
+.tp-virtual-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  font-size: 0.8rem;
+}
+.tp-virtual-bar .btn-text {
+  padding: 0.35rem 0.5rem;
+}
+.tp-virtual-bar .sub {
+  padding: 0 0.5rem;
+}
+.tp-virtual-bar kbd {
+  font-size: 0.7rem;
+  margin-right: 0.25em;
+}
+/* the key legend floats over the page instead of pushing it down */
+.tp-virtual-keys {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: repeat(3, max-content);
+  gap: 0.3rem 1.1rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--roundness);
+  background: var(--bg-color);
+  box-shadow: 0 0 0 2px var(--sub-alt-color);
+  color: var(--sub-color);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  animation: tpMenuIn 0.16s ease-out;
+}
+.tp-virtual-keys kbd {
+  display: inline-block;
+  min-width: 1.3em;
+  margin-right: 0.35em;
+  font-size: 0.68rem;
+  text-align: center;
+}
+@media (max-width: 980px) {
+  .tp-virtual {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    gap: 0.4rem;
+  }
+  .tp-virtual .timer-display,
+  .tp-virtual-side {
+    justify-self: center;
+  }
+  .tp-virtual-canvas {
+    width: min(100%, 30rem);
+    height: clamp(12rem, 36vh, 20rem);
+  }
+  .tp-virtual-bar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+  }
+  .tp-virtual-keys {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+.tp-input-note {
+  color: var(--sub-color);
+  font-size: 0.9rem;
+  text-align: center;
 }
 
 /* ------------------------------------------------------------ bottom panels */
@@ -616,6 +734,9 @@
   .tp-scramble-wrap {
     margin-top: 1.25rem;
   }
+  .tp-virtual-canvas {
+    height: clamp(8rem, 18vh, 15rem);
+  }
   .tp-timer-area {
     min-height: clamp(8rem, 19vh, 15rem);
     padding: 0.5rem 0 0.25rem;
@@ -630,6 +751,9 @@
 @media (min-width: 981px) and (max-height: 760px) {
   .tp-scramble-wrap {
     margin-top: 0.75rem;
+  }
+  .tp-virtual-canvas {
+    height: clamp(6.5rem, 15vh, 15rem);
   }
   .tp-timer-area {
     min-height: clamp(6.5rem, 15vh, 15rem);

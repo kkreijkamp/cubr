@@ -30,6 +30,8 @@ import { SolveModal } from '../components/timer/SolveModal';
 import { AverageModal } from '../components/timer/AverageModal';
 import { QuickActions } from '../components/timer/QuickActions';
 import { ManualEntry } from '../components/timer/ManualEntry';
+import { VirtualInput } from '../components/timer/inputs/VirtualInput';
+import { AVAILABLE_INPUTS, INPUT_MODES, modeInfo, updateInput, useInputState, type InputMode } from '../input/inputMode';
 import { ConfirmModal, PromptModal } from '../components/timer/Dialogs';
 import { MergeSessionsModal } from '../components/timer/MergeSessionsModal';
 import { copyText, isTouchDevice, playPbSound } from '../components/timer/feedback';
@@ -69,6 +71,8 @@ type ModalState =
   | null;
 
 const GUEST_HINT_KEY = 'cubetype.guestHintDismissed';
+const IDLE: TimerState = { phase: 'idle', inInspection: false, startedAt: null, inspectionStartedAt: null, result: null };
+const AVAILABLE = AVAILABLE_INPUTS;
 const PB_KINDS_NS = [5, 12, 100];
 
 /**
@@ -113,7 +117,12 @@ export default function TimerPage() {
   const eventInfo = getEvent(event) ?? EVENTS[0];
   const scr = useScrambleQueue(event);
 
-  const [manual, setManual] = useState(false);
+  const device = useInputState();
+  const input: InputMode = AVAILABLE.includes(device.mode) ? device.mode : 'timer';
+  const manual = input === 'typing';
+  const setInput = useCallback((mode: InputMode) => updateInput({ mode }), []);
+  /** what a timer other than the keyboard one is doing (virtual puzzle, stackmat, ...) */
+  const [altState, setAltState] = useState<TimerState>(IDLE);
   const [editingScramble, setEditingScramble] = useState(false);
   const [overlay, setOverlay] = useState(false);
   const [modal, setModal] = useState<ModalState>(null);
@@ -171,7 +180,8 @@ export default function TimerPage() {
     [record],
   );
 
-  const engineEnabled = !manual && !editingScramble && !overlay && modal === null && !paletteOpen;
+  const inputsEnabled = !editingScramble && !overlay && modal === null && !paletteOpen;
+  const engineEnabled = input === 'timer' && inputsEnabled;
   const engine = useTimerEngine({
     enabled: engineEnabled,
     // WCA inspection only applies to events that have it (not blindfolded, not FMC)
@@ -180,7 +190,8 @@ export default function TimerPage() {
     alerts: settings.inspectionAlerts,
     onSolve,
   });
-  const { phase, inInspection } = engine.state;
+  const active = input === 'timer' ? engine.state : input === 'typing' ? IDLE : altState;
+  const { phase, inInspection } = active;
   const { clearResult, cancel: cancelEngine } = engine;
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
@@ -210,10 +221,11 @@ export default function TimerPage() {
   }, [phase, inInspection, settings.focusMode]);
   useEffect(() => () => document.body.classList.remove('focus'), []);
 
-  // leaving manual mode / opening things: never keep a stale engine result around
+  // leaving the timer for another input: never keep a stale engine result around
   useEffect(() => {
-    if (manual) cancelEngine();
-  }, [manual, cancelEngine]);
+    if (input !== 'timer') cancelEngine();
+    setAltState(IDLE);
+  }, [input, cancelEngine]);
 
   // ---------------------------------------------------------------- actions on the latest solve
   const penaltyLast = useCallback((p: Penalty) => {
@@ -323,9 +335,13 @@ export default function TimerPage() {
         case 'customScramble':
           return setEditingScramble(true);
         case 'input':
-          return setManual(a.input === 'typing');
+          if (AVAILABLE.includes(a.input)) {
+            setInput(a.input);
+            toast.notice(`entering times with: ${modeInfo(a.input).label}`, { durationMs: 1500 });
+          } else toast.notice(`cubetype has no ${modeInfo(a.input).label} input yet`);
+          return;
         case 'missingInput':
-          toast.notice(`cubetype has no ${a.name} input: ctrl+alt+t times with the keyboard, ctrl+alt+i types times in`);
+          toast.notice(`cubetype has no ${a.name} input`);
           return;
         case 'comment':
           return commentLast();
@@ -335,7 +351,7 @@ export default function TimerPage() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [penaltyLast, deleteLast, commentLast, cycleSession, changeEvent, event, session, settings.inspection]);
+  }, [penaltyLast, deleteLast, commentLast, cycleSession, changeEvent, event, session, settings.inspection, setInput]);
 
   // ---------------------------------------------------------------- palette commands
   useRegisterCommands(
@@ -405,12 +421,24 @@ export default function TimerPage() {
       }
       cmds.push(
         { id: 'timer-toggle-list', label: settings.showSolveList ? 'Hide solve list' : 'Show solve list', icon: <ListBulletIcon />, keywords: ['toggle'], run: () => updateSettings({ showSolveList: !settings.showSolveList }) },
-        { id: 'timer-manual', label: manual ? 'Use the timer (leave manual entry)' : 'Manual entry (type times)', icon: <CommandLineIcon />, keywords: ['typing', 'toggle'], run: () => setManual((m) => !m) },
+        {
+          id: 'timer-input',
+          label: 'Enter times with...',
+          icon: <CommandLineIcon />,
+          keywords: ['input', 'typing', 'manual', 'stackmat', 'virtual', 'bluetooth', 'smart cube', 'qcube'],
+          children: () =>
+            INPUT_MODES.filter((m) => AVAILABLE.includes(m.id)).map((m) => ({
+              id: `timer-input-${m.id}`,
+              label: `${m.label} - ${m.hint}`,
+              active: m.id === input,
+              run: () => setInput(m.id),
+            })),
+        },
         { id: 'timer-inspection-toggle', label: settings.inspection ? 'Turn inspection off' : 'Turn inspection on', icon: <EyeIcon />, keywords: ['toggle', 'wca'], run: () => updateSettings({ inspection: !settings.inspection }) },
       );
       return cmds;
     },
-    [st.sessions, event, session?.id, last?.id, last?.penalty, settings.showSolveList, settings.inspection, manual, deleteLast],
+    [st.sessions, event, session?.id, last?.id, last?.penalty, settings.showSolveList, settings.inspection, input, deleteLast],
   );
 
 
@@ -424,6 +452,8 @@ export default function TimerPage() {
     return s;
   }, [engine.state, last]);
 
+  // the latest solve as a stable value (inputs show it while idle)
+  const lastResult = useMemo(() => (last ? { timeMs: last.timeMs, penalty: last.penalty } : null), [last?.timeMs, last?.penalty]); // eslint-disable-line react-hooks/exhaustive-deps
   const openSolve = useCallback((index: number) => setModal({ kind: 'solve', index }), []);
   const openAverage = useCallback((n: number, which: 'current' | 'best') => setModal({ kind: 'avg', n, which }), []);
   const onOverlayChange = useCallback((open: boolean) => setOverlay(open), []);
@@ -463,8 +493,9 @@ export default function TimerPage() {
         onMergeSessions={() => setModal({ kind: 'mergeSessions' })}
         inspection={settings.inspection}
         onToggleInspection={() => updateSettings({ inspection: !settings.inspection })}
-        manual={manual}
-        onToggleManual={() => setManual((m) => !m)}
+        input={input}
+        inputs={AVAILABLE}
+        onInput={setInput}
         onOverlayChange={onOverlayChange}
         mode={st.mode}
         pending={st.pending}
@@ -481,9 +512,30 @@ export default function TimerPage() {
         setEditing={setEditingScramble}
       />
 
-      <div className="tp-timer-area" {...(manual ? {} : engine.touchHandlers)} aria-label={touch ? 'timer: hold to get ready, release to start' : 'timer'}>
+      <div className={`tp-timer-area input-${input}`} {...(input === 'timer' ? engine.touchHandlers : {})} aria-label={input !== 'timer' ? undefined : touch ? 'timer: hold to get ready, release to start' : 'timer'}>
         {manual ? (
           <ManualEntry onSubmit={(r) => record(r, 'manual')} disabled={modal !== null || paletteOpen} />
+        ) : input === 'virtual' || input === 'qcube' ? (
+          <VirtualInput
+            key={input}
+            event={event}
+            flat={input === 'qcube'}
+            scramble={scr.current?.text ?? null}
+            enabled={inputsEnabled}
+            inspection={settings.inspection && eventInfo.inspection}
+            alerts={settings.inspectionAlerts}
+            last={lastResult}
+            precision={settings.precision}
+            timerUpdate={settings.timerUpdate}
+            sizeRem={settings.timerSize}
+            pb={pb && isIdle}
+            settings={settings}
+            onState={setAltState}
+            onSolve={(r) => {
+              lastStopAt.current = performance.now();
+              record(r, 'timer');
+            }}
+          />
         ) : (
           <div key={pbKey}>
             <TimerDisplay state={displayState} precision={settings.precision} timerUpdate={settings.timerUpdate} sizeRem={settings.timerSize} pb={pb && isIdle} />
@@ -492,7 +544,7 @@ export default function TimerPage() {
       </div>
 
       <div className="tp-under fade-on-focus">
-        {solves.length === 0 && !manual && st.ready ? (
+        {solves.length === 0 && input === 'timer' && st.ready ? (
           <div className="tp-hint">
             {touch ? (
               'hold the timer, release to start - tap anywhere to stop'

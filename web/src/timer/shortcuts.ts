@@ -1,6 +1,7 @@
 // Timer page keyboard shortcuts: all of csTimer's (its src/js/shortcut.js), so csTimer habits carry
 // over, plus cubetype's own on keys csTimer leaves free. Space, Esc and Tab are handled elsewhere.
 import type { Penalty } from '@cubetype/cubestats';
+import type { InputMode } from '../input/inputMode';
 
 export type ShortcutAction =
   | { kind: 'event'; event: string }
@@ -10,8 +11,8 @@ export type ShortcutAction =
   | { kind: 'session'; dir: 1 | -1 }
   | { kind: 'scramble'; dir: 1 | -1 }
   | { kind: 'customScramble' }
-  | { kind: 'input'; input: 'timer' | 'typing' }
-  /** a csTimer input (stackmat, bluetooth, ...) that cubetype doesn't have */
+  | { kind: 'input'; input: InputMode }
+  /** a csTimer input that cubetype doesn't have (last layer training) */
   | { kind: 'missingInput'; name: string }
   | { kind: 'comment' }
   | { kind: 'inspection' };
@@ -57,12 +58,12 @@ const CTRL: Record<string, ShortcutAction> = {
 const CTRL_ALT: Record<string, ShortcutAction> = {
   KeyT: { kind: 'input', input: 'timer' },
   KeyI: { kind: 'input', input: 'typing' },
-  KeyS: { kind: 'missingInput', name: 'stackmat' },
-  KeyM: { kind: 'missingInput', name: 'moyu timer' },
-  KeyV: { kind: 'missingInput', name: 'virtual cube' },
-  KeyG: { kind: 'missingInput', name: 'smart cube' },
-  KeyQ: { kind: 'missingInput', name: 'qcube' },
-  KeyB: { kind: 'missingInput', name: 'bluetooth timer' },
+  KeyS: { kind: 'input', input: 'stackmat' },
+  KeyM: { kind: 'input', input: 'moyu' },
+  KeyV: { kind: 'input', input: 'virtual' },
+  KeyG: { kind: 'input', input: 'smartcube' },
+  KeyQ: { kind: 'input', input: 'qcube' },
+  KeyB: { kind: 'input', input: 'bttimer' },
   KeyL: { kind: 'missingInput', name: 'last layer training' },
 };
 

@@ -53,10 +53,10 @@ describe('csTimer shortcuts', () => {
     expect(ctrl('Digit4')).toBeNull();
   });
 
-  it('ctrl + alt + t / i: timer / typing; the inputs cubetype lacks say so', () => {
-    expect(ctrlAlt('KeyT')).toEqual({ kind: 'input', input: 'timer' });
-    expect(ctrlAlt('KeyI')).toEqual({ kind: 'input', input: 'typing' });
-    for (const code of ['KeyS', 'KeyM', 'KeyV', 'KeyG', 'KeyQ', 'KeyB', 'KeyL']) expect(ctrlAlt(code)?.kind, code).toBe('missingInput');
+  it("ctrl + alt + a letter: csTimer's inputs; last layer training says cubetype hasn't got it", () => {
+    const inputs: Record<string, string> = { KeyT: 'timer', KeyI: 'typing', KeyS: 'stackmat', KeyM: 'moyu', KeyV: 'virtual', KeyG: 'smartcube', KeyQ: 'qcube', KeyB: 'bttimer' };
+    for (const [code, input] of Object.entries(inputs)) expect(ctrlAlt(code), code).toEqual({ kind: 'input', input });
+    expect(ctrlAlt('KeyL')?.kind).toBe('missingInput');
     // ctrl + alt + a key csTimer doesn't use is nothing, not the alt or ctrl shortcut
     expect(ctrlAlt('KeyD')).toBeNull();
     expect(ctrlAlt('Digit1')).toBeNull();
