@@ -122,6 +122,7 @@ export class VirtualSession {
     const r = ops(this.model).key(code);
     if (!r) return { used: false };
     if ('depth' in r) {
+      if (this.model.kind === 'poly') this.model.twisty.pressDepth(code);
       this.emit();
       return { used: true };
     }

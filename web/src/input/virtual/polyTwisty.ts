@@ -17,8 +17,10 @@ export interface PolyTwisty {
   parse(alg: string): Move[] | null;
   /** turns the whole puzzle (allowed during inspection without starting the timer) */
   isRotation(m: Move): boolean;
-  /** a key (KeyboardEvent.code) pressed while solving */
+  /** what a key (KeyboardEvent.code) does; only says so for a depth key (pressDepth changes the depth) */
   key(code: string): KeyResult;
+  /** a depth key pressed: csTimer's 3 and 4 (left hand), 7 and 8 (right hand) */
+  pressDepth(code: string): void;
   /** forget the layer depth set by the depth keys */
   resetDepth(): void;
   /** the depth markers for big cubes: [left, right] outer-move depth */
@@ -170,18 +172,18 @@ export function cubeTwisty(n: number): PolyTwisty {
     },
     isRotation: (m) => m.from <= 1 && m.to >= n,
     key(code) {
-      if (code === 'Digit3' || code === 'Digit4' || code === 'Digit7' || code === 'Digit8') {
-        if (code === 'Digit3') left = Math.max(1, left - 1);
-        else if (code === 'Digit4') left = Math.min(left + 1, n - 1);
-        else if (code === 'Digit7') right = Math.min(right + 1, n - 1);
-        else right = Math.max(1, right - 1);
-        return { depth: true };
-      }
+      if (code === 'Digit3' || code === 'Digit4' || code === 'Digit7' || code === 'Digit8') return { depth: true };
       const k = keys()[code];
       if (!k) return null;
       // inner slices (M, S, E) need a middle layer
       if (k[0] > n || (k[0] >= 2 && k[1] < k[0])) return null;
       return { move: mv(k[0], k[1], k[2], k[3]) };
+    },
+    pressDepth(code) {
+      if (code === 'Digit3') left = Math.max(1, left - 1);
+      else if (code === 'Digit4') left = Math.min(left + 1, n - 1);
+      else if (code === 'Digit7') right = Math.min(right + 1, n - 1);
+      else if (code === 'Digit8') right = Math.max(1, right - 1);
     },
     resetDepth() {
       left = right = 1;
@@ -301,6 +303,7 @@ export function pyraminxTwisty(): PolyTwisty {
       const s = KEYS[code];
       return s ? { move: parseToken(s)! } : null;
     },
+    pressDepth() {},
     resetDepth() {},
     depth: () => [1, 1],
     touch: () => TOUCH,
@@ -386,6 +389,7 @@ export function skewbTwisty(): PolyTwisty {
     },
     isRotation: (m) => puzzle.axes[m.axis].cuts.length === 0,
     key: (code) => KEYS[code]?.() ?? null,
+    pressDepth() {},
     resetDepth() {},
     depth: () => [1, 1],
     touch: () => ({}),
@@ -485,6 +489,7 @@ export function megaminxTwisty(): PolyTwisty {
       const s = KEYS[code];
       return s ? { move: parseToken(s)! } : null;
     },
+    pressDepth() {},
     resetDepth() {},
     depth: () => [1, 1],
     touch: () => TOUCH,

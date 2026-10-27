@@ -20,6 +20,14 @@ describe('a virtual solve (csTimer virtual.js)', () => {
     expect(s.phase).toBe('idle');
   });
 
+  it('the depth keys work through the session: 4 then L turns the outer two layers', () => {
+    const s = session('444');
+    s.scramble('Lw', 0);
+    expect(s.key('Digit4', 10).used).toBe(true);
+    // Lw undoes the scramble's Lw: L' on two layers (E) solves it
+    expect(s.key('KeyE', 20).solved?.penalty).toBe('OK');
+  });
+
   it('rotations during inspection do not start it', () => {
     const s = session('333');
     s.scramble("x y'", 0);

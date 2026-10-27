@@ -177,8 +177,17 @@ describe('virtual puzzles', () => {
   it('the depth keys make outer moves deeper on big cubes', () => {
     const t = cubeTwisty(5);
     expect(t.key('Digit7')).toEqual({ depth: true });
+    t.pressDepth('Digit7');
     expect(t.name((t.key('KeyI') as { move: never }).move)).toBe('Rw');
     t.resetDepth();
+    expect(t.name((t.key('KeyI') as { move: never }).move)).toBe('R');
+  });
+
+  it('looking up what every key does (the key legend) leaves the depth alone', () => {
+    const t = cubeTwisty(3);
+    for (const d of '1234567890') t.key(`Digit${d}`);
+    expect(t.name((t.key('KeyD') as { move: never }).move)).toBe('L');
+    expect(t.name((t.key('KeyE') as { move: never }).move)).toBe("L'");
     expect(t.name((t.key('KeyI') as { move: never }).move)).toBe('R');
   });
 });
