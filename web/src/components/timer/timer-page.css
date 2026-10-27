@@ -72,6 +72,12 @@
   .tp-menu.tp-events-menu {
     grid-template-columns: repeat(3, minmax(5.5rem, 1fr));
   }
+  /* the input button sits near the right end of the bar: hang its menu from there, inside the page */
+  .tp-menu.tp-input-menu {
+    left: auto;
+    right: 0;
+    transform: none;
+  }
   /* no counts on phones: drop their column (and its gap) so "3x3 oh" fits */
   .tp-events-menu .tp-menu-item {
     grid-template-columns: 1rem 1fr;
@@ -178,12 +184,6 @@
   color: var(--sub-color);
   font-variant-numeric: tabular-nums;
 }
-.tp-menu-hint {
-  grid-column: 2 / 4;
-  margin-top: -0.2rem;
-  color: var(--sub-color);
-  font-size: 0.7rem;
-}
 .tp-menu-sep {
   height: 2px;
   background: var(--sub-alt-color);
@@ -191,18 +191,7 @@
   border-radius: 2px;
 }
 
-/* input dropdown: each way of entering times with a line on it and its csTimer key */
-.tp-input-menu {
-  min-width: 21rem;
-}
-.tp-input-menu .tp-menu-label {
-  display: grid;
-  gap: 0.1rem;
-  white-space: normal;
-}
-.tp-input-menu .tp-menu-hint {
-  margin: 0;
-}
+/* input dropdown: each way of entering times with its csTimer key */
 .tp-input-menu .tp-menu-count kbd {
   font-size: 0.62rem;
   padding: 0.1em 0.35em;

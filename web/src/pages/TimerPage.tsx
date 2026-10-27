@@ -435,7 +435,7 @@ export default function TimerPage() {
           children: () =>
             INPUT_MODES.filter((m) => AVAILABLE.includes(m.id)).map((m) => ({
               id: `timer-input-${m.id}`,
-              label: `${m.label} - ${m.hint}`,
+              label: m.label,
               active: m.id === input,
               run: () => setInput(m.id),
             })),

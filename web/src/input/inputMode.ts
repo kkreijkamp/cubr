@@ -7,21 +7,19 @@ export type InputMode = 'timer' | 'typing' | 'stackmat' | 'moyu' | 'virtual' | '
 export interface InputModeInfo {
   id: InputMode;
   label: string;
-  /** a line on what it is */
-  hint: string;
   /** csTimer's ctrl+alt key */
   key: string;
 }
 
 export const INPUT_MODES: InputModeInfo[] = [
-  { id: 'timer', label: 'timer', hint: 'space bar or touch', key: 't' },
-  { id: 'typing', label: 'typing', hint: 'type each time in', key: 'i' },
-  { id: 'stackmat', label: 'stackmat', hint: 'a stackmat timer on the microphone input', key: 's' },
-  { id: 'moyu', label: 'moyu timer', hint: 'a moyu timer on the microphone input', key: 'm' },
-  { id: 'virtual', label: 'virtual', hint: 'a virtual puzzle you turn with the keyboard', key: 'v' },
-  { id: 'qcube', label: 'qcube', hint: 'the virtual puzzle drawn flat', key: 'q' },
-  { id: 'smartcube', label: 'smart cube', hint: 'a bluetooth cube: GAN, Giiker, GoCube, MoYu, QiYi', key: 'g' },
-  { id: 'bttimer', label: 'bluetooth timer', hint: 'a GAN or QiYi smart timer', key: 'b' },
+  { id: 'timer', label: 'timer', key: 't' },
+  { id: 'typing', label: 'typing', key: 'i' },
+  { id: 'stackmat', label: 'stackmat', key: 's' },
+  { id: 'moyu', label: 'moyu timer', key: 'm' },
+  { id: 'virtual', label: 'virtual', key: 'v' },
+  { id: 'qcube', label: 'qcube', key: 'q' },
+  { id: 'smartcube', label: 'smart cube', key: 'g' },
+  { id: 'bttimer', label: 'bluetooth timer', key: 'b' },
 ];
 
 /** the ways of entering times the timer page has (all of csTimer's but last layer training) */

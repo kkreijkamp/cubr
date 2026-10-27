@@ -332,10 +332,7 @@ function InputMenu({ open, setOpen, value, options, onChange }: { open: boolean;
               {...noFocus}
             >
               <span className="tp-menu-check">{m.id === value && <CheckIcon width={14} height={14} />}</span>
-              <span className="tp-menu-label">
-                {m.label}
-                <span className="tp-menu-hint">{m.hint}</span>
-              </span>
+              <span className="tp-menu-label">{m.label}</span>
               <span className="tp-menu-count">
                 <kbd>ctrl</kbd>+<kbd>alt</kbd>+<kbd>{m.key}</kbd>
               </span>
