@@ -228,6 +228,22 @@
 .tp-scramble-loading {
   color: var(--sub-color);
 }
+/* a smart cube's progress along the scramble */
+.tp-scramble .sm-done {
+  color: var(--sub-color);
+}
+.tp-scramble .sm-current {
+  color: var(--main-color);
+}
+.tp-scramble .sm-check {
+  color: var(--main-color);
+}
+.tp-scramble .sm-check svg {
+  vertical-align: -0.05em;
+}
+.tp-scramble.off {
+  color: var(--sub-color);
+}
 .tp-scramble-actions {
   display: flex;
   align-items: center;
@@ -448,6 +464,15 @@
     left: 50%;
     transform: translateX(-50%);
   }
+}
+/* a smart cube's status: the cube, what can be done, then a question or a hint, a row each */
+.tp-smart-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.tp-hardware-bar .tp-smart-row {
+  justify-content: center;
 }
 /* hardware timers and cubes: the timer as usual, a quiet status line under it */
 .tp-hardware {

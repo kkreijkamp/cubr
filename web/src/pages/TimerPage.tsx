@@ -33,6 +33,8 @@ import { ManualEntry } from '../components/timer/ManualEntry';
 import { VirtualInput } from '../components/timer/inputs/VirtualInput';
 import { StackmatInput } from '../components/timer/inputs/StackmatInput';
 import { BtTimerInput } from '../components/timer/inputs/BtTimerInput';
+import { SmartCubeInput } from '../components/timer/inputs/SmartCubeInput';
+import type { ScrambleHint } from '../input/bluetooth/smartSession';
 import { AVAILABLE_INPUTS, INPUT_MODES, modeInfo, updateInput, useInputState, type InputMode } from '../input/inputMode';
 import { ConfirmModal, PromptModal } from '../components/timer/Dialogs';
 import { MergeSessionsModal } from '../components/timer/MergeSessionsModal';
@@ -125,6 +127,8 @@ export default function TimerPage() {
   const setInput = useCallback((mode: InputMode) => updateInput({ mode }), []);
   /** what a timer other than the keyboard one is doing (virtual puzzle, stackmat, ...) */
   const [altState, setAltState] = useState<TimerState>(IDLE);
+  /** a smart cube's progress along the scramble */
+  const [smartHint, setSmartHint] = useState<ScrambleHint | null>(null);
   const [editingScramble, setEditingScramble] = useState(false);
   const [overlay, setOverlay] = useState(false);
   const [modal, setModal] = useState<ModalState>(null);
@@ -512,6 +516,7 @@ export default function TimerPage() {
         onCustom={scr.setCustom}
         editing={editingScramble}
         setEditing={setEditingScramble}
+        hint={input === 'smartcube' ? smartHint : null}
       />
 
       <div className={`tp-timer-area input-${input}`} {...(input === 'timer' ? engine.touchHandlers : {})} aria-label={input !== 'timer' ? undefined : touch ? 'timer: hold to get ready, release to start' : 'timer'}>
@@ -551,6 +556,27 @@ export default function TimerPage() {
               lastStopAt.current = performance.now();
               record(r, 'timer');
             }}
+          />
+        ) : input === 'smartcube' ? (
+          <SmartCubeInput
+            event={event}
+            scramble={scr.current?.text ?? null}
+            enabled={inputsEnabled}
+            inspection={settings.inspection && eventInfo.inspection}
+            alerts={settings.inspectionAlerts}
+            last={lastResult}
+            precision={settings.precision}
+            timerUpdate={settings.timerUpdate}
+            sizeRem={settings.timerSize}
+            pb={pb && isIdle}
+            settings={settings}
+            onState={setAltState}
+            onSolve={(r) => {
+              lastStopAt.current = performance.now();
+              record(r, 'timer');
+            }}
+            onScramble={scr.setFromCube}
+            onHint={setSmartHint}
           />
         ) : input === 'virtual' || input === 'qcube' ? (
           <VirtualInput

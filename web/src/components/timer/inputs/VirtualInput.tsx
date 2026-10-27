@@ -45,7 +45,7 @@ function isTyping(el: EventTarget | null): boolean {
 const MOVE_KEYS = /^(Key[A-Z]|Digit\d|Semicolon|Comma|Period|Slash)$/;
 
 /** the camera a puzzle starts with (cubes: csTimer's orientation option) */
-function baseCamera(model: VirtualModel, view: 'UF' | 'URF'): Camera {
+export function baseCamera(model: VirtualModel, view: 'UF' | 'URF'): Camera {
   if (model.kind === 'poly') {
     const v = model.twisty.view;
     const cube = model.twisty.id.startsWith('cube');

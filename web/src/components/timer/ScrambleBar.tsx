@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { ArrowPathIcon, CheckIcon, ChevronLeftIcon, PencilIcon, SignalSlashIcon, Square2StackIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import type { ScrambleItem } from '../../timer/useScrambleQueue';
+import type { ScrambleHint } from '../../input/bluetooth/smartSession';
 import { toast } from '../../lib/toast';
 import { copyText } from './feedback';
 import { noFocus } from './ConfigBar';
@@ -13,6 +14,8 @@ interface Props {
   onCustom: (text: string) => void;
   editing: boolean;
   setEditing: (v: boolean) => void;
+  /** a smart cube's progress along the scramble */
+  hint?: ScrambleHint | null;
 }
 
 /** Font size steps by scramble length: 2x2/3x3 large, big cubes & megaminx smaller. */
@@ -26,7 +29,7 @@ function sizeFor(text: string): string {
   return '0.85rem';
 }
 
-export function ScrambleBar({ scramble, onNext, onPrev, hasPrev, onCustom, editing, setEditing }: Props) {
+export function ScrambleBar({ scramble, onNext, onPrev, hasPrev, onCustom, editing, setEditing, hint }: Props) {
   const [draft, setDraft] = useState('');
   const taRef = useRef<HTMLTextAreaElement>(null);
 
@@ -89,8 +92,8 @@ export function ScrambleBar({ scramble, onNext, onPrev, hasPrev, onCustom, editi
   return (
     <div className="tp-scramble-wrap fade-on-focus">
       {scramble ? (
-        <div className="tp-scramble" style={{ ['--scramble-size' as string]: sizeFor(scramble.text) }} key={scramble.text}>
-          {scramble.text}
+        <div className={`tp-scramble${hint?.pending ? ' off' : ''}`} style={{ ['--scramble-size' as string]: sizeFor(scramble.text) }} key={scramble.text}>
+          {hint && !hint.pending ? <HintedMoves hint={hint} /> : scramble.text}
         </div>
       ) : (
         <div className="tp-scramble tp-scramble-loading">
@@ -118,7 +121,34 @@ export function ScrambleBar({ scramble, onNext, onPrev, hasPrev, onCustom, editi
           </span>
         )}
         {scramble?.custom && <span className="tp-scramble-hint">custom scramble</span>}
+        {scramble?.fromCube && (
+          <span className="tp-scramble-hint" data-tip="the cube was scrambled by hand: this is a scramble that gives the same state">
+            read from the cube
+          </span>
+        )}
+        {hint && (hint.fix || hint.pending) && <span className="tp-scramble-hint">{hint.pending ? 'off the scramble' : 'off the scramble - these turns lead back'}</span>}
       </div>
     </div>
+  );
+}
+
+/** csTimer's smart cube scramble: turns done dimmed, the current one marked (what's left of it, if half done), a tick when it's all done */
+function HintedMoves({ hint }: { hint: ScrambleHint }) {
+  const complete = hint.done >= hint.moves.length;
+  return (
+    <>
+      {hint.moves.map((m, i) => (
+        <Fragment key={i}>
+          {i > 0 && ' '}
+          <span className={complete ? undefined : i < hint.done ? 'sm-done' : i === hint.done ? 'sm-current' : undefined}>{i === hint.done && hint.rest ? hint.rest : m}</span>
+        </Fragment>
+      ))}
+      {complete && (
+        <span className="sm-check" aria-label="scrambled">
+          {' '}
+          <CheckIcon width="0.8em" height="0.8em" />
+        </span>
+      )}
+    </>
   );
 }

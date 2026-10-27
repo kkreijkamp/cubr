@@ -47,6 +47,10 @@ export interface Settings {
   smartBeep: boolean;
   /** smart cube: show the cube on screen */
   smartView: '3D' | '2D' | 'off';
+  /** smart cube: also mark it scrambled a second after one face is turned 4 times one way (x4) or back and forth (xi2) */
+  smartTurnMark: 'off' | 'x4' | 'xi2';
+  /** smart cube: on connecting to a cube that isn't solved, ask to mark it solved, always do, or never */
+  smartReset: 'ask' | 'always' | 'never';
   /** stackmat: use the timer's status signals (hands on, green light) */
   stackmatStatus: boolean;
 }
@@ -75,6 +79,8 @@ export const DEFAULT_SETTINGS: Settings = {
   smartSpace: true,
   smartBeep: true,
   smartView: '3D',
+  smartTurnMark: 'off',
+  smartReset: 'ask',
   stackmatStatus: true,
 };
 
@@ -106,6 +112,8 @@ function sanitize(raw: Partial<Settings> | null | undefined): Settings {
   oneOf('virtualView', ['UF', 'URF']);
   oneOf('smartScrambled', ['scramble', '2', '3', '4', '5', 'never']);
   oneOf('smartView', ['3D', '2D', 'off']);
+  oneOf('smartTurnMark', ['off', 'x4', 'xi2']);
+  oneOf('smartReset', ['ask', 'always', 'never']);
   // read by puzzle, so it has to be an object (each colour in it is checked where it is used)
   if (!s.customStickers || typeof s.customStickers !== 'object' || Array.isArray(s.customStickers)) s.customStickers = {};
   return s;

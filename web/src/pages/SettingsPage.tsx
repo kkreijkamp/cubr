@@ -144,9 +144,15 @@ const CSTIMER_KEYS: [ReactNode, string][] = [
   ],
   [
     <>
-      <kbd>ctrl</kbd>+<kbd>alt</kbd>+<kbd>t</kbd> / <kbd>i</kbd>
+      <kbd>ctrl</kbd>+<kbd>alt</kbd>+<kbd>t</kbd> <kbd>i</kbd> <kbd>s</kbd> <kbd>m</kbd>
     </>,
-    'time with the timer / type times in',
+    'enter times with: the timer / typing / a stackmat / a moyu timer',
+  ],
+  [
+    <>
+      <kbd>ctrl</kbd>+<kbd>alt</kbd>+<kbd>v</kbd> <kbd>q</kbd> <kbd>g</kbd> <kbd>b</kbd>
+    </>,
+    'enter times with: a virtual puzzle / qcube / a smart cube / a bluetooth timer',
   ],
 ];
 
@@ -585,41 +591,98 @@ function InputGroup() {
   const s = useSettings();
   const device = useInputState();
   return (
-    <Group title="input">
-      <SettingRow title="enter times with" description="Kept on this device: a stackmat or a bluetooth cube belongs to one computer. Ctrl+alt and a letter switches on the timer page, as on csTimer." wide>
-        <Options
-          value={AVAILABLE_INPUTS.includes(device.mode) ? device.mode : 'timer'}
-          options={INPUT_MODES.filter((m) => AVAILABLE_INPUTS.includes(m.id)).map((m) => ({ value: m.id, label: m.label }))}
-          onChange={(mode) => updateInput({ mode })}
-        />
-      </SettingRow>
-      <SettingRow title="stackmat status" description="Use the stackmat's status signals: hands on the mat, the green light. Off, a solve is the time counting up and stopping (csTimer's option, for timers that send no status).">
-        <Options value={s.stackmatStatus} options={onOff} onChange={set('stackmatStatus')} />
-      </SettingRow>
-      <SettingRow title="virtual turn speed" description="How long each turn of the virtual puzzle takes to animate (csTimer's base speed). Queued turns go quicker.">
-        <Options
-          value={s.virtualSpeed}
-          options={[
-            { value: 0, label: 'instant' },
-            { value: 50, label: '20 tps' },
-            { value: 100, label: '10 tps' },
-            { value: 200, label: '5 tps' },
-            { value: 500, label: '2 tps' },
-          ]}
-          onChange={set('virtualSpeed')}
-        />
-      </SettingRow>
-      <SettingRow title="virtual cube view" description="Look at the top and front faces, or at the top front right corner. The arrow keys turn the view while you solve.">
-        <Options
-          value={s.virtualView}
-          options={[
-            { value: 'UF', label: 'top, front' },
-            { value: 'URF', label: 'corner' },
-          ]}
-          onChange={set('virtualView')}
-        />
-      </SettingRow>
-    </Group>
+    <>
+      <Group title="input">
+        <SettingRow title="enter times with" description="Kept on this device: a stackmat or a bluetooth cube belongs to one computer. Ctrl+alt and a letter switches on the timer page, as on csTimer." wide>
+          <Options
+            value={AVAILABLE_INPUTS.includes(device.mode) ? device.mode : 'timer'}
+            options={INPUT_MODES.filter((m) => AVAILABLE_INPUTS.includes(m.id)).map((m) => ({ value: m.id, label: m.label }))}
+            onChange={(mode) => updateInput({ mode })}
+          />
+        </SettingRow>
+        <SettingRow title="stackmat status" description="Use the stackmat's status signals: hands on the mat, the green light. Off, a solve is the time counting up and stopping (csTimer's option, for timers that send no status).">
+          <Options value={s.stackmatStatus} options={onOff} onChange={set('stackmatStatus')} />
+        </SettingRow>
+        <SettingRow title="virtual turn speed" description="How long each turn of the virtual puzzle takes to animate (csTimer's base speed). Queued turns go quicker.">
+          <Options
+            value={s.virtualSpeed}
+            options={[
+              { value: 0, label: 'instant' },
+              { value: 50, label: '20 tps' },
+              { value: 100, label: '10 tps' },
+              { value: 200, label: '5 tps' },
+              { value: 500, label: '2 tps' },
+            ]}
+            onChange={set('virtualSpeed')}
+          />
+        </SettingRow>
+        <SettingRow title="virtual cube view" description="Look at the top and front faces, or at the top front right corner. The arrow keys turn the view while you solve.">
+          <Options
+            value={s.virtualView}
+            options={[
+              { value: 'UF', label: 'top, front' },
+              { value: 'URF', label: 'corner' },
+            ]}
+            onChange={set('virtualView')}
+          />
+        </SettingRow>
+      </Group>
+      <Group title="smart cube">
+        <SettingRow title="mark scrambled" description="When the solve is ready to start: as soon as the cube matches the scramble, or that long after the last turn (scrambling it your own way), or only by key. Then the first turn starts the timer.">
+          <Options
+            value={s.smartScrambled}
+            options={[
+              { value: 'scramble', label: 'on the scramble' },
+              { value: '2', label: '2 s' },
+              { value: '3', label: '3 s' },
+              { value: '4', label: '4 s' },
+              { value: '5', label: '5 s' },
+              { value: 'never', label: 'never' },
+            ]}
+            onChange={set('smartScrambled')}
+          />
+        </SettingRow>
+        <SettingRow title="space marks scrambled" description="Press space when the cube is scrambled. A cube scrambled its own way gets a scramble worked out from its state.">
+          <Options value={s.smartSpace} options={onOff} onChange={set('smartSpace')} />
+        </SettingRow>
+        <SettingRow title="turns mark scrambled" description="Or turn one face four times the same way (U U U U), or back and forth (U U' U U'), and it's marked a second later.">
+          <Options
+            value={s.smartTurnMark}
+            options={[
+              { value: 'off', label: 'off' },
+              { value: 'x4', label: 'U U U U' },
+              { value: 'xi2', label: "U U' U U'" },
+            ]}
+            onChange={set('smartTurnMark')}
+          />
+        </SettingRow>
+        <SettingRow title="beep when scrambled" description="A beep as the cube is marked scrambled.">
+          <Options value={s.smartBeep} options={onOff} onChange={set('smartBeep')} />
+        </SettingRow>
+        <SettingRow title="cube on screen" description="Draw the cube as it is, turning as you turn it.">
+          <Options
+            value={s.smartView}
+            options={[
+              { value: '3D', label: '3D' },
+              { value: '2D', label: '2D' },
+              { value: 'off', label: 'off' },
+            ]}
+            onChange={set('smartView')}
+          />
+        </SettingRow>
+        <SettingRow title="unsolved on connect" description="A cube that connects in a state it hasn't been marked solved in: ask whether it's solved, mark it solved, or leave it.">
+          <Options
+            value={s.smartReset}
+            options={[
+              { value: 'ask', label: 'ask' },
+              { value: 'always', label: 'mark solved' },
+              { value: 'never', label: 'leave it' },
+            ]}
+            onChange={set('smartReset')}
+          />
+        </SettingRow>
+      </Group>
+    </>
   );
 }
 

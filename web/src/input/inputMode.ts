@@ -24,8 +24,8 @@ export const INPUT_MODES: InputModeInfo[] = [
   { id: 'bttimer', label: 'bluetooth timer', hint: 'a GAN or QiYi smart timer', key: 'b' },
 ];
 
-/** the ways of entering times the timer page has so far */
-export const AVAILABLE_INPUTS: InputMode[] = ['timer', 'typing', 'stackmat', 'moyu', 'virtual', 'qcube', 'bttimer'];
+/** the ways of entering times the timer page has (all of csTimer's but last layer training) */
+export const AVAILABLE_INPUTS: InputMode[] = INPUT_MODES.map((m) => m.id);
 
 export interface DeviceInputState {
   mode: InputMode;
@@ -33,8 +33,8 @@ export interface DeviceInputState {
   stackmatDevice: string;
   /** bluetooth MAC addresses by device name (needed for the encrypted cubes), as csTimer keeps them */
   macs: Record<string, string>;
-  /** the smart cube's own reading when it was last marked solved (URFDLB facelets) */
-  smartSolved: string | null;
+  /** each smart cube's own reading when it was last marked solved (URFDLB facelets), by device name */
+  smartSolved: Record<string, string>;
 }
 
 const KEY = 'cubetype.input';
@@ -46,7 +46,7 @@ function load(): DeviceInputState {
     mode: raw.mode && MODES.has(raw.mode) ? raw.mode : 'timer',
     stackmatDevice: typeof raw.stackmatDevice === 'string' ? raw.stackmatDevice : '',
     macs: raw.macs && typeof raw.macs === 'object' ? raw.macs : {},
-    smartSolved: typeof raw.smartSolved === 'string' && raw.smartSolved.length === 54 ? raw.smartSolved : null,
+    smartSolved: raw.smartSolved && typeof raw.smartSolved === 'object' ? raw.smartSolved : {},
   };
 }
 
