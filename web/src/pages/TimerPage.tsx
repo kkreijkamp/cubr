@@ -32,6 +32,7 @@ import { QuickActions } from '../components/timer/QuickActions';
 import { ManualEntry } from '../components/timer/ManualEntry';
 import { VirtualInput } from '../components/timer/inputs/VirtualInput';
 import { StackmatInput } from '../components/timer/inputs/StackmatInput';
+import { BtTimerInput } from '../components/timer/inputs/BtTimerInput';
 import { AVAILABLE_INPUTS, INPUT_MODES, modeInfo, updateInput, useInputState, type InputMode } from '../input/inputMode';
 import { ConfirmModal, PromptModal } from '../components/timer/Dialogs';
 import { MergeSessionsModal } from '../components/timer/MergeSessionsModal';
@@ -524,6 +525,22 @@ export default function TimerPage() {
             inspection={settings.inspection && eventInfo.inspection}
             alerts={settings.inspectionAlerts}
             useStatus={settings.stackmatStatus}
+            last={lastResult}
+            precision={settings.precision}
+            timerUpdate={settings.timerUpdate}
+            sizeRem={settings.timerSize}
+            pb={pb && isIdle}
+            onState={setAltState}
+            onSolve={(r) => {
+              lastStopAt.current = performance.now();
+              record(r, 'timer');
+            }}
+          />
+        ) : input === 'bttimer' ? (
+          <BtTimerInput
+            enabled={inputsEnabled}
+            inspection={settings.inspection && eventInfo.inspection}
+            alerts={settings.inspectionAlerts}
             last={lastResult}
             precision={settings.precision}
             timerUpdate={settings.timerUpdate}
