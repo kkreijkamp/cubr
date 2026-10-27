@@ -431,6 +431,78 @@
   color: var(--text-color);
 }
 
+/* the virtual puzzles' keys: a move and its key (or keys) to a cell, in columns; a key you set
+   in the accent colour, the one waiting for a key in the text colour */
+.st-bind-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+}
+.st-bind-tools .st-options {
+  justify-content: flex-start;
+  margin: 0 0 0 -0.5em;
+}
+.st-bind-tools > .btn-text {
+  font-size: 0.85rem;
+}
+.st-bind-note {
+  min-height: 1.6em;
+  margin: 0.2rem 0 0.5rem;
+  color: var(--sub-color);
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+.st-binds {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  column-gap: 2.5rem;
+}
+.st-bind {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid var(--sub-alt-color);
+  font-size: 0.85rem;
+}
+.st-bind-move {
+  color: var(--text-color);
+  white-space: nowrap;
+}
+.st-bind-keys {
+  display: flex;
+  gap: 0.1rem;
+  margin-right: -0.25rem;
+}
+.st-bind-key {
+  padding: 0.25rem;
+  border: 0;
+  border-radius: var(--roundness);
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+.st-bind-key kbd {
+  display: inline-block;
+  min-width: 1.8em;
+  text-align: center;
+  transition: background var(--dur);
+}
+.st-bind-key.own kbd {
+  background: var(--main-color);
+}
+.st-bind-key:hover kbd,
+.st-bind-key.waiting kbd {
+  background: var(--text-color);
+}
+.st-bind-key:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--text-color);
+}
+
 /* narrow: the rail becomes a row of tabs held at the top of the window (sideways scroll when
    they don't fit), like the profile's events */
 @media (max-width: 860px) {

@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { getEvent, type Penalty, type Precision } from '@cubetype/cubestats';
 import { TimerDisplay } from '../../../timer/TimerDisplay';
 import { alertAt, type TimerState } from '../../../timer/useTimerEngine';
+import { useKeyboardLayout } from '../../../lib/keyboardLayout';
 import type { Settings, TimerUpdate } from '../../../lib/settings';
+import { actionOf, BINDABLE, controls, keyLabel, keyOf, keyPuzzle } from '../../../input/virtual/keymap';
 import { modelFor, type VirtualModel } from '../../../input/virtual/models';
 import { clockColors, puzzlePalette } from '../../../input/virtual/palette';
 import { drawPoly, drawSq1, type Camera, type Palette } from '../../../input/virtual/render3d';
@@ -30,7 +33,7 @@ interface Props {
   timerUpdate: TimerUpdate;
   sizeRem: number;
   pb: boolean;
-  settings: Pick<Settings, 'stickerColours' | 'customStickers' | 'virtualSpeed' | 'virtualView'>;
+  settings: Pick<Settings, 'stickerColours' | 'customStickers' | 'virtualSpeed' | 'virtualView' | 'virtualKeys'>;
   onState: (s: TimerState) => void;
   onSolve: (r: { timeMs: number; penalty: Penalty }) => void;
 }
@@ -41,8 +44,6 @@ function isTyping(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
   return el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName);
 }
-
-const MOVE_KEYS = /^(Key[A-Z]|Digit\d|Semicolon|Comma|Period|Slash)$/;
 
 /** the camera a puzzle starts with (cubes: csTimer's orientation option) */
 export function baseCamera(model: VirtualModel, view: 'UF' | 'URF'): Camera {
@@ -77,20 +78,6 @@ function netFor(model: VirtualModel): NetLayout | null {
   }
 }
 
-/** the keys the puzzle answers to, for the legend: key -> move name */
-function legend(model: VirtualModel): [string, string][] {
-  const codes = [...'IKJFHGDESLWO'].map((c) => `Key${c}`).concat(['Semicolon', 'KeyA'], [...'TYNBPQURMVXZC'].map((c) => `Key${c}`), ['Comma', 'Period', 'Slash'], [...'1234567890'].map((d) => `Digit${d}`));
-  const out: [string, string][] = [];
-  const m = model as unknown as { key(c: string): { move: unknown } | { depth: true } | null; name(mv: unknown): string };
-  for (const code of codes) {
-    const r = m.key(code);
-    const label = code.replace(/^Key|^Digit/, '').replace('Semicolon', ';').replace('Comma', ',').replace('Period', '.').replace('Slash', '/').toLowerCase();
-    if (r && 'move' in r) out.push([label, m.name(r.move)]);
-    else if (r) out.push([label, 'depth']);
-  }
-  return out;
-}
-
 export function VirtualInput(p: Props) {
   const model = useMemo(() => modelFor(p.event), [p.event]);
   const blind = Boolean(getEvent(p.event)?.blind);
@@ -105,6 +92,7 @@ export function VirtualInput(p: Props) {
   const cam = useRef<Camera | null>(null);
   const alertTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const touch = useMemo(isTouchDevice, []);
+  const layout = useKeyboardLayout();
   const props = useRef(p);
   props.current = p;
   const dirty = useRef(true);
@@ -178,7 +166,7 @@ export function VirtualInput(p: Props) {
     [session, finish],
   );
 
-  // keyboard: csTimer's layout while scrambled or solving; space scrambles; esc gives up; arrows turn the view
+  // keyboard: csTimer's layout (or your own) while scrambled or solving; space scrambles; esc gives up; arrows turn the view
   useEffect(() => {
     if (!session || !p.enabled) return;
     const onKey = (e: KeyboardEvent) => {
@@ -212,8 +200,9 @@ export function VirtualInput(p: Props) {
         dirty.current = true;
         return;
       }
-      if (!MOVE_KEYS.test(e.code) || session.phase === 'idle' || e.repeat) return;
-      const r = session.key(e.code, now);
+      if (!BINDABLE.test(e.code) || session.phase === 'idle' || e.repeat) return;
+      const own = props.current.settings.virtualKeys[keyPuzzle(session.model)] ?? {};
+      const r = session.key(actionOf(own, e.code), now);
       if (!r.used) return;
       e.preventDefault();
       if (r.solved) finish(r.solved);
@@ -318,7 +307,7 @@ export function VirtualInput(p: Props) {
     return <div className="tp-input-note">there is no virtual puzzle for {getEvent(p.event)?.name ?? p.event}</div>;
   }
 
-  const keys = legend(model);
+  const own = p.settings.virtualKeys[keyPuzzle(model)] ?? {};
   const idle = phase === 'idle';
   return (
     <div className={`tp-virtual${p.flat ? ' flat' : ''}`}>
@@ -367,9 +356,12 @@ export function VirtualInput(p: Props) {
       </div>
       {showKeys && (
         <div className="tp-virtual-keys" role="note" aria-label="keys">
-          {keys.map(([k, name]) => (
-            <span key={k}>
-              <kbd>{k}</kbd> {name}
+          {controls(model).map((c) => (
+            <span key={c.label}>
+              {c.actions.map((a) => (
+                <kbd key={a}>{keyLabel(keyOf(own, a), layout)}</kbd>
+              ))}{' '}
+              {c.label}
             </span>
           ))}
           {!p.flat && (
@@ -377,6 +369,9 @@ export function VirtualInput(p: Props) {
               <kbd>arrows</kbd> view
             </span>
           )}
+          <Link className="tp-virtual-keys-edit" to="/settings?tab=shortcuts">
+            change the keys
+          </Link>
         </div>
       )}
       </div>

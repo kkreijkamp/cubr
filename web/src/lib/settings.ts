@@ -1,5 +1,6 @@
 // User settings: persisted in localStorage for everyone, synced to the auth service
 // (PUT /api/auth/me/settings) for logged-in users so they follow you across devices.
+import { cleanKeyMaps, type KeyMaps } from '../input/virtual/keymap';
 import { applyTheme, DEFAULT_THEME } from './themes';
 import { createStore, loadJson, saveJson, useStore } from './store';
 
@@ -39,6 +40,8 @@ export interface Settings {
   virtualSpeed: number;
   /** virtual cube camera: csTimer's orientation option (looking at the top and front, or the top front right corner) */
   virtualView: 'UF' | 'URF';
+  /** virtual puzzle: your own keys, per puzzle (input/virtual/keymap); none = csTimer's layout */
+  virtualKeys: KeyMaps;
   /** smart cube: when a scramble counts as done (csTimer "mark scrambled after"): matching the scramble, n seconds without a move, or never */
   smartScrambled: 'scramble' | '2' | '3' | '4' | '5' | 'never';
   /** smart cube: space marks the cube as scrambled */
@@ -75,6 +78,7 @@ export const DEFAULT_SETTINGS: Settings = {
   lastEvent: '333',
   virtualSpeed: 100,
   virtualView: 'UF',
+  virtualKeys: {},
   smartScrambled: 'scramble',
   smartSpace: true,
   smartBeep: true,
@@ -116,6 +120,7 @@ function sanitize(raw: Partial<Settings> | null | undefined): Settings {
   oneOf('smartReset', ['ask', 'always', 'never']);
   // read by puzzle, so it has to be an object (each colour in it is checked where it is used)
   if (!s.customStickers || typeof s.customStickers !== 'object' || Array.isArray(s.customStickers)) s.customStickers = {};
+  s.virtualKeys = cleanKeyMaps(s.virtualKeys);
   return s;
 }
 

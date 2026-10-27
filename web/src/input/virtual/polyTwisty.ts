@@ -206,6 +206,12 @@ export function cubeTwisty(n: number): PolyTwisty {
         const flip = face === 'L' || face === 'D' || face === 'B';
         return rot + amt + ((m.amount < 0) !== flip ? "'" : '');
       }
+      // the middle layer: M turns as L, E as D, S as F
+      if (n % 2 === 1 && m.from === (n + 1) / 2 && m.to === m.from) {
+        const slice = { L: 'M', R: 'M', D: 'E', U: 'E', F: 'S', B: 'S' }[face]!;
+        const flip = face === 'R' || face === 'U' || face === 'B';
+        return slice + amt + ((m.amount < 0) !== flip ? "'" : '');
+      }
       if (m.from === 1) return (m.to > 2 ? m.to : '') + face + (m.to >= 2 ? 'w' : '') + amt + prime;
       return (m.from === m.to ? `${m.from}` : `${m.from}-${m.to}`) + face + (m.from === m.to ? '' : 'w') + amt + prime;
     },

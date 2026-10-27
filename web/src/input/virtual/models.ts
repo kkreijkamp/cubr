@@ -100,19 +100,30 @@ const clock: ClockModel = {
 
 const cache = new Map<string, VirtualModel>();
 
+const EVENT_MODEL: Record<string, string> = { '222': 'c2', '333': 'c3', '333oh': 'c3', '333bf': 'c3', '333fm': 'c3', '444': 'c4', '444bf': 'c4', '555': 'c5', '555bf': 'c5', '666': 'c6', '777': 'c7', pyram: 'pyram', skewb: 'skewb', minx: 'minx', sq1: 'sq1', clock: 'clock' };
+
+function build(key: string): VirtualModel {
+  if (/^c\d$/.test(key)) return poly(cubeTwisty(Number(key.slice(1))));
+  if (key === 'pyram') return poly(pyraminxTwisty());
+  if (key === 'skewb') return poly(skewbTwisty());
+  if (key === 'minx') return poly(megaminxTwisty());
+  return key === 'sq1' ? sq1 : clock;
+}
+
 /** the virtual puzzle for an event (null for one there isn't one for) */
 export function modelFor(event: string): VirtualModel | null {
-  const key = { '222': 'c2', '333': 'c3', '333oh': 'c3', '333bf': 'c3', '333fm': 'c3', '444': 'c4', '444bf': 'c4', '555': 'c5', '555bf': 'c5', '666': 'c6', '777': 'c7', pyram: 'pyram', skewb: 'skewb', minx: 'minx', sq1: 'sq1', clock: 'clock' }[event];
+  const key = EVENT_MODEL[event];
   if (!key) return null;
   let m = cache.get(key);
   if (!m) {
-    if (/^c\d$/.test(key)) m = poly(cubeTwisty(Number(key.slice(1))));
-    else if (key === 'pyram') m = poly(pyraminxTwisty());
-    else if (key === 'skewb') m = poly(skewbTwisty());
-    else if (key === 'minx') m = poly(megaminxTwisty());
-    else if (key === 'sq1') m = sq1;
-    else m = clock;
+    m = build(key);
     cache.set(key, m);
   }
   return m;
+}
+
+/** one of its own, its layer depth untouched by a solve (to list its keys) */
+export function newModel(event: string): VirtualModel | null {
+  const key = EVENT_MODEL[event];
+  return key ? build(key) : null;
 }

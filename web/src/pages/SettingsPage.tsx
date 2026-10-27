@@ -11,12 +11,15 @@ import '../components/timer/settings-page.css';
 import { ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { formatNumber } from '../lib/format';
+import { useKeyboardLayout } from '../lib/keyboardLayout';
 import { applyVisualSettings, DEFAULT_SETTINGS, FONTS, updateSettings, useSettings, type Settings } from '../lib/settings';
 import { SCHEMES, stickerColour, type Scheme } from '../lib/scrambleNet';
 import { clearLocalData, exportAll, forgetUser, importSessions, localDataSummary, useSolveState } from '../lib/solves';
 import { applyTheme, isLightTheme, randomTheme, THEMES, themeLabel, type Theme } from '../lib/themes';
 import { toast } from '../lib/toast';
 import { AVAILABLE_INPUTS, INPUT_MODES, updateInput, useInputState } from '../input/inputMode';
+import { actionOf, bind, BINDABLE, controls, KEY_PUZZLES, keyLabel, keyOf, type KeyPuzzle } from '../input/virtual/keymap';
+import { newModel } from '../input/virtual/models';
 
 const PANES = [
   { id: 'timer', label: 'timer' },
@@ -492,6 +495,7 @@ export default function SettingsPage() {
           <Group title="cubetype's own">
             <KeyList keys={OWN_KEYS} />
           </Group>
+          <VirtualKeys maps={s.virtualKeys} />
         </Pane>
 
         <Pane id="danger">
@@ -683,6 +687,146 @@ function InputGroup() {
         </SettingRow>
       </Group>
     </>
+  );
+}
+
+/** The virtual puzzles' keys, a puzzle at a time: click a move's key, then press the one you want. */
+function VirtualKeys({ maps }: { maps: Settings['virtualKeys'] }) {
+  const [puzzle, setPuzzle] = useState<KeyPuzzle>('cube');
+  /** the move (by its csTimer key) waiting for a key */
+  const [waiting, setWaiting] = useState<string | null>(null);
+  const [note, setNote] = useState<ReactNode>(null);
+  const layout = useKeyboardLayout();
+  const model = useMemo(() => newModel(KEY_PUZZLES.find((p) => p.id === puzzle)!.event)!, [puzzle]);
+  const list = useMemo(() => controls(model), [model]);
+  const map = useMemo(() => maps[puzzle] ?? {}, [maps, puzzle]);
+  const label = (code: string) => keyLabel(code, layout);
+  const moveOf = (action: string) => list.find((c) => c.actions.includes(action))?.label ?? null;
+
+  const save = (next: typeof map) => {
+    const all = { ...maps, [puzzle]: next };
+    if (Object.keys(next).length === 0) delete all[puzzle];
+    updateSettings({ virtualKeys: all });
+  };
+
+  // the next key pressed is the move's (esc lets it be)
+  useEffect(() => {
+    if (!waiting) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'].includes(e.key)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === 'Escape') {
+        setWaiting(null);
+        setNote(null);
+        return;
+      }
+      if (e.ctrlKey || e.altKey || e.metaKey || !BINDABLE.test(e.code)) {
+        setNote(
+          <span className="error">
+            that key has a job of its own - press another for {moveOf(waiting)} (esc keeps it)
+          </span>,
+        );
+        return;
+      }
+      const old = keyOf(map, waiting);
+      const was = moveOf(actionOf(map, e.code));
+      const move = moveOf(waiting);
+      setWaiting(null);
+      if (old === e.code) {
+        setNote(null);
+        return;
+      }
+      save(bind(map, waiting, e.code));
+      setNote(
+        <>
+          <kbd>{label(e.code)}</kbd> turns {move} now
+          {was ? (
+            <>
+              , and <kbd>{label(old)}</kbd> turns {was}
+            </>
+          ) : (
+            <>
+              ; <kbd>{label(old)}</kbd> does nothing
+            </>
+          )}
+        </>,
+      );
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  });
+
+  const changed = Object.keys(map).length > 0;
+  return (
+    <Group title="virtual puzzle keys">
+      <p className="st-note">
+        Click a move's key, then press the key you want for it. If that key already turns something, the two swap. All cubes share one layout, named here as on a 3x3: on
+        bigger cubes the slice keys turn the second layer, and the depth keys set how many layers the outer turns take.
+      </p>
+      <div className="st-bind-tools">
+        <Options
+          value={puzzle}
+          options={KEY_PUZZLES.map((p) => ({ value: p.id, label: p.label }))}
+          onChange={(p) => {
+            setPuzzle(p);
+            setWaiting(null);
+            setNote(null);
+          }}
+        />
+        <button
+          className="btn-text"
+          disabled={!changed}
+          onClick={() => {
+            save({});
+            setWaiting(null);
+            setNote(`${KEY_PUZZLES.find((p) => p.id === puzzle)!.label}: back to csTimer's keys`);
+          }}
+        >
+          <ArrowUturnLeftIcon width={14} height={14} /> csTimer's keys
+        </button>
+      </div>
+      <p className="st-bind-note" aria-live="polite">
+        {note ??
+          (waiting && (
+            <>
+              press a key for <span className="main">{moveOf(waiting)}</span> (esc keeps it)
+            </>
+          ))}
+      </p>
+      <div className="st-binds">
+        {list.map((c) => (
+          <div key={c.label} className="st-bind">
+            <span className="st-bind-move">{c.label}</span>
+            <span className="st-bind-keys">
+              {c.actions.map((a) => {
+                const code = keyOf(map, a);
+                const on = waiting === a;
+                return (
+                  <button
+                    key={a}
+                    className={`st-bind-key${on ? ' waiting' : ''}${code !== a ? ' own' : ''}`}
+                    aria-label={`${c.label}: ${label(code)}`}
+                    aria-pressed={on}
+                    onClick={() => {
+                      setWaiting(on ? null : a);
+                      setNote(null);
+                    }}
+                    onBlur={() => {
+                      if (!on) return;
+                      setWaiting(null);
+                      setNote(null);
+                    }}
+                  >
+                    <kbd>{on ? '...' : label(code)}</kbd>
+                  </button>
+                );
+              })}
+            </span>
+          </div>
+        ))}
+      </div>
+    </Group>
   );
 }
 
