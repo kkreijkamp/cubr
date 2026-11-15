@@ -1,0 +1,98 @@
+# =============================================================================================
+# cubr production override: the whole stack on one VM, reached only through a Cloudflare Tunnel.
+# ---------------------------------------------------------------------------------------------
+#   docker compose -f docker-compose.yml -f compose.prod.yml pull
+#   docker compose -f docker-compose.yml -f compose.prod.yml up -d
+# (deploy/vps/deploy.sh copies these files to /opt/cubr on the VM and runs exactly that.)
+#
+# Differences from the local stack:
+#   - images come from Artifact Registry at CUBR_VERSION (built by cloudbuild.yaml), no builds here
+#   - real secrets from .env (see .env.example): Postgres password, JWT secret, internal token
+#   - nothing is published to the internet: cloudflared dials out to Cloudflare and forwards
+#     https://cubr.dev to the gateway; the gateway is also on 127.0.0.1:8080 for checks over SSH
+#   - Postgres and Redis are not published at all (use `docker compose exec`)
+#   - Node heaps are capped so ten services can't outgrow the e2-small's 2 GB (+2 GB swap)
+#   - the seed job (synthetic users) only runs with --profile seed, never with --profile jobs
+# Needs Docker Compose >= 2.24 for !reset / !override.
+# =============================================================================================
+
+x-prod-env: &prod-env
+  DATABASE_URL: postgres://cubr:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/cubr
+  JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+  INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?set INTERNAL_API_TOKEN in .env}
+  NODE_NAME: ${NODE_NAME:-cubr-1}
+  NODE_OPTIONS: --max-old-space-size=192
+
+services:
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    ports: !reset []
+
+  redis:
+    ports: !reset []
+
+  auth:
+    image: australia-southeast1-docker.pkg.dev/cubr-app/cubr/auth:${CUBR_VERSION:?set CUBR_VERSION in .env}
+    build: !reset null
+    environment: *prod-env
+
+  scramble:
+    image: australia-southeast1-docker.pkg.dev/cubr-app/cubr/scramble:${CUBR_VERSION:?set CUBR_VERSION in .env}
+    build: !reset null
+    environment: *prod-env
+
+  solve:
+    image: australia-southeast1-docker.pkg.dev/cubr-app/cubr/solve:${CUBR_VERSION:?set CUBR_VERSION in .env}
+    build: !reset null
+    environment: *prod-env
+
+  stats:
+    image: australia-southeast1-docker.pkg.dev/cubr-app/cubr/stats:${CUBR_VERSION:?set CUBR_VERSION in .env}
+    build: !reset null
+    environment: *prod-env
+
+  leaderboard:
+    image: australia-southeast1-docker.pkg.dev/cubr-app/cubr/leaderboard:${CUBR_VERSION:?set CUBR_VERSION in .env}
+    build: !reset null
+    environment: *prod-env
+
+  race:
+    image: australia-southeast1-docker.pkg.dev/cubr-app/cubr/race:${CUBR_VERSION:?set CUBR_VERSION in .env}
+    build: !reset null
+    environment: *prod-env
+
+  wca:
+    image: australia-southeast1-docker.pkg.dev/cubr-app/cubr/wca:${CUBR_VERSION:?set CUBR_VERSION in .env}
+    build: !reset null
+    environment: *prod-env
+
+  web:
+    image: australia-southeast1-docker.pkg.dev/cubr-app/cubr/web:${CUBR_VERSION:?set CUBR_VERSION in .env}
+    build: !reset null
+    environment:
+      NODE_NAME: ${NODE_NAME:-cubr-1}
+
+  gateway:
+    ports: !override
+      - "127.0.0.1:8080:8080"          # checks over SSH only; the public way in is cloudflared
+
+  cloudflared:
+    image: cloudflare/cloudflared:2026.11.0
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN in .env}
+    depends_on:
+      gateway: { condition: service_healthy }
+
+  wca-import:
+    image: australia-southeast1-docker.pkg.dev/cubr-app/cubr/wca-import:${CUBR_VERSION:?set CUBR_VERSION in .env}
+    build: !reset null
+    environment:
+      DATABASE_URL: postgres://cubr:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/cubr
+
+  seed:
+    profiles: !override ["seed"]       # synthetic users never belong in production by accident
+    image: australia-southeast1-docker.pkg.dev/cubr-app/cubr/seed:${CUBR_VERSION:?set CUBR_VERSION in .env}
+    build: !reset null
