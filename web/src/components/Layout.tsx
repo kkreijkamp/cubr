@@ -20,6 +20,7 @@ import { Toasts } from './Toasts';
 import { CommandPalette, usePaletteHotkeys } from './CommandPalette';
 import { GlobalCommands } from './GlobalCommands';
 import { LocalUploadOffer } from './timer/LocalUploadOffer';
+import { PatchNotesModal } from './PatchNotesModal';
 import { useAuth } from '../lib/auth';
 import { openPalette } from '../lib/commands';
 import { useSettings } from '../lib/settings';
@@ -84,6 +85,7 @@ const REPO_URL = 'https://github.com/kkreijkamp/cubr';
 function Footer() {
   const settings = useSettings();
   const [info, setInfo] = useState<{ version: string; pod: string } | null>(null);
+  const [notesOpen, setNotesOpen] = useState(false);
   useEffect(() => {
     api
       .info('/_info')
@@ -110,10 +112,11 @@ function Footer() {
         <button className="btn-text" onClick={() => openPalette('theme')} data-tip="change theme" aria-label="change theme">
           <SwatchIcon width={14} height={14} /> {themeLabel(settings.theme)}
         </button>
-        <Link to="/status" className="btn-text" data-tip={info ? `served by ${info.pod}` : 'version'}>
+        <button className="btn-text" onClick={() => setNotesOpen(true)} data-tip="patch notes" aria-haspopup="dialog">
           {info ? `v${info.version}` : 'version'}
-        </Link>
+        </button>
       </div>
+      {notesOpen && <PatchNotesModal running={info?.version ?? null} onClose={() => setNotesOpen(false)} />}
     </footer>
   );
 }
