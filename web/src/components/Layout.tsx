@@ -79,7 +79,7 @@ function Header() {
 }
 
 /** The source code (a private repository: it opens for the people who have access). */
-const REPO_URL = 'https://github.com/kkreijkamp/cubetype';
+const REPO_URL = 'https://github.com/kkreijkamp/cubr';
 
 function Footer() {
   const settings = useSettings();
