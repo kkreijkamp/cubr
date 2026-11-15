@@ -1,35 +1,55 @@
-/* login / register page */
+/* login / sign up page: one quiet column, the two modes as big text tabs */
 .lg-page {
+  width: min(100%, 22rem);
+  margin: 0 auto;
+  padding-top: 12vh;
   display: grid;
-  grid-template-columns: minmax(0, 20rem) auto minmax(0, 20rem);
-  justify-content: center;
-  align-items: start;
-  gap: 3rem;
-  padding-top: 6vh;
+  align-content: start;
 }
-.lg-divider {
-  width: 0.25rem;
-  align-self: stretch;
-  border-radius: 0.25rem;
-  background: var(--sub-alt-color);
+.lg-tabs {
+  display: flex;
+  gap: 1.5rem;
+}
+.lg-tab {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 2rem;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--sub-color);
+  cursor: pointer;
+  border-radius: var(--roundness);
+  transition: color var(--dur) ease-in-out;
+}
+.lg-tab:hover {
+  color: var(--text-color);
+}
+.lg-tab.active {
+  color: var(--text-color);
+  cursor: default;
+}
+.lg-tab:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 0.1rem var(--bg-color), 0 0 0 0.2rem var(--text-color);
+}
+.lg-lede {
+  margin: 0.6rem 0 2rem;
+  /* two lines kept free so the form does not jump between the tabs */
+  min-height: 3em;
+  color: var(--sub-color);
+  font-size: 0.8rem;
+  line-height: 1.5;
 }
 .lg-form {
   display: grid;
   gap: 0.75rem;
   min-width: 0;
+  animation: fadeIn 0.2s ease-out;
 }
-.lg-form .h3 {
-  margin: 0 0 0.25rem;
-}
-.lg-form .h3 svg {
-  width: 1.1em;
-  height: 1.1em;
-}
-.lg-form .lg-sub {
-  color: var(--sub-color);
-  font-size: 0.75rem;
-  margin: -0.5rem 0 0.25rem;
-  line-height: 1.5;
+.lg-form[hidden] {
+  display: none;
 }
 .lg-field {
   display: grid;
@@ -40,11 +60,11 @@
 }
 .lg-input input {
   width: 100%;
-  padding-right: 2.4em;
+  padding-right: 2.6em;
 }
 .lg-input .lg-indicator {
   position: absolute;
-  right: 0.7em;
+  right: 0.75em;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
@@ -57,6 +77,17 @@
 }
 .lg-input .lg-indicator.bad {
   color: var(--error-color);
+}
+.lg-input .lg-reveal {
+  position: absolute;
+  right: 0.25em;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 0.4em;
+}
+.lg-input .lg-reveal svg {
+  width: 1em;
+  height: 1em;
 }
 .lg-input input[aria-invalid='true'] {
   box-shadow: inset 0 0 0 1px var(--error-color);
@@ -82,47 +113,40 @@
   margin-top: 0.1em;
 }
 .lg-form .btn {
-  margin-top: 0.25rem;
+  margin-top: 0.5rem;
 }
-.lg-perks {
-  grid-column: 1 / -1;
+.lg-note {
   display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 0.75rem 2rem;
+  align-items: flex-start;
+  gap: 0.5em;
+  margin: 1.5rem 0 0;
   color: var(--sub-color);
   font-size: 0.75rem;
-  margin-top: 1rem;
+  line-height: 1.5;
 }
-.lg-perks span {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5em;
-}
-.lg-perks svg {
+.lg-note svg {
+  flex-shrink: 0;
+  margin-top: 0.2em;
   color: var(--main-color);
+}
+.lg-guest {
+  justify-self: start;
+  margin-top: 1.5rem;
+  color: var(--sub-color);
+  font-size: 0.8rem;
+  text-decoration: none;
+  border-radius: 0.25rem;
+  transition: color var(--dur);
+}
+.lg-guest:hover {
+  color: var(--text-color);
 }
 
 @media (max-width: 760px) {
   .lg-page {
-    grid-template-columns: minmax(0, 24rem);
-    gap: 2rem;
-    padding-top: 1rem;
+    padding-top: 2rem;
   }
-  .lg-divider {
-    width: auto;
-    height: 0.25rem;
-  }
-  /* login first on phones (the common case), then register */
-  .lg-page .lg-login {
-    order: -2;
-  }
-  .lg-page .lg-divider {
-    order: -1;
-  }
-  .lg-perks {
-    justify-content: flex-start;
-    flex-direction: column;
-    margin-top: 0;
+  .lg-tab {
+    font-size: 1.75rem;
   }
 }

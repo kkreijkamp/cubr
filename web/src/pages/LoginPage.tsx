@@ -1,20 +1,18 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { Navigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import {
-  ArrowRightEndOnRectangleIcon,
-  CalendarDaysIcon,
   CheckIcon,
-  CloudIcon,
+  CloudArrowUpIcon,
   ExclamationCircleIcon,
-  FlagIcon,
-  TrophyIcon,
-  UserPlusIcon,
+  EyeIcon,
+  EyeSlashIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { Loading, Spinner } from '../components/Spinner';
 import { safeNext } from '../components/social/util';
 import { ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { localDataSummary } from '../lib/solves';
 import { toast } from '../lib/toast';
 import '../components/social/login.css';
 
@@ -52,6 +50,15 @@ function describeAuthError(err: unknown, mode: 'login' | 'register'): string {
   return (err as Error)?.message || 'something went wrong';
 }
 
+type Mode = 'login' | 'register';
+
+/** Focus a form's first field when it becomes the visible one (desktop only: on touch it would pop the keyboard). */
+function useFocusWhenActive(active: boolean, ref: React.RefObject<HTMLInputElement | null>) {
+  useEffect(() => {
+    if (active && window.matchMedia?.('(pointer: fine)').matches) ref.current?.focus();
+  }, [active, ref]);
+}
+
 interface FieldProps {
   type?: string;
   name: string;
@@ -65,10 +72,13 @@ interface FieldProps {
   show: boolean;
   inputRef?: React.Ref<HTMLInputElement>;
   maxLength?: number;
+  /** password field with a show / hide toggle */
+  revealable?: boolean;
 }
 
-function Field({ type = 'text', name, placeholder, value, onChange, autoComplete, error, show, inputRef, maxLength }: FieldProps) {
+function Field({ type = 'text', name, placeholder, value, onChange, autoComplete, error, show, inputRef, maxLength, revealable }: FieldProps) {
   const [touched, setTouched] = useState(false);
+  const [revealed, setRevealed] = useState(false);
   // nag about a field only after it was left non-empty, or once the form was submitted
   const visible = show || (touched && value.length > 0);
   const bad = visible && Boolean(error);
@@ -79,7 +89,7 @@ function Field({ type = 'text', name, placeholder, value, onChange, autoComplete
       <div className="lg-input">
         <input
           ref={inputRef}
-          type={type}
+          type={revealable && revealed ? 'text' : type}
           name={name}
           placeholder={placeholder}
           aria-label={placeholder}
@@ -93,15 +103,30 @@ function Field({ type = 'text', name, placeholder, value, onChange, autoComplete
           onChange={(e) => onChange(e.target.value)}
           onBlur={() => setTouched(true)}
         />
-        {bad && (
-          <span className="lg-indicator bad" aria-hidden="true">
-            <XMarkIcon width={16} height={16} />
-          </span>
-        )}
-        {ok && (
-          <span className="lg-indicator ok" aria-hidden="true">
-            <CheckIcon width={16} height={16} />
-          </span>
+        {revealable ? (
+          <button
+            type="button"
+            className="lg-reveal btn-text"
+            aria-label={revealed ? 'hide password' : 'show password'}
+            aria-pressed={revealed}
+            data-tip={revealed ? 'hide password' : 'show password'}
+            onClick={() => setRevealed((r) => !r)}
+          >
+            {revealed ? <EyeSlashIcon /> : <EyeIcon />}
+          </button>
+        ) : (
+          <>
+            {bad && (
+              <span className="lg-indicator bad" aria-hidden="true">
+                <XMarkIcon width={16} height={16} />
+              </span>
+            )}
+            {ok && (
+              <span className="lg-indicator ok" aria-hidden="true">
+                <CheckIcon width={16} height={16} />
+              </span>
+            )}
+          </>
         )}
       </div>
       {bad && (
@@ -122,23 +147,29 @@ function FormError({ children, shakeKey }: { children: ReactNode; shakeKey: numb
   );
 }
 
-function RegisterForm() {
+interface FormProps {
+  active: boolean;
+  /** focus the first field when shown (off while the tabs are driven by the keyboard) */
+  focusFirst: boolean;
+}
+
+function RegisterForm({ active, focusFirst }: FormProps) {
   const { register } = useAuth();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [verify, setVerify] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [serverField, setServerField] = useState<{ field: 'username' | 'email'; message: string } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [errorTick, setErrorTick] = useState(0);
+  const usernameRef = useRef<HTMLInputElement>(null);
+  useFocusWhenActive(active && focusFirst, usernameRef);
 
   const errors = {
     username: serverField?.field === 'username' ? serverField.message : validateUsername(username),
     email: serverField?.field === 'email' ? serverField.message : validateEmail(email),
     password: validatePassword(password),
-    verify: !verify ? 'repeat your password' : verify !== password ? 'passwords do not match' : null,
   };
   const hasErrors = Object.values(errors).some(Boolean);
 
@@ -167,14 +198,20 @@ function RegisterForm() {
   };
 
   return (
-    <form className="lg-form lg-register" onSubmit={onSubmit} noValidate>
-      <h2 className="h3">
-        <UserPlusIcon /> register
-      </h2>
+    <form
+      className="lg-form"
+      id="lg-panel-register"
+      role="tabpanel"
+      aria-labelledby="lg-tab-register"
+      hidden={!active}
+      onSubmit={onSubmit}
+      noValidate
+    >
       <Field
         name="username"
         placeholder="username"
         autoComplete="username"
+        inputRef={usernameRef}
         maxLength={20}
         value={username}
         onChange={(v) => {
@@ -201,34 +238,24 @@ function RegisterForm() {
       <Field
         type="password"
         name="new-password"
-        placeholder="password"
+        placeholder="password (8+ characters)"
         autoComplete="new-password"
         maxLength={128}
         value={password}
         onChange={setPassword}
         error={errors.password}
         show={submitted}
-      />
-      <Field
-        type="password"
-        name="verify-password"
-        placeholder="verify password"
-        autoComplete="new-password"
-        maxLength={128}
-        value={verify}
-        onChange={setVerify}
-        error={errors.verify}
-        show={submitted}
+        revealable
       />
       {formError && <FormError shakeKey={errorTick}>{formError}</FormError>}
-      <button type="submit" className="btn block" disabled={busy}>
-        {busy ? <Spinner size={16} /> : <UserPlusIcon />} sign up
+      <button type="submit" className="btn primary block" disabled={busy}>
+        {busy && <Spinner size={16} />} create account
       </button>
     </form>
   );
 }
 
-function LoginForm() {
+function LoginForm({ active, focusFirst }: FormProps) {
   const { login } = useAuth();
   const [identity, setIdentity] = useState('');
   const [password, setPassword] = useState('');
@@ -238,11 +265,7 @@ function LoginForm() {
   const [errorTick, setErrorTick] = useState(0);
   const identityRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
-
-  // keyboard-first: focus the login field on desktop (not on touch devices - it would pop the keyboard)
-  useEffect(() => {
-    if (window.matchMedia?.('(pointer: fine)').matches) identityRef.current?.focus();
-  }, []);
+  useFocusWhenActive(active && focusFirst, identityRef);
 
   const errors = {
     identity: identity.trim() ? null : 'enter your username or email',
@@ -273,10 +296,15 @@ function LoginForm() {
   };
 
   return (
-    <form className="lg-form lg-login" onSubmit={onSubmit} noValidate>
-      <h2 className="h3">
-        <ArrowRightEndOnRectangleIcon /> login
-      </h2>
+    <form
+      className="lg-form"
+      id="lg-panel-login"
+      role="tabpanel"
+      aria-labelledby="lg-tab-login"
+      hidden={!active}
+      onSubmit={onSubmit}
+      noValidate
+    >
       <Field
         name="login"
         placeholder="username or email"
@@ -297,49 +325,102 @@ function LoginForm() {
         onChange={setPassword}
         error={errors.password}
         show={submitted && !formError}
+        revealable
       />
       {formError && <FormError shakeKey={errorTick}>{formError}</FormError>}
-      <button type="submit" className="btn block" disabled={busy}>
-        {busy ? <Spinner size={16} /> : <ArrowRightEndOnRectangleIcon />} sign in
+      <button type="submit" className="btn primary block" disabled={busy}>
+        {busy && <Spinner size={16} />} sign in
       </button>
     </form>
   );
 }
 
+const TABS: { mode: Mode; label: string; lede: string }[] = [
+  { mode: 'login', label: 'sign in', lede: 'welcome back. your solves, pbs and settings are waiting.' },
+  { mode: 'register', label: 'sign up', lede: 'keep your solves in the cloud, rank on the leaderboards and race under your own name.' },
+];
+
 export default function LoginPage() {
   const { status } = useAuth();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const next = safeNext(params.get('next'));
+  const mode: Mode = params.get('mode') === 'signup' ? 'register' : 'login';
+  const tab = TABS.find((t) => t.mode === mode) ?? TABS[0];
+  const tabRefs = useRef<Record<Mode, HTMLButtonElement | null>>({ login: null, register: null });
+  // arrow keys on the tabs keep focus on the tabs; a click moves it into the form
+  const [keyNav, setKeyNav] = useState(false);
+  // guest solves in this browser: offered for upload right after signing in
+  const guestSolves = useMemo(() => localDataSummary().solves, []);
+
+  const setMode = (m: Mode) => {
+    const p = new URLSearchParams(params);
+    if (m === 'register') p.set('mode', 'signup');
+    else p.delete('mode');
+    setParams(p, { replace: true });
+  };
+
+  const onTabKey = (e: KeyboardEvent) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    const other: Mode = mode === 'login' ? 'register' : 'login';
+    setKeyNav(true);
+    setMode(other);
+    tabRefs.current[other]?.focus();
+  };
 
   useEffect(() => {
-    document.title = 'sign in | cubetype';
-    return () => {
+    document.title = `${tab.label} | cubetype`;
+  }, [tab.label]);
+  useEffect(
+    () => () => {
       document.title = 'cubetype';
-    };
-  }, []);
+    },
+    [],
+  );
 
   if (status === 'loading') return <Loading />;
   if (status === 'authed') return <Navigate to={next} replace />;
 
   return (
     <div className="lg-page">
-      <RegisterForm />
-      <div className="lg-divider" aria-hidden="true" />
-      <LoginForm />
-      <div className="lg-perks">
-        <span>
-          <CloudIcon width={14} height={14} /> solves synced across devices
-        </span>
-        <span>
-          <TrophyIcon width={14} height={14} /> a spot on the leaderboards
-        </span>
-        <span>
-          <CalendarDaysIcon width={14} height={14} /> daily challenge rankings
-        </span>
-        <span>
-          <FlagIcon width={14} height={14} /> race with your name
-        </span>
+      <div className="lg-tabs" role="tablist" aria-label="account">
+        {TABS.map((t) => (
+          <button
+            key={t.mode}
+            ref={(el) => {
+              tabRefs.current[t.mode] = el;
+            }}
+            type="button"
+            role="tab"
+            id={`lg-tab-${t.mode}`}
+            aria-selected={mode === t.mode}
+            aria-controls={`lg-panel-${t.mode}`}
+            tabIndex={mode === t.mode ? 0 : -1}
+            className={`lg-tab${mode === t.mode ? ' active' : ''}`}
+            onClick={() => {
+              setKeyNav(false);
+              setMode(t.mode);
+            }}
+            onKeyDown={onTabKey}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
+      <p className="lg-lede">{tab.lede}</p>
+      <LoginForm active={mode === 'login'} focusFirst={!keyNav} />
+      <RegisterForm active={mode === 'register'} focusFirst={!keyNav} />
+      {guestSolves > 0 && (
+        <p className="lg-note">
+          <CloudArrowUpIcon width={14} height={14} />
+          <span>
+            {guestSolves} guest {guestSolves === 1 ? 'solve' : 'solves'} in this browser can move to your account once you&apos;re in.
+          </span>
+        </p>
+      )}
+      <Link to="/" className="lg-guest">
+        or keep timing as a guest
+      </Link>
     </div>
   );
 }
