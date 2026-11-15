@@ -1,9 +1,10 @@
 #!/bin/bash
 # Deploys cubr to the production VM over IAP SSH (no public SSH port needed).
 #   deploy/vps/deploy.sh init        once: create /opt/cubr/.env with fresh random secrets
-#   deploy/vps/deploy.sh [version]   copy the compose files + gateway config to /opt/cubr, set
-#                                    CUBR_VERSION (default: package.json version), pull the
-#                                    images from Artifact Registry and (re)start the stack
+#   deploy/vps/deploy.sh [version]   copy the compose files + gateway config to /opt/cubr, pull
+#                                    the images for that version (default: the repo's current
+#                                    version, scripts/bump-version.sh --current) from Artifact
+#                                    Registry, then set CUBR_VERSION and (re)start the stack
 # Images for a version are built and pushed first with:
 #   gcloud builds submit --config=cloudbuild.yaml --ignore-file=.dockerignore --region=australia-southeast1 .
 # Settings (env): CUBR_VM (cubr-1), CUBR_ZONE (australia-southeast1-a), CUBR_GCLOUD_CONFIG (cubr).
@@ -32,7 +33,10 @@ if [ "${1:-}" = "init" ]; then
   exit 0
 fi
 
-VERSION="${1:-$(node -p "require('./package.json').version")}"
+VERSION="${1:-$(scripts/bump-version.sh --current)}"
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "not a version: '${VERSION}'" >&2; exit 1; }
+gcloud artifacts docker images describe "${REGISTRY_HOST}/cubr-app/cubr/web:${VERSION}" --configuration "$CONF" >/dev/null 2>&1 \
+  || { echo "no images for ${VERSION} in Artifact Registry: build them first (see the header)" >&2; exit 1; }
 echo "deploying cubr ${VERSION} to ${VM}"
 
 # 1. compose files, gateway config, backup script and systemd timers, laid out like the repo so
@@ -45,12 +49,13 @@ COPYFILE_DISABLE=1 tar --no-xattrs -czf - docker-compose.yml deploy/vps/compose.
       sudo systemctl daemon-reload
       sudo systemctl enable --now cubr-backup.timer cubr-wca-import.timer 2>/dev/null'
 
-# 2. version, registry login (VM service account), pull, start, wait for health
+# 2. registry login (VM service account), pull the new version (a shell variable beats .env), and
+#    only once that worked record it in .env and restart, then wait for health
 on_vm "set -e; cd /opt/cubr
-  grep -q '^CUBR_VERSION=' .env && sed -i 's/^CUBR_VERSION=.*/CUBR_VERSION=${VERSION}/' .env || echo 'CUBR_VERSION=${VERSION}' >> .env
   grep -q '^CLOUDFLARE_TUNNEL_TOKEN=.\\+' .env || { echo 'CLOUDFLARE_TUNNEL_TOKEN is empty in .env' >&2; exit 1; }
   gcloud auth configure-docker ${REGISTRY_HOST} --quiet >/dev/null 2>&1
-  ${COMPOSE} pull --quiet
+  CUBR_VERSION=${VERSION} ${COMPOSE} pull --quiet
+  grep -q '^CUBR_VERSION=' .env && sed -i 's/^CUBR_VERSION=.*/CUBR_VERSION=${VERSION}/' .env || echo 'CUBR_VERSION=${VERSION}' >> .env
   ${COMPOSE} up -d --remove-orphans
   for i in \$(seq 1 60); do
     starting=\$(${COMPOSE} ps --format '{{.Status}}' | grep -cE 'starting|unhealthy' || true)

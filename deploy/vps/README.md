@@ -20,7 +20,7 @@ holds). The hosting decision and costs are in `A4/cubetype-aws-migration-2026-11
 git push                                   # commit first: hooks bump the version + tag
 gcloud builds submit --configuration=cubr --config=cloudbuild.yaml \
   --ignore-file=.dockerignore --region=australia-southeast1 .     # ~2 min, pushes all images
-deploy/vps/deploy.sh                       # defaults to package.json's version
+deploy/vps/deploy.sh                       # defaults to the current version (scripts/bump-version.sh --current)
 ```
 
 `deploy.sh` copies the compose files and gateway config to `/opt/cubr`, sets `CUBR_VERSION`,
