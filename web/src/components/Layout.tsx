@@ -9,7 +9,6 @@ import {
   FlagIcon,
   GlobeAltIcon,
   InformationCircleIcon,
-  SignalIcon,
   SwatchIcon,
   TrophyIcon,
   UserIcon,
@@ -61,9 +60,6 @@ function Header() {
         ))}
       </nav>
       <div className="nav nav-side">
-        <NavLink to="/status" className={({ isActive }) => `btn-text hide-mobile${isActive ? ' active' : ''}`} data-tip="cluster status" data-tip-pos="down" aria-label="cluster status">
-          <SignalIcon width={20} height={20} />
-        </NavLink>
         {status === 'authed' && user ? (
           <NavLink to="/account" className={({ isActive }) => `btn-text nav-user${isActive ? ' active' : ''}`} data-tip="account" data-tip-pos="down">
             {user.avatarUrl ? <Avatar user={user} size={20} className="nav-avatar" /> : <UserIcon width={20} height={20} />}
@@ -98,9 +94,6 @@ function Footer() {
         <button className="btn-text" onClick={() => openPalette()}>
           <CommandLineIcon width={14} height={14} /> <kbd>esc</kbd> command line
         </button>
-        <Link to="/status" className="btn-text">
-          <SignalIcon width={14} height={14} /> status
-        </Link>
         <Link to="/about" className="btn-text">
           <InformationCircleIcon width={14} height={14} /> about
         </Link>
