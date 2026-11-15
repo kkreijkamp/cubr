@@ -110,7 +110,19 @@ To run a single service on the host against the compose databases, see the heade
 
 ## Credits
 
-csTimer (inspiration for timer behaviour and statistics), Monkeytype (design language and theme
-palettes), cubing.js (scrambles and previews, MPL-2.0/GPL-3.0). This information is based on
-competition results owned and maintained by the World Cube Association, published at
-https://worldcubeassociation.org/results.
+- [csTimer](https://github.com/cs0x7f/cstimer) (GPL-3.0): timer behaviour and statistics. The smart
+  cube and bluetooth timer drivers, the cube model and the virtual puzzle in `web/src/input/` are
+  derived from csTimer's source.
+- [Monkeytype](https://github.com/monkeytypegame/monkeytype) (GPL-3.0): the design language and
+  the theme palettes.
+- [cubing.js](https://github.com/cubing/cubing.js) (MPL-2.0 or GPL-3.0): scrambles and previews.
+- This information is based on competition results owned and maintained by the World Cube
+  Association, published at https://worldcubeassociation.org/results.
+
+## License
+
+Copyright (C) 2026 Koen Kreijkamp
+
+cubr is free software: you can redistribute it and/or modify it under the terms of the GNU General
+Public License, version 3 ([`LICENSE`](LICENSE)). It comes with no warranty. GPL-3.0 matches the
+csTimer and Monkeytype code it builds on.
