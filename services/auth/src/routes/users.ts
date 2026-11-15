@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { badRequest, notFound, parse } from '@cubetype/common';
+import { badRequest, notFound, parse } from '@cubr/common';
 import type { Deps } from './index.js';
 import { MAX_IDS, USERNAME_RE, USER_COLUMNS, parseIdList, toPublicUser, type UserRow } from '../users.js';
 

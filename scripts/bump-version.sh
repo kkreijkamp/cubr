@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================================
-# The release version of cubetype, kept in step across every file that names it: the image tags
+# The release version of cubr, kept in step across every file that names it: the image tags
 # in the GKE overlays, VERSION in scripts/commands.sh, the defaults in cloudbuild.yaml and
 # scripts/build-push.sh, and the deployment table in deploy/README.md.
 #

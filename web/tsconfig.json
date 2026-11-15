@@ -13,7 +13,7 @@
     "allowImportingTsExtensions": false,
     "types": ["vite/client"],
     "paths": {
-      "@cubetype/cubestats": ["../packages/cubestats/src/index.ts"]
+      "@cubr/cubestats": ["../packages/cubestats/src/index.ts"]
     }
   },
   "include": ["src", "../packages/cubestats/src"]

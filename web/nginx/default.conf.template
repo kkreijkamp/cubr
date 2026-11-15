@@ -1,4 +1,4 @@
-# nginx config for the cubetype web container (rendered by envsubst at container start).
+# nginx config for the cubr web container (rendered by envsubst at container start).
 # Serves the React SPA; API traffic never reaches this container - the Ingress (cloud) or the
 # gateway (local) routes /api/* and /socket.io to the backend services.
 server {

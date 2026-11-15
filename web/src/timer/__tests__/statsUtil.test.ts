@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseTimeInput, sessionStats } from '@cubetype/cubestats';
+import { effectiveMs, parseTimeInput, rollingAverage, sessionStats } from '@cubr/cubestats';
 import {
   averageReport,
   averageWindow,
@@ -7,12 +7,10 @@ import {
   fmtAvg,
   fmtSolveLong,
   fmtSolveShort,
-  histogram,
   parseAvgKey,
   parseManualEntry,
-  shortTime,
+  pbFlags,
   statNs,
-  strideIndices,
 } from '../../components/timer/statsUtil';
 import type { Solve } from '../../lib/types';
 
@@ -51,9 +49,6 @@ describe('formatting', () => {
     expect(fmtSolveShort({ timeMs: 12349, penalty: 'DNF' }, 2)).toBe('DNF');
     expect(fmtSolveLong({ timeMs: 12349, penalty: 'DNF' }, 2)).toBe('DNF(12.34)');
     expect(fmtSolveLong({ timeMs: 1, penalty: 'DNF' }, 2)).toBe('DNF');
-    expect(shortTime(12500)).toBe('12.5');
-    expect(shortTime(8000)).toBe('8');
-    expect(shortTime(75000)).toBe('1:15');
   });
 });
 
@@ -89,23 +84,15 @@ describe('pb detection', () => {
     const after = mk([12000, 11000, 13000, 12500, 11800, 12100, 15000]);
     expect(detectPbs(sessionStats(before, [5]), sessionStats(after, [5]))).toEqual([]);
   });
-});
-
-describe('charts helpers', () => {
-  it('strideIndices keeps first/last and caps the count', () => {
-    expect(strideIndices(5, 10)).toEqual([0, 1, 2, 3, 4]);
-    const s = strideIndices(10_000, 1500);
-    expect(s).toHaveLength(1500);
-    expect(s[0]).toBe(0);
-    expect(s[s.length - 1]).toBe(9999);
+  it('pbFlags: the first solve is a pb, then every one that beats all before it', () => {
+    const ms = mk([12000, 11500, 'DNF', 11800, 12500, 11000, 11900, 10800]).map(effectiveMs);
+    expect(pbFlags(ms)).toEqual([true, true, false, false, false, true, false, true]);
+    // the first ao5 is a pb too
+    expect(pbFlags(rollingAverage(ms, 5)).indexOf(true)).toBe(4);
   });
-  it('histogram uses nice buckets and counts every finite time', () => {
-    const times = [10100, 10400, 10900, 11200, 12800, Infinity];
-    const b = histogram(times);
-    expect(b.reduce((a, x) => a + x.count, 0)).toBe(5);
-    const step = b[0].to - b[0].from;
-    expect([100, 200, 250, 500, 1000]).toContain(step);
-    expect(histogram([])).toEqual([]);
+  it('pbFlags: ties, DNFs and missing averages never count', () => {
+    expect(pbFlags([null, null, 900, Infinity, 900, 800, null, 850, 700])).toEqual([false, false, true, false, false, true, false, false, true]);
+    expect(pbFlags([Infinity, 1000, 1000])).toEqual([false, true, false]);
   });
 });
 

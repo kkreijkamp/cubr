@@ -1,5 +1,5 @@
-import { DLQ_STREAM, withTx, type EventEnvelope, type Pool, type PoolClient, type Redis } from '@cubetype/common';
-import { effectiveMs } from '@cubetype/cubestats';
+import { DLQ_STREAM, withTx, type EventEnvelope, type Pool, type PoolClient, type Redis } from '@cubr/common';
+import { effectiveMs } from '@cubr/cubestats';
 import type { FastifyBaseLogger } from 'fastify';
 import type { ZodType, ZodTypeDef } from 'zod';
 import { makeBucketer, validTz } from './domain/buckets.js';
@@ -9,10 +9,20 @@ import {
   solveChangedSchema,
   solveCreatedSchema,
   solvesImportedSchema,
+  userDeletedSchema,
   userEventSchema,
-  type SolveCreated, sessionRenamedSchema, sessionsMergedSchema} from './eventSchemas.js';
+  type SolveCreated, sessionRenamedSchema, sessionsMergedSchema, sessionUpdatedSchema} from './eventSchemas.js';
 import { recomputeEvent, type RecomputeDeps } from './recompute.js';
+import { CACHE_KEY as GLOBAL_CACHE_KEY } from './routes/global.js';
 import { ensureUser, loadPbs, lockUser, markProcessed, queuePbUpdated, refreshTotals, upsertPb } from './store.js';
+
+/** Every stats table with a user_id column (all of a deleted account's rows go). */
+export const USER_TABLES = ['user_totals', 'personal_bests', 'pb_history', 'daily_activity', 'hourly', 'solve_ledger', 'deleted_sessions', 'sessions'] as const;
+
+async function isDeletedUser(c: PoolClient, userId: string): Promise<boolean> {
+  const { rowCount } = await c.query('SELECT 1 FROM stats.deleted_users WHERE user_id = $1', [userId]);
+  return (rowCount ?? 0) > 0;
+}
 
 export interface ProjectorDeps {
   pool: Pool;
@@ -30,12 +40,16 @@ export interface ProjectorDeps {
  * takes the per-user lock, records the event id in processed_events (duplicate deliveries are
  * skipped) and writes resulting pb.updated events to the outbox table.
  */
-/** Upserts a session's display name (from solve.created and session.renamed). */
-export async function upsertSessionName(c: PoolClient | Pool, sessionId: string, userId: string, event: string, name: string): Promise<void> {
+/**
+ * Upserts a session's display name (from solve.created, session.renamed and session.updated), and
+ * its practice flag where the event carries one.
+ */
+export async function upsertSessionName(c: PoolClient | Pool, sessionId: string, userId: string, event: string, name: string, practice?: boolean | null): Promise<void> {
   await c.query(
-    `INSERT INTO stats.sessions (session_id, user_id, event, name) VALUES ($1, $2, $3, $4)
-     ON CONFLICT (session_id) DO UPDATE SET name = excluded.name, event = excluded.event, updated_at = now()`,
-    [sessionId, userId, event, name],
+    `INSERT INTO stats.sessions (session_id, user_id, event, name, practice) VALUES ($1, $2, $3, $4, coalesce($5, false))
+     ON CONFLICT (session_id) DO UPDATE
+       SET name = excluded.name, event = excluded.event, practice = coalesce($5, stats.sessions.practice), updated_at = now()`,
+    [sessionId, userId, event, name, practice ?? null],
   );
 }
 
@@ -52,6 +66,10 @@ export function createProjector(deps: ProjectorDeps) {
       await lockUser(c, userId);
       if (!(await markProcessed(c, eventId))) {
         log.debug({ eventId }, 'duplicate event skipped');
+        return 0;
+      }
+      if (await isDeletedUser(c, userId)) {
+        log.debug({ eventId, userId }, 'event for a deleted account skipped');
         return 0;
       }
       return (await fn(c)) ?? 0;
@@ -106,7 +124,7 @@ export function createProjector(deps: ProjectorDeps) {
       [d.solveId, d.userId, d.event, d.sessionId, d.timeMs, effDb, d.createdAt],
     );
     if (!ins.rowCount) return 0;
-    if (d.sessionName) await upsertSessionName(c, d.sessionId, d.userId, d.event, d.sessionName);
+    if (d.sessionName) await upsertSessionName(c, d.sessionId, d.userId, d.event, d.sessionName, d.practice);
 
     // A back-dated solve lands in the middle of its session and shifts the rolling windows, so an
     // incremental compare would be wrong: rebuild the event from solve-service instead (rare).
@@ -144,6 +162,8 @@ export function createProjector(deps: ProjectorDeps) {
              dnfs = stats.hourly.dnfs + EXCLUDED.dnfs`,
       [d.userId, d.event, hour, effDb === null ? 0 : 1, effDb ?? 0, effDb === null ? 1 : 0],
     );
+    // a practice session's solve counts as cubing, never as a personal best
+    if (d.practice) return 0;
 
     // PB candidates: single from this solve; ao5/ao12 from the payload's rolling values (computed
     // by solve-service over the session); mo3/ao50/ao100 from the session's last 100 solves in
@@ -242,6 +262,19 @@ export function createProjector(deps: ProjectorDeps) {
     });
   }
 
+  // ---- session.updated: marked as practice (or no longer): its solves leave (or rejoin) the PBs
+  async function onSessionUpdated(evt: EventEnvelope) {
+    const d = await payload(sessionUpdatedSchema, evt);
+    if (!d) return;
+    await inUserTx(d.eventId, d.userId, async (c) => {
+      const user = await ensureUser(c, d.userId, d.username, validTz(d.tz));
+      await upsertSessionName(c, d.sessionId, d.userId, d.event, d.name, d.practice);
+      const { pbChanges } = await recomputeEvent(c, rdeps, { userId: d.userId, username: user.username, event: d.event, tz: user.tz });
+      await refreshTotals(c, d.userId);
+      return pbChanges;
+    });
+  }
+
   // ---- sessions.merged: sources are gone (tombstone + drop names), recompute the event -
   //      merging interleaves solves, so within-session rolling PBs (ao5, ao12, ...) change
   async function onSessionsMerged(evt: EventEnvelope) {
@@ -282,8 +315,27 @@ export function createProjector(deps: ProjectorDeps) {
     });
   }
 
+  // ---- user.deleted: the account is gone - drop every row of it and keep a tombstone, so events
+  //      for it still on the way (a late solve.created, a queued pb.updated) are ignored
+  async function onUserDeleted(evt: EventEnvelope) {
+    const d = await payload(userDeletedSchema, evt);
+    if (!d) return;
+    await withTx(pool, async (c) => {
+      await lockUser(c, d.userId);
+      if (!(await markProcessed(c, d.eventId))) return;
+      await c.query('INSERT INTO stats.deleted_users (user_id) VALUES ($1) ON CONFLICT DO NOTHING', [d.userId]);
+      for (const table of USER_TABLES) await c.query(`DELETE FROM stats.${table} WHERE user_id = $1`, [d.userId]);
+      await c.query(`DELETE FROM stats.pb_outbox WHERE payload->>'userId' = $1`, [d.userId]);
+    });
+    // the global counters include the account's solves until their 10 s cache runs out
+    await deps.redis.del(GLOBAL_CACHE_KEY).catch(() => 0);
+    log.info({ userId: d.userId }, 'deleted the stats of a deleted account');
+  }
+
   return async function handle(evt: EventEnvelope): Promise<void> {
     switch (evt.type) {
+      case 'user.deleted':
+        return onUserDeleted(evt);
       case 'user.registered':
       case 'user.updated':
         return onUser(evt);
@@ -296,6 +348,8 @@ export function createProjector(deps: ProjectorDeps) {
         return onSessionDeleted(evt);
       case 'session.renamed':
         return onSessionRenamed(evt);
+      case 'session.updated':
+        return onSessionUpdated(evt);
       case 'sessions.merged':
         return onSessionsMerged(evt);
       case 'solves.imported':

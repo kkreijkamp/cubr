@@ -48,7 +48,7 @@ async function runCheck(fn: DependencyCheck): Promise<'ok' | 'down'> {
 }
 
 /**
- * Creates a Fastify instance with the cross-cutting behaviour every cubetype service shares:
+ * Creates a Fastify instance with the cross-cutting behaviour every cubr service shares:
  * JSON error envelope, X-Served-By / X-Service headers, /healthz, /readyz and <prefix>/_info.
  */
 export function createServer(config: BaseConfig, opts: ServerOptions): Server {

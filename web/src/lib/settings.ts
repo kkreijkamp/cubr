@@ -1,5 +1,6 @@
 // User settings: persisted in localStorage for everyone, synced to the auth service
 // (PUT /api/auth/me/settings) for logged-in users so they follow you across devices.
+import { cleanKeyMaps, type KeyMaps } from '../input/virtual/keymap';
 import { applyTheme, DEFAULT_THEME } from './themes';
 import { createStore, loadJson, saveJson, useStore } from './store';
 
@@ -21,22 +22,49 @@ export interface Settings {
   /** timer font size in rem */
   timerSize: number;
   scramblePreview: PreviewMode;
+  /** the 2D scramble preview's sticker colours: cubr's, or your own (customStickers) */
+  stickerColours: 'default' | 'custom';
+  /** your own sticker colours: per scheme (lib/scrambleNet SCHEMES), one per face; gaps are the default */
+  customStickers: Record<string, (string | null)[]>;
   /** fade the UI while solving */
   focusMode: boolean;
   /** which averages appear in the timer stats panel */
   statsShown: string[];
   confirmDelete: boolean;
   showSolveList: boolean;
-  showCharts: boolean;
   /** play a sound when you set a PB */
   pbSound: boolean;
   /** last used event (timer page) */
   lastEvent: string;
+  /** virtual puzzle: ms per animated turn (0 = no animation), csTimer's "VRC base speed" */
+  virtualSpeed: number;
+  /** virtual cube camera: csTimer's orientation option (looking at the top and front, or the top front right corner) */
+  virtualView: 'UF' | 'URF';
+  /** virtual (and smart) cube: how far the stickers float off a hollow cube, as csTimer draws it (0-100; 0 = a solid cube) */
+  virtualFloat: number;
+  /** virtual (and smart) cube: the dark edge round each sticker (0-100; 50 = the cube's own, 0 = none) */
+  virtualOutline: number;
+  /** virtual puzzle: your own keys, per puzzle (input/virtual/keymap); none = csTimer's layout */
+  virtualKeys: KeyMaps;
+  /** smart cube: when a scramble counts as done (csTimer "mark scrambled after"): matching the scramble, n seconds without a move, or never */
+  smartScrambled: 'scramble' | '2' | '3' | '4' | '5' | 'never';
+  /** smart cube: space marks the cube as scrambled */
+  smartSpace: boolean;
+  /** smart cube: beep when the cube is marked scrambled */
+  smartBeep: boolean;
+  /** smart cube: show the cube on screen */
+  smartView: '3D' | '2D' | 'off';
+  /** smart cube: also mark it scrambled a second after one face is turned 4 times one way (x4) or back and forth (xi2) */
+  smartTurnMark: 'off' | 'x4' | 'xi2';
+  /** smart cube: on connecting to a cube that isn't solved, ask to mark it solved, always do, or never */
+  smartReset: 'ask' | 'always' | 'never';
+  /** stackmat: use the timer's status signals (hands on, green light) */
+  stackmatStatus: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   theme: DEFAULT_THEME,
-  font: 'Roboto Mono',
+  font: 'Lexend Deca',
   inspection: false,
   inspectionAlerts: 'beep',
   holdMs: 300,
@@ -44,34 +72,76 @@ export const DEFAULT_SETTINGS: Settings = {
   precision: 2,
   timerSize: 7,
   scramblePreview: '2D',
+  stickerColours: 'default',
+  customStickers: {},
   focusMode: true,
   statsShown: ['mo3', 'ao5', 'ao12', 'ao100'],
   confirmDelete: true,
   showSolveList: true,
-  showCharts: true,
   pbSound: true,
   lastEvent: '333',
+  virtualSpeed: 100,
+  virtualView: 'UF',
+  virtualFloat: 30,
+  virtualOutline: 50,
+  virtualKeys: {},
+  smartScrambled: 'scramble',
+  smartSpace: true,
+  smartBeep: true,
+  smartView: '3D',
+  smartTurnMark: 'off',
+  smartReset: 'ask',
+  stackmatStatus: true,
 };
 
-export const FONTS: { name: string; css: string }[] = [
+export interface FontOption {
+  name: string;
+  css: string;
+  /** widest digit, when wider than the "0" (no tabular figures): sizes the timer's digit cells (default 1ch) */
+  digitWidth?: string;
+}
+
+export const FONTS: FontOption[] = [
+  { name: 'Lexend Deca', css: "'Lexend Deca', system-ui, sans-serif", digitWidth: '0.62em' },
+  { name: 'Comfortaa', css: "'Comfortaa', system-ui, sans-serif", digitWidth: '0.65em' },
   { name: 'Roboto Mono', css: "'Roboto Mono', ui-monospace, monospace" },
-  { name: 'Lexend Deca', css: "'Lexend Deca', system-ui, sans-serif" },
   { name: 'System Mono', css: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace' },
   { name: 'System Sans', css: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif' },
   { name: 'Georgia', css: 'Georgia, serif' },
 ];
 
-const KEY = 'cubetype.settings';
+const KEY = 'cubr.settings';
 
 function sanitize(raw: Partial<Settings> | null | undefined): Settings {
-  return { ...DEFAULT_SETTINGS, ...(raw && typeof raw === 'object' ? raw : {}) };
+  const s = { ...DEFAULT_SETTINGS, ...(raw && typeof raw === 'object' ? raw : {}) };
+  // choices from another version (or a hand-edited store) fall back to the default
+  const oneOf = <K extends keyof Settings>(key: K, allowed: readonly Settings[K][]) => {
+    if (!allowed.includes(s[key])) s[key] = DEFAULT_SETTINGS[key];
+  };
+  oneOf('virtualSpeed', [0, 50, 100, 200, 500, 1000]);
+  oneOf('virtualView', ['UF', 'URF']);
+  if (typeof s.virtualFloat !== 'number' || !Number.isFinite(s.virtualFloat)) s.virtualFloat = DEFAULT_SETTINGS.virtualFloat;
+  s.virtualFloat = Math.round(Math.max(0, Math.min(100, s.virtualFloat)));
+  if (typeof s.virtualOutline !== 'number' || !Number.isFinite(s.virtualOutline)) s.virtualOutline = DEFAULT_SETTINGS.virtualOutline;
+  s.virtualOutline = Math.round(Math.max(0, Math.min(100, s.virtualOutline)));
+  oneOf('smartScrambled', ['scramble', '2', '3', '4', '5', 'never']);
+  oneOf('smartView', ['3D', '2D', 'off']);
+  oneOf('smartTurnMark', ['off', 'x4', 'xi2']);
+  oneOf('smartReset', ['ask', 'always', 'never']);
+  // read by puzzle, so it has to be an object (each colour in it is checked where it is used)
+  if (!s.customStickers || typeof s.customStickers !== 'object' || Array.isArray(s.customStickers)) s.customStickers = {};
+  s.virtualKeys = cleanKeyMaps(s.virtualKeys);
+  return s;
 }
 
 export const settingsStore = createStore<Settings>(sanitize(loadJson<Partial<Settings>>(KEY, {})));
 
 function applyFont(name: string) {
   const f = FONTS.find((x) => x.name === name) ?? FONTS[0];
-  document.documentElement.style.setProperty('--font', f.css);
+  const root = document.documentElement.style;
+  root.setProperty('--font', f.css);
+  if (f.digitWidth) root.setProperty('--digit-width', f.digitWidth);
+  else root.removeProperty('--digit-width');
 }
 
 /** Apply visual settings to the document (call once at startup). */

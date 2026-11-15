@@ -4,16 +4,21 @@ import type { FastifyInstance } from 'fastify';
 import {
   HttpError,
   INTERNAL_TOKEN_HEADER,
+  TOKEN_TTL_SEC,
   conflict,
+  forbidden,
   internalTokenMatches,
+  newEventId,
   parse,
+  publishEvent,
   rateLimited,
   revokedKey,
+  revokedUserKey,
   signToken,
   unauthorized,
   unavailable,
   withTx,
-} from '@cubetype/common';
+} from '@cubr/common';
 import type { Deps } from './index.js';
 import {
   SETTINGS_MAX_BYTES,
@@ -21,6 +26,7 @@ import {
   UUID_RE,
   buildUserUpdate,
   conflictMessage,
+  deleteMeSchema,
   jsonBytes,
   loginSchema,
   patchMeSchema,
@@ -130,6 +136,41 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
       if (!ok) throw unavailable('Could not revoke the token right now, please retry');
       return reply.status(204).send();
     });
+  });
+
+  // ---- DELETE /api/auth/me --------------------------------------------------------------------
+  // Deletes the account, after asking for the password again. One transaction: the user row goes
+  // (settings and avatar cascade), every token issued so far is revoked, and user.deleted is
+  // published - solve, stats and leaderboard delete the user's data when they see it. If Redis
+  // can't take the revocation or the event, nothing is deleted (503, try again).
+  app.delete('/api/auth/me', { preHandler: auth.requireAuth }, async (req, reply) => {
+    const me = req.user!;
+    if (!UUID_RE.test(me.id)) throw unauthorized();
+    if (!(await allow(redis, `delete:${me.id}`, 5, 600))) throw rateLimited('Too many attempts, try again in a few minutes');
+    const { password } = parse(deleteMeSchema, req.body ?? {});
+    await withTx(pool, async (c) => {
+      const { rows } = await c.query<{ username: string; password_hash: string }>(
+        'select username, password_hash from auth.users where id = $1 for update',
+        [me.id],
+      );
+      if (!rows[0]) throw unauthorized('Account no longer exists');
+      // 403, not 401: a wrong password must not look like an expired session to the client
+      if (!(await bcrypt.compare(password, rows[0].password_hash))) throw forbidden('Wrong password');
+      await c.query('delete from auth.users where id = $1', [me.id]);
+
+      const revokedAt = String(Math.floor(Date.now() / 1000));
+      const revoked = await withTimeout(redis.set(revokedUserKey(me.id), revokedAt, 'EX', TOKEN_TTL_SEC).then(() => true), 2000, false);
+      if (!revoked) throw unavailable('Could not delete the account right now, please retry');
+      const data = { eventId: newEventId('auth'), userId: me.id, username: rows[0].username };
+      const published = await withTimeout(publishEvent(redis, 'user.deleted', data).then(() => true), 2000, false);
+      if (!published) {
+        // the row stays (rollback), so the tokens must keep working too
+        await withTimeout(redis.del(revokedUserKey(me.id)), 2000, 0);
+        throw unavailable('Could not delete the account right now, please retry');
+      }
+    });
+    req.log.info({ userId: me.id }, 'account deleted');
+    return reply.status(204).send();
   });
 
   // ---- GET /api/auth/me -----------------------------------------------------------------------

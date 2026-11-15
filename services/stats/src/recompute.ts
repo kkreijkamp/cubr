@@ -1,5 +1,5 @@
-import { fetchJson, HttpError, internalHeaders, parse, type PoolClient } from '@cubetype/common';
-import { effectiveMs } from '@cubetype/cubestats';
+import { fetchJson, HttpError, internalHeaders, parse, type PoolClient } from '@cubr/common';
+import { effectiveMs } from '@cubr/cubestats';
 import type { FastifyBaseLogger } from 'fastify';
 import { bucketSolves } from './domain/buckets.js';
 import { computePbs, PB_KINDS, replayHistory, type ListSolve } from './domain/pbs.js';
@@ -81,6 +81,17 @@ export async function recomputeEvent(
     );
   }
 
+  // 1b. which of the listed sessions are practice ones (the profile chart's PB line leaves them out)
+  const listed = [...new Set(solves.map((s) => s.sessionId))];
+  if (listed.length) {
+    const practice = [...new Set(solves.filter((s) => s.practice).map((s) => s.sessionId))];
+    await c.query(
+      `UPDATE stats.sessions SET practice = (session_id = ANY($3::uuid[])), updated_at = now()
+        WHERE user_id = $1 AND session_id = ANY($2::uuid[]) AND practice <> (session_id = ANY($3::uuid[]))`,
+      [userId, listed, practice],
+    );
+  }
+
   // 2. daily_activity + hourly, bucketed in the user's timezone
   const { days, hours } = bucketSolves(solves, tz);
   await c.query('DELETE FROM stats.daily_activity WHERE user_id = $1 AND event = $2', [userId, event]);
@@ -100,7 +111,8 @@ export async function recomputeEvent(
     );
   }
 
-  // 3. personal bests: diff against the stored rows, emit pb.updated for every change
+  // 3. personal bests (practice sessions left out): diff against the stored rows, emit pb.updated
+  //    for every change
   const next = computePbs(solves);
   const prev = await loadPbs(c, userId, event);
   let pbChanges = 0;

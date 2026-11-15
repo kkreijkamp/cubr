@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parse, HttpError } from '@cubetype/common';
+import { parse, HttpError } from '@cubr/common';
 import { distributionQuery, escapeLike, personParams, personSearchQuery, rankQuery } from '../src/schemas.js';
 
 function badRequest(fn: () => unknown): string {

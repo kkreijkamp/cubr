@@ -1,4 +1,4 @@
-import { badRequest, parse, requireInternal } from '@cubetype/common';
+import { badRequest, parse, requireInternal } from '@cubr/common';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { Cached } from '../cache.js';
 import { WCA_ID_RE, distributionQuery, personParams, personSearchQuery, rankQuery } from '../schemas.js';

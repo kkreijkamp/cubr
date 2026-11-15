@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HttpError } from '@cubetype/common';
+import { HttpError } from '@cubr/common';
 import { MAX_PLAYERS, addPlayer, newRoom, normalize, removePlayer, setStatus, startRound, submitResult, toRoomState } from '../src/room.js';
 import { presenceFrom } from '../src/store.js';
 import type { Identity, StoredRoom } from '../src/types.js';

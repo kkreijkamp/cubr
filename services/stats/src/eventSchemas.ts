@@ -16,8 +16,10 @@ export const CONSUMED_TYPES = [
   'solve.deleted',
   'session.deleted',
   'session.renamed',
+  'session.updated',
   'sessions.merged',
   'solves.imported',
+  'user.deleted',
 ] as const;
 
 export const userEventSchema = z.object({
@@ -25,6 +27,11 @@ export const userEventSchema = z.object({
   userId: uuid,
   username: z.string().min(1).max(64),
   createdAt: isoDate.nullish(),
+});
+
+export const userDeletedSchema = z.object({
+  eventId: z.string().min(1),
+  userId: uuid,
 });
 
 export const solveCreatedSchema = z.object({
@@ -43,6 +50,8 @@ export const solveCreatedSchema = z.object({
     .partial()
     .nullish(),
   sessionName: z.string().max(200).nullish(),
+  /** a practice session's solve: counted, but never a PB */
+  practice: z.boolean().nullish(),
 });
 
 /** solve.updated / solve.deleted: only the routing fields are needed (they trigger a recompute). */
@@ -77,6 +86,18 @@ export const sessionRenamedSchema = z.object({
   name: z.string().min(1).max(200),
 });
 
+/** session.updated: the session was marked as practice, or no longer is (its event is recomputed). */
+export const sessionUpdatedSchema = z.object({
+  eventId: z.string().min(1),
+  userId: uuid,
+  username: optUsername,
+  sessionId: uuid,
+  event,
+  name: z.string().min(1).max(200),
+  practice: z.boolean(),
+  tz: optTz,
+});
+
 /** sessions.merged: solves of sourceIds moved into targetId, sources deleted. */
 export const sessionsMergedSchema = z.object({
   eventId: z.string().min(1),
@@ -90,7 +111,7 @@ export const sessionsMergedSchema = z.object({
 
 /** Response of solve-service GET /internal/users/:id/sessions */
 export const sessionListSchema = z.object({
-  sessions: z.array(z.object({ id: uuid, name: z.string(), event })),
+  sessions: z.array(z.object({ id: uuid, name: z.string(), event, practice: z.boolean().optional() })),
 });
 
 export const solvesImportedSchema = z.object({
@@ -118,6 +139,7 @@ export const solveListSchema = z.object({
       timeMs: z.number().int().positive(),
       penalty,
       createdAt: isoDate,
+      practice: z.boolean().optional(),
     }),
   ),
 });

@@ -1,5 +1,5 @@
 // Small helpers shared by the social pages (login, profile/account, leaderboards, about).
-import { getEvent, type ImportSkipped } from '@cubetype/cubestats';
+import { getEvent, type ImportSkipped } from '@cubr/cubestats';
 import { ApiError } from '../../lib/api';
 import { localDateKey } from '../../lib/format';
 import type { PbKind } from '../../lib/types';
@@ -13,7 +13,7 @@ export function eventLabel(id: string): string {
 
 /** Events whose official WCA average is a mean of 3 rather than an average of 5. */
 const MEAN_OF_3 = new Set(['666', '777', '333bf', '444bf', '555bf']);
-/** Which cubetype PB kind corresponds to the WCA "average" of an event. */
+/** Which cubr PB kind corresponds to the WCA "average" of an event. */
 export function wcaAverageKind(event: string): 'ao5' | 'mo3' {
   return MEAN_OF_3.has(event) ? 'mo3' : 'ao5';
 }
@@ -92,14 +92,14 @@ export function plural(n: number, word: string, pluralWord = `${word}s`): string
 /** "3 multi-blind solves left out ..." lines for an import preview. */
 export function skippedNotes(skipped: ImportSkipped): string[] {
   const notes: string[] = [];
-  if (skipped.multiBlind) notes.push(`${plural(skipped.multiBlind, 'multi-blind solve')} left out: cubetype has no multi-blind event.`);
+  if (skipped.multiBlind) notes.push(`${plural(skipped.multiBlind, 'multi-blind solve')} left out: cubr has no multi-blind event.`);
   if (skipped.invalid) notes.push(`${plural(skipped.invalid, 'solve')} without a valid time (1 ms - 24 h) left out.`);
   return notes;
 }
 
 /** Like csTimer's own exports (cstimer_YYYYMMDD_hhmmss.txt). */
 export function csTimerFileName(now = new Date()): string {
-  return `cstimer_${localDateKey(now).replace(/-/g, '')}_cubetype.txt`;
+  return `cstimer_${localDateKey(now).replace(/-/g, '')}_cubr.txt`;
 }
 
 export const prefersReducedMotion = (): boolean =>

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { HttpError, notFound, type Redis } from '@cubetype/common';
+import { HttpError, notFound, type Redis } from '@cubr/common';
 import { newRoom, normalize, toRoomState } from './room.js';
 import { newRoomId } from './sanitize.js';
 import type { ChatMessage, Presence, RoomState, StoredRoom } from './types.js';

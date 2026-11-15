@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { parse } from '@cubetype/common';
+import { parse } from '@cubr/common';
 import type { DailyChallenges } from '../daily.js';
 import { toHttpError } from '../errors.js';
 import { dailyQuerySchema, resolveDailyDate } from '../validation.js';

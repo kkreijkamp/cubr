@@ -55,6 +55,7 @@ describe('toSession', () => {
         id: 'a',
         name: '3x3',
         event: '333',
+        practice: true,
         created_at: new Date('2026-10-14T00:00:00Z'),
         updated_at: new Date('2026-10-14T00:00:01Z'),
         solve_count: 42,
@@ -63,6 +64,7 @@ describe('toSession', () => {
       id: 'a',
       name: '3x3',
       event: '333',
+      practice: true,
       createdAt: '2026-10-14T00:00:00.000Z',
       updatedAt: '2026-10-14T00:00:01.000Z',
       solveCount: 42,
@@ -70,7 +72,8 @@ describe('toSession', () => {
   });
 
   it('defaults a missing count to 0', () => {
-    const s = toSession({ id: 'a', name: 'x', event: '222', created_at: new Date(0), updated_at: new Date(0) });
+    const s = toSession({ id: 'a', name: 'x', event: '222', practice: false, created_at: new Date(0), updated_at: new Date(0) });
     expect(s.solveCount).toBe(0);
+    expect(s.practice).toBe(false);
   });
 });

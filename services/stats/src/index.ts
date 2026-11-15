@@ -1,7 +1,7 @@
 import {
   consumeEvents, createPool, createRedis, createServer, loadConfig, migrate, pingPostgres, start, waitForPostgres,
   type Consumer,
-} from '@cubetype/common';
+} from '@cubr/common';
 import { CONSUMED_TYPES } from './eventSchemas.js';
 import { migrations } from './migrations.js';
 import { createPbRelay, startMaintenance } from './outbox.js';

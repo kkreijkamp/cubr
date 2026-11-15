@@ -1,4 +1,4 @@
-import { newEventId, type PoolClient } from '@cubetype/common';
+import { newEventId, type PoolClient } from '@cubr/common';
 import type { PbKind } from './domain/pbs.js';
 
 /** Payload of a pb.updated event (SPEC section 8). */
@@ -24,7 +24,7 @@ export interface PbRow {
  * Two-key form so it cannot collide with other services' single-key advisory locks.
  */
 export async function lockUser(c: PoolClient, userId: string): Promise<void> {
-  await c.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', ['cubetype:stats:user', userId]);
+  await c.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', ['cubr:stats:user', userId]);
 }
 
 /** Records the event id; returns false if it was already processed (duplicate delivery). */

@@ -41,6 +41,11 @@ export const patchMeSchema = z.object({
 });
 export type PatchMe = z.infer<typeof patchMeSchema>;
 
+/** DELETE /api/auth/me: the password again, so a stolen token alone cannot delete the account. */
+export const deleteMeSchema = z.object({
+  password: z.string().min(1).max(128),
+});
+
 export const settingsSchema = z.object({
   settings: z.record(z.unknown()),
 });

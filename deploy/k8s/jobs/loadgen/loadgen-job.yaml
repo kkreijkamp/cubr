@@ -6,9 +6,9 @@
 #   TARGET_URL   what to hit (444 = 4x4x4 random-state scrambles, expensive; 5 per request)
 #   CONCURRENCY  parallel connections (more = more load)
 #   DURATION     how long to run (fortio duration syntax: 90s, 3m, ...)
-# Start:  kubectl -n cubetype delete job loadgen --ignore-not-found && kubectl apply -k deploy/k8s/jobs/loadgen
-# Watch:  kubectl -n cubetype get hpa scramble -w
-# Stop:   kubectl -n cubetype delete job loadgen
+# Start:  kubectl -n cubr delete job loadgen --ignore-not-found && kubectl apply -k deploy/k8s/jobs/loadgen
+# Watch:  kubectl -n cubr get hpa scramble -w
+# Stop:   kubectl -n cubr delete job loadgen
 # =============================================================================================
 apiVersion: batch/v1
 kind: Job
@@ -17,7 +17,7 @@ metadata:
   labels:
     app.kubernetes.io/name: loadgen
     app.kubernetes.io/component: batch
-    app.kubernetes.io/part-of: cubetype
+    app.kubernetes.io/part-of: cubr
 spec:
   backoffLimit: 0                       # a load test is not retried
   ttlSecondsAfterFinished: 600          # clean up 10 min after it finished
@@ -26,7 +26,7 @@ spec:
       labels:
         app.kubernetes.io/name: loadgen
         app.kubernetes.io/component: batch
-        app.kubernetes.io/part-of: cubetype
+        app.kubernetes.io/part-of: cubr
     spec:
       restartPolicy: Never
       automountServiceAccountToken: false

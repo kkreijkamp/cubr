@@ -1,85 +1,85 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
-import {
-  ArrowUpRight,
-  Bell,
-  Box,
-  ChartLine,
-  Database,
-  Download,
-  Eye,
-  Gauge,
-  Hand,
-  Hash,
-  Keyboard,
-  List,
-  Maximize2,
-  Palette,
-  Play,
-  RotateCcw,
-  Search,
-  Shuffle,
-  Sigma,
-  Timer,
-  Trash2,
-  TriangleAlert,
-  Type,
-  Upload,
-  Volume2,
-} from 'lucide-react';
-import { CsTimerFormatError, EVENTS, parseTimerFile, toCsTimerExport, type TimerImport } from '@cubetype/cubestats';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowDownTrayIcon, ArrowUpRightIcon, ArrowUpTrayIcon, ArrowUturnLeftIcon, ArrowsRightLeftIcon, CubeIcon, MagnifyingGlassIcon, PlayIcon } from '@heroicons/react/24/outline';
+import { CsTimerFormatError, EVENTS, parseTimerFile, toCsTimerExport, type TimerImport } from '@cubr/cubestats';
+import { Modal } from '../components/Modal';
 import { csTimerFileName, skippedNotes } from '../components/social/util';
 import { ConfirmModal } from '../components/timer/Dialogs';
 import { playPbSound } from '../components/timer/feedback';
 import { AVG_CHOICES, parseAvgKey } from '../components/timer/statsUtil';
 import '../components/timer/settings-page.css';
+import { ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { formatNumber } from '../lib/format';
+import { useKeyboardLayout } from '../lib/keyboardLayout';
 import { applyVisualSettings, DEFAULT_SETTINGS, FONTS, updateSettings, useSettings, type Settings } from '../lib/settings';
-import { clearLocalData, exportAll, importSessions, localDataSummary, useSolveState } from '../lib/solves';
+import { SCHEMES, stickerColour, type Scheme } from '../lib/scrambleNet';
+import { clearLocalData, exportAll, forgetUser, importSessions, localDataSummary, useSolveState } from '../lib/solves';
 import { applyTheme, isLightTheme, randomTheme, THEMES, themeLabel, type Theme } from '../lib/themes';
 import { toast } from '../lib/toast';
+import { AVAILABLE_INPUTS, INPUT_MODES, updateInput, useInputState } from '../input/inputMode';
+import { actionOf, bind, BINDABLE, controls, KEY_PUZZLES, keyLabel, keyOf, type KeyPuzzle } from '../input/virtual/keymap';
+import { modelFor, newModel, type PolyModel } from '../input/virtual/models';
+import { puzzlePalette } from '../input/virtual/palette';
+import { drawPoly } from '../input/virtual/render3d';
+import { baseCamera } from '../components/timer/inputs/VirtualInput';
 
-const SECTIONS = [
-  { id: 'timer', label: 'timer', icon: Timer },
-  { id: 'inspection', label: 'inspection', icon: Eye },
-  { id: 'display', label: 'display', icon: Maximize2 },
-  { id: 'stats', label: 'stats', icon: Sigma },
-  { id: 'theme', label: 'theme', icon: Palette },
-  { id: 'data', label: 'data', icon: Database },
-  { id: 'shortcuts', label: 'shortcuts', icon: Keyboard },
-  { id: 'danger', label: 'danger zone', icon: TriangleAlert },
+const PANES = [
+  { id: 'timer', label: 'timer' },
+  { id: 'display', label: 'display' },
+  { id: 'stats', label: 'stats' },
+  { id: 'theme', label: 'theme' },
+  { id: 'data', label: 'data' },
+  { id: 'shortcuts', label: 'shortcuts' },
+  { id: 'danger', label: 'danger zone' },
 ] as const;
+type PaneId = (typeof PANES)[number]['id'];
 
 interface RowProps {
-  icon: ReactNode;
   title: string;
   children: ReactNode;
   description: ReactNode;
+  /** the controls go under the text instead of beside it (long lists of choices) */
   wide?: boolean;
 }
 
-/** Monkeytype setting row: title + description on the left, controls on the right. */
-function SettingRow({ icon, title, description, children, wide }: RowProps) {
+/** One setting: its name and a line on what it does, the choices on the right. */
+function SettingRow({ title, description, children, wide }: RowProps) {
+  const id = useId();
   return (
     <div className={`st-row${wide ? ' wide' : ''}`}>
       <div className="st-text">
-        <h3 className="h3">
-          {icon}
+        <h3 className="st-title" id={id}>
           {title}
         </h3>
         <div className="st-desc">{description}</div>
       </div>
-      <div className="st-controls">{children}</div>
+      <div className="st-controls" role="group" aria-labelledby={id}>
+        {children}
+      </div>
     </div>
   );
 }
 
+/** A few settings that belong together, under a quiet lowercase label. */
+function Group({ title, children }: { title: string; children: ReactNode }) {
+  const id = useId();
+  return (
+    <section className="st-group" aria-labelledby={id}>
+      <h2 className="st-label" id={id}>
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+/** The choices as text, like the timer's config bar: the chosen one in the accent colour. */
 function Options<T extends string | number | boolean>({ value, options, onChange }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
   return (
-    <div className="option-group">
+    <div className="st-options">
       {options.map((o) => (
-        <button key={String(o.value)} className={`btn${o.value === value ? ' active' : ''}`} onClick={() => onChange(o.value)} aria-pressed={o.value === value}>
+        <button key={String(o.value)} className={`btn-text${o.value === value ? ' active' : ''}`} onClick={() => onChange(o.value)} aria-pressed={o.value === value}>
           {o.label}
         </button>
       ))}
@@ -96,16 +96,10 @@ function set<K extends keyof Settings>(key: K) {
   return (v: Settings[K]) => updateSettings({ [key]: v } as Partial<Settings>);
 }
 
-const SHORTCUTS: [ReactNode, string][] = [
+// csTimer's shortcuts (all of them)
+const CSTIMER_KEYS: [ReactNode, string][] = [
   [<kbd key="s">space</kbd>, 'hold to get ready, release to start, any key stops'],
   [<kbd key="e">esc</kbd>, 'cancel inspection - stop as DNF while running - command line when idle'],
-  [
-    <>
-      <kbd>ctrl</kbd>+<kbd>k</kbd>
-    </>,
-    'command line (anywhere)',
-  ],
-  [<kbd key="t">tab</kbd>, 'next scramble'],
   [
     <>
       <kbd>alt</kbd>+<kbd>left</kbd> / <kbd>right</kbd>
@@ -114,21 +108,39 @@ const SHORTCUTS: [ReactNode, string][] = [
   ],
   [
     <>
-      <kbd>alt</kbd>+<kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>
+      <kbd>alt</kbd>+<kbd>i</kbd>
+    </>,
+    'type in your own scramble',
+  ],
+  [
+    <>
+      <kbd>alt</kbd>+<kbd>2</kbd> ... <kbd>7</kbd>
+    </>,
+    'event: 2x2 ... 7x7',
+  ],
+  [
+    <>
+      <kbd>alt</kbd>+<kbd>1</kbd> <kbd>p</kbd> <kbd>m</kbd> <kbd>c</kbd> <kbd>s</kbd>
+    </>,
+    'event: square-1 / pyraminx / megaminx / clock / skewb',
+  ],
+  [
+    <>
+      <kbd>ctrl</kbd>+<kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>
     </>,
     'latest solve: no penalty / +2 / DNF',
   ],
   [
     <>
-      <kbd>alt</kbd>+<kbd>backspace</kbd> or <kbd>alt</kbd>+<kbd>z</kbd>
+      <kbd>alt</kbd>+<kbd>z</kbd> or <kbd>ctrl</kbd>+<kbd>z</kbd>
     </>,
-    'delete the latest solve',
+    'delete the latest solve (alt+backspace too)',
   ],
   [
     <>
-      <kbd>alt</kbd>+<kbd>c</kbd>
+      <kbd>alt</kbd>+<kbd>d</kbd>
     </>,
-    'comment on the latest solve',
+    'clear the session (delete all its solves)',
   ],
   [
     <>
@@ -138,15 +150,38 @@ const SHORTCUTS: [ReactNode, string][] = [
   ],
   [
     <>
-      <kbd>alt</kbd>+<kbd>i</kbd>
+      <kbd>ctrl</kbd>+<kbd>alt</kbd>+<kbd>t</kbd> <kbd>i</kbd> <kbd>s</kbd> <kbd>m</kbd>
     </>,
-    'toggle WCA inspection',
+    'enter times with: the timer / typing / a stackmat / a moyu timer',
   ],
   [
     <>
-      <kbd>alt</kbd>+<kbd>m</kbd>
+      <kbd>ctrl</kbd>+<kbd>alt</kbd>+<kbd>v</kbd> <kbd>q</kbd> <kbd>g</kbd> <kbd>b</kbd>
     </>,
-    'toggle manual time entry',
+    'enter times with: a virtual puzzle / qcube / a smart cube / a bluetooth timer',
+  ],
+];
+
+// cubr's own, on keys csTimer leaves free
+const OWN_KEYS: [ReactNode, string][] = [
+  [
+    <>
+      <kbd>ctrl</kbd>+<kbd>k</kbd>
+    </>,
+    'command line (anywhere)',
+  ],
+  [<kbd key="t">tab</kbd>, 'next scramble'],
+  [
+    <>
+      <kbd>alt</kbd>+<kbd>n</kbd>
+    </>,
+    'comment on the latest solve',
+  ],
+  [
+    <>
+      <kbd>alt</kbd>+<kbd>w</kbd>
+    </>,
+    'toggle WCA inspection',
   ],
   [
     <>
@@ -155,6 +190,19 @@ const SHORTCUTS: [ReactNode, string][] = [
     'browse solves in the solve window',
   ],
 ];
+
+function KeyList({ keys }: { keys: [ReactNode, string][] }) {
+  return (
+    <dl className="st-keys">
+      {keys.map(([k, what], i) => (
+        <div key={i}>
+          <dt>{k}</dt>
+          <dd>{what}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
 
 function download(name: string, text: string) {
   const blob = new Blob([text], { type: 'application/json' });
@@ -168,223 +216,349 @@ function download(name: string, text: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/** One of the rail's sections in the list. */
+function Pane({ id, children }: { id: PaneId; children: ReactNode }) {
+  return (
+    <div className="st-pane" id={`settings-${id}`}>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Settings: one list of every section, with a rail beside it that jumps to a section and lights
+ * the one in view (?tab= opens the page on a section). No cards - groups are set apart by space
+ * and small labels, and every choice is text with the chosen one in the accent colour.
+ */
 export default function SettingsPage() {
   const s = useSettings();
-  const { status } = useAuth();
+  const { status, user } = useAuth();
+  const navigate = useNavigate();
   const solveState = useSolveState();
-  const [confirm, setConfirm] = useState<'clear' | 'reset' | null>(null);
+  const [confirm, setConfirm] = useState<'clear' | 'reset' | 'account' | null>(null);
   const [local, setLocal] = useState(() => localDataSummary());
+  const [params] = useSearchParams();
+  const asked = PANES.find((p) => p.id === params.get('tab'))?.id;
+  // the section in view, lit in the rail
+  const [active, setActive] = useState<PaneId>(asked ?? 'timer');
+  // while a jump scrolls, the rail keeps the section it jumped to
+  const jumping = useRef(false);
+  const railRef = useRef<HTMLElement>(null);
 
   useEffect(() => setLocal(localDataSummary()), [solveState.sessions, solveState.solves]);
   // never leave a hover preview applied when navigating away
   useEffect(() => () => applyVisualSettings(), []);
 
+  const jump = (id: PaneId, smooth = true) => {
+    const el = document.getElementById(`settings-${id}`);
+    if (!el) return;
+    setActive(id);
+    jumping.current = true;
+    const done = () => {
+      jumping.current = false;
+      window.removeEventListener('scrollend', done);
+      clearTimeout(timer);
+    };
+    const timer = window.setTimeout(done, 1500);
+    window.addEventListener('scrollend', done);
+    el.scrollIntoView({ behavior: smooth && !matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'auto', block: 'start' });
+  };
+
+  useEffect(() => {
+    let frame = 0;
+    const spy = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        if (jumping.current) return;
+        // the last section whose top has passed the top third of the window; at the very bottom
+        // the last one, which is too short to get there
+        const line = window.innerHeight / 3;
+        let current: PaneId = PANES[0].id;
+        for (const p of PANES) if ((document.getElementById(`settings-${p.id}`)?.getBoundingClientRect().top ?? Infinity) <= line) current = p.id;
+        if (window.scrollY > 0 && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2) current = PANES[PANES.length - 1].id;
+        setActive(current);
+      });
+    };
+    window.addEventListener('scroll', spy, { passive: true });
+    window.addEventListener('resize', spy);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', spy);
+      window.removeEventListener('resize', spy);
+    };
+  }, []);
+
+  // a link to a section opens on it - a frame late, after the layout's scroll to the top of a new page
+  useEffect(() => {
+    if (!asked) return;
+    const frame = requestAnimationFrame(() => jump(asked, false));
+    return () => cancelAnimationFrame(frame);
+  }, []); // only on arriving
+
+  // on phones the rail is a row of tabs that scrolls sideways: keep the lit one in sight
+  useEffect(() => {
+    const rail = railRef.current;
+    const item = rail?.querySelector<HTMLElement>('.st-rail-item.active');
+    if (!rail || !item || rail.scrollWidth <= rail.clientWidth) return;
+    rail.scrollTo({ left: item.offsetLeft - (rail.clientWidth - item.offsetWidth) / 2, behavior: 'smooth' });
+  }, [active]);
+
   return (
     <div className="settings-page">
-      <nav className="st-quicknav" aria-label="settings sections">
-        {SECTIONS.map(({ id, label, icon: Icon }) => (
-          <button key={id} className="btn-text" onClick={() => document.getElementById(`settings-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-            <Icon size={14} /> {label}
-          </button>
-        ))}
-      </nav>
-
-      <Section id="timer" title="timer">
-        <SettingRow icon={<Hand size={16} />} title="hold to start" description="How long space (or your finger) must be held before the timer turns green and is ready to start. Stops accidental starts.">
-          <Options value={s.holdMs} options={[0, 300, 550, 1000].map((v) => ({ value: v, label: v === 0 ? 'off' : `${v / 1000}s` }))} onChange={set('holdMs')} />
-        </SettingRow>
-        <SettingRow icon={<Gauge size={16} />} title="timer update" description="What the timer shows while you solve. Hiding the time helps you stay relaxed instead of watching the clock.">
-          <Options
-            value={s.timerUpdate}
-            options={[
-              { value: 'realtime', label: 'realtime' },
-              { value: 'tenths', label: '0.1s' },
-              { value: 'seconds', label: 'seconds' },
-              { value: 'hidden', label: 'hidden' },
-            ]}
-            onChange={set('timerUpdate')}
-          />
-        </SettingRow>
-        <SettingRow icon={<Hash size={16} />} title="precision" description="Decimal places for times and averages. Singles are truncated, averages rounded like the WCA.">
-          <Options
-            value={s.precision}
-            options={[
-              { value: 2, label: '0.01' },
-              { value: 3, label: '0.001' },
-            ]}
-            onChange={set('precision')}
-          />
-        </SettingRow>
-        <SettingRow icon={<Maximize2 size={16} />} title="timer size" description="Size of the big timer on the timer page.">
-          <div className="st-size">
-            <Options
-              value={s.timerSize}
-              options={[
-                { value: 5, label: 's' },
-                { value: 7, label: 'm' },
-                { value: 9, label: 'l' },
-                { value: 11, label: 'xl' },
-              ]}
-              onChange={set('timerSize')}
-            />
-            <div className="st-size-preview" style={{ fontSize: `${s.timerSize * 0.38}rem` }}>
-              12.34
-            </div>
-          </div>
-        </SettingRow>
-        <SettingRow icon={<Eye size={16} />} title="focus mode" description="Fade out everything except the timer while you inspect and solve.">
-          <Options value={s.focusMode} options={onOff} onChange={set('focusMode')} />
-        </SettingRow>
-      </Section>
-
-      <Section id="inspection" title="inspection">
-        <SettingRow icon={<Timer size={16} />} title="WCA inspection" description="15 seconds of inspection before each solve. Starting after 15 s adds +2, after 17 s the solve is a DNF (WCA A4d).">
-          <Options
-            value={s.inspection}
-            options={[
-              { value: true, label: 'on' },
-              { value: false, label: 'off' },
-            ]}
-            onChange={set('inspection')}
-          />
-        </SettingRow>
-        <SettingRow icon={<Bell size={16} />} title="inspection alerts" description="Called out at 8 and 12 seconds, like a judge at a competition.">
-          <Options
-            value={s.inspectionAlerts}
-            options={[
-              { value: 'off', label: 'off' },
-              { value: 'beep', label: 'beep' },
-              { value: 'voice', label: 'voice' },
-            ]}
-            onChange={set('inspectionAlerts')}
-          />
-        </SettingRow>
-      </Section>
-
-      <Section id="display" title="display">
-        <SettingRow icon={<Eye size={16} />} title="scramble preview" description="Draw the scrambled puzzle next to your stats so you can check you scrambled correctly.">
-          <Options
-            value={s.scramblePreview}
-            options={[
-              { value: 'off', label: 'off' },
-              { value: '2D', label: '2D' },
-              { value: '3D', label: '3D' },
-            ]}
-            onChange={set('scramblePreview')}
-          />
-        </SettingRow>
-        <SettingRow icon={<List size={16} />} title="solve list" description="Show the list of solves in the current session on the timer page.">
-          <Options value={s.showSolveList} options={onOff} onChange={set('showSolveList')} />
-        </SettingRow>
-        <SettingRow icon={<ChartLine size={16} />} title="charts" description="Show the trend and distribution charts below your solves.">
-          <Options value={s.showCharts} options={onOff} onChange={set('showCharts')} />
-        </SettingRow>
-        <SettingRow icon={<Type size={16} />} title="font" description="One font for the whole app. Hover to preview." wide>
-          <div className="option-group wide st-fonts" onMouseLeave={() => applyVisualSettings()}>
-            {FONTS.map((f) => (
-              <button
-                key={f.name}
-                className={`btn${s.font === f.name ? ' active' : ''}`}
-                style={{ fontFamily: f.css }}
-                onMouseEnter={() => document.documentElement.style.setProperty('--font', f.css)}
-                onClick={() => updateSettings({ font: f.name })}
-              >
-                {f.name.toLowerCase()}
-              </button>
-            ))}
-          </div>
-        </SettingRow>
-      </Section>
-
-      <Section id="stats" title="stats">
-        <SettingRow icon={<Sigma size={16} />} title="averages shown" description="Which averages appear in the stats panel. Averages trim the best and worst 5 % (at least one each side); mo3 is a plain mean.">
-          <div className="st-chips">
-            {AVG_CHOICES.map((k) => {
-              const on = s.statsShown.includes(k);
-              return (
-                <button
-                  key={k}
-                  className={`btn${on ? ' active' : ''}`}
-                  aria-pressed={on}
-                  onClick={() => {
-                    const next = on ? s.statsShown.filter((x) => x !== k) : [...s.statsShown, k];
-                    updateSettings({ statsShown: next.sort((a, b) => (parseAvgKey(a) ?? 0) - (parseAvgKey(b) ?? 0)) });
-                  }}
-                >
-                  {k}
-                </button>
-              );
-            })}
-          </div>
-        </SettingRow>
-        <SettingRow icon={<Trash2 size={16} />} title="confirm delete" description="Ask before deleting a solve with alt+backspace or from the solve window.">
-          <Options value={s.confirmDelete} options={onOff} onChange={set('confirmDelete')} />
-        </SettingRow>
-        <SettingRow
-          icon={<Volume2 size={16} />}
-          title="pb sound"
-          description={
-            <>
-              Play a short chime when you set a new personal best.{' '}
-              <button className="btn-text st-inline" onClick={playPbSound}>
-                <Play size={12} /> preview
-              </button>
-            </>
-          }
-        >
-          <Options value={s.pbSound} options={onOff} onChange={set('pbSound')} />
-        </SettingRow>
-      </Section>
-
-      <Section id="theme" title="theme">
-        <ThemeGrid current={s.theme} />
-      </Section>
-
-      <Section id="data" title="data">
-        <DataTools loggedIn={status === 'authed'} />
-      </Section>
-
-      <Section id="shortcuts" title="keyboard shortcuts">
-        <div className="st-shortcuts">
-          {SHORTCUTS.map(([keys, label], i) => (
-            <div key={i} className="st-shortcut">
-              <span className="keys">{keys}</span>
-              <span className="what">{label}</span>
-            </div>
+      <aside className="st-side">
+        <h1 className="st-label">settings</h1>
+        <nav className="st-rail" aria-label="settings sections" ref={railRef}>
+          {PANES.map((p) => (
+            <button
+              key={p.id}
+              className={`st-rail-item${p.id === active ? ' active' : ''}${p.id === 'danger' ? ' danger' : ''}`}
+              aria-current={p.id === active ? 'true' : undefined}
+              onClick={() => jump(p.id)}
+            >
+              {p.label}
+            </button>
           ))}
-        </div>
-      </Section>
+        </nav>
+      </aside>
 
-      <Section id="danger" title="danger zone">
-        <SettingRow
-          icon={<Trash2 size={16} />}
-          title="clear guest data"
-          description={
-            <>
-              Delete every session and solve stored in this browser while signed out
-              {local.solves > 0 ? (
+      <div className="st-list">
+        <Pane id="timer">
+          <Group title="timer">
+            <SettingRow title="hold to start" description="How long space (or your finger) is held before the timer turns green. Stops accidental starts.">
+              <Options value={s.holdMs} options={[0, 300, 550, 1000].map((v) => ({ value: v, label: v === 0 ? 'off' : `${v / 1000}s` }))} onChange={set('holdMs')} />
+            </SettingRow>
+            <SettingRow title="timer update" description="What the timer shows while you solve. Hiding it keeps your eyes off the clock.">
+              <Options
+                value={s.timerUpdate}
+                options={[
+                  { value: 'realtime', label: 'realtime' },
+                  { value: 'tenths', label: '0.1s' },
+                  { value: 'seconds', label: 'seconds' },
+                  { value: 'hidden', label: 'hidden' },
+                ]}
+                onChange={set('timerUpdate')}
+              />
+            </SettingRow>
+            <SettingRow title="precision" description="Decimal places for times. Singles are truncated, averages rounded like the WCA.">
+              <Options
+                value={s.precision}
+                options={[
+                  { value: 2, label: '0.01' },
+                  { value: 3, label: '0.001' },
+                ]}
+                onChange={set('precision')}
+              />
+            </SettingRow>
+          </Group>
+          <InputGroup />
+          <Group title="inspection">
+            <SettingRow title="WCA inspection" description="15 seconds to inspect before each solve. Starting after 15 s adds +2, after 17 s the solve is a DNF (WCA A4d).">
+              <Options value={s.inspection} options={onOff} onChange={set('inspection')} />
+            </SettingRow>
+            <SettingRow title="inspection alerts" description="Called out at 8 and 12 seconds, like a judge at a competition.">
+              <Options
+                value={s.inspectionAlerts}
+                options={[
+                  { value: 'off', label: 'off' },
+                  { value: 'beep', label: 'beep' },
+                  { value: 'voice', label: 'voice' },
+                ]}
+                onChange={set('inspectionAlerts')}
+              />
+            </SettingRow>
+          </Group>
+        </Pane>
+
+        <Pane id="display">
+          <Group title="display">
+            <SettingRow title="timer size" description="Size of the big timer.">
+              <span className="st-size-preview" style={{ fontSize: `${s.timerSize * 0.24}rem` }} aria-hidden="true">
+                12.34
+              </span>
+              <Options
+                value={s.timerSize}
+                options={[
+                  { value: 5, label: 's' },
+                  { value: 7, label: 'm' },
+                  { value: 9, label: 'l' },
+                  { value: 11, label: 'xl' },
+                ]}
+                onChange={set('timerSize')}
+              />
+            </SettingRow>
+            <SettingRow title="focus mode" description="Fade out everything but the timer while you inspect and solve.">
+              <Options value={s.focusMode} options={onOff} onChange={set('focusMode')} />
+            </SettingRow>
+            <SettingRow title="solve list" description="The current session's solves under the timer.">
+              <Options value={s.showSolveList} options={onOff} onChange={set('showSolveList')} />
+            </SettingRow>
+          </Group>
+          <Group title="scramble preview">
+            <SettingRow title="preview" description="Draw the scrambled puzzle so you can check you scrambled it right.">
+              <Options
+                value={s.scramblePreview}
+                options={[
+                  { value: 'off', label: 'off' },
+                  { value: '2D', label: '2D' },
+                  { value: '3D', label: '3D' },
+                ]}
+                onChange={set('scramblePreview')}
+              />
+            </SettingRow>
+            <SettingRow title="sticker colours" description="The 2D preview's colours: the standard scheme, or your own colour for each face of each puzzle. 3D always uses the standard colours.">
+              <Options
+                value={s.stickerColours}
+                options={[
+                  { value: 'default', label: 'default' },
+                  { value: 'custom', label: 'custom' },
+                ]}
+                onChange={set('stickerColours')}
+              />
+            </SettingRow>
+            {s.stickerColours === 'custom' && <StickerColours custom={s.customStickers} />}
+          </Group>
+          <Group title="app">
+            <SettingRow title="font" description="One font for the whole app." wide>
+              <div className="st-options">
+                {FONTS.map((f) => (
+                  <button
+                    key={f.name}
+                    className={`btn-text${s.font === f.name ? ' active' : ''}`}
+                    style={{ fontFamily: f.css }}
+                    aria-pressed={s.font === f.name}
+                    onClick={() => updateSettings({ font: f.name })}
+                  >
+                    {f.name.toLowerCase()}
+                  </button>
+                ))}
+              </div>
+            </SettingRow>
+          </Group>
+        </Pane>
+
+        <Pane id="stats">
+          <Group title="stats">
+            <SettingRow title="averages shown" description="Which averages the stats panel shows. Averages trim the best and worst 5 % (at least one each side); mo3 is a plain mean." wide>
+              <div className="st-options">
+                {AVG_CHOICES.map((k) => {
+                  const on = s.statsShown.includes(k);
+                  return (
+                    <button
+                      key={k}
+                      className={`btn-text${on ? ' active' : ''}`}
+                      aria-pressed={on}
+                      onClick={() => {
+                        const next = on ? s.statsShown.filter((x) => x !== k) : [...s.statsShown, k];
+                        updateSettings({ statsShown: next.sort((a, b) => (parseAvgKey(a) ?? 0) - (parseAvgKey(b) ?? 0)) });
+                      }}
+                    >
+                      {k}
+                    </button>
+                  );
+                })}
+              </div>
+            </SettingRow>
+          </Group>
+          <Group title="solves">
+            <SettingRow title="confirm delete" description="Ask before deleting a solve with alt+z (or ctrl+z, alt+backspace) or from the solve window.">
+              <Options value={s.confirmDelete} options={onOff} onChange={set('confirmDelete')} />
+            </SettingRow>
+            <SettingRow
+              title="pb sound"
+              description={
                 <>
-                  {' '}
-                  (<span className="main">{formatNumber(local.solves)} solves</span> in {local.sessions} session{local.sessions === 1 ? '' : 's'})
+                  A short chime when you set a new personal best.{' '}
+                  <button className="btn-text st-inline" onClick={playPbSound}>
+                    <PlayIcon width={12} height={12} /> preview
+                  </button>
                 </>
-              ) : (
-                ' (there are none right now)'
-              )}
-              . Solves in your account are not affected. <span className="error">You can't undo this.</span>
-            </>
-          }
-        >
-          <button className="btn danger" onClick={() => setConfirm('clear')} disabled={local.solves === 0 && local.sessions <= 1}>
-            clear guest data
-          </button>
-        </SettingRow>
-        <SettingRow icon={<RotateCcw size={16} />} title="reset settings" description="Put every setting on this page back to its default (your solves are kept).">
-          <button className="btn danger" onClick={() => setConfirm('reset')}>
-            reset settings
-          </button>
-        </SettingRow>
-      </Section>
+              }
+            >
+              <Options value={s.pbSound} options={onOff} onChange={set('pbSound')} />
+            </SettingRow>
+          </Group>
+        </Pane>
 
+        <Pane id="theme">
+          <ThemePicker current={s.theme} />
+        </Pane>
+
+        <Pane id="data">
+          <DataTools loggedIn={status === 'authed'} />
+        </Pane>
+
+        <Pane id="shortcuts">
+          <Group title="shortcuts">
+            <p className="st-note">
+              All of csTimer's shortcuts work the same here, so your habits carry over. Some browsers use ctrl+1/2/3 to switch tabs and don't pass them on; the penalty buttons under the
+              timer do the same job.
+            </p>
+            <KeyList keys={CSTIMER_KEYS} />
+          </Group>
+          <Group title="cubr's own">
+            <KeyList keys={OWN_KEYS} />
+          </Group>
+          <VirtualKeys maps={s.virtualKeys} />
+        </Pane>
+
+        <Pane id="danger">
+          <Group title="danger zone">
+            <SettingRow
+              title="clear guest data"
+              description={
+                <>
+                  Delete every session and solve stored in this browser while signed out
+                  {local.solves > 0 ? (
+                    <>
+                      {' '}
+                      (<span className="main">{formatNumber(local.solves)} solves</span> in {local.sessions} session{local.sessions === 1 ? '' : 's'})
+                    </>
+                  ) : (
+                    ' (there are none right now)'
+                  )}
+                  . Solves in your account are not affected. <span className="error">You can't undo this.</span>
+                </>
+              }
+            >
+              <button className="btn st-danger" onClick={() => setConfirm('clear')} disabled={local.solves === 0 && local.sessions <= 1}>
+                clear guest data
+              </button>
+            </SettingRow>
+            <SettingRow title="reset settings" description="Put every setting back to its default (your solves are kept).">
+              <button className="btn st-danger" onClick={() => setConfirm('reset')}>
+                reset settings
+              </button>
+            </SettingRow>
+            {status === 'authed' && user && (
+              <SettingRow
+                title="delete account"
+                description={
+                  <>
+                    Delete <span className="main">{user.username}</span> and everything in it: your solves and sessions, stats, leaderboard places, profile and settings. Export your
+                    solves first (data) if you want to keep them. Guest data in this browser is not affected. <span className="error">You can't undo this.</span>
+                  </>
+                }
+              >
+                <button className="btn st-danger" onClick={() => setConfirm('account')}>
+                  delete account
+                </button>
+              </SettingRow>
+            )}
+          </Group>
+        </Pane>
+      </div>
+
+      {confirm === 'account' && user && (
+        <DeleteAccountModal
+          username={user.username}
+          onDeleted={() => {
+            forgetUser(user.id);
+            toast.notice('your account has been deleted');
+            navigate('/');
+          }}
+          onClose={() => setConfirm(null)}
+        />
+      )}
       {confirm === 'clear' && (
         <ConfirmModal
           title="clear guest data"
@@ -419,14 +593,381 @@ export default function SettingsPage() {
   );
 }
 
-function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+/** How times are entered (kept on this device), and the virtual puzzle's options. */
+function InputGroup() {
+  const s = useSettings();
+  const device = useInputState();
   return (
-    <section className="st-section" id={`settings-${id}`} aria-labelledby={`settings-${id}-title`}>
-      <h2 className="st-section-title" id={`settings-${id}-title`}>
-        {title}
-      </h2>
-      <div className="st-section-body">{children}</div>
-    </section>
+    <>
+      <Group title="input">
+        <SettingRow title="enter times with" description="Kept on this device: a stackmat or a bluetooth cube belongs to one computer. Ctrl+alt and a letter switches on the timer page, as on csTimer." wide>
+          <Options
+            value={AVAILABLE_INPUTS.includes(device.mode) ? device.mode : 'timer'}
+            options={INPUT_MODES.filter((m) => AVAILABLE_INPUTS.includes(m.id)).map((m) => ({ value: m.id, label: m.label }))}
+            onChange={(mode) => updateInput({ mode })}
+          />
+        </SettingRow>
+        <SettingRow title="stackmat status" description="Use the stackmat's status signals: hands on the mat, the green light. Off, a solve is the time counting up and stopping (csTimer's option, for timers that send no status).">
+          <Options value={s.stackmatStatus} options={onOff} onChange={set('stackmatStatus')} />
+        </SettingRow>
+        <SettingRow title="virtual turn speed" description="How long each turn of the virtual puzzle takes to animate (csTimer's base speed). Queued turns go quicker.">
+          <Options
+            value={s.virtualSpeed}
+            options={[
+              { value: 0, label: 'instant' },
+              { value: 50, label: '20 tps' },
+              { value: 100, label: '10 tps' },
+              { value: 200, label: '5 tps' },
+              { value: 500, label: '2 tps' },
+            ]}
+            onChange={set('virtualSpeed')}
+          />
+        </SettingRow>
+        <SettingRow title="virtual cube view" description="Look at the top and front faces, or at the top front right corner. The arrow keys turn the view while you solve.">
+          <Options
+            value={s.virtualView}
+            options={[
+              { value: 'UF', label: 'top, front' },
+              { value: 'URF', label: 'corner' },
+            ]}
+            onChange={set('virtualView')}
+          />
+        </SettingRow>
+        <SettingRow title="floating stickers" description="The virtual and smart cubes drawn as csTimer draws them: stickers floating off a hollow cube, the far side seen through the gaps. Further right they float further apart; all the way left, a solid cube.">
+          <CubePreview settings={s} />
+          <Slider label="floating stickers" value={s.virtualFloat} zero="solid" onChange={set('virtualFloat')} />
+        </SettingRow>
+        <SettingRow title="sticker outline" description="The dark edge round each sticker of the virtual and smart cubes. Halfway is the cube's own; further right it's thicker, all the way left there's none.">
+          <CubePreview settings={s} />
+          <Slider label="sticker outline" value={s.virtualOutline} zero="none" onChange={set('virtualOutline')} />
+        </SettingRow>
+      </Group>
+      <Group title="smart cube">
+        <SettingRow title="mark scrambled" description="When the solve is ready to start: as soon as the cube matches the scramble, or that long after the last turn (scrambling it your own way), or only by key. Then the first turn starts the timer.">
+          <Options
+            value={s.smartScrambled}
+            options={[
+              { value: 'scramble', label: 'on the scramble' },
+              { value: '2', label: '2 s' },
+              { value: '3', label: '3 s' },
+              { value: '4', label: '4 s' },
+              { value: '5', label: '5 s' },
+              { value: 'never', label: 'never' },
+            ]}
+            onChange={set('smartScrambled')}
+          />
+        </SettingRow>
+        <SettingRow title="space marks scrambled" description="Press space when the cube is scrambled. A cube scrambled its own way gets a scramble worked out from its state.">
+          <Options value={s.smartSpace} options={onOff} onChange={set('smartSpace')} />
+        </SettingRow>
+        <SettingRow title="turns mark scrambled" description="Or turn one face four times the same way (U U U U), or back and forth (U U' U U'), and it's marked a second later.">
+          <Options
+            value={s.smartTurnMark}
+            options={[
+              { value: 'off', label: 'off' },
+              { value: 'x4', label: 'U U U U' },
+              { value: 'xi2', label: "U U' U U'" },
+            ]}
+            onChange={set('smartTurnMark')}
+          />
+        </SettingRow>
+        <SettingRow title="beep when scrambled" description="A beep as the cube is marked scrambled.">
+          <Options value={s.smartBeep} options={onOff} onChange={set('smartBeep')} />
+        </SettingRow>
+        <SettingRow title="cube on screen" description="Draw the cube as it is, turning as you turn it.">
+          <Options
+            value={s.smartView}
+            options={[
+              { value: '3D', label: '3D' },
+              { value: '2D', label: '2D' },
+              { value: 'off', label: 'off' },
+            ]}
+            onChange={set('smartView')}
+          />
+        </SettingRow>
+        <SettingRow title="unsolved on connect" description="A cube that connects in a state it hasn't been marked solved in: ask whether it's solved, mark it solved, or leave it.">
+          <Options
+            value={s.smartReset}
+            options={[
+              { value: 'ask', label: 'ask' },
+              { value: 'always', label: 'mark solved' },
+              { value: 'never', label: 'leave it' },
+            ]}
+            onChange={set('smartReset')}
+          />
+        </SettingRow>
+      </Group>
+    </>
+  );
+}
+
+/** 0 to 100 in fives, the value beside it (`zero` names 0) */
+function Slider({ label, value, zero, onChange }: { label: string; value: number; zero: string; onChange: (v: number) => void }) {
+  const text = value === 0 ? zero : `${value}%`;
+  return (
+    <>
+      <input className="st-range" type="range" min={0} max={100} step={5} value={value} onChange={(e) => onChange(Number(e.target.value))} aria-label={label} aria-valuetext={text} />
+      <span className="st-range-value">{text}</span>
+    </>
+  );
+}
+
+/** a solved cube drawn as the virtual cube is, to see its look while setting it */
+function CubePreview({ settings: s }: { settings: Settings }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    const model = modelFor('333') as PolyModel;
+    if (!canvas) return;
+    const size = canvas.clientWidth;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = canvas.height = size * dpr;
+    const ctx = canvas.getContext('2d')!;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, size, size);
+    drawPoly(ctx, size, size, model.twisty.puzzle, model.solved(), baseCamera(model, s.virtualView), puzzlePalette('cube', s), [], { float: s.virtualFloat / 100, outline: s.virtualOutline / 50 });
+  }, [s]);
+  return <canvas ref={ref} className="st-float-preview" aria-hidden="true" />;
+}
+
+/** The virtual puzzles' keys, a puzzle at a time: click a move's key, then press the one you want. */
+function VirtualKeys({ maps }: { maps: Settings['virtualKeys'] }) {
+  const [puzzle, setPuzzle] = useState<KeyPuzzle>('cube');
+  /** the move (by its csTimer key) waiting for a key */
+  const [waiting, setWaiting] = useState<string | null>(null);
+  const [note, setNote] = useState<ReactNode>(null);
+  const layout = useKeyboardLayout();
+  const model = useMemo(() => newModel(KEY_PUZZLES.find((p) => p.id === puzzle)!.event)!, [puzzle]);
+  const list = useMemo(() => controls(model), [model]);
+  const map = useMemo(() => maps[puzzle] ?? {}, [maps, puzzle]);
+  const label = (code: string) => keyLabel(code, layout);
+  const moveOf = (action: string) => list.find((c) => c.actions.includes(action))?.label ?? null;
+
+  const save = (next: typeof map) => {
+    const all = { ...maps, [puzzle]: next };
+    if (Object.keys(next).length === 0) delete all[puzzle];
+    updateSettings({ virtualKeys: all });
+  };
+
+  // the next key pressed is the move's (esc lets it be)
+  useEffect(() => {
+    if (!waiting) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'].includes(e.key)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === 'Escape') {
+        setWaiting(null);
+        setNote(null);
+        return;
+      }
+      if (e.ctrlKey || e.altKey || e.metaKey || !BINDABLE.test(e.code)) {
+        setNote(
+          <span className="error">
+            that key has a job of its own - press another for {moveOf(waiting)} (esc keeps it)
+          </span>,
+        );
+        return;
+      }
+      const old = keyOf(map, waiting);
+      const was = moveOf(actionOf(map, e.code));
+      const move = moveOf(waiting);
+      setWaiting(null);
+      if (old === e.code) {
+        setNote(null);
+        return;
+      }
+      save(bind(map, waiting, e.code));
+      setNote(
+        <>
+          <kbd>{label(e.code)}</kbd> turns {move} now
+          {was ? (
+            <>
+              , and <kbd>{label(old)}</kbd> turns {was}
+            </>
+          ) : (
+            <>
+              ; <kbd>{label(old)}</kbd> does nothing
+            </>
+          )}
+        </>,
+      );
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  });
+
+  const changed = Object.keys(map).length > 0;
+  return (
+    <Group title="virtual puzzle keys">
+      <p className="st-note">
+        Click a move's key, then press the key you want for it. If that key already turns something, the two swap. All cubes share one layout, named here as on a 3x3: on
+        bigger cubes the slice keys turn the second layer, and the depth keys set how many layers the outer turns take.
+      </p>
+      <div className="st-bind-tools">
+        <Options
+          value={puzzle}
+          options={KEY_PUZZLES.map((p) => ({ value: p.id, label: p.label }))}
+          onChange={(p) => {
+            setPuzzle(p);
+            setWaiting(null);
+            setNote(null);
+          }}
+        />
+        <button
+          className="btn-text"
+          disabled={!changed}
+          onClick={() => {
+            save({});
+            setWaiting(null);
+            setNote(`${KEY_PUZZLES.find((p) => p.id === puzzle)!.label}: back to csTimer's keys`);
+          }}
+        >
+          <ArrowUturnLeftIcon width={14} height={14} /> csTimer's keys
+        </button>
+      </div>
+      <p className="st-bind-note" aria-live="polite">
+        {note ??
+          (waiting && (
+            <>
+              press a key for <span className="main">{moveOf(waiting)}</span> (esc keeps it)
+            </>
+          ))}
+      </p>
+      <div className="st-binds">
+        {list.map((c) => (
+          <div key={c.label} className="st-bind">
+            <span className="st-bind-move">{c.label}</span>
+            <span className="st-bind-keys">
+              {c.actions.map((a) => {
+                const code = keyOf(map, a);
+                const on = waiting === a;
+                return (
+                  <button
+                    key={a}
+                    className={`st-bind-key${on ? ' waiting' : ''}${code !== a ? ' own' : ''}`}
+                    aria-label={`${c.label}: ${label(code)}`}
+                    aria-pressed={on}
+                    onClick={() => {
+                      setWaiting(on ? null : a);
+                      setNote(null);
+                    }}
+                    onBlur={() => {
+                      if (!on) return;
+                      setWaiting(null);
+                      setNote(null);
+                    }}
+                  >
+                    <kbd>{on ? '...' : label(code)}</kbd>
+                  </button>
+                );
+              })}
+            </span>
+          </div>
+        ))}
+      </div>
+    </Group>
+  );
+}
+
+/** Deleting the account: the password is asked again, then it's gone for good. */
+function DeleteAccountModal({ username, onDeleted, onClose }: { username: string; onDeleted: () => void; onClose: () => void }) {
+  const { deleteAccount } = useAuth();
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    if (!password || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteAccount(password);
+      onDeleted();
+    } catch (e) {
+      setError(e instanceof ApiError && e.status === 403 ? 'wrong password' : (e as Error).message || "couldn't delete the account, try again");
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal title="delete account" onClose={onClose} center>
+      <form
+        className="stack"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void submit();
+        }}
+      >
+        <div className="dialog-message">
+          Delete <span className="main">{username}</span> with all its solves, sessions, stats and leaderboard places? <span className="error">This can't be undone.</span>
+        </div>
+        <div className="field">
+          <label htmlFor="delete-account-password">type your password to confirm</label>
+          <input
+            id="delete-account-password"
+            type="password"
+            autoComplete="current-password"
+            autoFocus
+            maxLength={128}
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setError(null);
+            }}
+          />
+          {error && <div className="error-text">{error}</div>}
+        </div>
+        <div className="dialog-actions">
+          <button type="button" className="btn" onClick={onClose}>
+            cancel
+          </button>
+          <button type="submit" className="btn danger" disabled={!password || busy}>
+            {busy ? 'deleting...' : 'delete account'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+/** your own sticker colours: per puzzle, a swatch for each face that opens a colour picker */
+function StickerColours({ custom }: { custom: Settings['customStickers'] }) {
+  const save = (scheme: Scheme, faces: (string | null)[]) => {
+    const next = { ...custom };
+    if (faces.every((c) => c === null)) delete next[scheme.id];
+    else next[scheme.id] = faces;
+    updateSettings({ customStickers: next });
+  };
+  const pick = (scheme: Scheme, face: number, colour: string) =>
+    // only the faces you changed are stored, so a later change to a default colour still reaches you
+    save(
+      scheme,
+      scheme.faces.map((f, i) => (i === face ? (colour === f.colour ? null : colour) : (custom[scheme.id]?.[i] ?? null))),
+    );
+
+  return (
+    <div className="st-stickers">
+      {SCHEMES.map((scheme) => {
+        const own = custom[scheme.id];
+        return (
+          <div key={scheme.id} className="st-sticker-row">
+            <span className="st-sticker-label">{scheme.label}</span>
+            <div className="st-swatches">
+              {scheme.faces.map((f, i) => {
+                const colour = stickerColour(f.cubing[0], scheme, own);
+                return (
+                  <label key={f.name} className="st-swatch" style={{ background: colour }} data-tip={f.name}>
+                    <input type="color" value={colour} onChange={(e) => pick(scheme, i, e.target.value)} aria-label={`${scheme.label}: ${f.name} face colour`} />
+                  </label>
+                );
+              })}
+            </div>
+            <button className="btn-text small" onClick={() => save(scheme, [])} disabled={!own} aria-label={`reset the ${scheme.label} colours`}>
+              <ArrowUturnLeftIcon width={14} height={14} /> reset
+            </button>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -439,7 +980,19 @@ const THEME_FILTERS: { value: ThemeFilter; label: string; test: (t: Theme) => bo
   { value: 'originals', label: 'originals', test: (t) => Boolean(t.original) },
 ];
 
-function ThemeGrid({ current }: { current: string }) {
+/** a theme in miniature: its background with its accent, sub and text colours as dots */
+function ThemeSwatch({ theme, big }: { theme: Theme; big?: boolean }) {
+  return (
+    <span className={`st-theme-swatch${big ? ' big' : ''}`} style={{ background: theme.bg }} aria-hidden="true">
+      <i style={{ background: theme.main }} />
+      <i style={{ background: theme.sub }} />
+      <i style={{ background: theme.text }} />
+    </span>
+  );
+}
+
+/** The theme in use on top, then every theme as a name with its swatch; hovering one previews it on the whole page. */
+function ThemePicker({ current }: { current: string }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<ThemeFilter>('all');
   const previewing = useRef(false);
@@ -447,11 +1000,16 @@ function ThemeGrid({ current }: { current: string }) {
     if (previewing.current) applyTheme(current, false);
     previewing.current = false;
   };
+  const preview = (t: Theme) => {
+    previewing.current = true;
+    applyTheme(t.name, false);
+  };
   const shown = useMemo(() => {
     const test = THEME_FILTERS.find((f) => f.value === filter)!.test;
     const q = query.trim().toLowerCase().replace(/[\s-]+/g, '_');
     return THEMES.filter((t) => test(t) && t.name.includes(q));
   }, [query, filter]);
+  const now = THEMES.find((t) => t.name === current);
   const shuffle = () => {
     // random within the current filter when it has more than the active theme
     const pool = shown.filter((t) => t.name !== current);
@@ -460,23 +1018,34 @@ function ThemeGrid({ current }: { current: string }) {
     updateSettings({ theme: next.name });
   };
   return (
-    <div className="st-theme-picker">
+    <Group title="theme">
+      {now && (
+        <div className="st-theme-now">
+          <ThemeSwatch theme={now} big />
+          <div className="st-theme-now-text">
+            <span className="name">{themeLabel(now.name)}</span>
+            <span className="meta">
+              {isLightTheme(now) ? 'light' : 'dark'}
+              {now.original && ' - a cubr original'}
+            </span>
+          </div>
+          <button className="btn-text st-random" onClick={shuffle} data-tip="a random theme from the list below">
+            <ArrowsRightLeftIcon width={16} height={16} /> random
+          </button>
+        </div>
+      )}
       <div className="st-theme-tools">
-        <label className="st-theme-search">
-          <Search size={14} aria-hidden="true" />
-          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="search themes" aria-label="search themes" />
-        </label>
-        <div className="st-theme-filters">
+        <div className="st-options" role="group" aria-label="show">
           {THEME_FILTERS.map((f) => (
-            <button key={f.value} className={`btn${f.value === filter ? ' active' : ''}`} onClick={() => setFilter(f.value)} aria-pressed={f.value === filter}>
-              {f.value === 'originals' && <Box size={14} />}
+            <button key={f.value} className={`btn-text${f.value === filter ? ' active' : ''}`} onClick={() => setFilter(f.value)} aria-pressed={f.value === filter}>
               {f.label}
             </button>
           ))}
         </div>
-        <button className="btn" onClick={shuffle} data-tip="pick a random theme from this list">
-          <Shuffle size={14} /> random
-        </button>
+        <label className="st-theme-search">
+          <MagnifyingGlassIcon width={14} height={14} aria-hidden="true" />
+          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="search themes" aria-label="search themes" />
+        </label>
         <span className="st-theme-count">
           {shown.length} / {THEMES.length}
         </span>
@@ -491,35 +1060,22 @@ function ThemeGrid({ current }: { current: string }) {
               role="radio"
               aria-checked={t.name === current}
               className={`st-theme${t.name === current ? ' active' : ''}`}
-              style={{ background: t.bg, color: t.text }}
-              onMouseEnter={() => {
-                previewing.current = true;
-                applyTheme(t.name, false);
-              }}
-              onFocus={() => {
-                previewing.current = true;
-                applyTheme(t.name, false);
-              }}
+              onMouseEnter={() => preview(t)}
+              onFocus={() => preview(t)}
               onBlur={restore}
               onClick={() => {
                 previewing.current = false;
                 updateSettings({ theme: t.name });
               }}
             >
-              <span className="st-theme-name">
-                {t.original && <Box size={11} className="st-theme-original" style={{ color: t.main }} aria-label="cubetype original" />}
-                {themeLabel(t.name)}
-              </span>
-              <span className="st-theme-dots" aria-hidden="true">
-                <i style={{ background: t.main }} />
-                <i style={{ background: t.sub }} />
-                <i style={{ background: t.text }} />
-              </span>
+              <ThemeSwatch theme={t} />
+              <span className="st-theme-name">{themeLabel(t.name)}</span>
+              {t.original && <CubeIcon width={12} height={12} className="st-theme-original" aria-label="cubr original" aria-hidden={false} />}
             </button>
           ))}
         </div>
       )}
-    </div>
+    </Group>
   );
 }
 
@@ -569,7 +1125,7 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
     setBusy(format === 'json' ? 'export' : 'export-cstimer');
     try {
       const data = await exportAll();
-      if (format === 'json') download(`cubetype-export-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data));
+      if (format === 'json') download(`cubr-export-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data));
       else download(csTimerFileName(), toCsTimerExport(data.sessions));
       const n = data.sessions.reduce((a, x) => a + x.solves.length, 0);
       toast.success(`exported ${formatNumber(n)} solves`);
@@ -582,78 +1138,77 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
 
   return (
     <>
-      <SettingRow
-        icon={<Upload size={16} />}
-        title="import solves"
-        description={
-          <>
-            A cubetype export, or any file csTimer can import: csTimer (<span className="text">export -&gt; export to file</span>), Twisty Timer, Cubic Timer,
-            Block Keeper, CubeDesk, DCTimer, mateus Cubetimer or GAN CubeStation. Each session becomes a cubetype session{' '}
-            {loggedIn ? 'in your account' : 'in this browser'}.
-          </>
-        }
-      >
-        <div className="st-import">
-          <input ref={fileRef} type="file" hidden onChange={(e) => void onFile(e.target.files?.[0])} />
-          {!parsed ? (
-            <button className="btn" onClick={() => fileRef.current?.click()} disabled={busy !== null}>
-              <Upload size={16} /> choose file
-            </button>
-          ) : (
-            <div className="st-import-preview">
-              <div className="small">
-                <span className="text">{parsed.file}</span> ({parsed.format})
-                <br />
-                <span className="main">{formatNumber(summary?.solves ?? 0)} solves</span> - {parsed.sessions.length} session{parsed.sessions.length === 1 ? '' : 's'} -{' '}
-                {summary?.events.join(', ')}
-                {skippedNotes(parsed.skipped).map((note) => (
-                  <span key={note}>
-                    <br />
-                    {note}
-                  </span>
-                ))}
+      <Group title="data">
+        <SettingRow
+          title="import"
+          wide={parsed !== null}
+          description={
+            <>
+              A cubr export, or any file csTimer can import: csTimer (<span className="text">export -&gt; export to file</span>), Twisty Timer, Cubic Timer, Block Keeper,
+              CubeDesk, DCTimer, mateus Cubetimer or GAN CubeStation. Each session becomes a cubr session {loggedIn ? 'in your account' : 'in this browser'}.
+            </>
+          }
+        >
+          <div className="st-import">
+            <input ref={fileRef} type="file" hidden onChange={(e) => void onFile(e.target.files?.[0])} />
+            {!parsed ? (
+              <button className="btn" onClick={() => fileRef.current?.click()} disabled={busy !== null}>
+                <ArrowUpTrayIcon width={16} height={16} /> choose file
+              </button>
+            ) : (
+              <div className="st-import-preview">
+                <div>
+                  <span className="text">{parsed.file}</span> ({parsed.format})
+                  <br />
+                  <span className="main">{formatNumber(summary?.solves ?? 0)} solves</span> - {parsed.sessions.length} session{parsed.sessions.length === 1 ? '' : 's'} -{' '}
+                  {summary?.events.join(', ')}
+                  {skippedNotes(parsed.skipped).map((note) => (
+                    <span key={note}>
+                      <br />
+                      {note}
+                    </span>
+                  ))}
+                </div>
+                <div className="row">
+                  <button className="btn" onClick={() => setParsed(null)} disabled={busy !== null}>
+                    cancel
+                  </button>
+                  <button className="btn primary" onClick={doImport} disabled={busy !== null}>
+                    {busy === 'import' ? 'importing...' : 'import'}
+                  </button>
+                </div>
               </div>
-              <div className="row">
-                <button className="btn" onClick={() => setParsed(null)} disabled={busy !== null}>
-                  cancel
-                </button>
-                <button className="btn primary" onClick={doImport} disabled={busy !== null}>
-                  {busy === 'import' ? 'importing...' : 'import'}
-                </button>
-              </div>
-            </div>
-          )}
-          {error && <div className="error small">{error}</div>}
-        </div>
-      </SettingRow>
-      <SettingRow
-        icon={<Download size={16} />}
-        title="export"
-        description={
-          <>
-            Every session and solve. JSON re-imports here or on another cubetype server; the csTimer file goes into csTimer with{' '}
-            <span className="text">export -&gt; import session(s) from other timers</span>, which adds sessions without replacing yours.
-          </>
-        }
-      >
-        <div className="row">
+            )}
+            {error && <div className="error small">{error}</div>}
+          </div>
+        </SettingRow>
+        <SettingRow
+          title="export"
+          description={
+            <>
+              Every session and solve. JSON re-imports here or on another cubr server; the csTimer file goes into csTimer with{' '}
+              <span className="text">export -&gt; import session(s) from other timers</span>, which adds sessions without replacing yours.
+            </>
+          }
+        >
           <button className="btn" onClick={() => void doExport('json')} disabled={busy !== null}>
-            <Download size={16} /> {busy === 'export' ? 'exporting...' : 'export json'}
+            <ArrowDownTrayIcon width={16} height={16} /> {busy === 'export' ? 'exporting...' : 'json'}
           </button>
           <button className="btn" onClick={() => void doExport('cstimer')} disabled={busy !== null}>
-            <Download size={16} /> {busy === 'export-cstimer' ? 'exporting...' : 'export for csTimer'}
+            <ArrowDownTrayIcon width={16} height={16} /> {busy === 'export-cstimer' ? 'exporting...' : 'csTimer'}
           </button>
-        </div>
-      </SettingRow>
-      <SettingRow
-        icon={<Database size={16} />}
-        title="account"
-        description={loggedIn ? 'Profile, PB history, activity and more data tools live on your account page.' : 'Sign in to sync your solves across devices, get on the leaderboards and race others.'}
-      >
-        <Link className="btn" to={loggedIn ? '/account' : '/login'}>
-          {loggedIn ? 'open account' : 'sign in'} <ArrowUpRight size={16} />
-        </Link>
-      </SettingRow>
+        </SettingRow>
+      </Group>
+      <Group title="account">
+        <SettingRow
+          title={loggedIn ? 'account page' : 'sync and leaderboards'}
+          description={loggedIn ? 'Profile, PB history, activity and more data tools live on your account page.' : 'Sync your solves across devices, get on the leaderboards and race others.'}
+        >
+          <Link className="btn" to={loggedIn ? '/account' : '/login'}>
+            {loggedIn ? 'open account' : 'sign in'} <ArrowUpRightIcon width={16} height={16} />
+          </Link>
+        </SettingRow>
+      </Group>
     </>
   );
 }

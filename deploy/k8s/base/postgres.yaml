@@ -14,7 +14,7 @@ metadata:
   labels:
     app.kubernetes.io/name: postgres
     app.kubernetes.io/component: database
-    app.kubernetes.io/part-of: cubetype
+    app.kubernetes.io/part-of: cubr
 spec:
   instances: 2                          # primary + 1 replica (the GKE overlay raises this to 3)
   imageName: ghcr.io/cloudnative-pg/postgresql:17.11-minimal-trixie   # PostgreSQL 17 (SPEC section 2), pinned
@@ -31,8 +31,8 @@ spec:
 
   bootstrap:
     initdb:
-      database: cubetype                # one database, schema-per-service (SPEC section 7)
-      owner: cubetype                   # application role; password generated into Secret pg-app
+      database: cubr                    # one database, schema-per-service (SPEC section 7)
+      owner: cubr                       # application role; password generated into Secret pg-app
 
   storage:
     size: 5Gi                           # one PVC per instance (default StorageClass; GKE overlay: standard-rwo)

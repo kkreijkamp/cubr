@@ -1,5 +1,5 @@
 // API types - mirror docs/SPEC.md section 9 exactly.
-import type { Penalty } from '@cubetype/cubestats';
+import type { Penalty } from '@cubr/cubestats';
 
 export type { Penalty };
 
@@ -23,6 +23,8 @@ export interface Session {
   id: string;
   name: string;
   event: string;
+  /** a practice session: its solves count for no personal best and no leaderboard (absent = no) */
+  practice?: boolean;
   createdAt: string;
   updatedAt: string;
   solveCount: number;
@@ -64,6 +66,8 @@ export interface StatsSummary {
     activeDays: number;
     currentStreak: number;
     longestStreak: number;
+    /** years with solves, newest first (the cuber's timezone); absent from an older stats service */
+    activeYears?: number[];
   };
   events: {
     event: string;

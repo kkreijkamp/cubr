@@ -1,4 +1,4 @@
-# cubetype
+# cubr
 
 **A cloud-native speedcubing timer, built as microservices on Google Kubernetes Engine.**
 
@@ -15,7 +15,7 @@ INFS3208 Cloud Computing - Individual Project (Type I: scalable & available web 
 
 - **Timer** - WCA-compliant: hold-to-start (space or touch), 15 s inspection with 8/12 s alerts and automatic +2/DNF, penalties, sessions per event (create, rename, merge), manual entry, focus mode.
 - **Scrambles** - official random-state scrambles for all 16 WCA events (cubing.js), with 2D/3D previews.
-- **Statistics** - mo3/ao5/ao12/ao50/ao100/ao1000 (current & best, WCA trimming rules), mean, standard deviation, trend & histogram charts, PB detection.
+- **Statistics** - mo3/ao5/ao12/ao50/ao100/ao1000 (current & best, WCA trimming rules), mean, standard deviation, PB detection.
 - **Accounts & sync** - solves stored in the cloud with offline-tolerant optimistic sync; import and export compatible with csTimer and most others; settings follow you across devices; profile pictures.
 - **Leaderboards** - all-time / weekly / daily per event (single, ao5, ao12), WCA-record anti-cheat.
 - **Daily challenge** - everyone gets the same 5 scrambles each UTC day; one attempt per scramble, ranked by ao5.
@@ -23,7 +23,7 @@ INFS3208 Cloud Computing - Individual Project (Type I: scalable & available web 
 - **Profiles & analytics** - PB cards, a solve history chart with rolling averages, activity heatmap, streaks, time-of-day performance.
 - **WCA comparison** - "where would I rank?" against ~2.3 M rows of official WCA data (rank, percentile, distribution).
 - **Cluster status page** - live view of which pod/version served each request: makes scaling, load balancing, self-healing and rolling updates visible during the demo.
-- 178 themes (168 Monkeytype palettes + 10 cube-inspired cubetype originals) with search, light/dark
+- 178 themes (168 Monkeytype palettes + 10 cube-inspired cubr originals) with search, light/dark
   filters and random pick, command palette (`esc` / `ctrl+k`), keyboard-first UI.
 
 ## Architecture
@@ -81,7 +81,7 @@ Requirements: Docker Desktop, Node 22.
 ```bash
 docker compose up --build -d                      # Postgres, Redis, 7 services, web, gateway -> http://localhost:8080
 docker compose --profile jobs run --rm wca-import # load the WCA dataset (WCA_TSV_DIR optional, see deploy/README.md)
-docker compose --profile jobs run --rm seed       # synthetic users + ~100k solves (demo login: demo / cubetype-demo)
+docker compose --profile jobs run --rm seed       # synthetic users + ~100k solves (demo login: demo / cubr-demo)
 node scripts/smoke.mjs http://localhost:8080      # end-to-end check through the gateway
 ```
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HttpError } from '@cubetype/common';
+import { HttpError } from '@cubr/common';
 import type { ScrambleBackend } from '../src/backends.js';
 import { GenerationTimeoutError, QueueFullError, toHttpError } from '../src/errors.js';
 import { ScrambleGenerator } from '../src/generator.js';

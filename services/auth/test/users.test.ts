@@ -5,6 +5,7 @@ import {
   buildUserUpdate,
   sniffImageType,
   conflictMessage,
+  deleteMeSchema,
   jsonBytes,
   loginSchema,
   parseIdList,
@@ -44,6 +45,15 @@ describe('registerSchema', () => {
     [{ username: 'abc', email: 'a@b.co' }],
   ])('rejects %j', (input) => {
     expect(registerSchema.safeParse(input).success).toBe(false);
+  });
+});
+
+describe('deleteMeSchema', () => {
+  it('needs the password (any non-empty one: it is checked against the hash)', () => {
+    expect(deleteMeSchema.safeParse({ password: 'hunter22' }).success).toBe(true);
+    expect(deleteMeSchema.safeParse({ password: '' }).success).toBe(false);
+    expect(deleteMeSchema.safeParse({}).success).toBe(false);
+    expect(deleteMeSchema.safeParse({ password: 'x'.repeat(129) }).success).toBe(false);
   });
 });
 

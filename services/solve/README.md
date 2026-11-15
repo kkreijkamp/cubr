@@ -1,6 +1,6 @@
 # solve service
 
-The core write path of cubetype: sessions and solves CRUD, csTimer bulk import/export, daily-challenge
+The core write path of cubr: sessions and solves CRUD, csTimer bulk import/export, daily-challenge
 attempts, and the **transactional outbox** that feeds the Redis event bus. Owns the Postgres schema `solve` (SPEC section 7.2),
 migrated at startup. Port 8080.
 
@@ -8,8 +8,8 @@ migrated at startup. Port 8080.
 | Route | Notes |
 |---|---|
 | `GET /api/sessions` | creates a default `3x3`/`333` session on first call (per-user advisory lock -> exactly one) |
-| `POST /api/sessions` `{id?, name, event}` | 201; same id again for this user -> 200 existing; id owned by someone else -> 409 |
-| `PATCH /api/sessions/:id` `{name}` / `DELETE /api/sessions/:id` | rename emits `session.renamed`; delete cascades solves, emits `session.deleted` |
+| `POST /api/sessions` `{id?, name, event, practice?, createdAt?}` | 201; same id again for this user -> 200 existing; id owned by someone else -> 409. `createdAt` (future clamped to now) keeps a cleared session's replacement in its place |
+| `PATCH /api/sessions/:id` `{name?, practice?}` / `DELETE /api/sessions/:id` | rename emits `session.renamed`; marking a session as practice (or no longer) emits `session.updated` - its solves then count for no PB and no leaderboard; delete cascades solves, emits `session.deleted` |
 | `POST /api/sessions/:id/merge` `{sourceIds}` | moves every solve of 1-50 source sessions into `:id` and deletes the sources in **one transaction**; only sessions of the same event (409 otherwise); emits `sessions.merged` |
 | `GET /api/sessions/:id/solves` | ascending; capped at the **latest** 50 000 (`truncated: true` when cut) |
 | `POST /api/solves` | idempotent on `id` (`ON CONFLICT DO NOTHING`): retry -> 200, no second event; id of another user -> 409. Returns `{solve, rolling:{ao5,ao12}}` |
@@ -18,16 +18,20 @@ migrated at startup. Port 8080.
 | `GET /api/solves/export` | `{exportedAt, sessions:[Session & {solves}]}` |
 | `GET /api/solves/daily?date=` | the user's daily solves per event + the official ao5 (from the recorded attempts) |
 | `GET /api/solves/_info`, `/api/sessions/_info` | info incl. `outbox: {backlog, published, lastPublishedAt, lastError, healthy}` |
-| `GET /internal/users/:userId/solves?event=` | **service-to-service only**: not routed by the gateway/Ingress and requires `X-Internal-Token` (403 otherwise): `{solves:[{id, sessionId, timeMs, penalty, createdAt}]}` ordered by session, time (stats recompute) |
-| `GET /internal/users/:userId/sessions` | same protection: `{sessions:[{id, name, event}]}` (read models backfill session names) |
+| `GET /internal/users/:userId/solves?event=` | **service-to-service only**: not routed by the gateway/Ingress and requires `X-Internal-Token` (403 otherwise): `{solves:[{id, sessionId, timeMs, penalty, createdAt, practice?}]}` ordered by session, time (stats recompute; `practice: true` marks a practice session's solves) |
+| `GET /internal/users/:userId/sessions` | same protection: `{sessions:[{id, name, event, practice}]}` (read models backfill session names) |
 
 Users only ever see their own rows; foreign ids return 404. A solve always gets the event of its session.
 `X-Timezone` (valid IANA name, else `UTC`) is copied into events as `tz`. Tokens revoked by logout are rejected
 (Redis lookup via common's `makeAuth`; fails open while Redis is down).
 
-## Events produced (stream `cubetype:events`, `eventId = solve-<outboxId>`)
-`solve.created` (with `rolling` = session's current ao5/ao12 incl. this solve, and `sessionName`), `solve.updated`,
-`solve.deleted`, `session.deleted`, `session.renamed`, `sessions.merged`, `solves.imported`, `daily.completed`. Each is inserted into `solve.outbox` **in the same
+## Events consumed
+Group `solve`: only `user.deleted` (from auth) - deletes the account's sessions, solves, daily attempts and its
+events still waiting in the outbox (`src/purge.ts`).
+
+## Events produced (stream `cubr:events`, `eventId = solve-<outboxId>`)
+`solve.created` (with `rolling` = session's current ao5/ao12 incl. this solve, `sessionName` and `practice`), `solve.updated`,
+`solve.deleted`, `session.deleted`, `session.renamed`, `session.updated`, `sessions.merged`, `solves.imported`, `daily.completed`. Each is inserted into `solve.outbox` **in the same
 transaction** as the data change. A relay loop in every replica claims up to 500 unpublished rows every 250 ms
 (`FOR UPDATE SKIP LOCKED`, so replicas never double-claim), XADDs each batch in id order, and marks the rows published.
 Published rows older than 1 day are deleted every 10 min.
@@ -58,12 +62,12 @@ changes neither that result nor the ao5 reported by `GET /api/solves/daily`.
 - `createdAt` more than 5 min in the future (a device clock running fast) is clamped to the server time instead of
   rejecting the solve; unparseable timestamps -> 400. The import clamps such timestamps the same way per solve.
 - `rolling` is computed inside the transaction while the session row is locked (`FOR NO KEY UPDATE`), so concurrent
-  solves in one session each see all earlier ones. ao5/ao12 use the WCA trimming rules from `@cubetype/cubestats`
+  solves in one session each see all earlier ones. ao5/ao12 use the WCA trimming rules from `@cubr/cubestats`
   (ms, `-1` = DNF, `null` = not enough solves).
 - No-op PATCHes (same values) emit nothing.
 - Empty bodies sent with `Content-Type: application/json` (for example a DELETE from a fetch wrapper) are accepted.
 - The relay, the readiness check and the backlog count use short client-side Postgres query timeouts (`queryWithTimeout` /
-  `pingPostgres` from `@cubetype/common`, 1.5-10 s) on top of the pool's defaults: a connection to a DB that vanished without a TCP reset (dead pod IP during a
+  `pingPostgres` from `@cubr/common`, 1.5-10 s) on top of the pool's defaults: a connection to a DB that vanished without a TCP reset (dead pod IP during a
   failover, or a frozen VM) must not stall the relay, and frequent probes must not pile up pool clients - a timed-out
   client is released with its error, so the pool drops it.
 
@@ -73,7 +77,7 @@ Standard vars (SPEC section 4): `PORT DATABASE_URL REDIS_URL JWT_SECRET INTERNAL
 development) the internal routes accept any call and log one warning at startup.
 ```
 docker compose up -d postgres redis
-PORT=8083 DATABASE_URL=postgres://cubetype:cubetype@localhost:55433/cubetype REDIS_URL=redis://localhost:56380 npm run dev -w services/solve
+PORT=8083 DATABASE_URL=postgres://cubr:cubr@localhost:55433/cubr REDIS_URL=redis://localhost:56380 npm run dev -w services/solve
 npx vitest run services/solve        # unit tests: mapping, rolling, schemas, import chunking
-docker build -f services/solve/Dockerfile -t cubetype/solve:dev .
+docker build -f services/solve/Dockerfile -t cubr/solve:dev .
 ```

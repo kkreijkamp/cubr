@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { parse, withTx } from '@cubetype/common';
+import { parse, withTx } from '@cubr/common';
 import { currentUser, tzFrom, type RouteContext } from '../context.js';
 import { planImport, writeImport } from '../importer.js';
 import { SOLVE_COLUMNS, toSession, toSolve, type Solve, type SolveRow } from '../mapping.js';
@@ -12,7 +12,7 @@ export const IMPORT_BODY_LIMIT = 25 * 1024 * 1024;
 
 export function registerImportExportRoutes(app: FastifyInstance, { pool, auth }: RouteContext): void {
   /**
-   * Bulk import (cubetype, csTimer and other timers' files are converted client-side with cubestats parseTimerFile).
+   * Bulk import (cubr, csTimer and other timers' files are converted client-side with cubestats parseTimerFile).
    * Everything happens in ONE transaction: new sessions, solves in unnest() batches, and a
    * single `solves.imported` outbox row - consumers recompute the user's affected events.
    * Auth runs onRequest, i.e. before a large body is read and parsed.

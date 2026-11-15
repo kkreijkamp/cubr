@@ -77,7 +77,7 @@ function wideLayout(): Layout {
     lbSub: 'http - /api/* -> services - /socket.io -> race',
     protocol: [510, 92],
     cluster: { x: 16, y: 190, w: 968, h: 460 },
-    clusterLabel: 'gke cluster - namespace cubetype',
+    clusterLabel: 'gke cluster - namespace cubr',
     services,
     wires: [
       [
@@ -178,7 +178,7 @@ function tallLayout(): Layout {
     lbSub: 'gke ingress - path routing',
     protocol: [190, 86],
     cluster: { x: 8, y: 176, w: 344, h: 796 },
-    clusterLabel: 'gke cluster - ns cubetype',
+    clusterLabel: 'gke cluster - ns cubr',
     services,
     wires: [
       [
@@ -306,7 +306,7 @@ function Diagram({ L }: { L: Layout }) {
   const arrowMain = `${uid}-arrow-main`;
   return (
     <svg className="arch-svg" viewBox={`0 0 ${L.w} ${L.h}`} role="img" aria-labelledby={`${uid}-t ${uid}-d`}>
-      <title id={`${uid}-t`}>cubetype architecture</title>
+      <title id={`${uid}-t`}>cubr architecture</title>
       <desc id={`${uid}-d`}>
         The browser talks HTTP and WebSockets to a Google Cloud load balancer (GKE Ingress), which routes to the web frontend and seven microservices
         (auth, scramble, wca, solve, stats, leaderboard, race) running as replicated deployments on GKE. Services store data in PostgreSQL (CloudNativePG
@@ -401,7 +401,7 @@ function Diagram({ L }: { L: Layout }) {
       <rect className="arch-store" x={L.redis.x} y={L.redis.y} width={L.redis.w} height={L.redis.h} rx={12} />
       <g className="arch-node arch-stream">
         <rect x={L.segs.streams.x} y={L.segs.streams.y} width={L.segs.streams.w} height={L.segs.streams.h} rx={8} />
-        <Label box={L.segs.streams} title="streams" sub="cubetype:events" L={L} />
+        <Label box={L.segs.streams} title="streams" sub="cubr:events" L={L} />
       </g>
       <g className="arch-node">
         <rect x={L.segs.cache.x} y={L.segs.cache.y} width={L.segs.cache.w} height={L.segs.cache.h} rx={8} />

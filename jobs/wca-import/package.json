@@ -1,5 +1,5 @@
 {
-  "name": "@cubetype/wca-import",
+  "name": "@cubr/wca-import",
   "version": "1.0.0",
   "private": true,
   "description": "Shell-script K8s Job/CronJob: loads the WCA results export into Postgres (schema wca). See README.md.",

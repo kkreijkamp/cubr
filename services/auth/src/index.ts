@@ -8,7 +8,7 @@ import {
   migrate,
   createRedis,
   makeAuth,
-} from '@cubetype/common';
+} from '@cubr/common';
 import { migrations } from './migrations.js';
 import { registerRoutes } from './routes/index.js';
 

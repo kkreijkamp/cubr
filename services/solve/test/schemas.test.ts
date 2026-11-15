@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { HttpError, parse } from '@cubetype/common';
+import { HttpError, parse } from '@cubr/common';
 import {
-  assertDailyAllowed, createSessionBody, createSolveBody, importBody, MAX_IMPORT_SOLVES, mergeSessionsBody, patchSolveBody,
+  assertDailyAllowed, createSessionBody, createSolveBody, importBody, MAX_IMPORT_SOLVES, mergeSessionsBody, patchSessionBody, patchSolveBody,
   resolveCreatedAt, utcDay,
 } from '../src/schemas.js';
 
@@ -55,10 +55,26 @@ describe('createSolveBody', () => {
 
 describe('createSessionBody / patchSolveBody', () => {
   it('validates session name and event', () => {
-    expect(parse(createSessionBody, { name: '  OH  ', event: '333oh' })).toEqual({ name: 'OH', event: '333oh' });
+    expect(parse(createSessionBody, { name: '  OH  ', event: '333oh' })).toEqual({ name: 'OH', event: '333oh', practice: false });
+    expect(parse(createSessionBody, { name: 'warm up', event: '333', practice: true })).toEqual({ name: 'warm up', event: '333', practice: true });
+    expect(errorOf(() => parse(createSessionBody, { name: 'x', event: '333', practice: 'yes' })).message).toMatch(/^practice:/);
     expect(errorOf(() => parse(createSessionBody, { name: '', event: '333' })).message).toMatch(/^name:/);
     expect(errorOf(() => parse(createSessionBody, { name: 'x'.repeat(41), event: '333' })).message).toMatch(/^name:/);
     expect(errorOf(() => parse(createSessionBody, { name: 'x', event: '333mbf' })).message).toMatch(/^event: unknown event/);
+  });
+
+  it('takes an optional createdAt (a cleared session keeps its place), which must be a timestamp', () => {
+    const at = '2026-03-01T10:00:00.000Z';
+    expect(parse(createSessionBody, { name: 'x', event: '333', createdAt: at })).toEqual({ name: 'x', event: '333', practice: false, createdAt: at });
+    expect(errorOf(() => parse(createSessionBody, { name: 'x', event: '333', createdAt: 'yesterday' })).message).toMatch(/^createdAt:/);
+  });
+
+  it('renames a session and/or marks it as practice, but not neither', () => {
+    expect(parse(patchSessionBody, { name: ' OH ' })).toEqual({ name: 'OH' });
+    expect(parse(patchSessionBody, { practice: true })).toEqual({ practice: true });
+    expect(parse(patchSessionBody, { name: 'x', practice: false })).toEqual({ name: 'x', practice: false });
+    expect(() => parse(patchSessionBody, {})).toThrow(HttpError);
+    expect(errorOf(() => parse(patchSessionBody, { name: '' })).message).toMatch(/^name:/);
   });
 
   it('requires at least one patch field, allows clearing the comment', () => {

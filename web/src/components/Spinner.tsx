@@ -1,8 +1,8 @@
-import { LoaderCircle } from 'lucide-react';
+import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import { useEffect, useState } from 'react';
 
 export function Spinner({ size = 20 }: { size?: number }) {
-  return <LoaderCircle className="spinner" size={size} />;
+  return <ArrowPathIcon className="spinner" width={size} height={size} />;
 }
 
 /** Centered spinner that only appears after a short delay (no flash on fast loads). */

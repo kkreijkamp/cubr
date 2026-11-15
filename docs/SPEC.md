@@ -1,9 +1,9 @@
-# cubetype - system specification
+# cubr - system specification
 
-> cubetype = csTimer's speedcubing functionality + Monkeytype's polish, delivered as a
+> cubr = csTimer's speedcubing functionality + Monkeytype's polish, delivered as a
 > cloud-native microservice application on Kubernetes (GKE). INFS3208 Type I project.
 
-This document describes the design of cubetype: the repository layout, the services and what each
+This document describes the design of cubr: the repository layout, the services and what each
 of them owns, the database schemas, the domain events and the HTTP contracts between the services
 and the web client. The contracts come first: every service is built and tested on its own against
 them, and this document changes together with the code whenever a contract changes. The deployment
@@ -14,7 +14,7 @@ is covered in `deploy/README.md`.
 ## 1. Repository layout
 
 ```
-cubetype/
+cubr/
   package.json                # npm workspaces: packages/*, services/*, jobs/*
   tsconfig.base.json          # strict TypeScript settings shared by all workspaces
   vitest.config.ts            # unit tests of packages, services and jobs
@@ -22,8 +22,8 @@ cubetype/
   cloudbuild.yaml             # Cloud Build: all images in parallel
   .github/workflows/ci.yml    # typecheck, tests, bundles, web build and kustomize render on every push
   packages/
-    common/                   # @cubetype/common  (server bootstrap, db, redis, auth, events, http, internal calls)
-    cubestats/                # @cubetype/cubestats (WCA averaging, formatting, events, solve import/export) - used by web AND services
+    common/                   # @cubr/common  (server bootstrap, db, redis, auth, events, http, internal calls)
+    cubestats/                # @cubr/cubestats (WCA averaging, formatting, events, solve import/export) - used by web AND services
   services/
     auth/  scramble/  solve/  stats/  leaderboard/  race/  wca/
   jobs/
@@ -44,10 +44,10 @@ cubetype/
 ```
 
 Each service folder: `src/index.ts` (entry), `src/routes/*.ts`, `src/migrations.ts` (if it owns a
-schema), `Dockerfile`, `package.json` (name `@cubetype/<svc>`), `README.md` (short), and
+schema), `Dockerfile`, `package.json` (name `@cubr/<svc>`), `README.md` (short), and
 `test/*.test.ts` (vitest, for the pure logic).
 
-The web app has its own `package.json` and lockfile. It uses `@cubetype/cubestats` straight from
+The web app has its own `package.json` and lockfile. It uses `@cubr/cubestats` straight from
 `packages/cubestats/src` (Vite alias + TypeScript path), so averages are computed by the same code
 in the browser and in the services.
 
@@ -104,7 +104,7 @@ JSON 404 instead of the SPA's `index.html`.
 | `APP_VERSION` | `dev` | baked in at image build via `--build-arg APP_VERSION` |
 | `POD_NAME` | `os.hostname()` | K8s downward API |
 | `NODE_NAME` | `local` | K8s downward API (spec.nodeName) |
-| `DATABASE_URL` | `postgres://cubetype:cubetype@postgres:5432/cubetype` | |
+| `DATABASE_URL` | `postgres://cubr:cubr@postgres:5432/cubr` | |
 | `REDIS_URL` | `redis://redis:6379` | |
 | `JWT_SECRET` | `dev-secret-change-me` | shared by all services (K8s Secret) |
 | `AUTH_URL` `SCRAMBLE_URL` `SOLVE_URL` `STATS_URL` `LEADERBOARD_URL` `WCA_URL` `RACE_URL` | `http://<name>:8080` | internal base URLs |
@@ -112,15 +112,15 @@ JSON 404 instead of the SPA's `index.html`.
 | `INTERNAL_API_TOKEN` | empty | shared secret for service-to-service calls (K8s Secret): `/internal/*` routes require it in `X-Internal-Token` (403 otherwise) and callers send it; auth also exempts such callers (the seed job) from its per-IP rate limits. Empty = not enforced, with a warning at startup (local development). |
 | `TRUST_PROXY_HOPS` | `1` | proxies in front of the service whose `X-Forwarded-For` entries are trusted when deriving the client IP (rate limits): 1 behind the compose/kind gateway, 2 behind the Google load balancer. Entries a client adds itself are never trusted. |
 
-Compose sets these in its `x-service-env` block; Kubernetes in the `cubetype-config` ConfigMap and
-the `cubetype-secrets` Secret (plus CloudNativePG's `pg-app` Secret for `DATABASE_URL`).
+Compose sets these in its `x-service-env` block; Kubernetes in the `cubr-config` ConfigMap and
+the `cubr-secrets` Secret (plus CloudNativePG's `pg-app` Secret for `DATABASE_URL`).
 Service-specific variables (e.g. scramble's `SCRAMBLE_WORKERS`, the seed job's `SEED_USERS`) are
 documented in the service READMEs.
 
 ## 5. Cross-cutting conventions
 
-- **JSON everywhere.** Errors: HTTP status + `{ "error": { "code": "BAD_REQUEST"|"UNAUTHORIZED"|"FORBIDDEN"|"NOT_FOUND"|"CONFLICT"|"RATE_LIMITED"|"UNAVAILABLE"|"INTERNAL", "message": "human readable" } }`. Use `HttpError` from `@cubetype/common`. zod failures -> 400 BAD_REQUEST with the first issue as message; a body over the size limit -> 413 `PAYLOAD_TOO_LARGE`.
-- **Auth:** `Authorization: Bearer <jwt>`. JWT HS256, issuer `cubetype`, claims `{ sub: userId, username, jti }`, TTL 30 days. Verify with `requireAuth` / `optionalAuth` from common (also checks Redis `auth:revoked:<jti>`; fails open if Redis is down).
+- **JSON everywhere.** Errors: HTTP status + `{ "error": { "code": "BAD_REQUEST"|"UNAUTHORIZED"|"FORBIDDEN"|"NOT_FOUND"|"CONFLICT"|"RATE_LIMITED"|"UNAVAILABLE"|"INTERNAL", "message": "human readable" } }`. Use `HttpError` from `@cubr/common`. zod failures -> 400 BAD_REQUEST with the first issue as message; a body over the size limit -> 413 `PAYLOAD_TOO_LARGE`.
+- **Auth:** `Authorization: Bearer <jwt>`. JWT HS256, issuer `cubr`, claims `{ sub: userId, username, jti }`, TTL 30 days. Verify with `requireAuth` / `optionalAuth` from common (also checks Redis `auth:revoked:<jti>`; fails open if Redis is down).
 - **Internal calls:** `/internal/*` routes are guarded by `requireInternal(config.internalToken)` from common (constant-time comparison of `X-Internal-Token`, 403 FORBIDDEN on mismatch); callers add `internalHeaders(config.internalToken)` to their requests.
 - **Rate limits:** `rateLimit()` from common, a fixed window per key (`INCR` + `EXPIRE ... NX` in one `MULTI`); it fails open while Redis is down, so an outage never locks users out.
 - **Times are integer milliseconds.** In averages/PBs JSON: a number = ms, `-1` = DNF, `null` = not available. Raw solves have `timeMs` (without penalty) + `penalty` in `"OK" | "+2" | "DNF"`.
@@ -138,13 +138,13 @@ documented in the service READMEs.
 
 Supported event ids (WCA ids): `333, 222, 444, 555, 666, 777, 333oh, 333bf, 333fm, 444bf, 555bf, clock, minx, pyram, skewb, sq1`.
 Event metadata (names, cubing.js puzzle ids, inspection, default scramble count) lives in
-`@cubetype/cubestats` `EVENTS`. `333oh` scrambles like `333`; `333bf/444bf/555bf` use the cubing.js
+`@cubr/cubestats` `EVENTS`. `333oh` scrambles like `333`; `333bf/444bf/555bf` use the cubing.js
 bld scramblers (orientation-randomised); `333fm` uses `333fm` scrambler. The daily challenge uses
 `333, 222, 444, pyram, skewb` (`DAILY_EVENTS`).
 
 ## 7. Database design (PostgreSQL, schema-per-service)
 
-One Postgres database `cubetype`; each service owns one schema and never reads another
+One Postgres database `cubr`; each service owns one schema and never reads another
 service's schema (communication is via HTTP or events). UUID default `gen_random_uuid()`.
 
 ### 7.1 `auth` schema (auth-service)
@@ -187,6 +187,7 @@ CREATE TABLE solve.sessions (
   user_id    uuid NOT NULL,
   name       text NOT NULL,
   event      text NOT NULL,
+  practice   boolean NOT NULL DEFAULT false,  -- migration 003: its solves count for no PB / leaderboard
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -268,7 +269,9 @@ Two later migrations add the bookkeeping that keeps the read model exact (detail
 projection, tombstones for deleted solves, the tail for incremental mo3/ao50/ao100),
 `deleted_sessions`, `pb_outbox` (transactional outbox for `pb.updated`), `user_totals.tz` (last
 timezone seen) and `hourly.dnfs`; `003_session_names` - `sessions` (display name per session for
-the history chart).
+the history chart); `004_deleted_users` - `deleted_users` (tombstones of deleted accounts: their rows
+are gone and later events for them are ignored); `005_practice_sessions` - `sessions.practice` (the
+history chart's PB line leaves practice sessions out).
 
 ### 7.4 `scramble` schema (scramble-service)
 ```sql
@@ -291,9 +294,10 @@ trigram/lower index on person name for search.
 ### 7.6 Redis keyspace
 | Key | Type | Owner | Purpose |
 |---|---|---|---|
-| `cubetype:events` | Stream (MAXLEN ~200000) | solve/auth/stats publish | domain event bus, consumer groups `stats`, `leaderboard` |
-| `cubetype:events:dlq` | Stream | consumers | dead letters: entries a consumer group could not handle |
+| `cubr:events` | Stream (MAXLEN ~200000) | solve/auth/stats publish | domain event bus, consumer groups `stats`, `leaderboard`, `solve` (user.deleted only) |
+| `cubr:events:dlq` | Stream | consumers | dead letters: entries a consumer group could not handle |
 | `auth:revoked:<jti>` | string, TTL = token remaining life | auth | logout / revocation |
+| `auth:revoked-user:<userId>` | string (unix seconds), TTL 30 d | auth | account deleted: every token issued at or before then is revoked |
 | `rl:<scope>:<key>` | counter, TTL | any | rate limiting |
 | `scramble:pool:<event>` | list | scramble | pre-generated scrambles |
 | `lb:<event>:<kind>:all` | zset (score=ms, member=userId) | leaderboard | all-time boards |
@@ -303,29 +307,32 @@ trigram/lower index on person name for search.
 | `lb:users` | hash userId -> JSON {username,country,avatarUrl} | leaderboard | display info |
 | `lb:flagged` | list | leaderboard | results rejected by the anti-cheat check |
 | `lb:meta:built` / `lb:rebuild-lock` | string | leaderboard | marks boards as rebuilt after Redis loss / one rebuilding replica |
+| `lb:deleted-users` | set | leaderboard | deleted accounts: removed from every board, later events for them ignored |
 | `race:room:<id>` (+ `:conns`, `:chat`) | string JSON, hash, list | race | room state, connected sockets per pod, last 50 chat messages (shared across replicas) |
 | `race:rooms`, `race:pods`, `race:lock:<id>` | zset, zset, string | race | public lobby, pod heartbeats, per-room lock |
 | `cache:stats:global` | string JSON, TTL 10 s | stats | global counters |
 | `cache:wca:<exportDate>.<importedAt>:*` | string JSON, TTL | wca | cache-aside for expensive queries (the dataset version in the key invalidates it on re-import) |
 
-## 8. Domain events (Redis Stream `cubetype:events`)
+## 8. Domain events (Redis Stream `cubr:events`)
 
 Each stream entry has fields `type` and `data` (JSON string). Every `data` contains `eventId`
 (globally unique string - solve outbox uses `solve-<outboxId>`, others use `<svc>-<uuid>`) and
 `occurredAt` (ISO). Consumers use consumer groups, ack after successful handling, reclaim stale
 pending entries (XAUTOCLAIM, idle > 60 s), and are idempotent (stats keeps `processed_events`).
 An entry that still fails after 5 attempts (20 for stats, whose recomputes depend on solve) is moved
-to `cubetype:events:dlq`. Use `publishEvent()` / `consumeEvents()` from common.
+to `cubr:events:dlq`. Use `publishEvent()` / `consumeEvents()` from common.
 
 | type | publisher | data fields (besides eventId, occurredAt) |
 |---|---|---|
 | `user.registered` | auth | `userId, username, displayName, country, wcaId, createdAt, avatarUrl` |
 | `user.updated` | auth | same as above |
-| `solve.created` | solve | `userId, username, event, sessionId, sessionName, solveId, timeMs, penalty, effectiveMs (int or null=DNF), createdAt, tz, source, rolling: {ao5, ao12}` (rolling = session's current ao5/ao12 *including* this solve; ms, -1 DNF, null n/a); daily-challenge solves also carry `dailyDate, dailyIndex` |
+| `user.deleted` | auth | `userId, username` - the account is gone: solve deletes its sessions, solves and daily attempts; stats and leaderboard delete its rows and ignore later events for it (tombstones) |
+| `solve.created` | solve | `userId, username, event, sessionId, sessionName, practice, solveId, timeMs, penalty, effectiveMs (int or null=DNF), createdAt, tz, source, rolling: {ao5, ao12}` (rolling = session's current ao5/ao12 *including* this solve; ms, -1 DNF, null n/a; `practice` = the session is a practice one: stats counts the solve but never as a PB, leaderboard skips it); daily-challenge solves also carry `dailyDate, dailyIndex` |
 | `solve.updated` | solve | same fields as created (new values) |
 | `solve.deleted` | solve | `userId, username, event, sessionId, solveId, timeMs, penalty, createdAt, tz, source` |
 | `session.deleted` | solve | `userId, username, sessionId, event, tz` |
 | `session.renamed` | solve | `userId, username, sessionId, event, name` (stats keeps session display names) |
+| `session.updated` | solve | `userId, username, sessionId, event, name, practice, tz` - the session became a practice one or stopped being one (stats recomputes the event's PBs; the all-time boards follow via `pb.updated`) |
 | `sessions.merged` | solve | `userId, username, event, targetId, sourceIds, solves, tz` (stats tombstones the sources and recomputes the event) |
 | `solves.imported` | solve | `userId, username, events: string[], count, tz` (bulk import: consumers recompute that user's events) |
 | `daily.completed` | solve | `userId, username, date, event, ao5 (ms or -1), times: number[], tz` (the five attempts as submitted) |
@@ -355,6 +362,7 @@ type PB = { valueMs: number; solveId: string|null; achievedAt: string };
 | PUT `/api/auth/me/settings` | req | `{settings: object}` (<= 16 KB JSON) | `{settings}` |
 | PUT `/api/auth/me/avatar` | req | raw image body, `Content-Type: image/webp\|image/jpeg\|image/png`, <= 300 KB (magic bytes must match) | `{user: PrivateUser}`; 400, 413, 429 (10/h) (+ `user.updated`) |
 | DELETE `/api/auth/me/avatar` | req | - | `{user: PrivateUser}` (+ `user.updated`) |
+| DELETE `/api/auth/me` | req | `{password}` | 204: the account is deleted and every token of it revoked (+ `user.deleted`, which makes the other services delete its data); 403 wrong password; 429 after 5 tries/10 min; 503 when Redis can't take the revocation or the event (then nothing is deleted) |
 | GET `/api/users/:idOrUsername/avatar` | - | `?v=` version | image bytes (immutable cache when `v` matches, ETag/304); 404 |
 | GET `/api/users/:username` | - | - | `{user: PublicUser}`; 404 |
 | GET `/api/users?ids=a,b,c` | - | <= 100 ids | `{users: PublicUser[]}` |
@@ -377,21 +385,21 @@ Pool: keep `scramble:pool:<event>` topped up (333/222/pyram/skewb: 200; 444/sq1/
 ### 9.3 solve (`/api/sessions`, `/api/solves`) - all routes require auth
 | Method & path | Body / query | Response |
 |---|---|---|
-| GET `/api/sessions` | - | `{sessions: Session[]}` (created_at asc). If the user has none, create a default "3x3" session (event 333) first. |
-| POST `/api/sessions` | `{id?, name, event}` | 201 `{session}` (idempotent on id: same id again -> 200; an id of another user -> 409) |
-| PATCH `/api/sessions/:id` | `{name}` | `{session}` (+ `session.renamed`) |
+| GET `/api/sessions` | - | `{sessions: Session[]}` (created_at asc; `Session = {id, name, event, practice, createdAt, updatedAt, solveCount}`). If the user has none, create a default "3x3" session (event 333) first. |
+| POST `/api/sessions` | `{id?, name, event, practice?, createdAt?}` | 201 `{session}` (idempotent on id: same id again -> 200; an id of another user -> 409). `createdAt` (ISO 8601, future values clamped to now) lets the empty session that replaces a cleared one keep its place in the list. |
+| PATCH `/api/sessions/:id` | `{name?, practice?}` (at least one) | `{session}` (+ `session.renamed` for a name, `session.updated` when `practice` changes). A practice session's solves count for no personal best and no leaderboard; its own session stats are unchanged. |
 | DELETE `/api/sessions/:id` | - | 204 (+ `session.deleted`) |
-| POST `/api/sessions/:id/merge` | `{sourceIds: uuid[]}` (1-50, != `:id`) | `{session, merged: {sessions, solves}}` - moves all solves of the source sessions into `:id` and deletes the sources in one transaction; 404 unknown session, 409 different event (+ `sessions.merged`) |
+| POST `/api/sessions/:id/merge` | `{sourceIds: uuid[]}` (1-50, != `:id`) | `{session, merged: {sessions, solves}}` - moves all solves of the source sessions into `:id` and deletes the sources in one transaction; 404 unknown session, 409 different event (+ `sessions.merged`). The merged solves take the target's `practice`. |
 | GET `/api/sessions/:id/solves` | - | `{solves: Solve[], truncated: boolean}` all solves, created_at asc (capped at the latest 50 000) |
 | POST `/api/solves` | `{id, sessionId, timeMs, penalty, scramble, comment?, source?, createdAt?, daily?: {date, index}}` | 201 `{solve, rolling: {ao5, ao12}}`; if `id` already exists for this user -> 200 same shape (idempotent). A `createdAt` in the future (fast device clock) is clamped to the server time. `daily` solves: see below. |
 | PATCH `/api/solves/:id` | `{penalty?, comment?}` | `{solve}` (+ `solve.updated`) |
 | DELETE `/api/solves/:id` | - | 204 (+ `solve.deleted`) |
-| POST `/api/sessions/import` | `{sessions: [{name, event, solves: [{timeMs, penalty, scramble, comment?, createdAt}]}]}` (<= 1 000 sessions, <= 100 000 solves, body <= 25 MB) | `{imported: {sessions, solves}}` (+ one `solves.imported`) - bulk insert in batches inside a transaction |
+| POST `/api/sessions/import` | `{sessions: [{name, event, practice?, solves: [{timeMs, penalty, scramble, comment?, createdAt}]}]}` (<= 1 000 sessions, <= 100 000 solves, body <= 25 MB) | `{imported: {sessions, solves}}` (+ one `solves.imported`) - bulk insert in batches inside a transaction |
 | GET `/api/solves/export` | - | `{exportedAt, sessions: [Session & {solves: Solve[]}]}` |
 | GET `/api/solves/daily?date=` | - | `{date, events: {"333": {solves: Solve[], ao5: number\|-1\|null}, ...}}` (only events with >=1 attempt; ao5 = the official result of the five attempts as submitted) |
 | GET `/api/solves/_info`, `/api/sessions/_info` | - | info (+ outbox backlog and relay state) |
-| GET `/internal/users/:userId/solves?event=` | - | `{solves: [{id, sessionId, timeMs, penalty, createdAt}]}` ordered by session_id, created_at (for stats recompute) |
-| GET `/internal/users/:userId/sessions` | - | `{sessions: [{id, name, event}]}` (stats backfills session display names) |
+| GET `/internal/users/:userId/solves?event=` | - | `{solves: [{id, sessionId, timeMs, penalty, createdAt, practice?}]}` ordered by session_id, created_at (for stats recompute; `practice: true` on a practice session's solves) |
+| GET `/internal/users/:userId/sessions` | - | `{sessions: [{id, name, event, practice}]}` (stats backfills session display names) |
 
 Daily challenge: a `daily: {date, index 0..4}` solve gets `source: 'daily'`; its session's event must
 be a daily-challenge event and `date` the UTC date of yesterday, today or tomorrow (today somewhere
@@ -408,20 +416,21 @@ Published rows older than a day are deleted.
 ### 9.4 stats (`/api/stats`)
 | Method & path | Response |
 |---|---|
-| GET `/api/stats/users/:userId/summary` | `{userId, username, totals: {solves, totalMs, firstSolveAt, lastSolveAt, activeDays, currentStreak, longestStreak}, events: [{event, solves, totalMs, meanMs, pbs: {single: PB\|null, mo3: PB\|null, ao5: PB\|null, ao12: PB\|null, ao50: PB\|null, ao100: PB\|null}}]}` (unknown user -> zeros) |
-| GET `/api/stats/users/:userId/activity?from=&to=` (default the 365 days ending today in the user's tz) | `{from, to, days: [{date: "YYYY-MM-DD", solves, totalMs}]}` (only days with solves) |
+| GET `/api/stats/users/:userId/summary` | `{userId, username, totals: {solves, totalMs, firstSolveAt, lastSolveAt, activeDays, currentStreak, longestStreak, activeYears: number[] (newest first)}, events: [{event, solves, totalMs, meanMs, pbs: {single: PB\|null, mo3: PB\|null, ao5: PB\|null, ao12: PB\|null, ao50: PB\|null, ao100: PB\|null}}]}` (unknown user -> zeros) |
+| GET `/api/stats/users/:userId/activity?from=&to=&event=` (default the 365 days ending today in the user's tz, all events) | `{from, to, days: [{date: "YYYY-MM-DD", solves, totalMs}]}` (only days with solves; `event` counts that event's solves only) |
 | GET `/api/stats/users/:userId/pb-history?event=333` | `{history: [{kind, valueMs, achievedAt}]}` asc |
 | GET `/api/stats/users/:userId/hourly?event=333` | `{hours: [{hour, solves, dnfs, meanMs}]}` 24 entries; `solves` counts every attempt, `meanMs` is the mean of the non-DNF ones (null if none); no `event` = all events |
-| GET `/api/stats/users/:userId/solves?event=333&limit=20000` | `{event, total, truncated, sessions: [{id, name\|null, solves, firstAt, lastAt}], solves: [[unixSeconds, timeMs, effectiveMs \| null, sessionIndex], ...]}` - chronological solve series (newest `limit`, max 50 000) from the read model, for the profile history chart (session filter) |
+| GET `/api/stats/users/:userId/solves?event=333&limit=20000` | `{event, total, truncated, sessions: [{id, name\|null, practice?, solves, firstAt, lastAt}], solves: [[unixSeconds, timeMs, effectiveMs \| null, sessionIndex], ...]}` - chronological solve series (newest `limit`, max 50 000) from the read model, for the profile history chart (session filter) |
 | GET `/api/stats/global` | `{users, solves, totalMs, solvesToday, activeUsersToday}` ("today" = UTC day; cached 10 s) |
 | GET `/api/stats/_info` | info |
 | GET `/internal/pbs?event=&kind=` | `{pbs: [{userId, username, event, kind, valueMs, achievedAt}]}` |
 
 Streak = consecutive days (in the user's tz as bucketed) with >= 1 solve, ending today or yesterday.
 PB rules: single = best effective time; mo3/aoN = best rolling value within a single session
-(chronological), using `@cubetype/cubestats`. On `solve.created` compare incrementally (single +
-rolling ao5/ao12 from the payload; recompute others cheaply if needed). On `solve.updated`,
-`solve.deleted`, `session.deleted`, `sessions.merged`, `solves.imported`: recompute that user's
+(chronological), using `@cubr/cubestats`; practice sessions never count. On `solve.created`
+compare incrementally (single + rolling ao5/ao12 from the payload; recompute others cheaply if
+needed; a `practice` solve only updates the counters). On `solve.updated`, `solve.deleted`,
+`session.deleted`, `session.updated`, `sessions.merged`, `solves.imported`: recompute that user's
 PBs for the affected event(s) from `GET solve /internal/users/:id/solves` and rebuild that user's
 daily_activity/hourly rows for the event. Emit `pb.updated` whenever a PB row changes (improves,
 worsens or disappears).
@@ -507,7 +516,7 @@ custom properties, command palette (Esc / Ctrl+K), focus mode while timing, toas
 
 ## 11. Kubernetes overview (deploy/k8s)
 
-Namespace `cubetype`. One Deployment + ClusterIP Service per microservice (2+ replicas,
+Namespace `cubr`. One Deployment + ClusterIP Service per microservice (2+ replicas,
 rolling update maxSurge 1 / maxUnavailable 0, readiness/liveness probes on /readyz /healthz,
 resource requests/limits, topology spread across nodes, PDB minAvailable 1, preStop sleep),
 HPA (CPU) for scramble, solve, web, race; HPA-managed Deployments don't set `replicas`. Pods run as
@@ -519,5 +528,5 @@ Ingress) and `gke` (GKE Ingress = external Application Load Balancer with contai
 balancing, BackendConfigs with `/readyz` health checks and a 1 h timeout for the race WebSockets,
 three Postgres instances, `TRUST_PROXY_HOPS=2`). The Ingress serves plain HTTP on a reserved static
 IP; TLS with a Google-managed certificate is possible future work. Images in Artifact Registry
-`australia-southeast1-docker.pkg.dev/<project>/cubetype/<svc>:<version>`. Details and the demo
+`australia-southeast1-docker.pkg.dev/<project>/cubr/<svc>:<version>`. Details and the demo
 runbook: `deploy/README.md`.

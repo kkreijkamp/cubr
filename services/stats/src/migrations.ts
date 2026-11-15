@@ -1,4 +1,4 @@
-import type { Migration } from '@cubetype/common';
+import type { Migration } from '@cubr/common';
 
 export const migrations: Migration[] = [
   {
@@ -94,6 +94,25 @@ CREATE TABLE stats.sessions (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX sessions_user ON stats.sessions (user_id);
+`,
+  },
+  {
+    // Tombstones for deleted accounts (user.deleted): their rows are removed and any later
+    // event for them (a late solve.created, a pb.updated already in flight) is ignored.
+    id: '004_deleted_users',
+    sql: `
+CREATE TABLE stats.deleted_users (
+  user_id uuid PRIMARY KEY, deleted_at timestamptz NOT NULL DEFAULT now()
+);
+`,
+  },
+  {
+    // Practice sessions (their solves count for no PB): the flag rides on the session names, fed by
+    // solve.created / session.updated, every recompute (the internal solve list) and the backfill.
+    // The profile's history chart leaves these sessions out of its PB line.
+    id: '005_practice_sessions',
+    sql: `
+ALTER TABLE stats.sessions ADD COLUMN practice boolean NOT NULL DEFAULT false;
 `,
   },
 ];

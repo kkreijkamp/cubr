@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { parseTimeInput, type Penalty } from '@cubetype/cubestats';
+import { parseTimeInput, type Penalty } from '@cubr/cubestats';
 import { parseManualEntry } from './statsUtil';
 
 interface Props {

@@ -3,7 +3,7 @@ import { Server, type DefaultEventsMap, type Socket } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { z, ZodError } from 'zod';
 import type { FastifyBaseLogger } from 'fastify';
-import { HttpError, badRequest, forbidden, notFound, rateLimit, rateLimited, unavailable, type Redis } from '@cubetype/common';
+import { HttpError, badRequest, forbidden, notFound, rateLimit, rateLimited, unavailable, type Redis } from '@cubr/common';
 import { resolveIdentity } from './identity.js';
 import { MAX_RESULT_MS, addPlayer, removePlayer, setStatus, startRound, submitResult } from './room.js';
 import { ROOM_ID_RE, sanitizeText } from './sanitize.js';

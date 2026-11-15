@@ -1,9 +1,9 @@
-import { badRequest, dayKey, parse, type Pool } from '@cubetype/common';
-import { EVENT_IDS, isEventId } from '@cubetype/cubestats';
+import { badRequest, dayKey, parse, type Pool } from '@cubr/common';
+import { EVENT_IDS, isEventId } from '@cubr/cubestats';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { PB_KINDS, type PbKind } from '../domain/pbs.js';
-import { addDays, computeStreaks, dayNumber, dayString } from '../domain/streaks.js';
+import { activeYears, addDays, computeStreaks, dayNumber, dayString } from '../domain/streaks.js';
 
 const userParams = z.object({ userId: z.string().uuid('userId must be a UUID') });
 
@@ -14,7 +14,7 @@ const dateStr = z
 
 const eventParam = z.string().refine(isEventId, 'unknown event');
 
-const activityQuery = z.object({ from: dateStr.optional(), to: dateStr.optional() });
+const activityQuery = z.object({ from: dateStr.optional(), to: dateStr.optional(), event: eventParam.optional() });
 const pbHistoryQuery = z.object({ event: eventParam.default('333') });
 const hourlyQuery = z.object({ event: eventParam.optional() });
 const solvesQuery = z.object({
@@ -59,7 +59,8 @@ export async function registerUserRoutes(app: FastifyInstance, pool: Pool): Prom
     ]);
     const t = totals.rows[0];
     const today = dayKey(new Date(), t?.tz ?? 'UTC');
-    const streaks = computeStreaks(days.rows.map((r) => r.day), today);
+    const dayKeys = days.rows.map((r) => r.day);
+    const streaks = computeStreaks(dayKeys, today);
 
     type EventLine = { event: string; solves: number; totalMs: number; meanMs: number | null; pbs: Record<PbKind, PB | null> };
     const byEvent = new Map<string, EventLine>();
@@ -88,12 +89,15 @@ export async function registerUserRoutes(app: FastifyInstance, pool: Pool): Prom
         firstSolveAt: iso(t?.first_solve_at ?? null),
         lastSolveAt: iso(t?.last_solve_at ?? null),
         ...streaks,
+        // the years the activity heatmap can show
+        activeYears: activeYears(dayKeys),
       },
       events,
     };
   });
 
-  // Heatmap data: only days with solves, default the last 365 days (in the user's timezone).
+  // Heatmap data: only days with solves, default the last 365 days (in the user's timezone);
+  // `event` narrows it to one event (default: all events).
   app.get('/api/stats/users/:userId/activity', async (req) => {
     const { userId } = parse(userParams, req.params);
     const q = parse(activityQuery, req.query);
@@ -102,9 +106,9 @@ export async function registerUserRoutes(app: FastifyInstance, pool: Pool): Prom
     if (from > to) throw badRequest('from must not be after to');
     const { rows } = await pool.query<{ day: string; solves: number; total_ms: number }>(
       `SELECT day, sum(solves)::int AS solves, sum(total_ms)::bigint AS total_ms
-         FROM stats.daily_activity WHERE user_id = $1 AND day BETWEEN $2 AND $3
+         FROM stats.daily_activity WHERE user_id = $1 AND day BETWEEN $2 AND $3 AND ($4::text IS NULL OR event = $4)
         GROUP BY day ORDER BY day`,
-      [userId, from, to],
+      [userId, from, to, q.event ?? null],
     );
     return { from, to, days: rows.map((r) => ({ date: r.day, solves: r.solves, totalMs: r.total_ms })) };
   });
@@ -142,13 +146,13 @@ export async function registerUserRoutes(app: FastifyInstance, pool: Pool): Prom
          ORDER BY created_at, seq`,
         [userId, event, limit],
       ),
-      pool.query<{ session_id: string; name: string | null; solves: number; first_at: Date; last_at: Date }>(
-        `SELECT l.session_id, nullif(s.name, '') AS name, count(*)::int AS solves,
+      pool.query<{ session_id: string; name: string | null; practice: boolean | null; solves: number; first_at: Date; last_at: Date }>(
+        `SELECT l.session_id, nullif(s.name, '') AS name, s.practice, count(*)::int AS solves,
                 min(l.created_at) AS first_at, max(l.created_at) AS last_at
            FROM stats.solve_ledger l
            LEFT JOIN stats.sessions s ON s.session_id = l.session_id
           WHERE l.user_id = $1 AND l.event = $2 AND NOT l.deleted
-          GROUP BY l.session_id, s.name
+          GROUP BY l.session_id, s.name, s.practice
           ORDER BY min(l.created_at)`,
         [userId, event],
       ),
@@ -162,6 +166,8 @@ export async function registerUserRoutes(app: FastifyInstance, pool: Pool): Prom
       sessions: sessions.rows.map((r) => ({
         id: r.session_id,
         name: r.name,
+        // its solves are no personal bests (the chart's PB line across sessions skips them)
+        ...(r.practice ? { practice: true } : {}),
         solves: r.solves,
         firstAt: r.first_at.toISOString(),
         lastAt: r.last_at.toISOString(),

@@ -13,7 +13,7 @@
 DROP SCHEMA IF EXISTS wca_staging CASCADE;
 CREATE SCHEMA wca_staging;
 
-COMMENT ON SCHEMA wca_staging IS 'cubetype: WCA export being imported (swapped into schema wca when complete)';
+COMMENT ON SCHEMA wca_staging IS 'cubr: WCA export being imported (swapped into schema wca when complete)';
 
 -- 8 rows, e.g. ('_Oceania', 'Oceania', 'OcR')
 CREATE TABLE wca_staging.continents (
@@ -47,7 +47,7 @@ CREATE TABLE wca_staging.persons (
   country_id text     NOT NULL
 );
 
--- ~19k rows. Only the columns cubetype needs: the export's delegates/organizers columns contain
+-- ~19k rows. Only the columns cubr needs: the export's delegates/organizers columns contain
 -- e-mail addresses and are removed BEFORE the data reaches the database (data minimisation,
 -- see project_columns in import.sh); long free-text columns (information, venue, ...) are
 -- dropped as well.

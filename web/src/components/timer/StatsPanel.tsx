@@ -1,6 +1,6 @@
 import { memo } from 'react';
-import { ChartNoAxesColumn } from 'lucide-react';
-import { avgKey, formatTime, type Precision, type SessionStats } from '@cubetype/cubestats';
+import { ChartBarIcon } from '@heroicons/react/24/outline';
+import { avgKey, formatTime, type Precision, type SessionStats } from '@cubr/cubestats';
 import type { Solve } from '../../lib/types';
 import { fmtAvg, fmtSolveShort } from './statsUtil';
 import { formatNumber } from '../../lib/format';
@@ -33,7 +33,7 @@ export const StatsPanel = memo(function StatsPanel({ stats, ns, solves, precisio
   return (
     <section className="tp-panel" aria-label="session statistics">
       <div className="tp-panel-title">
-        <ChartNoAxesColumn size={14} /> stats
+        <ChartBarIcon width={14} height={14} /> stats
       </div>
       <table className="tp-stats">
         <thead>
@@ -71,22 +71,17 @@ export const StatsPanel = memo(function StatsPanel({ stats, ns, solves, precisio
           })}
         </tbody>
       </table>
-      <div className="tp-stat-summary">
-        <div className="stat">
-          <div className="label">solves</div>
-          <div className="value text" data-tip={stats.dnfs ? `${stats.dnfs} DNF` : undefined}>
-            {formatNumber(stats.solved)}
-            {stats.count !== stats.solved && <span className="tp-of">/{formatNumber(stats.count)}</span>}
-          </div>
-        </div>
-        <div className="stat">
-          <div className="label">mean</div>
-          <div className="value text">{fmtAvg(stats.mean, precision)}</div>
-        </div>
-        <div className="stat">
-          <div className="label">{'\u03c3'}</div>
-          <div className="value text">{sigma}</div>
-        </div>
+      <div className="tp-stat-line">
+        <span data-tip={stats.dnfs ? `${stats.dnfs} DNF` : undefined}>
+          solves <b>{formatNumber(stats.solved)}</b>
+          {stats.count !== stats.solved && <span className="tp-of">/{formatNumber(stats.count)}</span>}
+        </span>
+        <span>
+          mean <b>{fmtAvg(stats.mean, precision)}</b>
+        </span>
+        <span>
+          {'\u03c3'} <b>{sigma}</b>
+        </span>
       </div>
     </section>
   );

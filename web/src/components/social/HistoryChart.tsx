@@ -1,9 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { ChartConfiguration } from 'chart.js';
-import { History } from 'lucide-react';
-import { rollingAverage } from '@cubetype/cubestats';
-import { EventSelect } from './Charts';
-import { WidgetError } from './Widget';
+import { rollingAverage } from '@cubr/cubestats';
+import { Section, WidgetError } from './Widget';
 import { eventLabel } from './util';
 import { api } from '../../lib/api';
 import { formatDateTime, formatNumber, formatTime } from '../../lib/format';
@@ -14,7 +12,7 @@ import { Loading, Spinner } from '../Spinner';
 /**
  * Monkeytype-style history chart: every solve as a point, with toggleable overlays for the PB
  * progression and rolling averages (ao5 ... ao1000). Averages are computed over the user's whole
- * chronological solve history with the shared WCA rules (@cubetype/cubestats), so a window that
+ * chronological solve history with the shared WCA rules (@cubr/cubestats), so a window that
  * starts mid-history still shows correct averages from its first point.
  */
 
@@ -109,19 +107,22 @@ interface Prepared {
   eff: number[]; // effective time, Infinity = DNF
   isPb: boolean[]; // solve set a new single PB
   pb: number[]; // running best single (Infinity before the first finish)
+  counts: boolean[]; // can be a PB (practice sessions' solves can't, across all sessions)
   avgs: Record<string, (number | null)[]>; // ao5 ... ao1000 (null = not enough solves, Infinity = DNF)
 }
 
-function prepare(rows: [number, number, number | null, number?][]): Prepared {
+/** `practice`: rows (by session index) whose solves set no PB */
+function prepare(rows: [number, number, number | null, number?][], practice: Set<number> = new Set()): Prepared {
   const n = rows.length;
   const t = rows.map((r) => r[0] * 1000);
   const raw = rows.map((r) => r[1]);
   const eff = rows.map((r) => (r[2] === null ? Number.POSITIVE_INFINITY : r[2]));
   const isPb: boolean[] = new Array(n).fill(false);
   const pb: number[] = new Array(n);
+  const counts = rows.map((r) => !practice.has(r[3] ?? -1));
   let best = Number.POSITIVE_INFINITY;
   for (let i = 0; i < n; i++) {
-    if (eff[i] < best) {
+    if (eff[i] < best && counts[i]) {
       best = eff[i];
       isPb[i] = true;
     }
@@ -129,11 +130,10 @@ function prepare(rows: [number, number, number | null, number?][]): Prepared {
   }
   const avgs: Record<string, (number | null)[]> = {};
   for (const l of LINES) if (l.key !== 'pb' && n >= l.n) avgs[l.key] = rollingAverage(eff, l.n);
-  return { n, t, raw, eff, isPb, pb, avgs };
+  return { n, t, raw, eff, isPb, pb, counts, avgs };
 }
 
-export function SolveHistoryChart({ userId, events, defaultEvent, precision }: { userId: string; events: string[]; defaultEvent: string; precision: 2 | 3 }) {
-  const [event, setEvent] = useState(defaultEvent);
+export function SolveHistoryChart({ userId, event, precision }: { userId: string; event: string; precision: 2 | 3 }) {
   const [range, setRange] = useState<Range>('all');
   const [xMode, setXMode] = useState<XMode>('solves');
   const [shown, setShown] = useState<Set<ToggleKey>>(() => new Set(DEFAULT_SHOWN));
@@ -144,11 +144,13 @@ export function SolveHistoryChart({ userId, events, defaultEvent, precision }: {
   const sessions = series.data?.sessions ?? [];
 
   // Filtering by session happens client-side (instant switching); averages and the pb line are
-  // then computed within that session only - the way cubers read session stats.
+  // then computed within that session only - the way cubers read session stats. Across all
+  // sessions, practice sessions' solves are drawn but set no pb (as on the profile's bests).
   const prep = useMemo(() => {
     if (!series.data) return null;
-    const rows = session < 0 ? series.data.solves : series.data.solves.filter((r) => r[3] === session);
-    return prepare(rows);
+    if (session >= 0) return prepare(series.data.solves.filter((r) => r[3] === session));
+    const practice = new Set((series.data.sessions ?? []).flatMap((s, i) => (s.practice ? [i] : [])));
+    return prepare(series.data.solves, practice);
   }, [series.data, session]);
 
   // visible window (averages were computed over the full history above)
@@ -157,9 +159,13 @@ export function SolveHistoryChart({ userId, events, defaultEvent, precision }: {
     const start = range === 'all' ? 0 : Math.max(0, prep.n - Number(range));
     const finite: number[] = [];
     let dnfs = 0;
+    let best: number | null = null;
     for (let i = start; i < prep.n; i++) {
-      if (Number.isFinite(prep.eff[i])) finite.push(prep.eff[i]);
-      else dnfs++;
+      if (Number.isFinite(prep.eff[i])) {
+        finite.push(prep.eff[i]);
+        // like the pb line: a practice session's solve is no best
+        if (prep.counts[i] && (best === null || prep.eff[i] < best)) best = prep.eff[i];
+      } else dnfs++;
     }
     const sorted = [...finite].sort((a, b) => a - b);
     // clamp the y axis so one forgotten-timer solve doesn't flatten everything
@@ -180,7 +186,7 @@ export function SolveHistoryChart({ userId, events, defaultEvent, precision }: {
       if (denom !== 0) trend = ((m * sxy - sx * sy) / denom) * trendUnit;
     }
     const mean = finite.length ? finite.reduce((a, b) => a + b, 0) / finite.length : null;
-    return { start, count: prep.n - start, dnfs, lo, hi, hidden, trend, trendUnit, best: sorted[0] ?? null, mean };
+    return { start, count: prep.n - start, dnfs, lo, hi, hidden, trend, trendUnit, best, mean };
   }, [prep, range]);
 
   const config = useMemo((): ChartConfiguration<'line'> | null => {
@@ -332,17 +338,19 @@ export function SolveHistoryChart({ userId, events, defaultEvent, precision }: {
                   return span < 120 * 86_400_000 ? `${String(d.getDate()).padStart(2, '0')} ${mon}` : `${mon} '${String(d.getFullYear()).slice(2)}`;
                 },
               },
-              title: { display: true, text: xMode === 'solves' ? 'solve' : 'date' },
+
             },
             y: (() => {
               const b = niceBounds(view.lo, view.hi);
               return { min: b.min, max: b.max, ticks: { stepSize: b.step, maxTicksLimit: 12, callback: (v: number | string) => formatTime(Number(v), 2) } };
             })(),
           });
+          // on the page background: faint horizontal lines only
           for (const axis of Object.values(s)) {
-            axis.grid = { ...axis.grid, color: c.bg, tickColor: 'transparent' };
+            axis.grid = { ...axis.grid, color: c.subAlt, tickColor: 'transparent' };
             axis.border = { display: false };
           }
+          s.x.grid = { display: false };
           return s;
         })(),
       },
@@ -367,20 +375,8 @@ export function SolveHistoryChart({ userId, events, defaultEvent, precision }: {
       ? `${trend < 0 ? 'improving' : 'slowing'} ${formatTime(Math.abs(trend), 2)} s per ${formatNumber(view.trendUnit)} solves`
       : null;
 
-  return (
-    <section className="pv-card pv-history" aria-label="solve history">
-      <div className="pv-card-head">
-        <h2 className="pv-title">
-          <History /> solve history
-          {series.data && (
-            <span className="sub">
-              - {session >= 0 && prep ? `${formatNumber(prep.n)} of ` : ''}
-              {formatNumber(series.data.total)} solves
-            </span>
-          )}
-          {series.loading && series.data && <Spinner size={14} />}
-        </h2>
-        <div className="pv-head-tools">
+  const tools = (
+    <>
           <div className="pv-seg" role="group" aria-label="range">
             {(['all', '1000', '100'] as Range[]).map((r) => (
               <button key={r} className={`btn-text${range === r ? ' active' : ''}`} onClick={() => setRange(r)} disabled={!!prep && r !== 'all' && prep.n <= Number(r)}>
@@ -408,23 +404,33 @@ export function SolveHistoryChart({ userId, events, defaultEvent, precision }: {
               <option value={-1}>all sessions</option>
               {sessions.map((s, i) => (
                 <option key={s.id} value={i}>
-                  {s.name ?? `session ${i + 1}`} - {formatNumber(s.solves)}
+                  {s.name ?? `session ${i + 1}`}
+                  {s.practice ? ' (practice)' : ''} - {formatNumber(s.solves)}
                 </option>
               ))}
             </select>
           )}
-          <EventSelect
-            events={events}
-            value={event}
-            onChange={(e) => {
-              setEvent(e);
-              setSession(-1);
-              setRange('all');
-            }}
-            label="solve history event"
-          />
-        </div>
-      </div>
+    </>
+  );
+
+  return (
+    <Section
+      label="solve history"
+      className="pf-history"
+      title="progress"
+      extra={
+        <>
+          {series.data && (
+            <>
+              {session >= 0 && prep ? `${formatNumber(prep.n)} of ` : ''}
+              {formatNumber(series.data.total)} solves
+            </>
+          )}
+          {series.loading && series.data && <Spinner size={12} />}
+        </>
+      }
+      tools={tools}
+    >
       {series.error && !series.data ? (
         <WidgetError error={series.error} what="the solve history" onRetry={series.reload} />
       ) : !prep ? (
@@ -464,6 +470,6 @@ export function SolveHistoryChart({ userId, events, defaultEvent, precision }: {
           </div>
         </>
       )}
-    </section>
+    </Section>
   );
 }

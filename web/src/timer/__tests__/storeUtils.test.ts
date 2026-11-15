@@ -101,6 +101,24 @@ describe('local db codec', () => {
     expect(again.db.sessions).toEqual(db.sessions);
   });
 
+  it('keeps a practice session one (stored only when it is)', () => {
+    const raw = {
+      v: 1,
+      sessions: [
+        { id: 's1', name: 'warm up', event: '333', practice: true },
+        { id: 's2', name: 'main', event: '333', practice: 'yes' },
+      ],
+      solves: {},
+      current: null,
+      lastByEvent: {},
+    };
+    const { db } = decodeLocalDb(raw, isEvent);
+    expect(db.sessions.map((s) => s.practice ?? false)).toEqual([true, false]);
+    const file = JSON.parse(encodeLocalDb(db));
+    expect(file.sessions.map((s: { practice?: boolean }) => s.practice)).toEqual([true, undefined]);
+    expect(decodeLocalDb(file, isEvent).db.sessions).toEqual(db.sessions);
+  });
+
   it('decodeQueue filters malformed entries', () => {
     expect(decodeQueue('x')).toEqual([]);
     const good = op({ kind: 'deleteSolve', id: 'a', sessionId: 's' });
@@ -149,6 +167,19 @@ describe('queue coalescing', () => {
     q = coalesce(q, op({ kind: 'deleteSession', id: 's9' }), null);
     expect(q).toEqual([]);
   });
+
+  it('folds marking a session as practice into its create, and keeps only the latest of a synced one', () => {
+    const cs = op({ kind: 'createSession', session: { id: 's9', name: 'a', event: '333', createdAt: 'x' } });
+    const q = coalesce([cs], op({ kind: 'setPractice', id: 's9', practice: true }), null);
+    expect(q).toHaveLength(1);
+    expect(q[0].op).toMatchObject({ session: { practice: true } });
+    let synced = coalesce([], op({ kind: 'setPractice', id: 's1', practice: true }), null);
+    synced = coalesce(synced, op({ kind: 'setPractice', id: 's1', practice: false }), null);
+    expect(synced.map((x) => x.op)).toEqual([{ kind: 'setPractice', id: 's1', practice: false }]);
+    expect(decodeQueue(synced)).toEqual(synced);
+    // deleted before it was sent: nothing left to say about it
+    expect(coalesce(synced, op({ kind: 'deleteSession', id: 's1' }), null).map((x) => x.op.kind)).toEqual(['deleteSession']);
+  });
 });
 
 describe('backoff', () => {
@@ -177,6 +208,7 @@ describe('optimistic overlays', () => {
       ['s2', 'new'],
     ]);
     expect(overlaySessions(out, [{ kind: 'deleteSession', id: 's2' }]).map((s) => s.id)).toEqual(['s1']);
+    expect(overlaySessions(out, [{ kind: 'setPractice', id: 's2', practice: true }]).map((s) => s.practice ?? false)).toEqual([false, true]);
   });
 
   it('applies solve ops idempotently', () => {

@@ -2,7 +2,7 @@
 // which the new pods answer with 404 (web/nginx: `try_files $uri =404`). Reloading fetches the
 // new index.html and its chunks. While old and new pods both serve, a fresh index.html can still
 // miss its chunks on an old pod, so reload at most once per 10 s instead of looping.
-const KEY = 'cubetype:chunk-reload-at';
+const KEY = 'cubr:chunk-reload-at';
 const WINDOW_MS = 10_000;
 
 let reloading = false;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Penalty } from '@cubetype/cubestats';
+import type { Penalty } from '@cubr/cubestats';
 import { dailyOverview, dailyResult, effectiveOrNull, rollingFromSolves } from '../src/rolling.js';
 
 const ok = (ms: number) => ({ timeMs: ms, penalty: 'OK' as Penalty });

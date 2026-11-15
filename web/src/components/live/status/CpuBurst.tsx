@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Flame, Square, Zap } from 'lucide-react';
+import { BoltIcon, FireIcon, StopIcon } from '@heroicons/react/24/outline';
 import { requestRaw } from '../../../lib/api';
 import { useRegisterCommands } from '../../../lib/commands';
 import { useStoredState } from '../hooks';
@@ -95,8 +95,8 @@ const mmss = (ms: number) => {
  * 4x4 scrambles back-to-back - CPU-heavy work - for 30/60/120 s.
  */
 export function CpuBurst({ onLog }: { onLog: (text: string, service: string) => void }) {
-  const [concurrency, setConcurrency] = useStoredState<number>('cubetype.status.burstC', 8);
-  const [duration, setDuration] = useStoredState<number>('cubetype.status.burstD', 60);
+  const [concurrency, setConcurrency] = useStoredState<number>('cubr.status.burstC', 8);
+  const [duration, setDuration] = useStoredState<number>('cubr.status.burstD', 60);
   const [view, setView] = useState<View | null>(null);
   const stats = useRef<Stats | null>(null);
   const ctrl = useRef<AbortController | null>(null);
@@ -195,8 +195,8 @@ export function CpuBurst({ onLog }: { onLog: (text: string, service: string) => 
     'status-burst',
     () => [
       running
-        ? { id: 'status-burst-stop', label: 'Stop CPU burst', icon: <Square />, run: () => finish('stopped') }
-        : { id: 'status-burst-start', label: 'Start CPU burst (scramble HPA)', icon: <Flame />, keywords: ['load', 'hpa', 'autoscaler'], run: start },
+        ? { id: 'status-burst-stop', label: 'Stop CPU burst', icon: <StopIcon />, run: () => finish('stopped') }
+        : { id: 'status-burst-start', label: 'Start CPU burst (scramble HPA)', icon: <FireIcon />, keywords: ['load', 'hpa', 'autoscaler'], run: start },
     ],
     [running, concurrency, duration],
   );
@@ -205,7 +205,7 @@ export function CpuBurst({ onLog }: { onLog: (text: string, service: string) => 
     <section className="card status-panel burst" aria-labelledby="burst-title">
       <div className="live-section-title">
         <h3 className="h3" id="burst-title">
-          <Flame /> cpu burst
+          <FireIcon /> cpu burst
         </h3>
         <span className="meta" title={`GET ${PATH}`}>
           drives the scramble HPA
@@ -225,18 +225,18 @@ export function CpuBurst({ onLog }: { onLog: (text: string, service: string) => 
           <Segmented label="duration" value={duration} onChange={setDuration} options={DURATIONS.map((d) => ({ value: d, label: `${d}s`, disabled: running }))} />
           {running ? (
             <button className="btn danger" onClick={() => finish('stopped')}>
-              <Square /> stop
+              <StopIcon /> stop
             </button>
           ) : (
             <button className="btn primary" onClick={start}>
-              <Zap /> start burst
+              <BoltIcon /> start burst
             </button>
           )}
         </div>
       </div>
 
       {!view ? (
-        <div className="panel-empty">tip: run <code>kubectl -n cubetype get hpa scramble -w</code> next to this page.</div>
+        <div className="panel-empty">tip: run <code>kubectl -n cubr get hpa scramble -w</code> next to this page.</div>
       ) : (
         <div className="burst-live">
           <div className={`burst-progress${running ? ' on' : ''}`} aria-hidden="true">

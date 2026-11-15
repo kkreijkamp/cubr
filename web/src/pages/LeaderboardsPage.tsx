@@ -1,21 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
-  CalendarCheck,
-  CalendarDays,
-  CalendarRange,
-  ChevronLeft,
-  ChevronRight,
-  Crown,
-  Globe,
-  Hash,
-  Sigma,
-  Sun,
-  Timer,
-  User,
-  UserX,
-} from 'lucide-react';
-import { DAILY_EVENTS, EVENTS } from '@cubetype/cubestats';
+  CalculatorIcon,
+  CalendarDateRangeIcon,
+  CalendarDaysIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ClockIcon,
+  GlobeAltIcon,
+  HashtagIcon,
+  SunIcon,
+  TrophyIcon,
+  UserIcon,
+  UserMinusIcon,
+} from '@heroicons/react/24/outline';
+import { DAILY_EVENTS, EVENTS } from '@cubr/cubestats';
 import { Avatar } from '../components/Avatar';
 import { Modal } from '../components/Modal';
 import { ErrorState, Loading, Spinner } from '../components/Spinner';
@@ -33,16 +32,16 @@ import '../components/social/leaderboards.css';
 const PAGE_SIZE = 50;
 
 type Period = 'all' | 'weekly' | 'daily' | 'challenge';
-const PERIODS: { id: Period; label: string; icon: typeof Globe }[] = [
-  { id: 'all', label: 'all-time', icon: Globe },
-  { id: 'weekly', label: 'weekly', icon: CalendarRange },
-  { id: 'daily', label: 'daily', icon: Sun },
-  { id: 'challenge', label: 'daily challenge', icon: CalendarCheck },
+const PERIODS: { id: Period; label: string; icon: typeof GlobeAltIcon }[] = [
+  { id: 'all', label: 'all-time', icon: GlobeAltIcon },
+  { id: 'weekly', label: 'weekly', icon: CalendarDateRangeIcon },
+  { id: 'daily', label: 'daily', icon: SunIcon },
+  { id: 'challenge', label: 'daily challenge', icon: CalendarDaysIcon },
 ];
-const KINDS: { id: LbKind; icon: typeof Timer }[] = [
-  { id: 'single', icon: Timer },
-  { id: 'ao5', icon: Sigma },
-  { id: 'ao12', icon: Sigma },
+const KINDS: { id: LbKind; icon: typeof ClockIcon }[] = [
+  { id: 'single', icon: ClockIcon },
+  { id: 'ao5', icon: CalculatorIcon },
+  { id: 'ao12', icon: CalculatorIcon },
 ];
 /** FMC results are move counts, not times, so there are no FMC leaderboards. */
 const BOARD_EVENTS = EVENTS.filter((e) => e.unit === 'time');
@@ -189,7 +188,7 @@ function Subtitle({ sel, periodKey }: { sel: Selection; periodKey: string | unde
         <>
           <span className="lb-pipe" aria-hidden="true" />
           <Link to="/daily">
-            play today&apos;s challenge <ChevronRight />
+            play today&apos;s challenge <ChevronRightIcon />
           </Link>
           <span>next in {formatDuration(msUntilReset('daily'))}</span>
         </>
@@ -203,7 +202,7 @@ function MeCard({ board, sel, precision, onJump }: { board: Leaderboard | undefi
   if (status === 'guest') {
     return (
       <div className="lb-me lb-me-empty">
-        <User size={20} />
+        <UserIcon width={20} height={20} />
         <span>
           <Link to={`/login?next=${encodeURIComponent('/leaderboards')}`}>sign in</Link> to save your solves and see where you rank.
         </span>
@@ -224,7 +223,7 @@ function MeCard({ board, sel, precision, onJump }: { board: Leaderboard | undefi
           : `solve some ${eventLabel(sel.event)} ${sel.period === 'daily' ? 'today' : 'this week'} to get ranked.`;
     return (
       <div className="lb-me lb-me-empty">
-        <UserX size={20} />
+        <UserMinusIcon width={20} height={20} />
         <span>
           you are not on this leaderboard yet. {how}{' '}
           {sel.period === 'challenge' ? (sel.date === utcDateKey() ? <Link to="/daily">go to the challenge</Link> : null) : <Link to="/">open the timer</Link>}
@@ -236,7 +235,7 @@ function MeCard({ board, sel, precision, onJump }: { board: Leaderboard | undefi
   const top = board.total > 0 ? (me.rank / board.total) * 100 : 100;
   return (
     <div className="lb-me" aria-label="your rank">
-      <div className="lb-me-rank">{me.rank === 1 ? <Crown size={22} aria-label="first place" /> : `#${formatNumber(me.rank)}`}</div>
+      <div className="lb-me-rank">{me.rank === 1 ? <TrophyIcon width={22} height={22} aria-label="first place" aria-hidden={false} /> : `#${formatNumber(me.rank)}`}</div>
       <div className="lb-me-who">
         <span className="name">
           <Avatar user={user} size={20} />
@@ -245,8 +244,8 @@ function MeCard({ board, sel, precision, onJump }: { board: Leaderboard | undefi
         <span className="sub">{me.rank === 1 ? 'goat - nobody is faster' : `you - top ${formatPercent(top)} of ${formatNumber(board.total)}`}</span>
       </div>
       <div className="lb-me-value">{formatTime(me.valueMs, precision)}</div>
-      <button className="btn small lb-me-jump" onClick={onJump} data-tip="jump to my page">
-        <User /> my page
+      <button className="btn small lb-me-jump" onClick={onJump} data-tip="jump to my rank">
+        <UserIcon /> my rank
       </button>
     </div>
   );
@@ -336,9 +335,9 @@ export default function LeaderboardsPage() {
   const myPage = me ? Math.ceil(me.rank / PAGE_SIZE) : null;
 
   useEffect(() => {
-    document.title = `${boardTitle(sel)} | cubetype`;
+    document.title = `${boardTitle(sel)} | cubr`;
     return () => {
-      document.title = 'cubetype';
+      document.title = 'cubr';
     };
   }, [sel]);
 
@@ -385,13 +384,13 @@ export default function LeaderboardsPage() {
         {
           id: 'lb-period',
           label: 'Leaderboard period...',
-          icon: <Crown />,
+          icon: <TrophyIcon />,
           children: () => PERIODS.map((p) => ({ id: `lb-period-${p.id}`, label: p.label, active: sel.period === p.id, run: () => update({ period: p.id }) })),
         },
         {
           id: 'lb-event',
           label: 'Leaderboard event...',
-          icon: <Crown />,
+          icon: <TrophyIcon />,
           children: () =>
             BOARD_EVENTS.filter((e) => sel.period !== 'challenge' || DAILY_EVENTS.includes(e.id)).map((e) => ({
               id: `lb-event-${e.id}`,
@@ -404,14 +403,14 @@ export default function LeaderboardsPage() {
         {
           id: 'lb-kind',
           label: 'Leaderboard type...',
-          icon: <Crown />,
+          icon: <TrophyIcon />,
           keywords: ['single', 'average'],
           children: () => kindsFor(sel.period).map((k) => ({ id: `lb-kind-${k}`, label: k, active: sel.kind === k, run: () => update({ kind: k }) })),
         },
       ];
-      if (sel.page < pages) cmds.push({ id: 'lb-next', label: 'Leaderboard: next page', icon: <ChevronRight />, run: () => goPage(sel.page + 1) });
-      if (sel.page > 1) cmds.push({ id: 'lb-prev', label: 'Leaderboard: previous page', icon: <ChevronLeft />, run: () => goPage(sel.page - 1) });
-      if (myPage) cmds.push({ id: 'lb-me', label: 'Leaderboard: jump to my page', icon: <User />, run: jumpToMe });
+      if (sel.page < pages) cmds.push({ id: 'lb-next', label: 'Leaderboard: next page', icon: <ChevronRightIcon />, run: () => goPage(sel.page + 1) });
+      if (sel.page > 1) cmds.push({ id: 'lb-prev', label: 'Leaderboard: previous page', icon: <ChevronLeftIcon />, run: () => goPage(sel.page - 1) });
+      if (myPage) cmds.push({ id: 'lb-me', label: 'Leaderboard: my rank', icon: <UserIcon />, run: jumpToMe });
       return cmds;
     },
     [sel, pages, myPage, update, goPage, jumpToMe],
@@ -436,7 +435,7 @@ export default function LeaderboardsPage() {
           <div className="lb-group lb-dates" role="group" aria-label="challenge date">
             {days.map((d, i) => (
               <button key={d} className={`btn${sel.date === d ? ' active' : ''}`} aria-pressed={sel.date === d} onClick={() => update({ date: d })}>
-                {i < 2 && <CalendarDays />} {shortDay(d, i)}
+                {i < 2 && <CalendarDaysIcon />} {shortDay(d, i)}
               </button>
             ))}
           </div>
@@ -504,19 +503,19 @@ export default function LeaderboardsPage() {
               </span>
               <nav className="lb-pager" aria-label="pagination">
                 <button className="btn" onClick={() => goPage(1)} disabled={sel.page === 1} data-tip="first page" aria-label="first page">
-                  <Crown />
+                  <TrophyIcon />
                 </button>
-                <button className="btn" onClick={jumpToMe} disabled={!myPage} data-tip="jump to my page" aria-label="jump to my page">
-                  <User />
+                <button className="btn" onClick={jumpToMe} disabled={!myPage} data-tip="jump to my rank" aria-label="jump to my rank">
+                  <UserIcon />
                 </button>
                 <button className="btn" onClick={() => goPage(sel.page - 1)} disabled={sel.page === 1} data-tip="previous page <-" aria-label="previous page">
-                  <ChevronLeft />
+                  <ChevronLeftIcon />
                 </button>
                 <button className="btn" onClick={() => setGotoOpen(true)} data-tip="go to page" aria-label={`page ${sel.page} of ${pages}, go to page`}>
                   {sel.page} / {pages}
                 </button>
                 <button className="btn" onClick={() => goPage(sel.page + 1)} disabled={sel.page >= pages} data-tip="next page ->" aria-label="next page">
-                  <ChevronRight />
+                  <ChevronRightIcon />
                 </button>
               </nav>
             </div>
@@ -525,7 +524,7 @@ export default function LeaderboardsPage() {
                 <thead>
                   <tr>
                     <th className="rank">
-                      <Hash aria-label="rank" />
+                      <HashtagIcon aria-label="rank" aria-hidden={false} />
                     </th>
                     <th className="name">name</th>
                     <th>{data.kind || sel.kind}</th>
@@ -537,7 +536,7 @@ export default function LeaderboardsPage() {
                     const mine = user?.id === e.userId;
                     return (
                       <tr key={`${e.rank}-${e.userId}`} className={mine ? 'me' : undefined}>
-                        <td className="rank">{e.rank === 1 ? <Crown size={18} aria-label="1" /> : formatNumber(e.rank)}</td>
+                        <td className="rank">{e.rank === 1 ? <TrophyIcon width={18} height={18} aria-label="1" aria-hidden={false} /> : formatNumber(e.rank)}</td>
                         <td className="name">
                           <Link to={`/profile/${encodeURIComponent(e.username)}`} className="lb-user">
                             <Avatar user={e} size={20} />

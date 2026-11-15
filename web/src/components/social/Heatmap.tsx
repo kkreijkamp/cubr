@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
-import { CalendarDays } from 'lucide-react';
-import { WidgetError } from './Widget';
+import { ChevronDownIcon } from '@heroicons/react/24/outline';
+import { Section, WidgetError } from './Widget';
 import { addDaysKey, formatDayKey, monthShort, plural } from './util';
 import { api } from '../../lib/api';
 import { formatNumber, localDateKey } from '../../lib/format';
@@ -81,17 +81,19 @@ function buildCalendar(from: string, to: string, today: string, days: ActivityDa
   return { cells, weeks, months: spaced, total };
 }
 
-/** GitHub/Monkeytype-style activity calendar of solves per day. */
-export function ActivityHeatmap({ userId, joinedAt }: { userId: string; joinedAt: string }) {
+/**
+ * GitHub/Monkeytype-style activity calendar of solves per day. The title's range ("the last 12 months")
+ * doubles as a picker for the calendar years in `years` (the ones with solves, newest first).
+ */
+export function ActivityHeatmap({ userId, event, years = [] }: { userId: string; event?: string; years?: number[] }) {
   const today = localDateKey();
-  const thisYear = Number(today.slice(0, 4));
-  const joinYear = Math.max(thisYear - 4, new Date(joinedAt).getFullYear() || thisYear);
-  const years = Array.from({ length: Math.max(0, thisYear - joinYear + 1) }, (_, i) => thisYear - i);
   const [range, setRange] = useState('last');
   const { from, to } = range === 'last' ? { from: addDaysKey(today, -364), to: today } : { from: `${range}-01-01`, to: `${range}-12-31` };
 
-  const activity = useAsync((signal) => api.stats.activity(userId, from, to, signal), [userId, from, to]);
-  const model = useMemo(() => buildCalendar(from, to, today, activity.data?.days ?? []), [from, to, today, activity.data]);
+  const activity = useAsync((signal) => api.stats.activity(userId, from, to, signal, event), [userId, from, to, event]);
+  // useAsync keeps the previous range's days while the next one loads: only use days for this range
+  const data = activity.data?.from === from && activity.data.to === to ? activity.data : undefined;
+  const model = useMemo(() => buildCalendar(from, to, today, data?.days ?? []), [from, to, today, data]);
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -101,7 +103,7 @@ export function ActivityHeatmap({ userId, joinedAt }: { userId: string; joinedAt
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollLeft = el.scrollWidth;
-  }, [model.weeks, activity.data]);
+  }, [model.weeks, data]);
 
   const onOver = (e: MouseEvent<HTMLDivElement>) => {
     const el = (e.target as HTMLElement).closest<HTMLElement>('[data-day]');
@@ -119,37 +121,49 @@ export function ActivityHeatmap({ userId, joinedAt }: { userId: string; joinedAt
     });
   };
 
-  const label = range === 'last' ? 'in the last 12 months' : `in ${range}`;
+  // the line under the calendar: how many days had solves, and the biggest one
+  const summary = useMemo(() => {
+    const days = (data?.days ?? []).filter((d) => d.solves > 0 && d.date >= from && d.date <= to);
+    const busiest = days.reduce<(typeof days)[number] | null>((a, d) => (!a || d.solves > a.solves ? d : a), null);
+    return { active: days.length, busiest };
+  }, [data, from, to]);
+
+  const rangeLabel = range === 'last' ? 'the last 12 months' : range;
+  const label = `in ${rangeLabel}`;
 
   return (
-    <section className="pv-card" aria-label="activity">
-      <div className="pv-card-head">
-        <h2 className="pv-title">
-          <CalendarDays />
+    <Section
+      label="activity"
+      className="pf-activity"
+      title="activity"
+      extra={
+        <span className="pv-title">
           <span>
-            {activity.error && !activity.data ? (
-              'activity'
+            {activity.error && !data ? 'activity' : <span className="text">{data ? plural(model.total, 'solve') : '...'}</span>} in{' '}
+            {years.length > 0 ? (
+              // reads as part of the title; the invisible select on top opens the native picker
+              <span className="hm-range">
+                <span aria-hidden="true">{rangeLabel}</span>
+                <ChevronDownIcon />
+                <select value={range} onChange={(e) => setRange(e.target.value)} aria-label="activity range">
+                  <option value="last">the last 12 months</option>
+                  {years.map((y) => (
+                    <option key={y} value={String(y)}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+              </span>
             ) : (
-              <>
-                <span className="text">{activity.data ? plural(model.total, 'solve') : '...'}</span> {label}
-              </>
+              rangeLabel
             )}
           </span>
-          {activity.loading && activity.data && <Spinner size={14} />}
-        </h2>
-        {years.length > 1 && (
-          <select className="pv-select" value={range} onChange={(e) => setRange(e.target.value)} aria-label="activity range">
-            <option value="last">last 12 months</option>
-            {years.map((y) => (
-              <option key={y} value={String(y)}>
-                {y}
-              </option>
-            ))}
-          </select>
-        )}
-      </div>
+          {activity.loading && activity.data && <Spinner size={12} />}
+        </span>
+      }
+    >
 
-      {activity.error && !activity.data ? (
+      {activity.error && !data ? (
         <WidgetError error={activity.error} what="activity data" onRetry={activity.reload} />
       ) : (
         <div className="hm-wrap" ref={wrapRef}>
@@ -161,7 +175,7 @@ export function ActivityHeatmap({ userId, joinedAt }: { userId: string; joinedAt
               style={{
                 gridTemplateColumns: `auto repeat(${model.weeks}, minmax(0, 1fr))`,
                 gridTemplateRows: 'repeat(7, auto) auto',
-                opacity: activity.data ? 1 : 0.4,
+                opacity: data ? 1 : 0.4,
               }}
               onMouseOver={onOver}
               onMouseLeave={() => setTip(null)}
@@ -198,7 +212,16 @@ export function ActivityHeatmap({ userId, joinedAt }: { userId: string; joinedAt
             </div>
           )}
           <div className="hm-foot">
-            <span>days use the cuber&apos;s local time zone</span>
+            <span data-tip="days use the cuber's local time zone">
+              {data && summary.busiest ? (
+                <>
+                  <b>{formatNumber(summary.active)}</b> active {summary.active === 1 ? 'day' : 'days'} - busiest <b>{formatDayKey(summary.busiest.date, false)}</b> (
+                  {plural(summary.busiest.solves, 'solve')})
+                </>
+              ) : (
+                'days use the cuber\'s local time zone'
+              )}
+            </span>
             <span className="hm-legend" aria-hidden="true">
               <span>less</span>
               {[0, 1, 2, 3, 4].map((l) => (
@@ -209,6 +232,6 @@ export function ActivityHeatmap({ userId, joinedAt }: { userId: string; joinedAt
           </div>
         </div>
       )}
-    </section>
+    </Section>
   );
 }

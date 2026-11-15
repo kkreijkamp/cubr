@@ -1,4 +1,4 @@
-import { fetchJson, internalHeaders, type FetchOptions } from '@cubetype/common';
+import { fetchJson, internalHeaders, type FetchOptions } from '@cubr/common';
 import type { FastifyBaseLogger } from 'fastify';
 import type { Kind } from './keys.js';
 

@@ -6,7 +6,7 @@ import { parseLocalDateTime, parseTimeString, parseTimerFile, readDelimited, Tim
 const iso = (ms: number) => new Date(ms).toISOString();
 const local = (y: number, mo: number, d: number, h = 0, mi = 0, s = 0) => iso(new Date(y, mo - 1, d, h, mi, s).getTime());
 
-describe('cubetype export', () => {
+describe('cubr export', () => {
   const exported = {
     exportedAt: '2026-10-20T10:00:00.000Z',
     sessions: [
@@ -17,17 +17,19 @@ describe('cubetype export', () => {
           { id: '2', sessionId: 'a', event: '333', timeMs: 12000, penalty: 'DNF', scramble: 'F2', comment: 'oops', source: 'timer', createdAt: '2026-10-03T00:00:00.000Z' },
         ],
       },
-      { id: 'b', name: 'pyra', event: 'pyram', createdAt: '', updatedAt: '', solveCount: 1, solves: [{ id: '3', timeMs: 3100, penalty: '+2', scramble: "U L' b", comment: '', createdAt: '2026-10-04T00:00:00.000Z' }] },
+      { id: 'b', name: 'pyra', event: 'pyram', practice: true, createdAt: '', updatedAt: '', solveCount: 1, solves: [{ id: '3', timeMs: 3100, penalty: '+2', scramble: "U L' b", comment: '', createdAt: '2026-10-04T00:00:00.000Z' }] },
     ],
   };
 
   it('imports its own pretty-printed export (moving data between servers)', () => {
     const r = parseTimerFile(new TextEncoder().encode(JSON.stringify(exported, null, 2)));
-    expect(r.format).toBe('cubetype');
+    expect(r.format).toBe('cubr');
     expect(r.sessions.map((s) => [s.name, s.event, s.solves.length])).toEqual([['main', '333', 2], ['pyra', 'pyram', 1]]);
     expect(r.sessions[0].solves[0]).toEqual({ timeMs: 9876, penalty: 'OK', scramble: "R U R'", comment: null, createdAt: '2026-10-02T03:04:05.678Z' });
     expect(r.sessions[0].solves[1]).toMatchObject({ penalty: 'DNF', comment: 'oops' });
     expect(r.sessions[1].solves[0].penalty).toBe('+2');
+    // a practice session stays one
+    expect(r.sessions.map((s) => s.practice ?? false)).toEqual([false, true]);
   });
 
   it('exports to a csTimer file that reads back the same', () => {
@@ -212,14 +214,14 @@ describe('limits and errors', () => {
   it('names the supported formats for an unknown file, and for formats csTimer only recognises', () => {
     for (const junk of ['hello', '{"a":1}', 'Session: 1\nfoo', '[1,2]']) {
       expect(() => parseTimerFile(junk)).toThrow(TimerFormatError);
-      expect(() => parseTimerFile(junk)).toThrow(/Supported: cubetype, csTimer, Twisty Timer/);
+      expect(() => parseTimerFile(junk)).toThrow(/Supported: cubr, csTimer, Twisty Timer/);
     }
     expect(new TimerFormatError('x')).toBeInstanceOf(CsTimerFormatError);
   });
 
   it('reports a file whose only solves are multi-blind', () => {
     const file = 'Puzzle,Category,Time(millis),Date(millis),Scramble,Penalty,Comment\n333mbld;Normal;995003600000;1546301100000;x;0;';
-    expect(() => parseTimerFile(file)).toThrow(/no solves cubetype can import \(multi-blind/);
+    expect(() => parseTimerFile(file)).toThrow(/no solves cubr can import \(multi-blind/);
   });
 
   it('decodes UTF-8 with a BOM and UTF-16 text', () => {

@@ -1,4 +1,4 @@
-import { PG_PING_TIMEOUT_MS, publishEvent, queryWithTimeout, withTx, type Pool, type Redis } from '@cubetype/common';
+import { PG_PING_TIMEOUT_MS, publishEvent, queryWithTimeout, withTx, type Pool, type Redis } from '@cubr/common';
 import type { FastifyBaseLogger } from 'fastify';
 
 const BATCH = 500;
@@ -13,7 +13,7 @@ export interface PbRelay {
 }
 
 /**
- * Relays stats.pb_outbox -> Redis stream `cubetype:events` as `pb.updated`.
+ * Relays stats.pb_outbox -> Redis stream `cubr:events` as `pb.updated`.
  * Only one replica relays at a time (transaction-scoped advisory lock), which keeps events in
  * order. Rows are deleted only after XADD succeeded, so a crash or Redis outage can cause a
  * re-publish (same eventId - consumers are idempotent) but never a lost event.
@@ -28,7 +28,7 @@ export function createPbRelay(pool: Pool, redis: Redis, log: FastifyBaseLogger, 
     return withTx(pool, async (c) => {
       const { rows: lock } = await c.query<{ ok: boolean }>(
         'SELECT pg_try_advisory_xact_lock(hashtext($1), 0) AS ok',
-        ['cubetype:stats:pb-outbox'],
+        ['cubr:stats:pb-outbox'],
       );
       if (!lock[0].ok) return { published: 0, more: false }; // another replica is relaying right now
       const { rows } = await c.query<{ id: number; payload: Record<string, unknown> }>(

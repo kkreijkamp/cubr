@@ -1,26 +1,27 @@
-import { lazy, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ChartLine,
-  Copy,
-  Crown,
-  Eye,
-  Keyboard,
-  Layers,
-  List,
-  Merge,
-  MessageSquare,
-  Pencil,
-  Plus,
-  RefreshCw,
-  Timer as TimerIcon,
-  Trash2,
-  X,
-} from 'lucide-react';
-import { EVENTS, effectiveMs, formatTime, getEvent, rollingAverage, sessionStats, type Penalty } from '@cubetype/cubestats';
+  ArrowPathIcon,
+  ArrowsPointingInIcon,
+  BeakerIcon,
+  ChatBubbleLeftIcon,
+  ClockIcon,
+  CommandLineIcon,
+  EyeIcon,
+  ListBulletIcon,
+  PencilIcon,
+  PlusIcon,
+  Square2StackIcon,
+  Square3Stack3DIcon,
+  TrashIcon,
+  TrophyIcon,
+  XMarkIcon,
+} from '@heroicons/react/24/outline';
+import { EVENTS, effectiveMs, formatTime, getEvent, rollingAverage, sessionStats, type Penalty } from '@cubr/cubestats';
 import { TimerDisplay } from '../timer/TimerDisplay';
 import { useTimerEngine, type TimerResult, type TimerState } from '../timer/useTimerEngine';
 import { useScrambleQueue } from '../timer/useScrambleQueue';
+import { shortcutFor, type ShortcutAction } from '../timer/shortcuts';
 import { TwistyPreview } from '../components/TwistyPreview';
 import { ConfigBar } from '../components/timer/ConfigBar';
 import { ScrambleBar } from '../components/timer/ScrambleBar';
@@ -30,10 +31,16 @@ import { SolveModal } from '../components/timer/SolveModal';
 import { AverageModal } from '../components/timer/AverageModal';
 import { QuickActions } from '../components/timer/QuickActions';
 import { ManualEntry } from '../components/timer/ManualEntry';
+import { VirtualInput } from '../components/timer/inputs/VirtualInput';
+import { StackmatInput } from '../components/timer/inputs/StackmatInput';
+import { BtTimerInput } from '../components/timer/inputs/BtTimerInput';
+import { SmartCubeInput } from '../components/timer/inputs/SmartCubeInput';
+import type { ScrambleHint } from '../input/bluetooth/smartSession';
+import { AVAILABLE_INPUTS, INPUT_MODES, modeInfo, updateInput, useInputState, type InputMode } from '../input/inputMode';
 import { ConfirmModal, PromptModal } from '../components/timer/Dialogs';
 import { MergeSessionsModal } from '../components/timer/MergeSessionsModal';
 import { copyText, isTouchDevice, playPbSound } from '../components/timer/feedback';
-import { averageWindow, detectPbs, fmtAvg, fmtSolveShort, statNs } from '../components/timer/statsUtil';
+import { averageWindow, detectPbs, fmtAvg, fmtSolveShort, pbFlags, statNs } from '../components/timer/statsUtil';
 import { noFocus } from '../components/timer/ConfigBar';
 import '../components/timer/timer-page.css';
 import { useAuth } from '../lib/auth';
@@ -41,12 +48,14 @@ import { paletteStore, useRegisterCommands, type Command } from '../lib/commands
 import { updateSettings, useSettings } from '../lib/settings';
 import {
   addSolve,
+  clearSession,
   createSession,
   deleteSession,
   deleteSolve,
   renameSession,
   setComment,
   setPenalty,
+  setSessionPractice,
   suggestSessionName,
   switchEvent,
   switchSession,
@@ -61,18 +70,42 @@ type ModalState =
   | { kind: 'newSession' }
   | { kind: 'renameSession' }
   | { kind: 'deleteSession' }
+  | { kind: 'clearSession' }
   | { kind: 'mergeSessions' }
   | { kind: 'deleteLast' }
   | { kind: 'comment'; solveId: string }
   | null;
 
-// Chart.js is only needed below the fold: keep it out of the first-paint bundle.
-const TrendChart = lazy(() => import('../components/timer/Charts').then((m) => ({ default: m.TrendChart })));
-const HistogramChart = lazy(() => import('../components/timer/Charts').then((m) => ({ default: m.HistogramChart })));
-const chartFallback = <div className="tp-chart-fallback" />;
-
-const GUEST_HINT_KEY = 'cubetype.guestHintDismissed';
+const GUEST_HINT_KEY = 'cubr.guestHintDismissed';
+const IDLE: TimerState = { phase: 'idle', inInspection: false, startedAt: null, inspectionStartedAt: null, result: null };
+const AVAILABLE = AVAILABLE_INPUTS;
 const PB_KINDS_NS = [5, 12, 100];
+
+/**
+ * The scramble preview is drawn as tall as its box: on wide screens the bottom panels share the
+ * height left under the timer, so the page fits the window without scrolling.
+ */
+function usePreviewHeight(ref: RefObject<HTMLDivElement>, on: boolean): number {
+  const [h, setH] = useState(200);
+  useEffect(() => {
+    const el = ref.current;
+    if (!on || !el) return;
+    const measure = () => {
+      const cs = getComputedStyle(el);
+      const inner = el.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+      // whole pixels, and only real changes, so the preview never resizes in a loop
+      setH((prev) => {
+        const next = Math.max(110, Math.min(320, Math.floor(inner)));
+        return Math.abs(next - prev) >= 2 ? next : prev;
+      });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref, on]);
+  return h;
+}
 
 function isTyping(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
@@ -90,7 +123,14 @@ export default function TimerPage() {
   const eventInfo = getEvent(event) ?? EVENTS[0];
   const scr = useScrambleQueue(event);
 
-  const [manual, setManual] = useState(false);
+  const device = useInputState();
+  const input: InputMode = AVAILABLE.includes(device.mode) ? device.mode : 'timer';
+  const manual = input === 'typing';
+  const setInput = useCallback((mode: InputMode) => updateInput({ mode }), []);
+  /** what a timer other than the keyboard one is doing (virtual puzzle, stackmat, ...) */
+  const [altState, setAltState] = useState<TimerState>(IDLE);
+  /** a smart cube's progress along the scramble */
+  const [smartHint, setSmartHint] = useState<ScrambleHint | null>(null);
   const [editingScramble, setEditingScramble] = useState(false);
   const [overlay, setOverlay] = useState(false);
   const [modal, setModal] = useState<ModalState>(null);
@@ -118,6 +158,8 @@ export default function TimerPage() {
   const times = useMemo(() => solves.map(effectiveMs), [solves]);
   const ao5 = useMemo(() => rollingAverage(times, 5), [times]);
   const ao12 = useMemo(() => rollingAverage(times, 12), [times]);
+  // every session pb as it was set, for the solve list
+  const pbs = useMemo(() => ({ single: pbFlags(times), ao5: pbFlags(ao5), ao12: pbFlags(ao12) }), [times, ao5, ao12]);
 
   // ---------------------------------------------------------------- refs for stable callbacks
   const scrRef = useRef(scr);
@@ -128,8 +170,8 @@ export default function TimerPage() {
   const lastStopAt = useRef(0);
 
   // ---------------------------------------------------------------- recording solves
-  const record = useCallback((r: { timeMs: number; penalty: Penalty }, source: 'timer' | 'manual') => {
-    const scramble = scrRef.current.current?.text ?? '';
+  const record = useCallback((r: { timeMs: number; penalty: Penalty }, source: 'timer' | 'manual', own?: string) => {
+    const scramble = own ?? scrRef.current.current?.text ?? '';
     pendingPb.current = true;
     addSolve({ timeMs: r.timeMs, penalty: r.penalty, scramble, source }).catch((e: Error) => {
       pendingPb.current = false;
@@ -146,7 +188,8 @@ export default function TimerPage() {
     [record],
   );
 
-  const engineEnabled = !manual && !editingScramble && !overlay && modal === null && !paletteOpen;
+  const inputsEnabled = !editingScramble && !overlay && modal === null && !paletteOpen;
+  const engineEnabled = input === 'timer' && inputsEnabled;
   const engine = useTimerEngine({
     enabled: engineEnabled,
     // WCA inspection only applies to events that have it (not blindfolded, not FMC)
@@ -155,7 +198,8 @@ export default function TimerPage() {
     alerts: settings.inspectionAlerts,
     onSolve,
   });
-  const { phase, inInspection } = engine.state;
+  const active = input === 'timer' ? engine.state : input === 'typing' ? IDLE : altState;
+  const { phase, inInspection } = active;
   const { clearResult, cancel: cancelEngine } = engine;
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
@@ -185,10 +229,11 @@ export default function TimerPage() {
   }, [phase, inInspection, settings.focusMode]);
   useEffect(() => () => document.body.classList.remove('focus'), []);
 
-  // leaving manual mode / opening things: never keep a stale engine result around
+  // leaving the timer for another input: never keep a stale engine result around
   useEffect(() => {
-    if (manual) cancelEngine();
-  }, [manual, cancelEngine]);
+    if (input !== 'timer') cancelEngine();
+    setAltState(IDLE);
+  }, [input, cancelEngine]);
 
   // ---------------------------------------------------------------- actions on the latest solve
   const penaltyLast = useCallback((p: Penalty) => {
@@ -267,36 +312,62 @@ export default function TimerPage() {
       const p = phaseRef.current;
       if (p !== 'idle' && p !== 'stopped') return;
       const inManualInput = e.target instanceof HTMLElement && e.target.hasAttribute('data-manual-entry');
-      if (isTyping(e.target) && !(inManualInput && e.altKey)) return;
+      // in the typing box, alt / ctrl+alt shortcuts and ctrl+1/2/3 still work (ctrl+z stays undo there)
+      if (isTyping(e.target) && !(inManualInput && (e.altKey || (e.ctrlKey && /^Digit[123]$/.test(e.code))))) return;
       if (e.key === 'Tab' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
         scrRef.current.next();
         return;
       }
-      if (!e.altKey || e.ctrlKey || e.metaKey) return;
-      const actions: Record<string, () => void> = {
-        Digit1: () => penaltyLast('OK'),
-        Digit2: () => penaltyLast('+2'),
-        Digit3: () => penaltyLast('DNF'),
-        Backspace: deleteLast,
-        KeyZ: deleteLast,
-        KeyC: commentLast,
-        ArrowLeft: () => scrRef.current.prev(),
-        ArrowRight: () => scrRef.current.next(),
-        ArrowUp: () => cycleSession(-1),
-        ArrowDown: () => cycleSession(1),
-        KeyI: () => updateSettings({ inspection: !settings.inspection }),
-        KeyM: () => setManual((m) => !m),
-      };
-      const fn = actions[e.code];
-      if (fn) {
-        e.preventDefault();
-        fn();
+      const action = shortcutFor(e);
+      if (!action) return;
+      e.preventDefault();
+      runShortcut(action);
+    };
+    const runShortcut = (a: ShortcutAction) => {
+      switch (a.kind) {
+        case 'event':
+          if (a.event !== event) changeEvent(a.event);
+          return;
+        case 'penalty':
+          return penaltyLast(a.penalty);
+        case 'deleteLast':
+          return deleteLast();
+        case 'clearSession':
+          if (session && session.solveCount > 0) setModal({ kind: 'clearSession' });
+          return;
+        case 'session':
+          return cycleSession(a.dir);
+        case 'scramble':
+          return a.dir < 0 ? scrRef.current.prev() : scrRef.current.next();
+        case 'customScramble':
+          return setEditingScramble(true);
+        case 'input':
+          if (AVAILABLE.includes(a.input)) {
+            setInput(a.input);
+            toast.notice(`entering times with: ${modeInfo(a.input).label}`, { durationMs: 1500 });
+          } else toast.notice(`cubr has no ${modeInfo(a.input).label} input yet`);
+          return;
+        case 'missingInput':
+          toast.notice(`cubr has no ${a.name} input`);
+          return;
+        case 'comment':
+          return commentLast();
+        case 'inspection':
+          return updateSettings({ inspection: !settings.inspection });
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [penaltyLast, deleteLast, commentLast, cycleSession, settings.inspection]);
+  }, [penaltyLast, deleteLast, commentLast, cycleSession, changeEvent, event, session, settings.inspection, setInput]);
+
+  // a practice session: its solves count for no pb on the profile and no leaderboard
+  const togglePractice = useCallback(() => {
+    if (!session) return;
+    const on = !session.practice;
+    void setSessionPractice(session.id, on);
+    toast.notice(on ? `${session.name} is a practice session: no pbs or leaderboards` : `${session.name} counts for pbs and leaderboards again`, { durationMs: 2500 });
+  }, [session]);
 
   // ---------------------------------------------------------------- palette commands
   useRegisterCommands(
@@ -307,7 +378,7 @@ export default function TimerPage() {
         {
           id: 'timer-event',
           label: 'Event...',
-          icon: <TimerIcon />,
+          icon: <ClockIcon />,
           keywords: ['puzzle', 'cube'],
           children: () =>
             EVENTS.map((e) => ({
@@ -321,7 +392,7 @@ export default function TimerPage() {
         {
           id: 'timer-session',
           label: 'Session...',
-          icon: <Layers />,
+          icon: <Square3Stack3DIcon />,
           children: () =>
             eventSessions.map((s) => ({
               id: `timer-session-${s.id}`,
@@ -330,26 +401,33 @@ export default function TimerPage() {
               run: () => void switchSession(s.id),
             })),
         },
-        { id: 'timer-new-session', label: 'New session', icon: <Plus />, run: () => setModal({ kind: 'newSession' }) },
-        { id: 'timer-rename-session', label: 'Rename session', icon: <Pencil />, run: () => setModal({ kind: 'renameSession' }) },
+        { id: 'timer-new-session', label: 'New session', icon: <PlusIcon />, run: () => setModal({ kind: 'newSession' }) },
+        { id: 'timer-rename-session', label: 'Rename session', icon: <PencilIcon />, run: () => setModal({ kind: 'renameSession' }) },
+        {
+          id: 'timer-practice-session',
+          label: session?.practice ? 'Count session for pbs and leaderboards' : 'Make session a practice session',
+          icon: <BeakerIcon />,
+          keywords: ['practice', 'pb', 'leaderboard', 'unranked', 'casual', 'session'],
+          run: togglePractice,
+        },
         {
           id: 'timer-merge-sessions',
           label: 'Merge sessions...',
-          icon: <Merge />,
+          icon: <ArrowsPointingInIcon />,
           keywords: ['combine', 'join', 'session'],
           run: () => setModal({ kind: 'mergeSessions' }),
         },
-        { id: 'timer-delete-session', label: 'Delete session', icon: <Trash2 />, run: () => setModal({ kind: 'deleteSession' }) },
-        { id: 'timer-new-scramble', label: 'New scramble', icon: <RefreshCw />, keywords: ['next'], run: () => scrRef.current.next() },
-        { id: 'timer-custom-scramble', label: 'Enter custom scramble', icon: <Pencil />, keywords: ['edit'], run: () => setEditingScramble(true) },
-        { id: 'timer-copy-scramble', label: 'Copy scramble', icon: <Copy />, run: () => void copyScramble() },
+        { id: 'timer-delete-session', label: 'Delete session', icon: <TrashIcon />, run: () => setModal({ kind: 'deleteSession' }) },
+        { id: 'timer-new-scramble', label: 'New scramble', icon: <ArrowPathIcon />, keywords: ['next'], run: () => scrRef.current.next() },
+        { id: 'timer-custom-scramble', label: 'Enter custom scramble', icon: <PencilIcon />, keywords: ['edit'], run: () => setEditingScramble(true) },
+        { id: 'timer-copy-scramble', label: 'Copy scramble', icon: <Square2StackIcon />, run: () => void copyScramble() },
       ];
       if (last) {
         cmds.push(
           {
             id: 'timer-penalty',
             label: 'Penalty last solve...',
-            icon: <TimerIcon />,
+            icon: <ClockIcon />,
             keywords: ['dnf', '+2', 'ok'],
             children: () =>
               (['OK', '+2', 'DNF'] as Penalty[]).map((p) => ({
@@ -359,19 +437,31 @@ export default function TimerPage() {
                 run: () => penaltyLast(p),
               })),
           },
-          { id: 'timer-comment-last', label: 'Comment last solve', icon: <MessageSquare />, run: commentLast },
-          { id: 'timer-delete-last', label: 'Delete last solve', icon: <Trash2 />, run: deleteLast },
+          { id: 'timer-comment-last', label: 'Comment last solve', icon: <ChatBubbleLeftIcon />, run: commentLast },
+          { id: 'timer-delete-last', label: 'Delete last solve', icon: <TrashIcon />, run: deleteLast },
+          { id: 'timer-clear-session', label: 'Clear session (delete all its solves)', icon: <TrashIcon />, keywords: ['reset', 'empty'], run: () => setModal({ kind: 'clearSession' }) },
         );
       }
       cmds.push(
-        { id: 'timer-toggle-charts', label: settings.showCharts ? 'Hide charts' : 'Show charts', icon: <ChartLine />, keywords: ['toggle'], run: () => updateSettings({ showCharts: !settings.showCharts }) },
-        { id: 'timer-toggle-list', label: settings.showSolveList ? 'Hide solve list' : 'Show solve list', icon: <List />, keywords: ['toggle'], run: () => updateSettings({ showSolveList: !settings.showSolveList }) },
-        { id: 'timer-manual', label: manual ? 'Use the timer (leave manual entry)' : 'Manual entry (type times)', icon: <Keyboard />, keywords: ['typing', 'toggle'], run: () => setManual((m) => !m) },
-        { id: 'timer-inspection-toggle', label: settings.inspection ? 'Turn inspection off' : 'Turn inspection on', icon: <Eye />, keywords: ['toggle', 'wca'], run: () => updateSettings({ inspection: !settings.inspection }) },
+        { id: 'timer-toggle-list', label: settings.showSolveList ? 'Hide solve list' : 'Show solve list', icon: <ListBulletIcon />, keywords: ['toggle'], run: () => updateSettings({ showSolveList: !settings.showSolveList }) },
+        {
+          id: 'timer-input',
+          label: 'Enter times with...',
+          icon: <CommandLineIcon />,
+          keywords: ['input', 'typing', 'manual', 'stackmat', 'virtual', 'bluetooth', 'smart cube', 'qcube'],
+          children: () =>
+            INPUT_MODES.filter((m) => AVAILABLE.includes(m.id)).map((m) => ({
+              id: `timer-input-${m.id}`,
+              label: m.label,
+              active: m.id === input,
+              run: () => setInput(m.id),
+            })),
+        },
+        { id: 'timer-inspection-toggle', label: settings.inspection ? 'Turn inspection off' : 'Turn inspection on', icon: <EyeIcon />, keywords: ['toggle', 'wca'], run: () => updateSettings({ inspection: !settings.inspection }) },
       );
       return cmds;
     },
-    [st.sessions, event, session?.id, last?.id, last?.penalty, settings.showCharts, settings.showSolveList, settings.inspection, manual, deleteLast],
+    [st.sessions, event, session?.id, session?.practice, togglePractice, last?.id, last?.penalty, settings.showSolveList, settings.inspection, input, deleteLast],
   );
 
 
@@ -385,6 +475,8 @@ export default function TimerPage() {
     return s;
   }, [engine.state, last]);
 
+  // the latest solve as a stable value (inputs show it while idle)
+  const lastResult = useMemo(() => (last ? { timeMs: last.timeMs, penalty: last.penalty } : null), [last?.timeMs, last?.penalty]); // eslint-disable-line react-hooks/exhaustive-deps
   const openSolve = useCallback((index: number) => setModal({ kind: 'solve', index }), []);
   const openAverage = useCallback((n: number, which: 'current' | 'best') => setModal({ kind: 'avg', n, which }), []);
   const onOverlayChange = useCallback((open: boolean) => setOverlay(open), []);
@@ -402,6 +494,8 @@ export default function TimerPage() {
 
   const showPreview = settings.scramblePreview !== 'off';
   const previewScramble = useDeferredValue(scr.current?.text ?? null);
+  const previewBoxRef = useRef<HTMLDivElement>(null);
+  const previewHeight = usePreviewHeight(previewBoxRef, showPreview);
   const cols = 1 + (showPreview ? 1 : 0) + (settings.showSolveList ? 1 : 0);
   const pb = !!last && last.id === pbSolveId;
   const pbKinds = pb ? 'new pb' : null;
@@ -418,12 +512,14 @@ export default function TimerPage() {
         onSession={(id) => void switchSession(id)}
         onNewSession={() => setModal({ kind: 'newSession' })}
         onRenameSession={() => setModal({ kind: 'renameSession' })}
+        onTogglePractice={togglePractice}
         onDeleteSession={() => setModal({ kind: 'deleteSession' })}
         onMergeSessions={() => setModal({ kind: 'mergeSessions' })}
         inspection={settings.inspection}
         onToggleInspection={() => updateSettings({ inspection: !settings.inspection })}
-        manual={manual}
-        onToggleManual={() => setManual((m) => !m)}
+        input={input}
+        inputs={AVAILABLE}
+        onInput={setInput}
         onOverlayChange={onOverlayChange}
         mode={st.mode}
         pending={st.pending}
@@ -438,11 +534,89 @@ export default function TimerPage() {
         onCustom={scr.setCustom}
         editing={editingScramble}
         setEditing={setEditingScramble}
+        hint={input === 'smartcube' ? smartHint : null}
       />
 
-      <div className="tp-timer-area" {...(manual ? {} : engine.touchHandlers)} aria-label={touch ? 'timer: hold to get ready, release to start' : 'timer'}>
+      <div className={`tp-timer-area input-${input}`} {...(input === 'timer' ? engine.touchHandlers : {})} aria-label={input !== 'timer' ? undefined : touch ? 'timer: hold to get ready, release to start' : 'timer'}>
         {manual ? (
           <ManualEntry onSubmit={(r) => record(r, 'manual')} disabled={modal !== null || paletteOpen} />
+        ) : input === 'stackmat' || input === 'moyu' ? (
+          <StackmatInput
+            key={input}
+            kind={input}
+            enabled={inputsEnabled}
+            inspection={settings.inspection && eventInfo.inspection}
+            alerts={settings.inspectionAlerts}
+            useStatus={settings.stackmatStatus}
+            last={lastResult}
+            precision={settings.precision}
+            timerUpdate={settings.timerUpdate}
+            sizeRem={settings.timerSize}
+            pb={pb && isIdle}
+            onState={setAltState}
+            onSolve={(r) => {
+              lastStopAt.current = performance.now();
+              record(r, 'timer');
+            }}
+          />
+        ) : input === 'bttimer' ? (
+          <BtTimerInput
+            enabled={inputsEnabled}
+            inspection={settings.inspection && eventInfo.inspection}
+            alerts={settings.inspectionAlerts}
+            last={lastResult}
+            precision={settings.precision}
+            timerUpdate={settings.timerUpdate}
+            sizeRem={settings.timerSize}
+            pb={pb && isIdle}
+            onState={setAltState}
+            onSolve={(r) => {
+              lastStopAt.current = performance.now();
+              record(r, 'timer');
+            }}
+          />
+        ) : input === 'smartcube' ? (
+          <SmartCubeInput
+            event={event}
+            scramble={scr.current?.text ?? null}
+            enabled={inputsEnabled}
+            inspection={settings.inspection && eventInfo.inspection}
+            alerts={settings.inspectionAlerts}
+            last={lastResult}
+            precision={settings.precision}
+            timerUpdate={settings.timerUpdate}
+            sizeRem={settings.timerSize}
+            pb={pb && isIdle}
+            settings={settings}
+            onState={setAltState}
+            onSolve={(r, own) => {
+              lastStopAt.current = performance.now();
+              record(r, 'timer', own);
+            }}
+            onScramble={scr.setFromCube}
+            onHint={setSmartHint}
+          />
+        ) : input === 'virtual' || input === 'qcube' ? (
+          <VirtualInput
+            key={input}
+            event={event}
+            flat={input === 'qcube'}
+            scramble={scr.current?.text ?? null}
+            enabled={inputsEnabled}
+            inspection={settings.inspection && eventInfo.inspection}
+            alerts={settings.inspectionAlerts}
+            last={lastResult}
+            precision={settings.precision}
+            timerUpdate={settings.timerUpdate}
+            sizeRem={settings.timerSize}
+            pb={pb && isIdle}
+            settings={settings}
+            onState={setAltState}
+            onSolve={(r) => {
+              lastStopAt.current = performance.now();
+              record(r, 'timer');
+            }}
+          />
         ) : (
           <div key={pbKey}>
             <TimerDisplay state={displayState} precision={settings.precision} timerUpdate={settings.timerUpdate} sizeRem={settings.timerSize} pb={pb && isIdle} />
@@ -451,7 +625,7 @@ export default function TimerPage() {
       </div>
 
       <div className="tp-under fade-on-focus">
-        {solves.length === 0 && !manual && st.ready ? (
+        {solves.length === 0 && input === 'timer' && st.ready ? (
           <div className="tp-hint">
             {touch ? (
               'hold the timer, release to start - tap anywhere to stop'
@@ -469,7 +643,7 @@ export default function TimerPage() {
           <div className="tp-avgline">
             {pbKinds && (
               <span className="pb-badge">
-                <Crown size={14} /> {pbKinds}
+                <TrophyIcon width={14} height={14} /> {pbKinds}
               </span>
             )}
             <span>
@@ -488,43 +662,20 @@ export default function TimerPage() {
         {showPreview && (
           <section className="tp-panel tp-preview" aria-label="scramble preview">
             <div className="tp-panel-title">
-              <Eye size={14} /> scramble preview
+              <EyeIcon width={14} height={14} /> scramble preview
             </div>
-            <div className="tp-preview-box">
+            <div className="tp-preview-box" ref={previewBoxRef}>
               {previewScramble ? (
-                <TwistyPreview puzzle={eventInfo.puzzle} scramble={previewScramble} visualization={settings.scramblePreview === '3D' ? '3D' : '2D'} height={200} />
+                <TwistyPreview puzzle={eventInfo.puzzle} scramble={previewScramble} visualization={settings.scramblePreview === '3D' ? '3D' : '2D'} height={previewHeight} />
               ) : null}
             </div>
           </section>
         )}
         {settings.showSolveList && (
-          <SolveList solves={solves} ao5={ao5} ao12={ao12} bestIndex={stats.bestIndex} precision={settings.precision} loading={st.loading || !st.ready} onOpen={openSolve} />
+          <SolveList solves={solves} ao5={ao5} ao12={ao12} pbs={pbs} bestIndex={stats.bestIndex} precision={settings.precision} loading={st.loading || !st.ready} onOpen={openSolve} />
         )}
       </div>
 
-      {settings.showCharts ? (
-        solves.length >= 2 ? (
-          <div className="tp-charts fade-on-focus">
-            <Suspense fallback={chartFallback}>
-              <TrendChart times={times} ao5={ao5} ao12={ao12} precision={settings.precision} onOpenSolve={openSolve} />
-            </Suspense>
-            <Suspense fallback={chartFallback}>
-              <HistogramChart times={times} latest={solves.length ? effectiveMs(solves[solves.length - 1]) : null} />
-            </Suspense>
-          </div>
-        ) : null
-      ) : (
-        <div className="tp-charts-toggle fade-on-focus">
-          <button className="btn-text small" onClick={() => updateSettings({ showCharts: true })} {...noFocus}>
-            <ChartLine size={14} /> show charts
-          </button>
-        </div>
-      )}
-
-      <div className="keytips tp-keytips fade-on-focus">
-        <kbd>space</kbd> start / stop - <kbd>tab</kbd> new scramble - <kbd>alt</kbd>+<kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd> ok / +2 / dnf -{' '}
-        <kbd>alt</kbd>+<kbd>backspace</kbd> delete last - <kbd>esc</kbd> command line
-      </div>
       {guest && (
         <div className="tp-guest fade-on-focus">
           <span>
@@ -543,7 +694,7 @@ export default function TimerPage() {
             }}
             {...noFocus}
           >
-            <X size={12} />
+            <XMarkIcon width={12} height={12} />
           </button>
         </div>
       )}
@@ -599,6 +750,23 @@ export default function TimerPage() {
           }
           confirmLabel="delete session"
           onConfirm={() => deleteSession(session.id)}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal?.kind === 'clearSession' && session && (
+        <ConfirmModal
+          title="clear session"
+          message={
+            <>
+              Delete all {session.solveCount} solve{session.solveCount === 1 ? '' : 's'} in <span className="main">{session.name}</span>? The session stays. This can't be undone.
+            </>
+          }
+          confirmLabel="clear session"
+          onConfirm={async () => {
+            await clearSession(session.id);
+            clearResult();
+            toast.notice(`cleared ${session.name}`, { durationMs: 1500 });
+          }}
           onClose={() => setModal(null)}
         />
       )}

@@ -45,7 +45,7 @@ export function eventForScrType(scrType: string | undefined): string {
   return '333';
 }
 
-/** csTimer's multi-blind scramble type: an attempt is a score, not a single time, and cubetype has no such event. */
+/** csTimer's multi-blind scramble type: an attempt is a score, not a single time, and cubr has no such event. */
 export const isMultiBlindScrType = (scrType: string | undefined): boolean => scrType === 'r3ni';
 
 export class CsTimerFormatError extends Error {}
@@ -120,7 +120,7 @@ export function parseCsTimerExport(text: string): ImportedSession[] {
   return finishImport(csTimerSessions(root as Record<string, unknown>)).sessions;
 }
 
-/** The sessions and solves of a cubetype export (only the fields a csTimer file can hold). */
+/** The sessions and solves of a cubr export (only the fields a csTimer file can hold). */
 export interface ExportSession {
   name: string;
   event: string;
@@ -137,7 +137,7 @@ const EVENT_TO_SCRTYPE: Record<string, string> = Object.fromEntries(Object.entri
 export function toCsTimerExport(sessions: ExportSession[]): string {
   const out: Record<string, unknown> = {};
   const sessionData: Record<string, unknown> = {};
-  const list = sessions.length ? sessions : [{ name: 'cubetype', event: '333', solves: [] }];
+  const list = sessions.length ? sessions : [{ name: 'cubr', event: '333', solves: [] }];
   list.forEach((s, i) => {
     const n = i + 1;
     out[`session${n}`] = [...s.solves]

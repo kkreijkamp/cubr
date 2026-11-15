@@ -1,4 +1,4 @@
-import type { Penalty } from '@cubetype/cubestats';
+import type { Penalty } from '@cubr/cubestats';
 
 export type { Penalty };
 export type PlayerStatus = 'idle' | 'inspecting' | 'solving' | 'done';

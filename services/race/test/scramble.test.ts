@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EVENT_IDS } from '@cubetype/cubestats';
+import { EVENT_IDS } from '@cubr/cubestats';
 import {
   clockScramble, fallbackScramble, megaminxScramble, nxnScramble, pyraminxScramble, skewbScramble, sq1Apply, sq1Scramble,
   sq1SolvedLayers,

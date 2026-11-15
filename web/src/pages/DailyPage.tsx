@@ -1,8 +1,8 @@
 // Daily challenge: 5 scrambles per event per UTC day, identical for everyone, ranked by ao5.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarDays, CloudOff, LogIn, RotateCcw } from 'lucide-react';
-import { averageOfN, DAILY_EVENTS, effectiveMs, formatSolve, formatTime, getEvent, type Penalty } from '@cubetype/cubestats';
+import { ArrowRightEndOnRectangleIcon, ArrowUturnLeftIcon, CalendarDaysIcon, SignalSlashIcon } from '@heroicons/react/24/outline';
+import { averageOfN, DAILY_EVENTS, effectiveMs, formatSolve, formatTime, getEvent, type Penalty } from '@cubr/cubestats';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useSettings } from '../lib/settings';
@@ -23,7 +23,7 @@ import '../components/live/live.css';
 import '../components/live/daily/daily.css';
 
 const ATTEMPTS = 5;
-const PRACTICE_KEY = 'cubetype.daily.practice';
+const PRACTICE_KEY = 'cubr.daily.practice';
 
 interface Attempt {
   index: number;
@@ -79,7 +79,7 @@ async function submitDaily(event: string, date: string, index: number, r: TimerR
   const body = { timeMs: r.timeMs, penalty: r.penalty, scramble, source: 'daily' as const, daily: { date, index } };
   if (solveStore.get().mode === 'cloud') {
     try {
-      const session = await ensureSession(event);
+      const session = await ensureSession(event, { counts: true });
       await addSolve({ ...body, sessionId: session.id });
       return;
     } catch (e) {
@@ -101,7 +101,7 @@ export default function DailyPage() {
   const now = useNow(1000);
   const today = utcDateKey(new Date(now));
   const [date, setDate] = useState(today);
-  const [event, setEvent] = useStoredState<string>('cubetype.daily.event', '333');
+  const [event, setEvent] = useStoredState<string>('cubr.daily.event', '333');
   const [local, setLocal] = useState<Record<string, Attempt[]>>({});
   const [practice, setPractice] = useState<PracticeStore>(loadPractice);
   const [boardKey, setBoardKey] = useState(0);
@@ -220,7 +220,7 @@ export default function DailyPage() {
       {
         id: 'daily-event',
         label: 'Daily challenge event...',
-        icon: <CalendarDays />,
+        icon: <CalendarDaysIcon />,
         children: () => DAILY_EVENTS.map((id) => ({ id: `daily-event-${id}`, label: getEvent(id)?.name ?? id, active: id === event, run: () => setEvent(id) })),
       },
     ],
@@ -248,7 +248,7 @@ export default function DailyPage() {
       <div className="live-head fade-on-focus">
         <div className="titles">
           <h1 className="h2">
-            <CalendarDays /> daily challenge
+            <CalendarDaysIcon /> daily challenge
           </h1>
           <div className="subtitle">5 scrambles - the same for everyone - ranked by ao5 - resets at 00:00 UTC</div>
         </div>
@@ -265,7 +265,7 @@ export default function DailyPage() {
 
       {!authed && status !== 'loading' && isToday && (
         <Notice
-          icon={<LogIn />}
+          icon={<ArrowRightEndOnRectangleIcon />}
           action={
             <Link to="/login?next=/daily" className="btn small">
               sign in
@@ -309,10 +309,10 @@ export default function DailyPage() {
                     {a?.state === 'saving' && <Spinner size={12} />}
                     {a?.state === 'failed' && (
                       <button className="btn-text" onClick={() => retry(a)} aria-label="retry" data-tip={a.error ?? 'retry'}>
-                        <RotateCcw size={12} />
+                        <ArrowUturnLeftIcon width={12} height={12} />
                       </button>
                     )}
-                    {a?.state === 'failed' && <CloudOff size={12} />}
+                    {a?.state === 'failed' && <SignalSlashIcon width={12} height={12} />}
                   </span>
                 </li>
               );
@@ -368,10 +368,10 @@ export default function DailyPage() {
               {!authed && isToday && (
                 <div className="row wrap" style={{ justifyContent: 'center' }}>
                   <button className="btn small" onClick={resetPractice}>
-                    <RotateCcw /> practise again
+                    <ArrowUturnLeftIcon /> practise again
                   </button>
                   <Link to="/login?next=/daily" className="btn small primary">
-                    <LogIn /> sign in to compete
+                    <ArrowRightEndOnRectangleIcon /> sign in to compete
                   </Link>
                 </div>
               )}

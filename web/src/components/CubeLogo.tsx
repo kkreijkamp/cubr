@@ -1,4 +1,4 @@
-/** cubetype logo mark: a 3x3 face whose centre sticker uses the text colour. */
+/** cubr logo mark: a 3x3 face whose centre sticker uses the text colour. */
 export function CubeLogo({ className }: { className?: string }) {
   const cells = [0, 1, 2].flatMap((r) => [0, 1, 2].map((c) => ({ r, c })));
   return (

@@ -1,0 +1,9 @@
+[Unit]
+Description=cubr: refresh the WCA results export
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/cubr
+ExecStart=/usr/bin/docker compose -f docker-compose.yml -f deploy/vps/compose.prod.yml --profile jobs run --rm wca-import

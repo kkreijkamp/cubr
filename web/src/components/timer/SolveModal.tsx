@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Copy, Trash2 } from 'lucide-react';
-import { getEvent, type Penalty, type Precision } from '@cubetype/cubestats';
+import { ChevronLeftIcon, ChevronRightIcon, Square2StackIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { getEvent, type Penalty, type Precision } from '@cubr/cubestats';
 import { Modal } from '../Modal';
 import { TwistyPreview } from '../TwistyPreview';
 import type { Solve } from '../../lib/types';
@@ -49,7 +49,7 @@ export function SolveModal({ solve, index, total, precision, preview, confirmDel
       if (t && ['INPUT', 'TEXTAREA'].includes(t.tagName)) return;
       if (e.key === 'ArrowLeft' && index > 0) onNavigate(index - 1);
       else if (e.key === 'ArrowRight' && index < total - 1) onNavigate(index + 1);
-      else if (e.altKey && /^Digit[123]$/.test(e.code)) {
+      else if (e.ctrlKey && !e.altKey && !e.metaKey && /^Digit[123]$/.test(e.code)) {
         e.preventDefault();
         void setPenalty(solve.id, PENALTIES[Number(e.code.slice(5)) - 1]);
       }
@@ -80,10 +80,10 @@ export function SolveModal({ solve, index, total, precision, preview, confirmDel
           solve <span className="text">#{index + 1}</span>
           <span className="tp-modal-nav">
             <button className="btn-text" onClick={() => onNavigate(index - 1)} disabled={index === 0} aria-label="previous solve" data-tip="previous (<-)">
-              <ChevronLeft size={18} />
+              <ChevronLeftIcon width={18} height={18} />
             </button>
             <button className="btn-text" onClick={() => onNavigate(index + 1)} disabled={index >= total - 1} aria-label="next solve" data-tip="next (->)">
-              <ChevronRight size={18} />
+              <ChevronRightIcon width={18} height={18} />
             </button>
           </span>
         </span>
@@ -103,7 +103,7 @@ export function SolveModal({ solve, index, total, precision, preview, confirmDel
 
       <div className="option-group" role="group" aria-label="penalty">
         {PENALTIES.map((p, i) => (
-          <button key={p} className={`btn${solve.penalty === p ? ' active' : ''}`} onClick={() => void setPenalty(solve.id, p)} data-tip={`alt+${i + 1}`}>
+          <button key={p} className={`btn${solve.penalty === p ? ' active' : ''}`} onClick={() => void setPenalty(solve.id, p)} data-tip={`ctrl+${i + 1}`}>
             {p === 'OK' ? 'no penalty' : p.toLowerCase()}
           </button>
         ))}
@@ -119,7 +119,7 @@ export function SolveModal({ solve, index, total, precision, preview, confirmDel
             }}
             disabled={!solve.scramble}
           >
-            <Copy size={14} /> copy
+            <Square2StackIcon width={14} height={14} /> copy
           </button>
         </div>
         <div className="tp-detail-scramble">{solve.scramble || <span className="sub">no scramble recorded</span>}</div>
@@ -152,7 +152,7 @@ export function SolveModal({ solve, index, total, precision, preview, confirmDel
 
       <div className="dialog-actions tp-detail-actions">
         <button className={`btn ${armed ? 'danger' : ''}`} onClick={remove}>
-          <Trash2 size={16} /> {armed ? 'click again to delete' : 'delete solve'}
+          <TrashIcon width={16} height={16} /> {armed ? 'click again to delete' : 'delete solve'}
         </button>
         <button
           className="btn primary"

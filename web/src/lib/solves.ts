@@ -8,14 +8,14 @@
 //  - Switches automatically on login/logout (onAuthChange from ./auth).
 //
 // Implementation notes
-//  - Local data: `cubetype.local.v1` (compact tuples, see timer/storeUtils.ts), written debounced
-//    and flushed on pagehide. Corrupt data is backed up to `cubetype.local.v1.corrupt`, never lost.
-//  - Cloud writes go through a persistent FIFO queue (`cubetype.queue.v1`) processed one op at a
+//  - Local data: `cubr.local.v1` (compact tuples, see timer/storeUtils.ts), written debounced
+//    and flushed on pagehide. Corrupt data is backed up to `cubr.local.v1.corrupt`, never lost.
+//  - Cloud writes go through a persistent FIFO queue (`cubr.queue.v1`) processed one op at a
 //    time; unsent edits are coalesced into their create. Network/5xx/429 -> exponential backoff
 //    (1 s ... 60 s, retried immediately on `online`). Server reads are overlaid with queued ops so
-//    optimistic changes survive reloads. The current session is cached (`cubetype.cloudcache.v1`)
+//    optimistic changes survive reloads. The current session is cached (`cubr.cloudcache.v1`)
 //    so a logged-in user can keep timing while solve-service is down.
-import { getEvent, isEventId, type ImportedSession, type Penalty } from '@cubetype/cubestats';
+import { getEvent, isEventId, type ImportedSession, type Penalty } from '@cubr/cubestats';
 import { api, ApiError, getToken, type ImportPayload } from './api';
 import { getCurrentUser, onAuthChange } from './auth';
 import { settingsStore, updateSettings } from './settings';
@@ -97,9 +97,9 @@ export function getCurrentSession(): Session | null {
 // ================================================================ module state
 
 const browser = typeof window !== 'undefined' && typeof document !== 'undefined';
-const CLOUD_CACHE_KEY = 'cubetype.cloudcache.v1';
-const LAST_SESSION_KEY = 'cubetype.lastSession.v1';
-const OFFER_DISMISSED_KEY = 'cubetype.uploadOffer.dismissed';
+const CLOUD_CACHE_KEY = 'cubr.cloudcache.v1';
+const LAST_SESSION_KEY = 'cubr.lastSession.v1';
+const OFFER_DISMISSED_KEY = 'cubr.uploadOffer.dismissed';
 
 type Scope = { mode: 'local' } | { mode: 'cloud'; userId: string };
 let scope: Scope | null = null;
@@ -343,10 +343,19 @@ async function send(op: SyncOp): Promise<void> {
   };
   switch (op.kind) {
     case 'createSession':
-      await api.sessions.create({ id: op.session.id, name: op.session.name, event: op.session.event });
+      await api.sessions.create({
+        id: op.session.id,
+        name: op.session.name,
+        event: op.session.event,
+        ...(op.session.practice ? { practice: true } : {}),
+        ...(op.keepCreatedAt ? { createdAt: op.session.createdAt } : {}),
+      });
       return;
     case 'renameSession':
       await api.sessions.rename(op.id, op.name).catch(ignore404);
+      return;
+    case 'setPractice':
+      await api.sessions.setPractice(op.id, op.practice).catch(ignore404);
       return;
     case 'deleteSession':
       await api.sessions.remove(op.id).catch(ignore404);
@@ -727,12 +736,12 @@ function validName(name: string): string {
   return n;
 }
 
-function createSessionInternal(name: string, event: string): Session {
+function createSessionInternal(name: string, event: string, practice = false): Session {
   const now = new Date().toISOString();
-  const session: Session = { id: uuid(), name, event, createdAt: now, updatedAt: now, solveCount: 0 };
+  const session: Session = { id: uuid(), name, event, ...(practice ? { practice } : {}), createdAt: now, updatedAt: now, solveCount: 0 };
   model.sessions = [...model.sessions, session];
   model.solves.set(session.id, []);
-  if (scope?.mode === 'cloud') enqueue({ kind: 'createSession', session: { id: session.id, name, event, createdAt: now } });
+  if (scope?.mode === 'cloud') enqueue({ kind: 'createSession', session: { id: session.id, name, event, ...(practice ? { practice } : {}), createdAt: now } });
   else saveLocalSoon();
   return session;
 }
@@ -835,12 +844,21 @@ export async function deleteSolve(solveId: string): Promise<void> {
   commit();
 }
 
-export async function createSession(name: string, event: string): Promise<Session> {
+export async function createSession(name: string, event: string, opts: { practice?: boolean } = {}): Promise<Session> {
   if (!solveStore.get().ready) await whenReady();
   if (!isEventId(event)) throw new Error(`Unknown event ${event}`);
-  const s = createSessionInternal(validName(name), event);
+  const s = createSessionInternal(validName(name), event, opts.practice === true);
   commit();
   return s;
+}
+
+/** A practice session's solves count for no personal best and no leaderboard (the session's own stats stay). */
+export async function setSessionPractice(sessionId: string, practice: boolean): Promise<void> {
+  const s = sessionById(sessionId);
+  if (!s || (s.practice === true) === practice) return;
+  patchSession(sessionId, { practice, updatedAt: new Date().toISOString() });
+  if (scope?.mode === 'cloud') enqueue({ kind: 'setPractice', id: sessionId, practice });
+  commit();
 }
 
 export async function renameSession(sessionId: string, name: string): Promise<void> {
@@ -869,6 +887,40 @@ export async function deleteSession(sessionId: string): Promise<void> {
   commit();
 }
 
+/**
+ * Deletes every solve in a session but keeps the session: its name and its place in the list
+ * (csTimer's alt+d). Signed in, an empty session with the same name and creation time takes its
+ * place - one request to create it and one to delete the old one, however many solves there were.
+ */
+export async function clearSession(sessionId: string): Promise<void> {
+  const old = sessionById(sessionId);
+  if (!old || old.solveCount === 0) return;
+  const now = new Date().toISOString();
+  if (scope?.mode !== 'cloud') {
+    model.solves.set(sessionId, []);
+    patchSession(sessionId, { solveCount: 0, updatedAt: now });
+    commit();
+    return;
+  }
+  const fresh: Session = { id: uuid(), name: old.name, event: old.event, ...(old.practice ? { practice: true } : {}), createdAt: old.createdAt, updatedAt: now, solveCount: 0 };
+  model.sessions = model.sessions.map((s) => (s.id === sessionId ? fresh : s));
+  model.solves.delete(sessionId);
+  model.solves.set(fresh.id, []);
+  for (const [ev, id] of Object.entries(model.lastByEvent)) if (id === sessionId) model.lastByEvent[ev] = fresh.id;
+  enqueue({
+    kind: 'createSession',
+    session: { id: fresh.id, name: fresh.name, event: fresh.event, ...(fresh.practice ? { practice: true } : {}), createdAt: fresh.createdAt },
+    keepCreatedAt: true,
+  });
+  enqueue({ kind: 'deleteSession', id: sessionId });
+  if (model.current === sessionId) {
+    commit();
+    await switchSession(fresh.id);
+    return;
+  }
+  commit();
+}
+
 export async function switchSession(sessionId: string): Promise<void> {
   const s = sessionById(sessionId);
   if (!s) throw new Error('Unknown session');
@@ -882,10 +934,12 @@ export async function switchSession(sessionId: string): Promise<void> {
   } else commit();
 }
 
-function findSessionFor(event: string): Session | undefined {
+/** The session of `event` used last (or the first); `counts`: one that isn't a practice session. */
+function findSessionFor(event: string, counts = false): Session | undefined {
+  const ok = (s: Session | undefined) => !!s && s.event === event && !(counts && s.practice);
   const last = sessionById(model.lastByEvent[event]);
-  if (last && last.event === event) return last;
-  return model.sessions.find((s) => s.event === event);
+  if (ok(last)) return last;
+  return model.sessions.find(ok);
 }
 
 /** Switch to the first session of `event`, creating one if none exists. */
@@ -896,11 +950,15 @@ export async function switchEvent(event: string): Promise<void> {
   await switchSession(s.id);
 }
 
-/** Returns a session for `event` without switching to it (creates one if needed). */
-export async function ensureSession(event: string): Promise<Session> {
+/**
+ * Returns a session for `event` without switching to it (creates one if needed). `counts`: one
+ * whose solves count for PBs and leaderboards (the daily challenge and races never go into a
+ * practice session).
+ */
+export async function ensureSession(event: string, opts: { counts?: boolean } = {}): Promise<Session> {
   if (!solveStore.get().ready) await whenReady();
   if (!isEventId(event)) throw new Error(`Unknown event ${event}`);
-  const found = findSessionFor(event);
+  const found = findSessionFor(event, opts.counts === true);
   if (found) return found;
   const s = createSessionInternal(suggestSessionNameFor(event), event);
   commit();
@@ -918,6 +976,7 @@ function opSessionId(op: SyncOp): string {
     case 'createSession':
       return op.session.id;
     case 'renameSession':
+    case 'setPractice':
     case 'deleteSession':
       return op.id;
     case 'createSolve':
@@ -1056,6 +1115,7 @@ export async function importSessions(sessions: ImportedSession[]): Promise<{ ses
     const payload: ImportPayload['sessions'] = valid.map((s) => ({
       name: (s.name.trim() || 'import').slice(0, 40),
       event: s.event,
+      ...(s.practice ? { practice: true } : {}),
       solves: s.solves.map((x) => ({ timeMs: x.timeMs, penalty: x.penalty, scramble: x.scramble, comment: x.comment, createdAt: x.createdAt })),
     }));
     const total = { sessions: 0, solves: 0 };
@@ -1071,7 +1131,15 @@ export async function importSessions(sessions: ImportedSession[]): Promise<{ ses
   let solves = 0;
   for (const s of valid) {
     const now = new Date().toISOString();
-    const session: Session = { id: uuid(), name: (s.name.trim() || 'import').slice(0, 40), event: s.event, createdAt: now, updatedAt: now, solveCount: s.solves.length };
+    const session: Session = {
+      id: uuid(),
+      name: (s.name.trim() || 'import').slice(0, 40),
+      event: s.event,
+      ...(s.practice ? { practice: true } : {}),
+      createdAt: now,
+      updatedAt: now,
+      solveCount: s.solves.length,
+    };
     const list = sortChrono(
       s.solves.map((x) => ({
         id: uuid(),
@@ -1133,6 +1201,7 @@ export async function uploadLocalSolves(): Promise<{ sessions: number; solves: n
       payload: {
         name: s.name,
         event: s.event,
+        ...(s.practice ? { practice: true } : {}),
         solves: list.map((x) => ({ timeMs: x.timeMs, penalty: x.penalty, scramble: x.scramble, comment: x.comment, createdAt: x.createdAt })),
       },
     }));
@@ -1184,6 +1253,25 @@ export function dismissUploadOffer(): void {
 export function localDataSummary(): { sessions: number; solves: number } {
   if (scope?.mode === 'local') return countLocal(localDb);
   return countLocal(readLocal(true));
+}
+
+/** Forgets what this browser keeps for an account (after deleting it): its offline copy and unsent changes. */
+export function forgetUser(uid: string): void {
+  queue = queue.filter((q) => q.userId !== uid);
+  saveQueue();
+  if (loadJson<{ userId?: unknown } | null>(CLOUD_CACHE_KEY, null)?.userId === uid) {
+    try {
+      localStorage.removeItem(CLOUD_CACHE_KEY);
+    } catch {
+      /* ignore */
+    }
+  }
+  const last = loadJson<Record<string, unknown>>(LAST_SESSION_KEY, {});
+  if (last && typeof last === 'object' && uid in last) {
+    const { [uid]: _gone, ...rest } = last;
+    saveJson(LAST_SESSION_KEY, rest);
+  }
+  publish();
 }
 
 /** Deletes every guest session/solve stored in this browser (does not touch cloud data). */

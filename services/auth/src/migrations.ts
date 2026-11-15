@@ -1,4 +1,4 @@
-import type { Migration } from '@cubetype/common';
+import type { Migration } from '@cubr/common';
 
 /** auth schema (docs/SPEC.md section 7.1). Applied by migrate() at startup; statements are idempotent. */
 export const migrations: Migration[] = [

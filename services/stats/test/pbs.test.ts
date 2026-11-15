@@ -108,6 +108,28 @@ describe('replayHistory', () => {
   });
 });
 
+describe('practice sessions', () => {
+  const practice = (x: ListSolve): ListSolve => ({ ...x, practice: true });
+
+  it('count for no personal best, however fast', () => {
+    const list = [
+      ...[10000, 11000, 12000, 10500, 11500].map((t, i) => solve(S1, i, t)),
+      ...[7000, 7100, 7200, 7300, 7400].map((t, i) => practice(solve(S2, 10 + i, t))),
+    ];
+    const pbs = computePbs(list);
+    expect(pbs.single?.valueMs).toBe(10000);
+    expect(pbs.ao5?.valueMs).toBe(11000);
+    expect(pbs.single?.solveId).toBe(list[0].id);
+    // only practice: no PBs at all
+    expect(computePbs(list.slice(5))).toEqual({});
+  });
+
+  it('leave no mark on the PB history', () => {
+    const list = [solve(S1, 0, 12000), practice(solve(S2, 1, 8000)), solve(S1, 2, 11000)];
+    expect(replayHistory(list).filter((h) => h.kind === 'single').map((h) => h.valueMs)).toEqual([12000, 11000]);
+  });
+});
+
 describe('incremental helpers', () => {
   it('isImprovement', () => {
     expect(isImprovement(9000, null)).toBe(true);

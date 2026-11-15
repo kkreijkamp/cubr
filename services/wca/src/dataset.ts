@@ -1,5 +1,5 @@
-import type { Pool } from '@cubetype/common';
-import { PG_PING_TIMEOUT_MS, queryWithTimeout, unavailable } from '@cubetype/common';
+import type { Pool } from '@cubr/common';
+import { PG_PING_TIMEOUT_MS, queryWithTimeout, unavailable } from '@cubr/common';
 
 /**
  * Which WCA export is currently loaded. The importer (jobs/wca-import) owns the `wca` schema

@@ -1,5 +1,5 @@
 import type { FastifyBaseLogger } from 'fastify';
-import { publishEvent, queryWithTimeout, type Pool, type PoolClient, type Redis } from '@cubetype/common';
+import { publishEvent, queryWithTimeout, type Pool, type PoolClient, type Redis } from '@cubr/common';
 
 /**
  * Transactional outbox (docs/SPEC.md section 7.2, section 9.3).
@@ -17,6 +17,7 @@ export type OutboxType =
   | 'solve.deleted'
   | 'session.deleted'
   | 'session.renamed'
+  | 'session.updated'
   | 'sessions.merged'
   | 'solves.imported'
   | 'daily.completed';

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================================
-# cubetype -- every command used to build, deploy, demonstrate and tear down cubetype on
+# cubr -- every command used to build, deploy, demonstrate and tear down cubr on
 # Google Kubernetes Engine (GKE Standard, project infs3208-a2-koen, zone australia-southeast1-a).
 #
 # HOW TO USE
@@ -29,18 +29,26 @@ PROJECT_ID="infs3208-a2-koen"           # Google Cloud project
 ACCOUNT="koen@mangotree.info"           # Google account that owns / is Owner of the project
 REGION="australia-southeast1"           # Sydney: Artifact Registry + Cloud Build region
 ZONE="australia-southeast1-a"           # zonal cluster = free GKE management fee (free tier)
-CLUSTER="cubetype"                      # GKE cluster name
-REPO="cubetype"                         # Artifact Registry Docker repository name
-VERSION="1.0.19"                         # release being deployed (image tag + APP_VERSION)
-NS="cubetype"                           # Kubernetes namespace of the app
-REGISTRY="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO"   # full image prefix, e.g. $REGISTRY/web:1.0.19
+CLUSTER="cubr"                          # GKE cluster name
+REPO="cubr"                             # Artifact Registry Docker repository name
+VERSION="1.1.0"                         # release being deployed (image tag + APP_VERSION)
+NS="cubr"                               # Kubernetes namespace of the app
+REGISTRY="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO"   # full image prefix, e.g. $REGISTRY/web:1.1.0
 CNPG_VERSION="1.30.1"                   # CloudNativePG (PostgreSQL operator) release
 DEPLOYMENTS="auth scramble solve stats leaderboard race wca web"
+
+# Legacy names: the INFS3208 deployment in this project predates the cubetype -> cubr rename
+# (2026-11) and still runs under the OLD names: cluster "cubetype", namespace "cubetype",
+# Artifact Registry repo "cubetype", global IP "cubetype-ip". Section 15 uses the new names, so
+# to remove that old deployment, run its clean-up commands with the old names instead, e.g.
+#   gcloud container clusters delete cubetype --zone="$ZONE" --quiet
+#   gcloud compute addresses delete cubetype-ip --global --quiet
+#   gcloud artifacts repositories delete cubetype --location="$REGION" --quiet
 
 # Prints the public IP of the GKE Ingress (empty until Google has provisioned the load balancer).
 ingress_ip() {
   # -o jsonpath: extract only the IP address field from the Ingress status
-  kubectl -n "$NS" get ingress cubetype -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+  kubectl -n "$NS" get ingress cubr -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
 }
 
 # =============================================================================================
@@ -97,7 +105,7 @@ section_3() {
   gcloud artifacts repositories create "$REPO" \
     --repository-format=docker \
     --location="$REGION" \
-    --description="cubetype container images (INFS3208)"
+    --description="cubr container images (INFS3208)"
 
   # Look up the numeric project number (part of the default service-account e-mails).
   #   --format='value(projectNumber)'  print only that field, no table
@@ -216,10 +224,10 @@ section_6() {
   # Reserve a permanent public IPv4 address for the load balancer, so the URL survives
   # re-deployments. --global: GKE Ingress creates a GLOBAL external Application Load Balancer.
   # The Ingress refers to it by name (annotation kubernetes.io/ingress.global-static-ip-name).
-  gcloud compute addresses create cubetype-ip --global --ip-version=IPV4
+  gcloud compute addresses create cubr-ip --global --ip-version=IPV4
 
   # Print the reserved address (this will be the app's URL: http://<address>/).
-  gcloud compute addresses describe cubetype-ip --global --format='value(address)'
+  gcloud compute addresses describe cubr-ip --global --format='value(address)'
 }
 
 # =============================================================================================
@@ -240,7 +248,7 @@ section_7() {
   # Verify the new resource type exists (Cluster = postgresql.cnpg.io/v1).
   kubectl get crd clusters.postgresql.cnpg.io
 
-  # (Optional) kubectl plugin for `kubectl cnpg status pg -n cubetype` (macOS / Homebrew).
+  # (Optional) kubectl plugin for `kubectl cnpg status pg -n cubr` (macOS / Homebrew).
   # brew install kubectl-cnpg
 }
 
@@ -252,27 +260,27 @@ section_8() {
   #   --dry-run=client -o yaml  don't create, just print the object   | kubectl apply -f -  create/update it
   kubectl create namespace "$NS" --dry-run=client -o yaml | kubectl apply -f -
 
-  # Create Secret cubetype-secrets, only if it does not exist yet (re-creating it would
+  # Create Secret cubr-secrets, only if it does not exist yet (re-creating it would
   # log every user out), with two random keys:
   #   JWT_SECRET          HS256 signing key shared by all services (32 random bytes, 64 hex chars)
   #   INTERNAL_API_TOKEN  shared secret the seed Job sends as X-Internal-Token so auth skips
   #                       its per-IP register/login rate limits (24 random bytes, 48 hex chars)
   # Flags: generic = Opaque secret from literal values; --from-literal = one key=value pair.
-  kubectl -n "$NS" get secret cubetype-secrets >/dev/null 2>&1 || \
-    kubectl -n "$NS" create secret generic cubetype-secrets \
+  kubectl -n "$NS" get secret cubr-secrets >/dev/null 2>&1 || \
+    kubectl -n "$NS" create secret generic cubr-secrets \
       --from-literal=JWT_SECRET="$(openssl rand -hex 32)" \
       --from-literal=INTERNAL_API_TOKEN="$(openssl rand -hex 24)"
 
   # (Only if the secret was created before INTERNAL_API_TOKEN existed) add the missing key in
   # place; -p = merge patch, stringData = plain text.
-  # kubectl -n "$NS" patch secret cubetype-secrets -p "{\"stringData\":{\"INTERNAL_API_TOKEN\":\"$(openssl rand -hex 24)\"}}"
+  # kubectl -n "$NS" patch secret cubr-secrets -p "{\"stringData\":{\"INTERNAL_API_TOKEN\":\"$(openssl rand -hex 24)\"}}"
 
   # Show that the secret exists (values are not printed, only key names and sizes).
-  kubectl -n "$NS" describe secret cubetype-secrets
+  kubectl -n "$NS" describe secret cubr-secrets
 }
 
 # =============================================================================================
-# 9. Deploy cubetype (kustomize overlay for GKE) and wait until it is up
+# 9. Deploy cubr (kustomize overlay for GKE) and wait until it is up
 # =============================================================================================
 section_9() {
   # Render deploy/k8s/overlays/gke (base + Artifact Registry images + Ingress + BackendConfigs
@@ -310,12 +318,12 @@ section_9() {
   waited=0
   until [ -n "$(ingress_ip)" ]; do
     if [ "$waited" -ge 1500 ]; then
-      echo "no Ingress address after 25 min: see kubectl -n $NS describe ingress cubetype" >&2
+      echo "no Ingress address after 25 min: see kubectl -n $NS describe ingress cubr" >&2
       return 1
     fi
     sleep 10; waited=$((waited + 10))
   done
-  kubectl -n "$NS" get ingress cubetype
+  kubectl -n "$NS" get ingress cubr
 
   # 2) Up to 10 more min until it answers: Google returns 404/502 until the backends' health
   #    checks pass (usually 5-10 min).
@@ -325,14 +333,14 @@ section_9() {
   until [ "$(curl -s -m 5 -o /dev/null -w '%{http_code}' "http://$(ingress_ip)/_info")" = 200 ]; do
     if [ "$waited" -ge 600 ]; then
       echo "the load balancer still doesn't answer after 10 min: see the backends' health below" >&2
-      kubectl -n "$NS" describe ingress cubetype
+      kubectl -n "$NS" describe ingress cubr
       return 1
     fi
     sleep 10; waited=$((waited + 10))
   done
 
   # Per-backend health as seen by Google (annotation ingress.kubernetes.io/backends -> HEALTHY).
-  kubectl -n "$NS" describe ingress cubetype
+  kubectl -n "$NS" describe ingress cubr
 
   # Smoke test through the public entry point: SPA info and one API.
   curl -s "http://$(ingress_ip)/_info"; echo
@@ -358,7 +366,7 @@ section_10() {
   kubectl -n "$NS" wait --for=condition=complete job/wca-import-now --timeout=1800s
 
   # Create the seed Job (150 users + ~100k solves through the public APIs), using the GKE
-  # image (overlays/gke/seed rewrites cubetype/seed:dev to Artifact Registry).
+  # image (overlays/gke/seed rewrites cubr/seed:dev to Artifact Registry).
   kubectl apply -k deploy/k8s/overlays/gke/seed
 
   # Follow its progress (one line per user).
@@ -466,7 +474,7 @@ section_13() {
   # First log in as the seeded demo user (section 10) and keep its token:
   #   -X POST -d  send the credentials as JSON    jq -r .token  print the raw token
   # IP="$(ingress_ip)"
-  # TOKEN="$(curl -s -X POST "http://$IP/api/auth/login" -H 'content-type: application/json' -d '{"login":"demo","password":"cubetype-demo"}' | jq -r .token)"
+  # TOKEN="$(curl -s -X POST "http://$IP/api/auth/login" -H 'content-type: application/json' -d '{"login":"demo","password":"cubr-demo"}' | jq -r .token)"
   # Then probe twice a second:
   #   -m 2  give up after 2 s (prints 000)    -o /dev/null  discard the body
   #   -w '%{http_code} '  print only the status code    -H authorization  send the token
@@ -669,7 +677,7 @@ section_15() {
   # gcloud container clusters delete "$CLUSTER" --zone="$ZONE" --quiet
   # 3) Release the static IP (a reserved but unused address is billed).
   #   --global  the IP is a global address (section 6)
-  # gcloud compute addresses delete cubetype-ip --global --quiet
+  # gcloud compute addresses delete cubr-ip --global --quiet
   # 4) Delete the image repository (storage billed per GB).
   #   --location  the repository's region
   # gcloud artifacts repositories delete "$REPO" --location="$REGION" --quiet

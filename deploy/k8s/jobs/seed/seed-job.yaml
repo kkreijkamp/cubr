@@ -2,7 +2,7 @@
 # so the data flows exactly like real traffic: solve -> outbox -> Redis Stream -> stats/leaderboard.
 # Not part of the base; applied through the GKE wrapper (image rewrite):
 #   kubectl apply -k deploy/k8s/overlays/gke/seed
-# Jobs are immutable: to run it again, `kubectl -n cubetype delete job seed` first.
+# Jobs are immutable: to run it again, `kubectl -n cubr delete job seed` first.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -10,7 +10,7 @@ metadata:
   labels:
     app.kubernetes.io/name: seed
     app.kubernetes.io/component: batch
-    app.kubernetes.io/part-of: cubetype
+    app.kubernetes.io/part-of: cubr
 spec:
   backoffLimit: 2                       # writes are idempotent (existing users are skipped), so retries are safe
   activeDeadlineSeconds: 3600
@@ -20,7 +20,7 @@ spec:
       labels:
         app.kubernetes.io/name: seed
         app.kubernetes.io/component: batch
-        app.kubernetes.io/part-of: cubetype
+        app.kubernetes.io/part-of: cubr
     spec:
       restartPolicy: Never
       automountServiceAccountToken: false
@@ -32,16 +32,16 @@ spec:
           type: RuntimeDefault
       containers:
         - name: seed
-          image: cubetype/seed:dev      # rewritten by the overlay wrapper
+          image: cubr/seed:dev          # rewritten by the overlay wrapper
           imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:
-                name: cubetype-config   # AUTH_URL, SOLVE_URL, SCRAMBLE_URL = in-cluster service addresses
+                name: cubr-config       # AUTH_URL, SOLVE_URL, SCRAMBLE_URL = in-cluster service addresses
           env:
             - name: INTERNAL_API_TOKEN  # sent as X-Internal-Token so auth skips its per-IP rate limits for the seeder
               valueFrom:
                 secretKeyRef:
-                  name: cubetype-secrets
+                  name: cubr-secrets
                   key: INTERNAL_API_TOKEN
             # tuning knobs (jobs/seed/README.md)
             - name: SEED_USERS          # synthetic users (+1 demo account)
@@ -53,7 +53,7 @@ spec:
             - name: SEED_DEMO_USER      # presentation account
               value: demo
             - name: SEED_DEMO_PASSWORD
-              value: cubetype-demo
+              value: cubr-demo
           resources:
             requests:
               cpu: 100m

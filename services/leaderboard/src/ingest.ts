@@ -1,8 +1,9 @@
-import type { EventEnvelope, Redis } from '@cubetype/common';
+import type { EventEnvelope, Redis } from '@cubr/common';
 import type { FastifyBaseLogger } from 'fastify';
 import { isBelowFloor, type FloorSource } from './floors.js';
 import {
   DAILY_TTL_SEC,
+  DELETED_USERS_KEY,
   FLAGGED_KEY,
   FLAGGED_MAX,
   USERS_KEY,
@@ -11,9 +12,11 @@ import {
   atKey,
   challengeKey,
   dailyKey,
+  flaggedBy,
   hasBoards,
   isKind,
   isValidDay,
+  purgePlan,
   tsKey,
   utcDay,
   utcWeek,
@@ -27,7 +30,7 @@ import {
 // All writes are idempotent (exact set / keep-best), so at-least-once redelivery is harmless.
 // ---------------------------------------------------------------------------------------------
 
-export const CONSUMED_TYPES = ['pb.updated', 'solve.created', 'daily.completed', 'user.registered', 'user.updated'];
+export const CONSUMED_TYPES = ['pb.updated', 'solve.created', 'daily.completed', 'user.registered', 'user.updated', 'user.deleted'];
 
 /** A keep-best write (ZADD LT) to a period board. */
 export interface BestWrite {
@@ -79,11 +82,12 @@ export function planPbUpdated(d: Data, nowMs = Date.now()): PbWrite | null {
 /**
  * solve.created -> daily + weekly boards for the single (effectiveMs; null = DNF -> skipped) and the
  * session's rolling ao5. Buckets are UTC days / ISO weeks of the solve's createdAt. Solves older
- * than a board's lifetime (3 d / 15 d) are skipped so replays don't resurrect expired boards.
+ * than a board's lifetime (3 d / 15 d) are skipped so replays don't resurrect expired boards, and
+ * so are a practice session's (the all-time boards follow stats' PBs, which leave them out too).
  */
 export function planSolveCreated(d: Data, nowMs = Date.now()): BestWrite[] {
   const event = String(d.event ?? '');
-  if (!hasBoards(event)) return [];
+  if (!hasBoards(event) || d.practice === true) return [];
   const createdMs = parseTime(d.createdAt) ?? parseTime(d.occurredAt) ?? nowMs;
   const created = new Date(createdMs);
   const achievedAt = created.toISOString();
@@ -180,10 +184,37 @@ export function makeHandler({ redis, floors, log }: IngestDeps) {
     await redis.lbBest(w.board, atKey(w.board), w.valueMs, evt.data.userId as string, w.achievedAt, w.ttlSec);
   }
 
+  /** A deleted account leaves every board, the display info and the anti-cheat list. */
+  async function purgeUser(userId: string) {
+    // first, so an event for the account handled meanwhile can't put it back
+    await redis.sadd(DELETED_USERS_KEY, userId);
+    let cursor = '0';
+    do {
+      const [next, keys] = await redis.scan(cursor, 'MATCH', 'lb:*', 'COUNT', 500);
+      cursor = next;
+      const plan = purgePlan(keys);
+      if (plan.length) {
+        const p = redis.pipeline();
+        for (const { op, key } of plan) {
+          if (op === 'hdel') p.hdel(key, userId);
+          else p.zrem(key, userId);
+        }
+        await p.exec();
+      }
+    } while (cursor !== '0');
+    await redis.hdel(USERS_KEY, userId);
+    for (const entry of await redis.lrange(FLAGGED_KEY, 0, -1)) {
+      if (flaggedBy(entry, userId)) await redis.lrem(FLAGGED_KEY, 0, entry);
+    }
+    log.info({ userId }, 'deleted account removed from the leaderboards');
+  }
+
   return async function handle(evt: EventEnvelope): Promise<void> {
     const d = evt.data as Data;
     const userId = d.userId;
     if (typeof userId !== 'string' || !userId) return;
+    if (evt.type === 'user.deleted') return purgeUser(userId);
+    if (await redis.sismember(DELETED_USERS_KEY, userId)) return; // late event for a deleted account
     const flagged = new Set<string>();
 
     const info = planUserInfo(evt.type, d);

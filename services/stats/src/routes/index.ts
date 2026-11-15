@@ -1,4 +1,4 @@
-import type { Pool, Redis } from '@cubetype/common';
+import type { Pool, Redis } from '@cubr/common';
 import type { FastifyInstance } from 'fastify';
 import { registerGlobalRoutes } from './global.js';
 import { registerInternalRoutes } from './internal.js';

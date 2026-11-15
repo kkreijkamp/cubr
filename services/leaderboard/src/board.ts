@@ -1,5 +1,5 @@
-import type { Redis } from '@cubetype/common';
-import { EVENT_IDS } from '@cubetype/cubestats';
+import type { Redis } from '@cubr/common';
+import { EVENT_IDS } from '@cubr/cubestats';
 import { KINDS, USERS_KEY, allTimeKey, atKey, pageRange, rankAt, type Kind } from './keys.js';
 
 // Read side: turns sorted sets + side hashes into the response shapes of SPEC section 9.5.

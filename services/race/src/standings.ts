@@ -1,4 +1,4 @@
-import { averageOfN, effectiveMs, toApiValue } from '@cubetype/cubestats';
+import { averageOfN, effectiveMs, toApiValue } from '@cubr/cubestats';
 import type { Results, Standing } from './types.js';
 
 /** Round keys in numeric order ("2" before "10"). */

@@ -1,5 +1,5 @@
-import { notFound } from '@cubetype/common';
-import type { EventInfo } from '@cubetype/cubestats';
+import { notFound } from '@cubr/common';
+import type { EventInfo } from '@cubr/cubestats';
 import type { CacheFn } from './cache.js';
 import type { Dataset, DatasetMeta } from './dataset.js';
 import type { PercentileRow, RankedRow, Repo } from './repo.js';

@@ -13,6 +13,8 @@ interface AuthContextValue {
   login(login: string, password: string): Promise<void>;
   register(username: string, email: string, password: string): Promise<void>;
   logout(): Promise<void>;
+  /** Deletes the account for good (after checking the password), then signs out. */
+  deleteAccount(password: string): Promise<void>;
   setUser(u: PrivateUser): void;
 }
 
@@ -31,7 +33,7 @@ export function getCurrentUser(): PrivateUser | null {
 }
 
 /** The last signed-in user, so the app stays signed in while the auth service is unreachable. */
-const USER_KEY = 'cubetype.user';
+const USER_KEY = 'cubr.user';
 function cachedUser(): PrivateUser | null {
   const u = loadJson<PrivateUser | null>(USER_KEY, null);
   return u && typeof u.id === 'string' && typeof u.username === 'string' ? u : null;
@@ -137,6 +139,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           /* token is discarded locally regardless */
         }
+        setToken(null);
+        applyUser(null);
+      },
+      async deleteAccount(password) {
+        await api.auth.deleteMe(password);
         setToken(null);
         applyUser(null);
       },

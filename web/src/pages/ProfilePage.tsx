@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { UserSearch } from 'lucide-react';
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { ErrorState, Loading } from '../components/Spinner';
 import { ProfileView } from '../components/social/ProfileView';
 import { friendlyError } from '../components/social/util';
@@ -14,9 +14,9 @@ export default function ProfilePage() {
   const profile = useAsync((signal) => api.auth.user(username, signal), [username]);
 
   useEffect(() => {
-    document.title = `${username} | cubetype`;
+    document.title = `${username} | cubr`;
     return () => {
-      document.title = 'cubetype';
+      document.title = 'cubr';
     };
   }, [username]);
 
@@ -24,7 +24,7 @@ export default function ProfilePage() {
     if (profile.error instanceof ApiError && profile.error.status === 404) {
       return (
         <div className="empty stack" style={{ justifyItems: 'center', paddingTop: '4rem' }}>
-          <UserSearch size={40} className="sub" aria-hidden="true" />
+          <MagnifyingGlassIcon width={40} height={40} className="sub" aria-hidden="true" />
           <div className="text" style={{ fontSize: '1.5rem' }}>
             no cuber called "{username}"
           </div>

@@ -10,6 +10,8 @@ export interface AuthUser {
   jti: string;
   /** expiry, unix seconds */
   exp: number;
+  /** issued at, unix seconds */
+  iat?: number;
 }
 
 declare module 'fastify' {
@@ -18,7 +20,7 @@ declare module 'fastify' {
   }
 }
 
-const ISSUER = 'cubetype';
+const ISSUER = 'cubr';
 export const TOKEN_TTL_SEC = 30 * 24 * 3600;
 
 const keyCache = new Map<string, Uint8Array>();
@@ -54,21 +56,37 @@ export async function verifyToken(secret: string, token: string): Promise<AuthUs
   if (!payload.sub || typeof payload.username !== 'string' || !payload.jti || !payload.exp) {
     throw new Error('malformed token');
   }
-  return { id: payload.sub, username: payload.username, jti: payload.jti, exp: payload.exp };
+  return { id: payload.sub, username: payload.username, jti: payload.jti, exp: payload.exp, iat: payload.iat };
 }
 
 export function revokedKey(jti: string): string {
   return `auth:revoked:${jti}`;
 }
 
-async function isRevoked(redis: Redis | undefined, jti: string): Promise<boolean> {
+/**
+ * Every token of this user issued at or before the stored time (unix seconds) is revoked: set when
+ * the account is deleted, for TOKEN_TTL_SEC (the longest a token lives).
+ */
+export function revokedUserKey(userId: string): string {
+  return `auth:revoked-user:${userId}`;
+}
+
+/** Whether a token is revoked, given what Redis holds for its jti and for its user. */
+export function tokenRevoked(user: Pick<AuthUser, 'iat'>, jtiHit: string | null, userRevokedAt: string | null): boolean {
+  if (jtiHit !== null) return true;
+  if (userRevokedAt === null) return false;
+  // a token without iat predates this check: treat it as issued before the revocation
+  return (user.iat ?? 0) <= Number(userRevokedAt);
+}
+
+async function isRevoked(redis: Redis | undefined, user: AuthUser): Promise<boolean> {
   if (!redis) return false;
   try {
-    const hit = await Promise.race([
-      redis.exists(revokedKey(jti)),
-      new Promise<number>((resolve) => setTimeout(() => resolve(0), 300)),
+    const hits = await Promise.race([
+      redis.mget(revokedKey(user.jti), revokedUserKey(user.id)),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 300)),
     ]);
-    return hit === 1;
+    return hits ? tokenRevoked(user, hits[0] ?? null, hits[1] ?? null) : false;
   } catch {
     return false; // fail open: Redis outage must not log everyone out
   }
@@ -90,7 +108,7 @@ export function makeAuth(secret: string, redis?: Redis) {
     if (!token) return null;
     try {
       const user = await verifyToken(secret, token);
-      if (await isRevoked(redis, user.jti)) return null;
+      if (await isRevoked(redis, user)) return null;
       return user;
     } catch {
       return null;

@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { List, MessageSquareText } from 'lucide-react';
-import type { Precision } from '@cubetype/cubestats';
+import { ChatBubbleLeftEllipsisIcon, ListBulletIcon } from '@heroicons/react/24/outline';
+import type { Precision } from '@cubr/cubestats';
 import type { Solve } from '../../lib/types';
 import { fmtAvg, fmtSolveShort } from './statsUtil';
 import { Loading } from '../Spinner';
@@ -12,6 +12,8 @@ interface Props {
   solves: Solve[];
   ao5: (number | null)[];
   ao12: (number | null)[];
+  /** per solve: did its single / ao5 / ao12 set a new session best when it happened */
+  pbs: { single: boolean[]; ao5: boolean[]; ao12: boolean[] };
   bestIndex: number | null;
   precision: Precision;
   loading: boolean;
@@ -22,7 +24,7 @@ interface Props {
  * Newest-first solve list. Only the rows in view are rendered (fixed row height), so sessions
  * with tens of thousands of solves scroll smoothly.
  */
-export const SolveList = memo(function SolveList({ solves, ao5, ao12, bestIndex, precision, loading, onOpen }: Props) {
+export const SolveList = memo(function SolveList({ solves, ao5, ao12, pbs, bestIndex, precision, loading, onOpen }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewH, setViewH] = useState(360);
@@ -63,12 +65,12 @@ export const SolveList = memo(function SolveList({ solves, ao5, ao12, bestIndex,
         aria-label={`solve ${i + 1}: ${fmtSolveShort(s, precision)}`}
       >
         <span className="idx">{i + 1}</span>
-        <span className={`time${s.penalty === 'DNF' ? ' dnf' : ''}`}>
+        <span className={`time${s.penalty === 'DNF' ? ' dnf' : ''}${pbs.single[i] ? ' pb' : ''}`}>
           {fmtSolveShort(s, precision)}
-          {s.comment && <MessageSquareText size={11} className="tp-comment-mark" aria-label="has comment" />}
+          {s.comment && <ChatBubbleLeftEllipsisIcon width={11} height={11} className="tp-comment-mark" aria-label="has comment" aria-hidden={false} />}
         </span>
-        <span>{fmtAvg(ao5[i], precision)}</span>
-        <span>{fmtAvg(ao12[i], precision)}</span>
+        <span className={pbs.ao5[i] ? 'pb' : undefined}>{fmtAvg(ao5[i], precision)}</span>
+        <span className={pbs.ao12[i] ? 'pb' : undefined}>{fmtAvg(ao12[i], precision)}</span>
       </div>,
     );
   }
@@ -76,7 +78,7 @@ export const SolveList = memo(function SolveList({ solves, ao5, ao12, bestIndex,
   return (
     <section className="tp-panel tp-solves" aria-label="solves">
       <div className="tp-panel-title">
-        <List size={14} /> solves
+        <ListBulletIcon width={14} height={14} /> solves
       </div>
       {loading && n === 0 ? (
         <Loading />

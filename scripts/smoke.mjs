@@ -53,7 +53,7 @@ async function eventually(name, fn, timeoutMs = 15_000) {
   check(name, false, last?.detail ?? 'timed out');
 }
 
-console.log(`cubetype smoke test -> ${BASE}\n`);
+console.log(`cubr smoke test -> ${BASE}\n`);
 
 console.log('health / info (every service answers through the entry point):');
 for (const p of ['/_info', '/api/auth/_info', '/api/scrambles/_info', '/api/solves/_info', '/api/stats/_info', '/api/leaderboards/_info', '/api/race/_info', '/api/wca/_info']) {

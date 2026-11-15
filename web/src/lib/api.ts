@@ -1,4 +1,4 @@
-// Thin typed client for every cubetype microservice. All calls are same-origin paths that the
+// Thin typed client for every cubr microservice. All calls are same-origin paths that the
 // Ingress (cloud) or gateway (local) routes to the right service - see docs/SPEC.md section 3.
 import type {
   ActivityDay,
@@ -38,7 +38,7 @@ export class ApiError extends Error {
   }
 }
 
-const TOKEN_KEY = 'cubetype.token';
+const TOKEN_KEY = 'cubr.token';
 let token: string | null = null;
 try {
   token = localStorage.getItem(TOKEN_KEY);
@@ -193,6 +193,7 @@ export interface ImportPayload {
   sessions: {
     name: string;
     event: string;
+    practice?: boolean;
     solves: { timeMs: number; penalty: Penalty; scramble: string; comment?: string | null; createdAt: string }[];
   }[];
 }
@@ -210,6 +211,8 @@ export const api = {
     /** PUT the raw image bytes (image/webp | image/jpeg | image/png, <= 300 KB) -> user with the new avatarUrl. */
     uploadAvatar: (blob: Blob) => request<{ user: PrivateUser }>('PUT', '/api/auth/me/avatar', blob, { timeoutMs: 30_000 }),
     removeAvatar: () => request<{ user: PrivateUser }>('DELETE', '/api/auth/me/avatar'),
+    /** Deletes the account and everything in it; the password is asked again (403 if wrong). */
+    deleteMe: (password: string) => request<void>('DELETE', '/api/auth/me', { password }),
     user: (username: string, signal?: AbortSignal) => get<{ user: PublicUser }>(`/api/users/${enc(username)}`, signal),
     users: (ids: string[]) => get<{ users: PublicUser[] }>(`/api/users${qs({ ids: ids.join(',') })}`),
   },
@@ -226,8 +229,10 @@ export const api = {
   },
   sessions: {
     list: (signal?: AbortSignal) => get<{ sessions: Session[] }>('/api/sessions', signal),
-    create: (body: { id?: string; name: string; event: string }) => request<{ session: Session }>('POST', '/api/sessions', body),
+    create: (body: { id?: string; name: string; event: string; practice?: boolean; createdAt?: string }) => request<{ session: Session }>('POST', '/api/sessions', body),
     rename: (id: string, name: string) => request<{ session: Session }>('PATCH', `/api/sessions/${enc(id)}`, { name }),
+    /** practice: its solves count for no personal best and no leaderboard */
+    setPractice: (id: string, practice: boolean) => request<{ session: Session }>('PATCH', `/api/sessions/${enc(id)}`, { practice }),
     remove: (id: string) => request<void>('DELETE', `/api/sessions/${enc(id)}`),
     solves: (id: string, signal?: AbortSignal) =>
       request<{ solves: Solve[] }>('GET', `/api/sessions/${enc(id)}/solves`, undefined, { signal, timeoutMs: 60_000 }),
@@ -254,8 +259,8 @@ export const api = {
   },
   stats: {
     summary: (userId: string, signal?: AbortSignal) => get<StatsSummary>(`/api/stats/users/${enc(userId)}/summary`, signal),
-    activity: (userId: string, from?: string, to?: string, signal?: AbortSignal) =>
-      get<{ days: ActivityDay[] }>(`/api/stats/users/${enc(userId)}/activity${qs({ from, to })}`, signal),
+    activity: (userId: string, from?: string, to?: string, signal?: AbortSignal, event?: string) =>
+      get<{ from: string; to: string; days: ActivityDay[] }>(`/api/stats/users/${enc(userId)}/activity${qs({ from, to, event })}`, signal),
     pbHistory: (userId: string, event: string, signal?: AbortSignal) =>
       get<{ history: { kind: PbKind; valueMs: number; achievedAt: string }[] }>(`/api/stats/users/${enc(userId)}/pb-history${qs({ event })}`, signal),
     /** chronological solve series: rows are [unixSeconds, timeMs, effectiveMs | null (DNF), sessionIndex] */
@@ -264,7 +269,7 @@ export const api = {
         event: string;
         total: number;
         truncated: boolean;
-        sessions?: { id: string; name: string | null; solves: number; firstAt: string; lastAt: string }[];
+        sessions?: { id: string; name: string | null; practice?: boolean; solves: number; firstAt: string; lastAt: string }[];
         solves: [number, number, number | null, number?][];
       }>(
         `/api/stats/users/${enc(userId)}/solves${qs({ event, limit: opts.limit })}`,

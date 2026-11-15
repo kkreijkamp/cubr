@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EVENT_IDS } from '@cubetype/cubestats';
+import { EVENT_IDS } from '@cubr/cubestats';
 import { POOL_TARGETS, pickRefillEvent, poolKey } from '../src/pool.js';
 
 const full = (): Record<string, number> => ({ ...POOL_TARGETS });

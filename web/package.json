@@ -1,5 +1,5 @@
 {
-  "name": "@cubetype/web",
+  "name": "@cubr/web",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -11,11 +11,12 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fontsource/comfortaa": "^5.3.0",
     "@fontsource/lexend-deca": "^5.3.0",
     "@fontsource/roboto-mono": "^5.3.0",
+    "@heroicons/react": "^2.2.0",
     "chart.js": "^4.5.1",
     "cubing": "^0.65.1",
-    "lucide-react": "^1.57.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.30.6",

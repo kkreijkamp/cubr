@@ -1,4 +1,4 @@
-import { dayKey, hourIn } from '@cubetype/common';
+import { dayKey, hourIn } from '@cubr/common';
 import { describe, expect, it } from 'vitest';
 import { bucketSolves, makeBucketer, validTz } from '../src/domain/buckets.js';
 

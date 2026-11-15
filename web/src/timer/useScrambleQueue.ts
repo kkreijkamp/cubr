@@ -10,6 +10,8 @@ export interface ScrambleItem {
   offline: boolean;
   /** typed in by the user */
   custom?: boolean;
+  /** worked out from the state a smart cube was scrambled into by hand */
+  fromCube?: boolean;
 }
 
 const BATCH = 5;
@@ -69,6 +71,8 @@ export interface ScrambleQueue {
   hasPrev: boolean;
   /** replace the current scramble with a user-entered one */
   setCustom: (text: string) => void;
+  /** replace the current scramble with one that gives the state a smart cube was scrambled into */
+  setFromCube: (text: string) => void;
 }
 
 export function useScrambleQueue(event: string): ScrambleQueue {
@@ -128,22 +132,25 @@ export function useScrambleQueue(event: string): ScrambleQueue {
     const h = history.current.get(event);
     const back = h?.pop();
     if (!back) return;
-    if (item && !item.custom) queues.set(event, [item, ...(queues.get(event) ?? [])]);
+    if (item && !item.custom && !item.fromCube) queues.set(event, [item, ...(queues.get(event) ?? [])]);
     req.current++;
     show(event, back);
     force((n) => n + 1);
   }, [event, item, show]);
 
-  const setCustom = useCallback(
-    (text: string) => {
+  const replace = useCallback(
+    (text: string, kind: 'custom' | 'fromCube') => {
       const t = text.trim();
       if (!t) return;
-      if (item && !item.custom) queues.set(event, [item, ...(queues.get(event) ?? [])]);
+      // a scramble from the service that wasn't used goes back to the front of the queue
+      if (item && !item.custom && !item.fromCube) queues.set(event, [item, ...(queues.get(event) ?? [])]);
       req.current++;
-      show(event, { text: t.slice(0, 2000), offline: false, custom: true });
+      show(event, { text: t.slice(0, 2000), offline: false, [kind]: true });
     },
     [event, item, show],
   );
+  const setCustom = useCallback((text: string) => replace(text, 'custom'), [replace]);
+  const setFromCube = useCallback((text: string) => replace(text, 'fromCube'), [replace]);
 
-  return { current: item, next, prev, hasPrev: (history.current.get(event)?.length ?? 0) > 0, setCustom };
+  return { current: item, next, prev, hasPrev: (history.current.get(event)?.length ?? 0) > 0, setCustom, setFromCube };
 }

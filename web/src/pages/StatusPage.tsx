@@ -2,7 +2,7 @@
 // a second and visualises load balancing (pods answering), scaling (new pods), self-healing (pods
 // replaced, outages + recovery) and rolling updates (versions changing colour).
 import { useEffect, useMemo, useState } from 'react';
-import { Activity, Check, Pause, Play, Terminal } from 'lucide-react';
+import { CheckIcon, CommandLineIcon, PauseIcon, PlayIcon, SignalIcon } from '@heroicons/react/24/outline';
 import { useStore } from '../lib/store';
 import { useRegisterCommands } from '../lib/commands';
 import { usePageVisible, copyText } from '../components/live/hooks';
@@ -27,12 +27,12 @@ function Cheatsheet({ services }: { services: ServiceView[] }) {
   const [copied, setCopied] = useState<string | null>(null);
   const solvePod = services.find((s) => s.name === 'solve')?.pods.find((p) => !p.stale)?.pod ?? '<solve-pod>';
   const rows: [string, string][] = [
-    ['watch pods', 'kubectl -n cubetype get pods -o wide -w'],
-    ['scale out', 'kubectl -n cubetype scale deploy/stats --replicas=4'],
-    ['self-healing', `kubectl -n cubetype delete pod ${solvePod}`],
-    ['rolling update', 'kubectl -n cubetype rollout restart deploy/web'],
-    ['rollout status', 'kubectl -n cubetype rollout status deploy/web'],
-    ['autoscaler', 'kubectl -n cubetype get hpa -w'],
+    ['watch pods', 'kubectl -n cubr get pods -o wide -w'],
+    ['scale out', 'kubectl -n cubr scale deploy/stats --replicas=4'],
+    ['self-healing', `kubectl -n cubr delete pod ${solvePod}`],
+    ['rolling update', 'kubectl -n cubr rollout restart deploy/web'],
+    ['rollout status', 'kubectl -n cubr rollout status deploy/web'],
+    ['autoscaler', 'kubectl -n cubr get hpa -w'],
   ];
   return (
     <div className="card cheatsheet">
@@ -50,7 +50,7 @@ function Cheatsheet({ services }: { services: ServiceView[] }) {
         >
           <span className="label">{label}</span>
           <code>{cmd}</code>
-          <span className="copied">{copied === cmd ? <Check size={14} /> : null}</span>
+          <span className="copied">{copied === cmd ? <CheckIcon width={14} height={14} /> : null}</span>
         </button>
       ))}
     </div>
@@ -77,10 +77,10 @@ export default function StatusPage() {
       {
         id: 'status-pause',
         label: userPaused ? 'Resume status polling' : 'Pause status polling',
-        icon: userPaused ? <Play /> : <Pause />,
+        icon: userPaused ? <PlayIcon /> : <PauseIcon />,
         run: () => setUserPaused((p) => !p),
       },
-      { id: 'status-cheats', label: 'Toggle kubectl cheatsheet', icon: <Terminal />, run: () => setShowCheats((v) => !v) },
+      { id: 'status-cheats', label: 'Toggle kubectl cheatsheet', icon: <CommandLineIcon />, run: () => setShowCheats((v) => !v) },
     ],
     [userPaused],
   );
@@ -103,7 +103,7 @@ export default function StatusPage() {
       <div className="live-head">
         <div className="titles">
           <h1 className="h2">
-            <Activity /> cluster status
+            <SignalIcon /> cluster status
           </h1>
           <div className="subtitle">
             live view of the kubernetes deployment - every number below comes from a real request to a service's <code>_info</code> endpoint.
@@ -115,10 +115,10 @@ export default function StatusPage() {
             {state.running ? 'live - 1s' : state.pausedReason === 'hidden' ? 'paused (tab hidden)' : 'paused'}
           </span>
           <button className="btn small" onClick={() => setUserPaused((p) => !p)} aria-label={userPaused ? 'resume polling' : 'pause polling'}>
-            {userPaused ? <Play /> : <Pause />} {userPaused ? 'resume' : 'pause'}
+            {userPaused ? <PlayIcon /> : <PauseIcon />} {userPaused ? 'resume' : 'pause'}
           </button>
           <button className={`btn small${showCheats ? ' active' : ''}`} onClick={() => setShowCheats((v) => !v)} aria-expanded={showCheats}>
-            <Terminal /> kubectl
+            <CommandLineIcon /> kubectl
           </button>
         </div>
       </div>

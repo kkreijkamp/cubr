@@ -38,7 +38,7 @@ export function loadConfig(serviceName: string): BaseConfig {
     version: env('APP_VERSION', 'dev'),
     podName: env('POD_NAME', os.hostname()),
     nodeName: env('NODE_NAME', 'local'),
-    databaseUrl: env('DATABASE_URL', 'postgres://cubetype:cubetype@postgres:5432/cubetype'),
+    databaseUrl: env('DATABASE_URL', 'postgres://cubr:cubr@postgres:5432/cubr'),
     redisUrl: env('REDIS_URL', 'redis://redis:6379'),
     jwtSecret: env('JWT_SECRET', 'dev-secret-change-me'),
     internalToken: env('INTERNAL_API_TOKEN', ''),

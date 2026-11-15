@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Network, Play } from 'lucide-react';
+import { PlayIcon, ScaleIcon } from '@heroicons/react/24/outline';
 import { api, SERVICE_INFO_PATHS } from '../../../lib/api';
 import { useStoredState } from '../hooks';
 import { Segmented } from '../ui';
@@ -36,8 +36,8 @@ function percentile(xs: number[], p: number): number | null {
  * the Kubernetes Service / Ingress spreading traffic over the replicas.
  */
 export function LoadBalanceTest({ vc, onLog }: { vc: (v: string) => string; onLog: (text: string, service: string) => void }) {
-  const [service, setService] = useStoredState<string>('cubetype.status.lbService', 'solve');
-  const [n, setN] = useStoredState<number>('cubetype.status.lbN', 50);
+  const [service, setService] = useStoredState<string>('cubr.status.lbService', 'solve');
+  const [n, setN] = useStoredState<number>('cubr.status.lbN', 50);
   const [result, setResult] = useState<LbResult | null>(null);
   const running = result !== null && result.durationMs === null;
   const runId = useRef(0);
@@ -98,7 +98,7 @@ export function LoadBalanceTest({ vc, onLog }: { vc: (v: string) => string; onLo
     <section className="card status-panel" aria-labelledby="lb-title">
       <div className="live-section-title">
         <h3 className="h3" id="lb-title">
-          <Network /> load balancing test
+          <ScaleIcon /> load balancing test
         </h3>
         <span className="meta">parallel GET .../_info</span>
       </div>
@@ -110,7 +110,7 @@ export function LoadBalanceTest({ vc, onLog }: { vc: (v: string) => string; onLo
         <div className="row wrap" style={{ gap: '0.5rem' }}>
           <Segmented label="requests" value={n} onChange={setN} options={SIZES.map((v) => ({ value: v, label: `${v}x` }))} />
           <button className="btn primary" onClick={() => void run()} disabled={running}>
-            <Play /> {running ? 'firing...' : 'fire'}
+            <PlayIcon /> {running ? 'firing...' : 'fire'}
           </button>
         </div>
       </div>

@@ -1,5 +1,5 @@
 # =============================================================================================
-# cubetype -- full local stack (docker compose v2)
+# cubr -- full local stack (docker compose v2)
 # ---------------------------------------------------------------------------------------------
 #   docker compose up -d --build                 # build all images and start the whole stack
 #   open http://localhost:8080                   # gateway = same routes as the GKE Ingress
@@ -11,18 +11,18 @@
 #
 # The gateway is the only entry point for the app (http://localhost:8080). Postgres and Redis
 # are also published, on 127.0.0.1 only and on non-default ports so a locally installed
-# Postgres/Redis cannot clash: 55433 (psql postgres://cubetype:cubetype@localhost:55433/cubetype)
+# Postgres/Redis cannot clash: 55433 (psql postgres://cubr:cubr@localhost:55433/cubr)
 # and 56380 (redis-cli -p 56380). The same ports let you run one service on the host:
-#   DATABASE_URL=postgres://cubetype:cubetype@localhost:55433/cubetype \
+#   DATABASE_URL=postgres://cubr:cubr@localhost:55433/cubr \
 #   REDIS_URL=redis://localhost:56380 npm run dev -w services/auth
 # Environment variables follow docs/SPEC.md section 4.
 # =============================================================================================
 
-name: cubetype                       # compose project name -> containers cubetype-<svc>-<n>
+name: cubr                           # compose project name -> containers cubr-<svc>-<n>
 
 # ---- shared snippets (YAML anchors) -------------------------------------------------------------
 x-service-env: &service-env
-  DATABASE_URL: postgres://cubetype:cubetype@postgres:5432/cubetype
+  DATABASE_URL: postgres://cubr:cubr@postgres:5432/cubr
   REDIS_URL: redis://redis:6379
   JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}   # override with JWT_SECRET=... docker compose up
   # Shared secret for /internal/* calls between services (X-Internal-Token); auth also lets the
@@ -63,15 +63,15 @@ services:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: cubetype
-      POSTGRES_PASSWORD: cubetype
-      POSTGRES_DB: cubetype
+      POSTGRES_USER: cubr
+      POSTGRES_PASSWORD: cubr
+      POSTGRES_DB: cubr
     volumes:
       - pgdata:/var/lib/postgresql/data   # survives `docker compose down` (use -v to wipe)
     ports:
       - "127.0.0.1:55433:5432"            # psql / services on the host: localhost:55433
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cubetype -d cubetype"]
+      test: ["CMD-SHELL", "pg_isready -U cubr -d cubr"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -93,46 +93,46 @@ services:
   # ---- microservices (build context = repo root: every image also needs packages/) ------------
   auth:
     <<: *service
-    image: cubetype/auth:dev          # local tag, built by `docker compose up --build`
+    image: cubr/auth:dev              # local tag, built by `docker compose up --build`
     build: { context: ., dockerfile: services/auth/Dockerfile, args: *build-args }
 
   scramble:
     <<: *service
-    image: cubetype/scramble:dev
+    image: cubr/scramble:dev
     build: { context: ., dockerfile: services/scramble/Dockerfile, args: *build-args }
 
   solve:
     <<: *service
-    image: cubetype/solve:dev
+    image: cubr/solve:dev
     build: { context: ., dockerfile: services/solve/Dockerfile, args: *build-args }
 
   stats:
     <<: *service
-    image: cubetype/stats:dev
+    image: cubr/stats:dev
     build: { context: ., dockerfile: services/stats/Dockerfile, args: *build-args }
 
   leaderboard:
     <<: *service
-    image: cubetype/leaderboard:dev
+    image: cubr/leaderboard:dev
     build: { context: ., dockerfile: services/leaderboard/Dockerfile, args: *build-args }
     depends_on:                       # Redis-only service (rebuilds boards from stats over HTTP)
       redis: { condition: service_healthy }
 
   race:
     <<: *service
-    image: cubetype/race:dev
+    image: cubr/race:dev
     build: { context: ., dockerfile: services/race/Dockerfile, args: *build-args }
     depends_on:                       # Redis-only service (room state + Socket.IO adapter)
       redis: { condition: service_healthy }
 
   wca:
     <<: *service
-    image: cubetype/wca:dev
+    image: cubr/wca:dev
     build: { context: ., dockerfile: services/wca/Dockerfile, args: *build-args }
 
   # ---- frontend ----------------------------------------------------------------------------------
   web:
-    image: cubetype/web:dev
+    image: cubr/web:dev
     build: { context: ., dockerfile: web/Dockerfile, args: *build-args }
     restart: unless-stopped
     environment:
@@ -168,11 +168,11 @@ services:
   #   -v "$PWD/data/wca/tsv:/data:ro" -e WCA_TSV_DIR=/data   to the `run` command.
   wca-import:
     profiles: ["jobs"]
-    image: cubetype/wca-import:dev
+    image: cubr/wca-import:dev
     build: { context: ., dockerfile: jobs/wca-import/Dockerfile, args: *build-args }
     restart: "no"
     environment:
-      DATABASE_URL: postgres://cubetype:cubetype@postgres:5432/cubetype
+      DATABASE_URL: postgres://cubr:cubr@postgres:5432/cubr
       FORCE: ${FORCE:-0}                         # 1 = re-import even if this export is already loaded
     depends_on:
       postgres: { condition: service_healthy }
@@ -183,7 +183,7 @@ services:
   # Run: docker compose --profile jobs run --rm seed      (smaller: SEED_USERS=20 docker compose ...)
   seed:
     profiles: ["jobs"]
-    image: cubetype/seed:dev
+    image: cubr/seed:dev
     build: { context: ., dockerfile: jobs/seed/Dockerfile, args: *build-args }
     restart: "no"
     environment:
@@ -194,7 +194,7 @@ services:
       SEED_AVG_SOLVES: ${SEED_AVG_SOLVES:-650}   # average history per user (~100k solves total)
       SEED_CONCURRENCY: ${SEED_CONCURRENCY:-6}   # users seeded in parallel
       SEED_DEMO_USER: demo                       # presentation account
-      SEED_DEMO_PASSWORD: cubetype-demo
+      SEED_DEMO_PASSWORD: cubr-demo
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-dev-internal-token-0123456789}   # must match auth's
     depends_on:
       auth: { condition: service_healthy }

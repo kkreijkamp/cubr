@@ -72,8 +72,8 @@ export class RaceError extends Error {
 }
 
 // ---- guest identity ---------------------------------------------------------------------------
-const GUEST_ID_KEY = 'cubetype.guestId';
-const GUEST_NAME_KEY = 'cubetype.guestName';
+const GUEST_ID_KEY = 'cubr.guestId';
+const GUEST_NAME_KEY = 'cubr.guestName';
 const GUEST_ID_RE = /^guest-[a-z0-9]{6,24}$/;
 
 function randomId(len: number): string {

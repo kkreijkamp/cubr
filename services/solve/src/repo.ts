@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { withTx, type AuthUser, type Pool, type PoolClient } from '@cubetype/common';
+import { withTx, type AuthUser, type Pool, type PoolClient } from '@cubr/common';
 import { iso, type SessionRow, type SolveRow } from './mapping.js';
 import { effectiveOrNull, rollingFromSolves, ROLLING_WINDOW, type Rolling } from './rolling.js';
-import type { Penalty } from '@cubetype/cubestats';
+import type { Penalty } from '@cubr/cubestats';
 
 // SQL shared by several routes. Every query is scoped by user_id: a user can never see or
 // touch another user's rows (foreign ids simply look like "not found").
@@ -10,7 +10,7 @@ import type { Penalty } from '@cubetype/cubestats';
 type Db = Pool | PoolClient;
 
 const SESSION_SELECT = `
-SELECT s.id, s.name, s.event, s.created_at, s.updated_at,
+SELECT s.id, s.name, s.event, s.practice, s.created_at, s.updated_at,
        (SELECT count(*) FROM solve.solves v WHERE v.session_id = s.id) AS solve_count
   FROM solve.sessions s`;
 

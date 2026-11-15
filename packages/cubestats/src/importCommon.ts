@@ -15,12 +15,14 @@ export interface ImportedSession {
   event: string;
   /** The source timer's own puzzle / scramble type, e.g. "444wca" or "pyra". */
   sourceType: string;
+  /** a cubr practice session (its solves count for no PB or leaderboard) */
+  practice?: boolean;
   solves: ImportedSolve[];
 }
 
 /** Solves an import leaves out instead of failing the whole file. */
 export interface ImportSkipped {
-  /** Multi-blind attempts: cubetype has no multi-blind event. */
+  /** Multi-blind attempts: cubr has no multi-blind event. */
   multiBlind: number;
   /** No usable time (missing, zero, or above the server's 24 h limit). */
   invalid: number;
@@ -33,6 +35,7 @@ export interface RawSession {
   sourceType: string;
   /** Sort key where the source has one (csTimer rank, CubeDesk order). */
   rank?: number;
+  practice?: boolean;
   solves: RawSolve[];
 }
 
@@ -90,7 +93,13 @@ export function finishImport(raw: RawSession[]): { sessions: ImportedSession[]; 
     }
     if (!solves.length) continue;
     const name = text(session.name).trim().slice(0, MAX_NAME) || `import ${index + 1}`;
-    sessions.push({ name, event: isEventId(session.event) ? session.event : '333', sourceType: session.sourceType, solves });
+    sessions.push({
+      name,
+      event: isEventId(session.event) ? session.event : '333',
+      sourceType: session.sourceType,
+      ...(session.practice ? { practice: true } : {}),
+      solves,
+    });
   }
   return { sessions, skipped };
 }

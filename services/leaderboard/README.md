@@ -13,8 +13,10 @@ Readiness gates on Redis. Fastify on :8080.
 
 **Events consumed** (group `leaderboard`, consumer = pod name): `pb.updated` -> all-time boards (exact
 ZADD, ZREM when null/-1; stale events are dropped via a per-user occurredAt guard in `<board>:ts`);
-`solve.created` -> daily + weekly boards for the single and rolling ao5 (`ZADD LT`, DNF skipped);
-`daily.completed` -> `lb:dc:<date>:<event>`; `user.*` and every payload with a `username` -> `lb:users`.
+`solve.created` -> daily + weekly boards for the single and rolling ao5 (`ZADD LT`, DNF and practice-session solves skipped);
+`daily.completed` -> `lb:dc:<date>:<event>`; `user.*` and every payload with a `username` -> `lb:users`;
+`user.deleted` -> the user leaves every board (SCAN `lb:*`: ZREM / HDEL `:at` `:ts`), `lb:users` and `lb:flagged`, and
+goes into `lb:deleted-users`, so later events for them are ignored.
 Score + achievedAt (`<board>:at` hash) are written atomically by small Lua scripts (`src/scripts.ts`).
 
 Decisions / simplifications:
@@ -22,7 +24,9 @@ Decisions / simplifications:
   (not the solver's timezone). TTLs: daily 3 d, weekly 15 d (refreshed on each write); solves older
   than that are ignored. Daily-challenge boards have no TTL (history).
 - Rank = position + 1: equal times do not share a rank (ties ordered by userId).
-- Weekly/daily boards only use `solve.created`; later edits (`solve.updated/deleted`) are not applied.
+- Weekly/daily boards only use `solve.created`; later edits (`solve.updated/deleted`) are not applied,
+  and neither is marking a session as practice afterwards (the all-time boards do follow it, via the
+  `pb.updated` from stats' recompute).
 - 333fm has no boards (move counts, not times); its routes return an empty board.
 - Unknown users in `lb:users` are shown as `username: "unknown"`.
 - **Anti-cheat:** values strictly below the WCA world record (`GET wca /internal/records`, cached 1 h,

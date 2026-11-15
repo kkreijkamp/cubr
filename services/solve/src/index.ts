@@ -1,8 +1,10 @@
 import {
-  loadConfig, createServer, start, createPool, pingPostgres, waitForPostgres, migrate, createRedis, makeAuth,
-} from '@cubetype/common';
+  loadConfig, createServer, start, createPool, pingPostgres, waitForPostgres, migrate, createRedis, makeAuth, consumeEvents,
+  type Consumer,
+} from '@cubr/common';
 import { migrations } from './migrations.js';
 import { startOutboxRelay, type Relay } from './outbox.js';
+import { makeUserPurge, PURGE_TYPES } from './purge.js';
 import { registerRoutes } from './routes/index.js';
 
 const config = loadConfig('solve');
@@ -11,6 +13,7 @@ const redis = createRedis(config.redisUrl);
 
 let migrated = false;
 let relay: Relay | undefined;
+let consumer: Consumer | undefined;
 
 const server = createServer(config, {
   infoPrefixes: ['/api/solves', '/api/sessions'],
@@ -30,9 +33,11 @@ const auth = makeAuth(config.jwtSecret, redis);
 await registerRoutes(app, { config, pool, redis, auth });
 
 // Listen first so liveness passes while Postgres boots; readiness stays 503 until migrated.
-// Shutdown order: stop the relay (it holds a pool client), then close Postgres and Redis.
-await start(server, config, [() => relay?.stop(), () => pool.end(), () => redis.quit()]);
+// Shutdown order: stop the relay and the consumer (they hold pool clients), then close Postgres and Redis.
+await start(server, config, [() => relay?.stop(), () => consumer?.stop(), () => pool.end(), () => redis.quit()]);
 await waitForPostgres(pool, app.log);
 await migrate(pool, 'solve', migrations, app.log);
 migrated = true;
 relay = startOutboxRelay({ pool, redis, log: app.log });
+// The only event solve consumes: user.deleted (delete the account's sessions and solves).
+consumer = consumeEvents(redis, { group: 'solve', consumer: config.podName, types: PURGE_TYPES, handler: makeUserPurge({ pool, log: app.log }), log: app.log });

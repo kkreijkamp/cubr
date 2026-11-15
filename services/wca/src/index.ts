@@ -1,4 +1,4 @@
-import { loadConfig, createServer, start, createPool, pingPostgres, waitForPostgres, createRedis } from '@cubetype/common';
+import { loadConfig, createServer, start, createPool, pingPostgres, waitForPostgres, createRedis } from '@cubr/common';
 import { createCache } from './cache.js';
 import { createDataset } from './dataset.js';
 import { createRepo } from './repo.js';

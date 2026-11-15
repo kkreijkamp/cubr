@@ -5,13 +5,13 @@ import { fileURLToPath } from 'node:url';
 
 // The SPA talks to the backend through same-origin paths (/api/*, /socket.io). In dev, Vite
 // proxies them to the local gateway (docker compose, port 8080) which mimics the K8s Ingress.
-const gateway = process.env.CUBETYPE_GATEWAY ?? 'http://localhost:8080';
+const gateway = process.env.CUBR_GATEWAY ?? 'http://localhost:8080';
 
 export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@cubetype/cubestats': fileURLToPath(new URL('../packages/cubestats/src/index.ts', import.meta.url)),
+      '@cubr/cubestats': fileURLToPath(new URL('../packages/cubestats/src/index.ts', import.meta.url)),
     },
   },
   server: {

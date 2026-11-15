@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { badRequest } from '@cubetype/common';
+import { badRequest } from '@cubr/common';
 
 export const MAX_COUNT = 25;
 

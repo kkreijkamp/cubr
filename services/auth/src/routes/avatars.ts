@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import { badRequest, notFound, rateLimited, unauthorized, withTx } from '@cubetype/common';
+import { badRequest, notFound, rateLimited, unauthorized, withTx } from '@cubr/common';
 import type { Deps } from './index.js';
 import {
   AVATAR_MAX_BYTES,

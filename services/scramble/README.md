@@ -6,7 +6,7 @@ daily challenge (5 persisted scrambles per event per day).
 
 | Route | Response |
 |---|---|
-| `GET /api/scrambles/events` | `{events: [{id, name, short, puzzle}]}` (from `@cubetype/cubestats` EVENTS) |
+| `GET /api/scrambles/events` | `{events: [{id, name, short, puzzle}]}` (from `@cubr/cubestats` EVENTS) |
 | `GET /api/scrambles/:event?count=1..25&fresh=0\|1` | `{event, scrambles, source: "pool"\|"generated"}` - 404 unknown event (e.g. `333mbf`), 400 bad count, 503 on timeout/overload |
 | `GET /api/scrambles/daily?date=YYYY-MM-DD` | `{date, events: {333, 222, 444, pyram, skewb: string[5]}}` - default today (UTC), only the last 30 days; 503 while Postgres is unreachable |
 | `GET /api/scrambles/_info` | standard info + `warmup`, `generator` (queue depth, generated, timings), `pool` (LLEN per event), `refill`, `memory` |
@@ -62,12 +62,12 @@ Shared vars (SPEC section 4) plus `SCRAMBLE_WORKERS` (1), `SCRAMBLE_TIMEOUT_MS` 
 `SCRAMBLE_REFILL_INTERVAL_MS` (2000), `SCRAMBLE_REFILL_BATCH` (5), `SCRAMBLE_REFILL_BUDGET_MS` (300).
 
 ## Build notes
-cubing.js is **external** to the esbuild bundle (`"cubetype": {"external": ["cubing"]}`) because it
+cubing.js is **external** to the esbuild bundle (`"cubr": {"external": ["cubing"]}`) because it
 spawns its search worker from its own files. The Dockerfile installs `cubing@0.65.1` (pinned to the
 lockfile) into `/app/node_modules` next to `/app/dist/index.mjs`, removing the browser/CLI-only
 deps (three.js, @optique, types) that `cubing/scramble` never loads.
 
 Dev: `docker compose up -d postgres redis`, then
-`PORT=8082 DATABASE_URL=postgres://cubetype:cubetype@localhost:55433/cubetype REDIS_URL=redis://localhost:56380 npm run dev -w services/scramble` -
+`PORT=8082 DATABASE_URL=postgres://cubr:cubr@localhost:55433/cubr REDIS_URL=redis://localhost:56380 npm run dev -w services/scramble` -
 Tests: `npx vitest run services/scramble` (cubing.test.ts runs real searches) -
-Image: `docker build -f services/scramble/Dockerfile -t cubetype/scramble:dev .`
+Image: `docker build -f services/scramble/Dockerfile -t cubr/scramble:dev .`

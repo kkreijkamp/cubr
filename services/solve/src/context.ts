@@ -1,5 +1,5 @@
 import type { FastifyRequest } from 'fastify';
-import { isValidTimeZone, unauthorized, type AuthUser, type BaseConfig, type Pool, type Redis, makeAuth } from '@cubetype/common';
+import { isValidTimeZone, unauthorized, type AuthUser, type BaseConfig, type Pool, type Redis, makeAuth } from '@cubr/common';
 
 export interface RouteContext {
   config: BaseConfig;

@@ -1,12 +1,26 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Activity, CalendarDays, Crown, Globe, Info, Keyboard, Palette, Settings, Swords, Timer, User } from 'lucide-react';
+import {
+  CalendarDaysIcon,
+  ClockIcon,
+  CodeBracketIcon,
+  Cog6ToothIcon,
+  CommandLineIcon,
+  FlagIcon,
+  GlobeAltIcon,
+  InformationCircleIcon,
+  SignalIcon,
+  SwatchIcon,
+  TrophyIcon,
+  UserIcon,
+} from '@heroicons/react/24/outline';
 import { Avatar } from './Avatar';
 import { CubeLogo } from './CubeLogo';
 import { Toasts } from './Toasts';
 import { CommandPalette, usePaletteHotkeys } from './CommandPalette';
 import { GlobalCommands } from './GlobalCommands';
 import { LocalUploadOffer } from './timer/LocalUploadOffer';
+import { PatchNotesModal } from './PatchNotesModal';
 import { useAuth } from '../lib/auth';
 import { openPalette } from '../lib/commands';
 import { useSettings } from '../lib/settings';
@@ -14,27 +28,24 @@ import { themeLabel } from '../lib/themes';
 import { api } from '../lib/api';
 
 const NAV = [
-  { to: '/', icon: Timer, label: 'timer', end: true },
-  { to: '/daily', icon: CalendarDays, label: 'daily challenge' },
-  { to: '/race', icon: Swords, label: 'race' },
-  { to: '/leaderboards', icon: Crown, label: 'leaderboards' },
-  { to: '/wca', icon: Globe, label: 'wca rankings' },
-  { to: '/about', icon: Info, label: 'about', hideMobile: true },
-  { to: '/settings', icon: Settings, label: 'settings' },
+  { to: '/', icon: ClockIcon, label: 'timer', end: true },
+  { to: '/daily', icon: CalendarDaysIcon, label: 'daily challenge' },
+  { to: '/race', icon: FlagIcon, label: 'race' },
+  { to: '/leaderboards', icon: TrophyIcon, label: 'leaderboards' },
+  { to: '/wca', icon: GlobeAltIcon, label: 'wca rankings' },
+  { to: '/about', icon: InformationCircleIcon, label: 'about', hideMobile: true },
+  { to: '/settings', icon: Cog6ToothIcon, label: 'settings' },
 ];
 
 function Header() {
   const { user, status } = useAuth();
   return (
     <header className="header">
-      <Link to="/" className="logo" aria-label="cubetype home">
+      <Link to="/" className="logo" aria-label="cubr home">
         <CubeLogo className="logo-icon" />
-        <span>
-          <span className="logo-sub">cube see</span>
-          <span className="logo-text">cubetype</span>
-        </span>
+        <span className="logo-text">cubr</span>
       </Link>
-      <nav className="nav">
+      <nav className="nav nav-main">
         {NAV.map(({ to, icon: Icon, label, end, hideMobile }) => (
           <NavLink
             key={to}
@@ -45,31 +56,36 @@ function Header() {
             data-tip-pos="down"
             aria-label={label}
           >
-            <Icon size={20} />
+            <Icon width={20} height={20} />
           </NavLink>
         ))}
-        <div className="spacer" />
+      </nav>
+      <div className="nav nav-side">
         <NavLink to="/status" className={({ isActive }) => `btn-text hide-mobile${isActive ? ' active' : ''}`} data-tip="cluster status" data-tip-pos="down" aria-label="cluster status">
-          <Activity size={20} />
+          <SignalIcon width={20} height={20} />
         </NavLink>
         {status === 'authed' && user ? (
           <NavLink to="/account" className={({ isActive }) => `btn-text nav-user${isActive ? ' active' : ''}`} data-tip="account" data-tip-pos="down">
-            {user.avatarUrl ? <Avatar user={user} size={20} className="nav-avatar" /> : <User size={20} />}
+            {user.avatarUrl ? <Avatar user={user} size={20} className="nav-avatar" /> : <UserIcon width={20} height={20} />}
             <span className="hide-mobile">{user.username}</span>
           </NavLink>
         ) : (
           <NavLink to="/login" className={({ isActive }) => `btn-text${isActive ? ' active' : ''}`} data-tip="sign in" data-tip-pos="down" aria-label="sign in">
-            <User size={20} />
+            <UserIcon width={20} height={20} />
           </NavLink>
         )}
-      </nav>
+      </div>
     </header>
   );
 }
 
+/** The source code (a private repository: it opens for the people who have access). */
+const REPO_URL = 'https://github.com/kkreijkamp/cubr';
+
 function Footer() {
   const settings = useSettings();
   const [info, setInfo] = useState<{ version: string; pod: string } | null>(null);
+  const [notesOpen, setNotesOpen] = useState(false);
   useEffect(() => {
     api
       .info('/_info')
@@ -80,23 +96,27 @@ function Footer() {
     <footer className="footer">
       <div className="footer-links">
         <button className="btn-text" onClick={() => openPalette()}>
-          <Keyboard size={14} /> <kbd>esc</kbd> command line
+          <CommandLineIcon width={14} height={14} /> <kbd>esc</kbd> command line
         </button>
         <Link to="/status" className="btn-text">
-          <Activity size={14} /> status
+          <SignalIcon width={14} height={14} /> status
         </Link>
         <Link to="/about" className="btn-text">
-          <Info size={14} /> about
+          <InformationCircleIcon width={14} height={14} /> about
         </Link>
+        <a href={REPO_URL} className="btn-text" target="_blank" rel="noreferrer noopener" data-tip="source code (private repo)">
+          <CodeBracketIcon width={14} height={14} /> github
+        </a>
       </div>
       <div className="footer-right">
         <button className="btn-text" onClick={() => openPalette('theme')} data-tip="change theme" aria-label="change theme">
-          <Palette size={14} /> {themeLabel(settings.theme)}
+          <SwatchIcon width={14} height={14} /> {themeLabel(settings.theme)}
         </button>
-        <Link to="/status" className="btn-text" data-tip={info ? `served by ${info.pod}` : 'version'}>
+        <button className="btn-text" onClick={() => setNotesOpen(true)} data-tip="patch notes" aria-haspopup="dialog">
           {info ? `v${info.version}` : 'version'}
-        </Link>
+        </button>
       </div>
+      {notesOpen && <PatchNotesModal running={info?.version ?? null} onClose={() => setNotesOpen(false)} />}
     </footer>
   );
 }

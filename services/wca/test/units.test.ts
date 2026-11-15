@@ -46,7 +46,7 @@ describe('apiToWca + rawThresholds', () => {
 });
 
 describe('supported events', () => {
-  it('serves cubetype events only (no 333mbf, no retired events)', () => {
+  it('serves cubr events only (no 333mbf, no retired events)', () => {
     expect(supportedEvent('333')?.name).toBe('3x3x3 Cube');
     expect(supportedEvent('333mbf')).toBeUndefined();
     expect(supportedEvent('333ft')).toBeUndefined();

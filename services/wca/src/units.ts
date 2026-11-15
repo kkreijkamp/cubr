@@ -1,21 +1,21 @@
-import { EVENTS, getEvent, type EventInfo } from '@cubetype/cubestats';
+import { EVENTS, getEvent, type EventInfo } from '@cubr/cubestats';
 
 /**
- * Unit conversion between the WCA export and the cubetype API.
+ * Unit conversion between the WCA export and the cubr API.
  *
  *   WCA export (raw)                          API
  *   timed events: centiseconds (1234)    ->   milliseconds (12340)
  *   333fm single: moves (22)             ->   moves (22)
  *   333fm average: moves x 100 (2467)    ->   moves (24.67)
  *
- * Only the events cubetype supports (cubestats EVENTS) are served; 333mbf (packed
+ * Only the events cubr supports (cubestats EVENTS) are served; 333mbf (packed
  * points/time encoding) and retired events are never exposed.
  */
 export type Kind = 'single' | 'average';
 export const KINDS: Kind[] = ['single', 'average'];
 export type Unit = EventInfo['unit']; // 'time' | 'moves'
 
-/** The events the wca service serves, in cubetype's display order. */
+/** The events the wca service serves, in cubr's display order. */
 export const WCA_EVENTS: EventInfo[] = EVENTS;
 
 export function supportedEvent(id: string): EventInfo | undefined {

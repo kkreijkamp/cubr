@@ -1,8 +1,9 @@
 import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Camera, ExternalLink, Link2, Pencil } from 'lucide-react';
-import { formatDuration } from '@cubetype/cubestats';
+import { CameraIcon, LinkIcon, PencilIcon } from '@heroicons/react/24/outline';
+import { formatDuration } from '@cubr/cubestats';
 import { AvatarEditor } from './AvatarEditor';
+import { EventDonut } from './EventDonut';
 import { countryName } from './countries';
 import { WidgetError } from './Widget';
 import { plural } from './util';
@@ -18,6 +19,9 @@ interface Props {
   summary: AsyncState<StatsSummary>;
   own: boolean;
   onEdit?: () => void;
+  /** the profile's selected event (the donut highlights it and picks another) */
+  event: string;
+  onEvent: (event: string) => void;
 }
 
 async function copyProfileLink(username: string) {
@@ -30,19 +34,36 @@ async function copyProfileLink(username: string) {
   }
 }
 
-export function ProfileHeader({ user, summary, own, onEdit }: Props) {
+/** "oct 2026" */
+function monthYear(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '-' : d.toLocaleString('en-US', { month: 'short', year: 'numeric' }).toLowerCase();
+}
+
+/** The top of the profile: who it is (and their events as a ring), then the lifetime totals as a row of big numbers. */
+export function ProfileHeader({ user, summary, own, onEdit, event, onEvent }: Props) {
   const name = user.displayName?.trim() || user.username;
   const totals = summary.data?.totals;
   const flag = flagEmoji(user.country);
-  const hasDetails = Boolean(user.bio || user.wcaId || user.country);
   // the picture is editable where the rest of the profile is (account page)
   const editableAvatar = own && Boolean(onEdit);
   const [avatarOpen, setAvatarOpen] = useState(false);
   const closeAvatar = useCallback(() => setAvatarOpen(false), []);
 
+  const stats: { label: string; value: string; tip?: string }[] = [
+    { label: 'solves', value: totals ? formatNumber(totals.solves) : '-' },
+    { label: 'time cubing', value: totals ? formatDuration(totals.totalMs) : '-', tip: totals ? `${formatNumber(Math.round(totals.totalMs / 1000))} seconds` : undefined },
+    { label: 'active days', value: totals ? formatNumber(totals.activeDays) : '-' },
+    {
+      label: 'day streak',
+      value: totals ? formatNumber(totals.currentStreak) : '-',
+      tip: totals ? `longest streak: ${plural(totals.longestStreak, 'day')}` : undefined,
+    },
+  ];
+
   return (
-    <section className="pv-card pv-header" aria-label="profile">
-      <div className="pv-ident">
+    <header className="pf-hero" aria-label="profile">
+      <div className="pf-id">
         {editableAvatar ? (
           <button
             type="button"
@@ -52,137 +73,79 @@ export function ProfileHeader({ user, summary, own, onEdit }: Props) {
             data-tip={user.avatarUrl ? 'change picture' : 'add a picture'}
             data-tip-pos="down"
           >
-            <Avatar user={user} size={80} />
+            <Avatar user={user} size={112} />
             <span className="pv-avatar-overlay" aria-hidden="true">
-              <Camera />
+              <CameraIcon />
             </span>
             <span className="pv-avatar-badge" aria-hidden="true">
-              <Camera />
+              <CameraIcon />
             </span>
           </button>
         ) : (
           <span className="pv-avatar">
-            <Avatar user={user} size={80} />
+            <Avatar user={user} size={112} />
           </span>
         )}
-        <div className="pv-name-block">
-          <h1 className="pv-name" title={name}>
+
+        <div className="pf-who">
+          <h1 className="pf-name" title={name}>
             {name}
           </h1>
-          <div className="pv-handle">
+          <div className="pf-meta">
             {user.displayName && <span>@{user.username}</span>}
             {flag && (
               <span className="flag" data-tip={countryName(user.country)} aria-label={countryName(user.country)}>
                 {flag}
               </span>
             )}
-            {own && <span className="pill">you</span>}
-          </div>
-          <div className="pv-handle" data-tip={timeAgo(user.createdAt)} style={{ justifySelf: 'start' }}>
-            joined {formatDate(user.createdAt)}
-          </div>
-        </div>
-      </div>
-
-      <div className="pv-divider" aria-hidden="true" />
-
-      <div className="pv-details">
-        {user.bio && (
-          <div className="pv-detail wide">
-            <span className="label">bio</span>
-            <span className="value">{user.bio}</span>
-          </div>
-        )}
-        {user.country && (
-          <div className="pv-detail">
-            <span className="label">country</span>
-            <span className="value">
-              {flag} {countryName(user.country)}
-            </span>
-          </div>
-        )}
-        {user.wcaId && (
-          <div className="pv-detail">
-            <span className="label">wca id</span>
-            <span className="value">
-              <Link to={`/wca?person=${encodeURIComponent(user.wcaId)}`}>{user.wcaId}</Link>
-              <a
-                className="ext"
-                href={`https://www.worldcubeassociation.org/persons/${encodeURIComponent(user.wcaId)}`}
-                target="_blank"
-                rel="noreferrer noopener"
-                aria-label="open WCA profile"
-                data-tip="wca profile"
-              >
-                <ExternalLink size={13} />
-              </a>
-            </span>
-          </div>
-        )}
-        {totals && totals.activeDays > 0 && (
-          <div className="pv-detail">
-            <span className="label">active days</span>
-            <span className="value">{formatNumber(totals.activeDays)}</span>
-          </div>
-        )}
-        {!hasDetails && (
-          <div className="pv-detail wide">
-            <span className="label">bio</span>
-            {own ? (
-              <span className="value muted">
-                tell people about yourself - add a bio, your country and your wca id.{' '}
-                {onEdit && (
-                  <button className="btn-text small" style={{ padding: 0, color: 'var(--main-color)' }} onClick={onEdit}>
-                    edit profile
-                  </button>
-                )}
-              </span>
-            ) : (
-              <span className="value muted">no bio yet.</span>
+            <span data-tip={`${formatDate(user.createdAt)} - ${timeAgo(user.createdAt)}`}>joined {monthYear(user.createdAt)}</span>
+            {user.wcaId && (
+              <Link to={`/wca?person=${encodeURIComponent(user.wcaId)}`} data-tip="official wca results">
+                {user.wcaId}
+              </Link>
             )}
+            {own && <span className="pill">you</span>}
+            <span className="pf-actions">
+              {own && onEdit && (
+                <button className="btn-text" onClick={onEdit} data-tip="edit profile" aria-label="edit profile">
+                  <PencilIcon />
+                </button>
+              )}
+              <button className="btn-text" onClick={() => copyProfileLink(user.username)} data-tip="copy profile link" aria-label="copy profile link">
+                <LinkIcon />
+              </button>
+            </span>
           </div>
-        )}
-      </div>
+          {user.bio ? (
+            <p className="pf-bio">{user.bio}</p>
+          ) : own && onEdit ? (
+            <button className="btn-text pf-bio-add" onClick={onEdit}>
+              add a bio, your country and your wca id
+            </button>
+          ) : null}
+        </div>
 
-      <div className="pv-divider d2" aria-hidden="true" />
+        {summary.data && <EventDonut events={summary.data.events} selected={event} onSelect={onEvent} />}
+      </div>
 
       {summary.error && !totals ? (
-        <div className="pv-stats" style={{ gridTemplateColumns: 'minmax(0, 1fr)' }}>
-          <WidgetError error={summary.error} what="the stats service" onRetry={summary.reload} compact />
-        </div>
+        <WidgetError error={summary.error} what="the stats service" onRetry={summary.reload} compact />
       ) : (
-        <div className="pv-stats">
-          <div className="stat">
-            <span className="label">solves</span>
-            <span className={`value${totals ? '' : ' dim'}`}>{totals ? formatNumber(totals.solves) : '-'}</span>
-          </div>
-          <div className="stat" data-tip={totals ? `${formatNumber(Math.round(totals.totalMs / 1000))} seconds` : undefined}>
-            <span className="label">time cubing</span>
-            <span className={`value${totals ? '' : ' dim'}`}>{totals ? formatDuration(totals.totalMs) : '-'}</span>
-          </div>
-          <div className="stat" data-tip={totals ? `longest streak: ${plural(totals.longestStreak, 'day')}` : undefined}>
-            <span className="label">streak</span>
-            <span className={`value${totals ? '' : ' dim'}`}>{totals ? plural(totals.currentStreak, 'day') : '-'}</span>
-          </div>
-        </div>
+        <dl className="pf-totals">
+          {stats.map((s) => (
+            <div key={s.label} className={totals ? undefined : 'dim'} data-tip={s.tip}>
+              <dt>{s.label}</dt>
+              <dd>{s.value}</dd>
+            </div>
+          ))}
+        </dl>
       )}
-
-      <div className="pv-strip">
-        {own && onEdit && (
-          <button className="btn-text" onClick={onEdit} data-tip="edit profile" data-tip-pos="left" aria-label="edit profile">
-            <Pencil />
-          </button>
-        )}
-        <button className="btn-text" onClick={() => copyProfileLink(user.username)} data-tip="copy profile link" data-tip-pos="left" aria-label="copy profile link">
-          <Link2 />
-        </button>
-      </div>
 
       {avatarOpen && (
         <Modal title="profile picture" onClose={closeAvatar}>
           <AvatarEditor onDone={closeAvatar} onCancel={closeAvatar} />
         </Modal>
       )}
-    </section>
+    </header>
   );
 }

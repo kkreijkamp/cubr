@@ -1,4 +1,4 @@
-import type { Redis } from '@cubetype/common';
+import type { Redis } from '@cubr/common';
 import type { FastifyBaseLogger } from 'fastify';
 
 /**

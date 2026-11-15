@@ -1,9 +1,9 @@
 {
-  "name": "@cubetype/cubestats",
+  "name": "@cubr/cubestats",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Speedcubing statistics shared by the cubetype frontend and services: WCA averaging rules, time formatting, event metadata, solve import/export (cubetype, csTimer and the timers csTimer reads)",
+  "description": "Speedcubing statistics shared by the cubr frontend and services: WCA averaging rules, time formatting, event metadata, solve import/export (cubr, csTimer and the timers csTimer reads)",
   "exports": {
     ".": "./src/index.ts"
   }

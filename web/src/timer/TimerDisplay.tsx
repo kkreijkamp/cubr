@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { formatTime, type Precision } from '@cubetype/cubestats';
+import { useEffect, useLayoutEffect, useRef } from 'react';
+import { formatTime, type Precision } from '@cubr/cubestats';
 import type { TimerState } from './useTimerEngine';
 import { INSPECTION_MS } from './useTimerEngine';
 import type { TimerUpdate } from '../lib/settings';
@@ -38,7 +38,23 @@ function runningText(elapsed: number, mode: TimerUpdate, precision: Precision): 
 }
 
 /**
- * The big timer number. While running/inspecting it updates its own text node every animation
+ * Writes the time one character per cell. Digits get a fixed width (timer.css), so the number keeps
+ * still while it runs even in a font without tabular figures (Comfortaa, Georgia).
+ */
+function setTimerText(el: HTMLElement, text: string): void {
+  if (el.dataset.text === text) return;
+  el.dataset.text = text;
+  while (el.childElementCount > text.length) el.lastElementChild!.remove();
+  while (el.childElementCount < text.length) el.append(document.createElement('span'));
+  for (let i = 0; i < text.length; i++) {
+    const cell = el.children[i] as HTMLElement;
+    if (cell.textContent !== text[i]) cell.textContent = text[i];
+    cell.className = text[i] >= '0' && text[i] <= '9' ? 'digit' : '';
+  }
+}
+
+/**
+ * The big timer number. While running/inspecting it updates its own cells every animation
  * frame (no React re-render per frame).
  */
 export function TimerDisplay({ state, precision, timerUpdate, sizeRem = 7, pb, className }: Props) {
@@ -52,8 +68,8 @@ export function TimerDisplay({ state, precision, timerUpdate, sizeRem = 7, pb, c
     const tick = () => {
       const el = textRef.current;
       if (el) {
-        if (phase === 'running' && startedAt !== null) el.textContent = runningText(performance.now() - startedAt, timerUpdate, precision);
-        else if (inspectionStartedAt !== null) el.textContent = inspectionText(performance.now() - inspectionStartedAt);
+        if (phase === 'running' && startedAt !== null) setTimerText(el, runningText(performance.now() - startedAt, timerUpdate, precision));
+        else if (inspectionStartedAt !== null) setTimerText(el, inspectionText(performance.now() - inspectionStartedAt));
       }
       raf = requestAnimationFrame(tick);
     };
@@ -85,9 +101,14 @@ export function TimerDisplay({ state, precision, timerUpdate, sizeRem = 7, pb, c
   }
   if (pb && (phase === 'idle' || phase === 'stopped')) cls += ' pb';
 
+  // every render, not just when `text` changes: the frame loop may have written something else since
+  useLayoutEffect(() => {
+    if (textRef.current) setTimerText(textRef.current, text);
+  });
+
   return (
     <div className={`timer-display ${cls} ${className ?? ''}`} style={{ ['--timer-size' as string]: `${sizeRem}rem` }} aria-live="off">
-      <span ref={textRef}>{text}</span>
+      <span ref={textRef} />
       {penaltyMark && <span className="penalty">{penaltyMark}</span>}
     </div>
   );

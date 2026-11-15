@@ -1,4 +1,4 @@
-import type { Migration } from '@cubetype/common';
+import type { Migration } from '@cubr/common';
 
 // Schema `solve` exactly as in docs/SPEC.md section 7.2. `migrate()` creates the schema itself and
 // tracks applied ids in solve.schema_migrations (advisory-locked, safe with many replicas).
@@ -69,6 +69,14 @@ SELECT user_id, daily_date, event, daily_index, id, time_ms, penalty, inserted_a
   FROM solve.solves
  WHERE daily_date IS NOT NULL AND daily_index IS NOT NULL
 ON CONFLICT DO NOTHING;
+`,
+  },
+  {
+    id: '003_practice_sessions',
+    sql: `
+-- A practice session's solves count for no personal best and no leaderboard. The flag travels in
+-- solve.created and the internal solve list; changing it emits session.updated.
+ALTER TABLE solve.sessions ADD COLUMN practice boolean NOT NULL DEFAULT false;
 `,
   },
 ];

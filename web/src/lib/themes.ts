@@ -1,4 +1,4 @@
-// Themes: a few cubetype originals (speedcubing-inspired) + Monkeytype's palettes (exact values from
+// Themes: a few cubr originals (speedcubing-inspired) + Monkeytype's palettes (exact values from
 // monkeytype's frontend/src/ts/constants/themes.ts, normalised to #rrggbb so charts can append an
 // alpha byte). Monkeytype themes that rely on its extra per-theme CSS or are unreadable without it
 // (text/bg contrast too low for a big timer) are left out.
@@ -14,12 +14,12 @@ export interface Theme {
   errorExtra: string;
   colorfulError: string;
   colorfulErrorExtra: string;
-  /** designed for cubetype rather than taken from monkeytype */
+  /** designed for cubr rather than taken from monkeytype */
   original?: boolean;
 }
 
 export const THEMES: Theme[] = [
-  // cubetype originals
+  // cubr originals
   {"name":"stickerless","bg":"#161616","main":"#ffd500","caret":"#ffd500","sub":"#6b6b6b","subAlt":"#202020","text":"#f1f1f1","error":"#e8263c","errorExtra":"#9c1426","colorfulError":"#ff6a13","colorfulErrorExtra":"#b34507","original":true},
   {"name":"white_cross","bg":"#f3f2ee","main":"#00975a","caret":"#0046ad","sub":"#9a978d","subAlt":"#e3e1da","text":"#20201e","error":"#d0252f","errorExtra":"#8f1920","colorfulError":"#ff6a13","colorfulErrorExtra":"#b34507","original":true},
   {"name":"stackmat","bg":"#a3ad94","main":"#2b3a1f","caret":"#151a10","sub":"#5f6a52","subAlt":"#949f85","text":"#151a10","error":"#7d1d1d","errorExtra":"#5a1414","colorfulError":"#8a2a00","colorfulErrorExtra":"#5e1d00","original":true},
@@ -247,7 +247,20 @@ const VARS: [Exclude<keyof Theme, 'name' | 'original'>, string][] = [
   ['colorfulErrorExtra', '--colorful-error-extra-color'],
 ];
 
-/** Applies a theme's colours to :root. `persist` stores them for the pre-paint script in index.html. */
+/**
+ * The favicon (a 3x3 cube face, as in public/favicon.svg) in a theme's colours: main-colour stickers and a
+ * text-colour centre on the theme's background, which fills the whole icon.
+ */
+export function faviconSvg(theme: Theme): string {
+  // the cube spans 24 of the 32 units (gap = 1/6 of a sticker, like the header logo)
+  const at = [4, 12.4, 20.8];
+  const stickers = at.flatMap((y) =>
+    at.map((x) => `<rect x="${x}" y="${y}" width="7.2" height="7.2" rx="1.8"${x === at[1] && y === at[1] ? ` fill="${theme.text}"` : ''}/>`),
+  );
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="5" fill="${theme.bg}"/><g fill="${theme.main}">${stickers.join('')}</g></svg>`;
+}
+
+/** Applies a theme's colours to :root and the favicon. `persist` stores them for the pre-paint script in index.html. */
 export function applyTheme(name: string, persist = true): void {
   const theme = getTheme(name);
   const root = document.documentElement;
@@ -257,14 +270,15 @@ export function applyTheme(name: string, persist = true): void {
     colors[v] = theme[k];
   }
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme.bg);
+  document.querySelector('link[rel="icon"]')?.setAttribute('href', `data:image/svg+xml,${encodeURIComponent(faviconSvg(theme))}`);
   if (persist) {
     try {
-      localStorage.setItem('cubetype.themeColors', JSON.stringify(colors));
+      localStorage.setItem('cubr.themeColors', JSON.stringify(colors));
     } catch {
       /* ignore */
     }
   }
-  window.dispatchEvent(new CustomEvent('cubetype:theme'));
+  window.dispatchEvent(new CustomEvent('cubr:theme'));
 }
 
 /** Reads the current value of a theme CSS variable (for canvas/chart colours). */

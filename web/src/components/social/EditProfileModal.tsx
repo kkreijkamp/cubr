@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { AlertCircle } from 'lucide-react';
+import { ExclamationCircleIcon } from '@heroicons/react/24/outline';
 import { AvatarEditor } from './AvatarEditor';
 import { CountrySelect } from './CountrySelect';
 import { friendlyError } from './util';
@@ -147,7 +147,7 @@ export function EditProfileModal({ user, onClose }: { user: PrivateUser; onClose
           </span>
         ) : (
           <span className="ep-hint" id="ep-wca-hint">
-            linking your wca id shows your official results next to your cubetype pbs.{' '}
+            linking your wca id shows your official results next to your cubr pbs.{' '}
             <a href="https://www.worldcubeassociation.org/persons" target="_blank" rel="noreferrer noopener">
               find your id
             </a>
@@ -155,7 +155,7 @@ export function EditProfileModal({ user, onClose }: { user: PrivateUser; onClose
         )}
         {error && (
           <div className="ep-error" role="alert">
-            <AlertCircle size={15} /> {error}
+            <ExclamationCircleIcon width={15} height={15} /> {error}
           </div>
         )}
         <div className="ep-actions">

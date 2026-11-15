@@ -1,5 +1,5 @@
-import { dayKey, hourIn, isValidTimeZone } from '@cubetype/common';
-import { effectiveMs, type Penalty } from '@cubetype/cubestats';
+import { dayKey, hourIn, isValidTimeZone } from '@cubr/common';
+import { effectiveMs, type Penalty } from '@cubr/cubestats';
 
 export interface DayAgg {
   day: string; // YYYY-MM-DD in the bucketing tz

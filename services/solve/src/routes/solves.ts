@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import { conflict, notFound, parse, withTx, type AuthUser, type PoolClient } from '@cubetype/common';
-import type { Penalty } from '@cubetype/cubestats';
+import { conflict, notFound, parse, withTx, type AuthUser, type PoolClient } from '@cubr/common';
+import type { Penalty } from '@cubr/cubestats';
 import { currentUser, FK_VIOLATION, pgCode, pgConstraint, tzFrom, UNIQUE_VIOLATION, type RouteContext } from '../context.js';
 import { SOLVE_COLUMNS, toSolve, type Solve, type SolveRow } from '../mapping.js';
 import { enqueue } from '../outbox.js';
@@ -75,8 +75,8 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
     const result = await withTx(pool, async (client) => {
       // Row lock on the session serialises concurrent writes to one session, so every
       // solve.created carries a rolling ao5/ao12 that includes all earlier solves.
-      const session = await client.query<{ event: string; name: string }>(
-        'SELECT event, name FROM solve.sessions WHERE id = $1 AND user_id = $2 FOR NO KEY UPDATE',
+      const session = await client.query<{ event: string; name: string; practice: boolean }>(
+        'SELECT event, name, practice FROM solve.sessions WHERE id = $1 AND user_id = $2 FOR NO KEY UPDATE',
         [body.sessionId, user.id],
       );
       if (!session.rows[0]) throw notFound('session not found');
@@ -109,8 +109,11 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
       const row = ins.rows[0];
       const newAttempt = daily ? await recordDailyAttempt(client, user, row) : false;
       const rolling = await sessionRolling(client, row.session_id);
-      // sessionName lets read models (stats) label sessions without querying this service
-      await enqueue(client, 'solve.created', { ...solveEventPayload(user, row, tz, rolling), sessionName: session.rows[0].name });
+      // sessionName lets read models (stats) label sessions without querying this service;
+      // practice keeps the solve off personal bests (stats) and the boards (leaderboard)
+      await enqueue(client, 'solve.created', {
+        ...solveEventPayload(user, row, tz, rolling), sessionName: session.rows[0].name, practice: session.rows[0].practice,
+      });
       if (daily && newAttempt) await completeDailyIfDone(client, user, daily.date, event, tz);
       return { created: true, row, rolling };
     }).catch(mapPgError);

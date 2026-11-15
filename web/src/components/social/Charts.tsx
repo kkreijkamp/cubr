@@ -1,8 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { ChartConfiguration } from 'chart.js';
-import { Clock } from 'lucide-react';
-import { EVENTS } from '@cubetype/cubestats';
-import { WidgetError } from './Widget';
+import { Section, WidgetError } from './Widget';
 import { eventLabel, plural } from './util';
 import { api } from '../../lib/api';
 import { formatTime } from '../../lib/format';
@@ -10,21 +8,7 @@ import { useAsync } from '../../lib/useAsync';
 import { ChartCanvas, themedScales, useThemeColors, type ThemeColors } from '../ChartCanvas';
 import { Loading, Spinner } from '../Spinner';
 
-const HEIGHT = 230;
-
-/** Event picker shared by the profile charts. */
-export function EventSelect({ events, value, onChange, label }: { events: string[]; value: string; onChange: (e: string) => void; label: string }) {
-  const options = events.length ? events : EVENTS.map((e) => e.id);
-  return (
-    <select className="pv-select" value={value} onChange={(e) => onChange(e.target.value)} aria-label={label}>
-      {options.map((id) => (
-        <option key={id} value={id}>
-          {eventLabel(id)}
-        </option>
-      ))}
-    </select>
-  );
-}
+const HEIGHT = 120;
 
 /** Tooltip styled like the app's balloon tooltips (sub background, bg text). */
 function tooltipStyle(c: ThemeColors) {
@@ -41,11 +25,11 @@ function tooltipStyle(c: ThemeColors) {
   };
 }
 
-/** Charts live on sub-alt cards, so the recessive grid uses the page background. */
-function cardScales(c: ThemeColors, scales: Record<string, any>) {
+/** Charts sit on the page background: faint grid lines, no axis borders. */
+function pageScales(c: ThemeColors, scales: Record<string, any>) {
   const themed = themedScales(c, scales);
   for (const s of Object.values(themed)) {
-    s.grid = { ...s.grid, color: c.bg, tickColor: 'transparent' };
+    s.grid = { ...s.grid, color: c.subAlt, tickColor: 'transparent' };
     s.border = { display: false };
   }
   return themed;
@@ -55,8 +39,7 @@ function cardScales(c: ThemeColors, scales: Record<string, any>) {
 
 const hh = (h: number) => `${String(h).padStart(2, '0')}:00`;
 
-export function HourlyChart({ userId, events, defaultEvent, precision }: { userId: string; events: string[]; defaultEvent: string; precision: 2 | 3 }) {
-  const [event, setEvent] = useState(defaultEvent);
+export function HourlyChart({ userId, event, precision }: { userId: string; event: string; precision: 2 | 3 }) {
   const [metric, setMetric] = useState<'solves' | 'mean'>('solves');
   const colors = useThemeColors();
   const hourly = useAsync((signal) => api.stats.hourly(userId, event, signal), [userId, event]);
@@ -88,9 +71,9 @@ export function HourlyChart({ userId, events, defaultEvent, precision }: { userI
             data: hours.map((h) => (metric === 'solves' ? h.solves : h.meanMs && h.meanMs > 0 ? h.meanMs : null)),
             backgroundColor: c.main,
             hoverBackgroundColor: c.text,
-            borderRadius: 4,
-            barPercentage: 0.82,
-            categoryPercentage: 0.92,
+            borderRadius: 3,
+            barPercentage: 0.7,
+            categoryPercentage: 0.9,
           },
         ],
       },
@@ -115,7 +98,7 @@ export function HourlyChart({ userId, events, defaultEvent, precision }: { userI
             },
           },
         },
-        scales: cardScales(c, {
+        scales: pageScales(c, {
           x: {
             grid: { display: false },
             ticks: { autoSkip: false, maxRotation: 0, callback: (_v: unknown, i: number) => (i % 3 === 0 ? String(i).padStart(2, '0') : '') },
@@ -133,22 +116,20 @@ export function HourlyChart({ userId, events, defaultEvent, precision }: { userI
   }, [hours, metric, colors, precision]);
 
   return (
-    <section className="pv-card" aria-label="time of day">
-      <div className="pv-card-head">
-        <h2 className="pv-title">
-          <Clock /> time of day {hourly.loading && hourly.data && <Spinner size={14} />}
-        </h2>
-        <div className="pv-head-tools">
-          <div className="pv-seg" role="group" aria-label="metric">
-            {(['solves', 'mean'] as const).map((m) => (
-              <button key={m} className={`btn-text${metric === m ? ' active' : ''}`} aria-pressed={metric === m} onClick={() => setMetric(m)}>
-                {m}
-              </button>
-            ))}
-          </div>
-          <EventSelect events={events} value={event} onChange={setEvent} label="time of day event" />
+    <Section
+      label="time of day"
+      title="time of day"
+      extra={hourly.loading && hourly.data && <Spinner size={12} />}
+      tools={
+        <div className="pv-seg" role="group" aria-label="metric">
+          {(['solves', 'mean'] as const).map((m) => (
+            <button key={m} className={`btn-text${metric === m ? ' active' : ''}`} aria-pressed={metric === m} onClick={() => setMetric(m)}>
+              {m}
+            </button>
+          ))}
         </div>
-      </div>
+      }
+    >
       {hourly.error && !hourly.data ? (
         <WidgetError error={hourly.error} what="the time-of-day chart" onRetry={hourly.reload} />
       ) : !hourly.data ? (
@@ -164,17 +145,17 @@ export function HourlyChart({ userId, events, defaultEvent, precision }: { userI
           <ChartCanvas config={config} height={HEIGHT} />
           {insight && (
             <div className="pv-insight">
-              most solves around <b>{hh(insight.busiest.hour)}</b>
+              busiest <b>{hh(insight.busiest.hour)}</b>
               {insight.fastest && (
                 <>
                   {' '}
-                  - fastest around <b>{hh(insight.fastest.hour)}</b> (mean {formatTime(insight.fastest.meanMs!, precision)})
+                  - fastest <b>{hh(insight.fastest.hour)}</b> (mean {formatTime(insight.fastest.meanMs!, precision)})
                 </>
               )}
             </div>
           )}
         </>
       )}
-    </section>
+    </Section>
   );
 }

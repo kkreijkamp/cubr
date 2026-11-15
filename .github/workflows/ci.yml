@@ -83,6 +83,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Build
-        run: docker build -f services/scramble/Dockerfile -t cubetype/scramble:ci .
+        run: docker build -f services/scramble/Dockerfile -t cubr/scramble:ci .
       - name: cubing.js resolves inside the image
-        run: docker run --rm cubetype/scramble:ci node -e "import('cubing/scramble').then(() => console.log('cubing ok'))"
+        run: docker run --rm cubr/scramble:ci node -e "import('cubing/scramble').then(() => console.log('cubing ok'))"

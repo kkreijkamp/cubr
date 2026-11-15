@@ -1,4 +1,4 @@
-import { createPool, createRedis, createServer, loadConfig, migrate, pingPostgres, start } from '@cubetype/common';
+import { createPool, createRedis, createServer, loadConfig, migrate, pingPostgres, start } from '@cubr/common';
 import { createBackend } from './backends.js';
 import { DailyChallenges } from './daily.js';
 import { ScrambleGenerator } from './generator.js';

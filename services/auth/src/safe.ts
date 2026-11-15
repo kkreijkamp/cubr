@@ -1,4 +1,4 @@
-import { publishEvent, newEventId, rateLimit, type Redis } from '@cubetype/common';
+import { publishEvent, newEventId, rateLimit, type Redis } from '@cubr/common';
 import type { FastifyBaseLogger } from 'fastify';
 
 // Redis is a *soft* dependency for auth: when it is down, register/login/profile must still work.

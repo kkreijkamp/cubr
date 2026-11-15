@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_THEME, getTheme, isLightTheme, randomTheme, THEMES } from '../themes';
+import { DEFAULT_THEME, faviconSvg, getTheme, isLightTheme, randomTheme, THEMES } from '../themes';
+import shippedFavicon from '../../../public/favicon.svg?raw';
 
 const COLORS = ['bg', 'main', 'caret', 'sub', 'subAlt', 'text', 'error', 'errorExtra', 'colorfulError', 'colorfulErrorExtra'] as const;
 
@@ -43,6 +44,16 @@ describe('themes', () => {
     expect(isLightTheme(getTheme('serika'))).toBe(true);
     expect(isLightTheme(getTheme('serika_dark'))).toBe(false);
     expect(isLightTheme(getTheme('stackmat'))).toBe(true);
+  });
+
+  it('draws the favicon in the theme colours (the default theme gives public/favicon.svg)', () => {
+    expect(faviconSvg(getTheme(DEFAULT_THEME))).toBe(shippedFavicon.trim());
+    const t = getTheme('8008');
+    const svg = faviconSvg(t);
+    expect(svg).toContain(`<rect width="32" height="32" rx="5" fill="${t.bg}"/>`); // the theme's background fills the icon
+    expect(svg).toContain(`<g fill="${t.main}">`);
+    expect(svg.match(/<rect x=/g)).toHaveLength(9);
+    expect(svg.match(new RegExp(`fill="${t.text}"`, 'g'))).toHaveLength(1);
   });
 
   it('picks a different random theme of the requested kind', () => {
