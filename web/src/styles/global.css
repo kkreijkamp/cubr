@@ -362,12 +362,14 @@ kbd {
   opacity: 0.33;
   pointer-events: none;
 }
+/* Keyboard focus ring. Text fields, selects and textareas are left out on purpose: browsers count
+   every click into them as focus-visible, so they would wear the ring all the time; the caret
+   already shows where focus is. */
 .btn:focus-visible,
 .btn-text:focus-visible,
 a:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
+input[type='checkbox']:focus-visible,
+input[type='radio']:focus-visible {
   outline: none;
   box-shadow: 0 0 0 0.1rem var(--bg-color), 0 0 0 0.2rem var(--text-color);
 }
