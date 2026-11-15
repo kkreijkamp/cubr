@@ -42,5 +42,19 @@ export function isEventId(id: string): boolean {
   return BY_ID.has(id);
 }
 
+/** Name of an event's default session: its short name ("3x3", "3x3 OH", "SQ-1"). */
+export function defaultSessionName(id: string): string {
+  return getEvent(id)?.short ?? id;
+}
+
+/**
+ * Name of an event's default practice session ("3x3 practice"). Every event gets one next to its
+ * default session: the server creates the pair for a new account, the web app when you first open
+ * an event, and solve migration 004 backfilled accounts that existed before.
+ */
+export function practiceSessionName(id: string): string {
+  return `${defaultSessionName(id)} practice`;
+}
+
 /** Events that have a daily challenge (5 scrambles per day, ranked by ao5). */
 export const DAILY_EVENTS = ['333', '222', '444', 'pyram', 'skewb'];

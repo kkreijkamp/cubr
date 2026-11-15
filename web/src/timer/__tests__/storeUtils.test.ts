@@ -3,6 +3,8 @@ import {
   backoffDelay,
   coalesce,
   decodeLocalDb,
+  defaultSessionsPlan,
+  freeSessionName,
   decodeQueue,
   encodeLocalDb,
   insertChrono,
@@ -250,5 +252,38 @@ describe('import chunking', () => {
     expect(huge.map((c) => c.sessions[0].name)).toEqual(['huge session name that is quite long!!', 'huge session name that is quite long (2)', 'huge session name that is quite long (3)']);
     expect(huge.flatMap((c) => c.sessions[0].solves)).toHaveLength(25);
     for (const c of huge) expect(c.sessions[0].name.length).toBeLessThanOrEqual(40);
+  });
+});
+
+describe('default sessions', () => {
+  const s = (name: string, event: string, practice = false) => ({ name, event, practice });
+
+  it('numbers a taken name, ignoring case', () => {
+    expect(freeSessionName('3x3', [])).toBe('3x3');
+    expect(freeSessionName('3x3', [s('3X3', '333'), s('3x3 2', '333')])).toBe('3x3 3');
+  });
+
+  it('gives a new event its default session and its practice session, in that order', () => {
+    expect(defaultSessionsPlan('333', [])).toEqual([
+      { name: '3x3', practice: false },
+      { name: '3x3 practice', practice: true },
+    ]);
+    expect(defaultSessionsPlan('333oh', [s('3x3', '333'), s('3x3 practice', '333', true)])).toEqual([
+      { name: '3x3 OH', practice: false },
+      { name: '3x3 OH practice', practice: true },
+    ]);
+  });
+
+  it('adds no second practice session to an event that has one', () => {
+    expect(defaultSessionsPlan('444', [s('4x4 practice', '444', true)])).toEqual([{ name: '4x4', practice: false }]);
+    // a practice session of another event doesn't count
+    expect(defaultSessionsPlan('444', [s('3x3 practice', '333', true)])).toHaveLength(2);
+  });
+
+  it('numbers taken names for both', () => {
+    expect(defaultSessionsPlan('sq1', [s('SQ-1', '333'), s('SQ-1 practice', '333')])).toEqual([
+      { name: 'SQ-1 2', practice: false },
+      { name: 'SQ-1 practice 2', practice: true },
+    ]);
   });
 });

@@ -18,7 +18,7 @@ import {
 import { EVENTS, getEvent, type EventInfo } from '@cubr/cubestats';
 import { INPUT_MODES, modeInfo, type InputMode } from '../../input/inputMode';
 import type { Session } from '../../lib/types';
-import { formatNumber } from '../../lib/format';
+import { formatNumber, practiceMarker } from '../../lib/format';
 
 /** Buttons on the timer page never take focus on click, so Space can't re-trigger them. */
 export const noFocus = { onMouseDown: (e: React.MouseEvent) => e.preventDefault() };
@@ -235,7 +235,7 @@ function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, 
         onClick={() => setOpen(!open)}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={`session: ${current?.name ?? 'none'}${current?.practice ? ' (practice)' : ''}`}
+        aria-label={`session: ${current?.name ?? 'none'}${practiceMarker(current?.name, current?.practice, ' (practice)')}`}
         data-tip={current?.practice && !open ? PRACTICE_TIP : undefined}
         data-tip-pos="down"
         {...noFocus}
@@ -260,7 +260,7 @@ function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, 
                 <span className="tp-menu-check">{s.id === current?.id && <CheckIcon width={14} height={14} />}</span>
                 <span className="tp-menu-label">
                   {s.name}
-                  {s.practice && <span className="tp-menu-tag">practice</span>}
+                  {practiceMarker(s.name, s.practice, 'practice') && <span className="tp-menu-tag">practice</span>}
                 </span>
                 <span className="tp-menu-count">{formatNumber(s.solveCount)}</span>
               </button>

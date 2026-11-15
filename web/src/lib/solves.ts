@@ -15,7 +15,7 @@
 //    (1 s ... 60 s, retried immediately on `online`). Server reads are overlaid with queued ops so
 //    optimistic changes survive reloads. The current session is cached (`cubr.cloudcache.v1`)
 //    so a logged-in user can keep timing while solve-service is down.
-import { getEvent, isEventId, type ImportedSession, type Penalty } from '@cubr/cubestats';
+import { defaultSessionName, isEventId, type ImportedSession, type Penalty } from '@cubr/cubestats';
 import { api, ApiError, getToken, type ImportPayload } from './api';
 import { getCurrentUser, onAuthChange } from './auth';
 import { settingsStore, updateSettings } from './settings';
@@ -34,6 +34,8 @@ import {
   LOCAL_KEY,
   overlaySessions,
   overlaySolves,
+  defaultSessionsPlan,
+  freeSessionName,
   planImportChunks,
   QUEUE_KEY,
   sortChrono,
@@ -486,25 +488,34 @@ function defaultEvent(): string {
 
 /** Default name for a new session of `event`: "3x3", then "3x3 2", "3x3 3" ... */
 export function suggestSessionName(event: string): string {
-  const base = getEvent(event)?.short ?? event;
-  const taken = new Set(solveStore.get().sessions.map((s) => s.name.toLowerCase()));
-  if (!taken.has(base.toLowerCase())) return base;
-  for (let i = 2; ; i++) if (!taken.has(`${base} ${i}`.toLowerCase())) return `${base} ${i}`;
+  return freeSessionName(defaultSessionName(event), solveStore.get().sessions);
 }
 
 async function loadLocalScope(): Promise<void> {
   localDb = readLocal();
   model = localDb;
-  if (!pickCurrent()) createSessionInternal(suggestSessionNameFor(defaultEvent()), defaultEvent());
+  if (!pickCurrent()) createDefaultSessions(defaultEvent());
   model.current = pickCurrent();
   publish({ ready: true, loading: false });
 }
 
+/** A single new session's name for `event` (its short name, numbered if taken). */
 function suggestSessionNameFor(event: string): string {
-  const base = getEvent(event)?.short ?? event;
-  const taken = new Set(model.sessions.map((s) => s.name.toLowerCase()));
-  if (!taken.has(base.toLowerCase())) return base;
-  for (let i = 2; ; i++) if (!taken.has(`${base} ${i}`.toLowerCase())) return `${base} ${i}`;
+  return freeSessionName(defaultSessionName(event), model.sessions);
+}
+
+/**
+ * Creates the sessions an event starts with: its default session ("3x3") and, if the event has
+ * no practice session yet, "3x3 practice" a millisecond later so the default one stays first.
+ * Used when a new account, a new guest or a newly opened event needs a session; replacing a
+ * deleted session creates only the default one. Returns the default session.
+ */
+function createDefaultSessions(event: string): Session {
+  const t = Date.now();
+  const created = defaultSessionsPlan(event, model.sessions).map((p, i) =>
+    createSessionInternal(p.name, event, p.practice, new Date(t + i).toISOString()),
+  );
+  return created[0];
 }
 
 let loadAttempts = 0;
@@ -543,7 +554,7 @@ async function loadCloudScope(uid: string, g: number, keepCurrent = false): Prom
     model.solves.set(cache.sessionId, overlaySolves(cache.sessionId, cache.solves, overlayOps()));
   }
   let cur = pickCurrent();
-  if (!cur) cur = createSessionInternal(suggestSessionNameFor(defaultEvent()), defaultEvent()).id;
+  if (!cur) cur = createDefaultSessions(defaultEvent()).id;
   model.current = cur;
   publish();
   await loadSessionSolves(cur, g);
@@ -736,8 +747,8 @@ function validName(name: string): string {
   return n;
 }
 
-function createSessionInternal(name: string, event: string, practice = false): Session {
-  const now = new Date().toISOString();
+function createSessionInternal(name: string, event: string, practice = false, createdAt = new Date().toISOString()): Session {
+  const now = createdAt;
   const session: Session = { id: uuid(), name, event, ...(practice ? { practice } : {}), createdAt: now, updatedAt: now, solveCount: 0 };
   model.sessions = [...model.sessions, session];
   model.solves.set(session.id, []);
@@ -946,7 +957,7 @@ function findSessionFor(event: string, counts = false): Session | undefined {
 export async function switchEvent(event: string): Promise<void> {
   if (!solveStore.get().ready) await whenReady();
   if (!isEventId(event)) throw new Error(`Unknown event ${event}`);
-  const s = findSessionFor(event) ?? createSessionInternal(suggestSessionNameFor(event), event);
+  const s = findSessionFor(event) ?? createDefaultSessions(event);
   await switchSession(s.id);
 }
 
@@ -960,7 +971,7 @@ export async function ensureSession(event: string, opts: { counts?: boolean } = 
   if (!isEventId(event)) throw new Error(`Unknown event ${event}`);
   const found = findSessionFor(event, opts.counts === true);
   if (found) return found;
-  const s = createSessionInternal(suggestSessionNameFor(event), event);
+  const s = createDefaultSessions(event);
   commit();
   return s;
 }
@@ -1289,7 +1300,7 @@ export function clearLocalData(): void {
   storageError = null;
   if (scope?.mode === 'local') {
     model = localDb;
-    createSessionInternal(suggestSessionNameFor(defaultEvent()), defaultEvent());
+    createDefaultSessions(defaultEvent());
     model.current = pickCurrent();
     publish();
   }

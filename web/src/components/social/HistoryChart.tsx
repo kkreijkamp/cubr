@@ -4,7 +4,7 @@ import { rollingAverage } from '@cubr/cubestats';
 import { Section, WidgetError } from './Widget';
 import { eventLabel } from './util';
 import { api } from '../../lib/api';
-import { formatDateTime, formatNumber, formatTime } from '../../lib/format';
+import { formatDateTime, formatNumber, formatTime, practiceMarker } from '../../lib/format';
 import { useAsync } from '../../lib/useAsync';
 import { ChartCanvas, themedScales, useThemeColors, type ThemeColors } from '../ChartCanvas';
 import { Loading, Spinner } from '../Spinner';
@@ -405,7 +405,7 @@ export function SolveHistoryChart({ userId, event, precision }: { userId: string
               {sessions.map((s, i) => (
                 <option key={s.id} value={i}>
                   {s.name ?? `session ${i + 1}`}
-                  {s.practice ? ' (practice)' : ''} - {formatNumber(s.solves)}
+                  {practiceMarker(s.name, s.practice, ' (practice)')} - {formatNumber(s.solves)}
                 </option>
               ))}
             </select>

@@ -1,8 +1,32 @@
 // Pure helpers behind lib/solves.ts (kept free of browser globals so they can be unit-tested):
 // compact localStorage codec, retry-queue coalescing, optimistic overlays, import chunking, backoff.
-import type { Penalty } from '@cubr/cubestats';
+import { defaultSessionName, practiceSessionName, type Penalty } from '@cubr/cubestats';
 import type { ImportPayload, NewSolve } from '../lib/api';
 import type { Session, Solve } from '../lib/types';
+
+// ---------------------------------------------------------------- default sessions
+
+/** `base`, or `base 2`, `base 3`, ... if a session already has that name (case-insensitive). */
+export function freeSessionName(base: string, sessions: readonly { name: string }[]): string {
+  const taken = new Set(sessions.map((s) => s.name.toLowerCase()));
+  if (!taken.has(base.toLowerCase())) return base;
+  for (let i = 2; ; i++) if (!taken.has(`${base} ${i}`.toLowerCase())) return `${base} ${i}`;
+}
+
+/**
+ * The sessions to create when an event needs one and has none to offer: its default session
+ * ("3x3") and, unless the event already has a practice session, its practice session
+ * ("3x3 practice"), in that order. Taken names get a number.
+ */
+export function defaultSessionsPlan(
+  event: string,
+  sessions: readonly Pick<Session, 'name' | 'event' | 'practice'>[],
+): { name: string; practice: boolean }[] {
+  const normal = { name: freeSessionName(defaultSessionName(event), sessions), practice: false };
+  if (sessions.some((s) => s.event === event && s.practice)) return [normal];
+  const practice = { name: freeSessionName(practiceSessionName(event), [...sessions, normal]), practice: true };
+  return [normal, practice];
+}
 
 // ---------------------------------------------------------------- ids
 
