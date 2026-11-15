@@ -147,7 +147,7 @@ export function EditProfileModal({ user, onClose }: { user: PrivateUser; onClose
           </span>
         ) : (
           <span className="ep-hint" id="ep-wca-hint">
-            linking your wca id shows your official results next to your cubetype pbs.{' '}
+            linking your wca id shows your official results next to your cubr pbs.{' '}
             <a href="https://www.worldcubeassociation.org/persons" target="_blank" rel="noreferrer noopener">
               find your id
             </a>

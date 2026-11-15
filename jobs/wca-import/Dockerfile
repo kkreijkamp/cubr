@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Build context = repo root:  docker build -f jobs/wca-import/Dockerfile -t cubetype/wca-import:dev .
+# Build context = repo root:  docker build -f jobs/wca-import/Dockerfile -t cubr/wca-import:dev .
 #
 # A shell-script job: postgres:17-alpine already ships psql + pg_isready matching the server
 # version; we add bash (the script), curl (download), unzip (stream files out of the zip) and

@@ -1,7 +1,7 @@
 // Scramble preview nets. cubing.js has a 2D net for each puzzle: an SVG with one shape per sticker,
 // id "ORBIT-l<piece>-o<orientation>", coloured for the solved puzzle. The preview keeps that layout
 // and that mapping from a scrambled state to stickers, but redraws every sticker as a flat rounded
-// tile with a gap around it, in cubetype's sticker colours. Everything here is pure (no DOM).
+// tile with a gap around it, in cubr's sticker colours. Everything here is pure (no DOM).
 
 export type Point = [number, number];
 /** a 2D affine transform [a, b, c, d, e, f], as in SVG: x' = a x + c y + e, y' = b x + d y + f */
@@ -317,14 +317,14 @@ export function stickerSources(orbits: Orbit[], pattern: Record<string, OrbitPat
   return out;
 }
 
-// cubing.js colours its nets with pure web colours; cubetype's defaults are the same colours a little
+// cubing.js colours its nets with pure web colours; cubr's defaults are the same colours a little
 // softer, and each face's colour can be your own (settings: sticker colours)
 export interface SchemeFace {
   /** what the face is called in the settings (its position, or its usual colour) */
   name: string;
   /** how cubing.js colours this face in its nets */
   cubing: string[];
-  /** cubetype's colour for it */
+  /** cubr's colour for it */
   colour: string;
 }
 
@@ -402,8 +402,8 @@ export function schemeFor(puzzle: string): Scheme | undefined {
 const HEX = /^#[0-9a-f]{6}$/i;
 
 /**
- * A net colour (as cubing.js gives it) as cubetype draws it: your own colour for that face when you
- * picked one (`custom`, one per face of the scheme), otherwise cubetype's.
+ * A net colour (as cubing.js gives it) as cubr draws it: your own colour for that face when you
+ * picked one (`custom`, one per face of the scheme), otherwise cubr's.
  */
 export function stickerColour(original: string, scheme: Scheme | undefined, custom?: readonly unknown[]): string {
   const c = original.trim().toLowerCase();

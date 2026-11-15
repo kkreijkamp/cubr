@@ -1,6 +1,6 @@
 // Timer page keyboard shortcuts: all of csTimer's (its src/js/shortcut.js), so csTimer habits carry
-// over, plus cubetype's own on keys csTimer leaves free. Space, Esc and Tab are handled elsewhere.
-import type { Penalty } from '@cubetype/cubestats';
+// over, plus cubr's own on keys csTimer leaves free. Space, Esc and Tab are handled elsewhere.
+import type { Penalty } from '@cubr/cubestats';
 import type { InputMode } from '../input/inputMode';
 
 export type ShortcutAction =
@@ -12,7 +12,7 @@ export type ShortcutAction =
   | { kind: 'scramble'; dir: 1 | -1 }
   | { kind: 'customScramble' }
   | { kind: 'input'; input: InputMode }
-  /** a csTimer input that cubetype doesn't have (last layer training) */
+  /** a csTimer input that cubr doesn't have (last layer training) */
   | { kind: 'missingInput'; name: string }
   | { kind: 'comment' }
   | { kind: 'inspection' };
@@ -41,7 +41,7 @@ const ALT: Record<string, ShortcutAction> = {
   KeyI: { kind: 'customScramble' },
   KeyD: { kind: 'clearSession' },
   KeyZ: { kind: 'deleteLast' },
-  // cubetype's own
+  // cubr's own
   Backspace: { kind: 'deleteLast' },
   KeyN: { kind: 'comment' },
   KeyW: { kind: 'inspection' },

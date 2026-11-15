@@ -22,7 +22,7 @@ export interface Settings {
   /** timer font size in rem */
   timerSize: number;
   scramblePreview: PreviewMode;
-  /** the 2D scramble preview's sticker colours: cubetype's, or your own (customStickers) */
+  /** the 2D scramble preview's sticker colours: cubr's, or your own (customStickers) */
   stickerColours: 'default' | 'custom';
   /** your own sticker colours: per scheme (lib/scrambleNet SCHEMES), one per face; gaps are the default */
   customStickers: Record<string, (string | null)[]>;
@@ -110,7 +110,7 @@ export const FONTS: FontOption[] = [
   { name: 'Georgia', css: 'Georgia, serif' },
 ];
 
-const KEY = 'cubetype.settings';
+const KEY = 'cubr.settings';
 
 function sanitize(raw: Partial<Settings> | null | undefined): Settings {
   const s = { ...DEFAULT_SETTINGS, ...(raw && typeof raw === 'object' ? raw : {}) };

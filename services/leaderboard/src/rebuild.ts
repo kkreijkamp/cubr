@@ -1,4 +1,4 @@
-import { fetchJson, internalHeaders, type FetchOptions, type Redis } from '@cubetype/common';
+import { fetchJson, internalHeaders, type FetchOptions, type Redis } from '@cubr/common';
 import type { FastifyBaseLogger } from 'fastify';
 import { isBelowFloor, type FloorSource } from './floors.js';
 import {

@@ -1,5 +1,5 @@
 import { ChatBubbleLeftIcon, TrashIcon } from '@heroicons/react/24/outline';
-import type { Penalty } from '@cubetype/cubestats';
+import type { Penalty } from '@cubr/cubestats';
 import type { Solve } from '../../lib/types';
 import { noFocus } from './ConfigBar';
 

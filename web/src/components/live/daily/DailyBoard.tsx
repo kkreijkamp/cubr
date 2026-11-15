@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { TrophyIcon } from '@heroicons/react/24/outline';
-import { formatTime, fromApiValue, type Precision } from '@cubetype/cubestats';
+import { formatTime, fromApiValue, type Precision } from '@cubr/cubestats';
 import { api, ApiError } from '../../../lib/api';
 import { flagEmoji, formatNumber } from '../../../lib/format';
 import { useAsync } from '../../../lib/useAsync';

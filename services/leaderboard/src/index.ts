@@ -6,7 +6,7 @@ import {
   makeAuth,
   consumeEvents,
   type Consumer,
-} from '@cubetype/common';
+} from '@cubr/common';
 import { FloorProvider } from './floors.js';
 import { CONSUMED_TYPES, makeHandler } from './ingest.js';
 import { startRebuildLoop } from './rebuild.js';

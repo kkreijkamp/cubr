@@ -33,8 +33,8 @@ export function useThemeColors(): ThemeColors {
   const [colors, setColors] = useState(readColors);
   useEffect(() => {
     const update = () => setColors(readColors());
-    window.addEventListener('cubetype:theme', update);
-    return () => window.removeEventListener('cubetype:theme', update);
+    window.addEventListener('cubr:theme', update);
+    return () => window.removeEventListener('cubr:theme', update);
   }, []);
   return colors;
 }

@@ -11,7 +11,7 @@ metadata:
   labels:
     app.kubernetes.io/name: leaderboard
     app.kubernetes.io/component: api
-    app.kubernetes.io/part-of: cubetype
+    app.kubernetes.io/part-of: cubr
 spec:
   replicas: 2                           # >= 2 so one pod can die/roll without downtime
   revisionHistoryLimit: 10              # old ReplicaSets kept for `kubectl rollout undo --to-revision`
@@ -29,7 +29,7 @@ spec:
       labels:
         app.kubernetes.io/name: leaderboard
         app.kubernetes.io/component: api
-        app.kubernetes.io/part-of: cubetype
+        app.kubernetes.io/part-of: cubr
     spec:
       automountServiceAccountToken: false   # the app never talks to the Kubernetes API
       terminationGracePeriodSeconds: 30     # preStop 10 s + up to 20 s graceful shutdown (common/start())
@@ -49,22 +49,22 @@ spec:
           matchLabelKeys: ["pod-template-hash"]   # spread each ReplicaSet (rollout) separately
       containers:
         - name: leaderboard
-          image: cubetype/leaderboard:dev    # rewritten per overlay (GKE: Artifact Registry, tag set in overlays/gke)
+          image: cubr/leaderboard:dev        # rewritten per overlay (GKE: Artifact Registry, tag set in overlays/gke)
           imagePullPolicy: IfNotPresent
           # APP_VERSION is baked into the image at build time (--build-arg) and deliberately not overridden here.
           envFrom:
             - configMapRef:
-                name: cubetype-config   # REDIS_URL, LOG_LEVEL, *_URL service addresses
+                name: cubr-config       # REDIS_URL, LOG_LEVEL, *_URL service addresses
           env:
             - name: JWT_SECRET          # shared HS256 signing key
               valueFrom:
                 secretKeyRef:
-                  name: cubetype-secrets
+                  name: cubr-secrets
                   key: JWT_SECRET
             - name: INTERNAL_API_TOKEN  # sent and required as X-Internal-Token on /internal/* calls between services
               valueFrom:
                 secretKeyRef:
-                  name: cubetype-secrets
+                  name: cubr-secrets
                   key: INTERNAL_API_TOKEN
             - name: POD_NAME            # downward API -> X-Served-By header / status page
               valueFrom:
@@ -128,7 +128,7 @@ metadata:
   labels:
     app.kubernetes.io/name: leaderboard
     app.kubernetes.io/component: api
-    app.kubernetes.io/part-of: cubetype
+    app.kubernetes.io/part-of: cubr
 spec:
   type: ClusterIP                       # internal virtual IP; kube-proxy load-balances over ready pods
   selector:
@@ -144,7 +144,7 @@ metadata:
   name: leaderboard
   labels:
     app.kubernetes.io/name: leaderboard
-    app.kubernetes.io/part-of: cubetype
+    app.kubernetes.io/part-of: cubr
 spec:
   minAvailable: 1                       # `kubectl drain` / node upgrades may never evict the last ready pod
   selector:

@@ -1,4 +1,4 @@
-import { createRedis, createServer, loadConfig, makeAuth, start } from '@cubetype/common';
+import { createRedis, createServer, loadConfig, makeAuth, start } from '@cubr/common';
 import { PodPresence } from './presence.js';
 import { registerRoutes } from './routes.js';
 import { makeScrambleFetcher } from './scramble.js';

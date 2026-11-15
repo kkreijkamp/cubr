@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import { badRequest, conflict, notFound, parse, withTx } from '@cubetype/common';
+import { badRequest, conflict, notFound, parse, withTx } from '@cubr/common';
 import { currentUser, tzFrom, type RouteContext } from '../context.js';
 import { SOLVE_COLUMNS, toSession, toSolve, type SessionRow, type SolveRow } from '../mapping.js';
 import { enqueue } from '../outbox.js';

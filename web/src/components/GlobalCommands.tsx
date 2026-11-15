@@ -85,7 +85,7 @@ export function GlobalCommands() {
             label: themeLabel(t.name),
             icon: <ThemeBubbles name={t.name} />,
             // "theme light", "theme original" etc. narrow the list
-            keywords: [isLightTheme(t) ? 'light' : 'dark', ...(t.original ? ['cubetype', 'original'] : ['monkeytype'])],
+            keywords: [isLightTheme(t) ? 'light' : 'dark', ...(t.original ? ['cubr', 'original'] : ['monkeytype'])],
             active: settings.theme === t.name,
             preview: () => applyTheme(t.name, false),
             run: () => updateSettings({ theme: t.name }),

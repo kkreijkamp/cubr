@@ -84,7 +84,7 @@ export class BtGroup<C> {
       const gatt = await device.gatt!.connect();
       const uuids = (await gatt.getPrimaryServices()).map((s) => uuid128(s.uuid));
       best = this.models.find((m) => (m.serviceFilters ?? []).some((s) => uuids.includes(uuid128(s)))) ?? null;
-      if (!best) throw new BluetoothError("this device isn't one cubetype knows");
+      if (!best) throw new BluetoothError("this device isn't one cubr knows");
     }
     this.model = best;
     try {

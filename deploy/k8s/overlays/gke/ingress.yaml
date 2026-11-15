@@ -10,13 +10,13 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: cubetype
+  name: cubr
   labels:
-    app.kubernetes.io/name: cubetype
-    app.kubernetes.io/part-of: cubetype
+    app.kubernetes.io/name: cubr
+    app.kubernetes.io/part-of: cubr
   annotations:
     kubernetes.io/ingress.class: "gce"                          # GKE's built-in external ALB controller
-    kubernetes.io/ingress.global-static-ip-name: "cubetype-ip"  # reserved in scripts/commands.sh section 6
+    kubernetes.io/ingress.global-static-ip-name: "cubr-ip"      # reserved in scripts/commands.sh section 6
 spec:
   defaultBackend:
     service:

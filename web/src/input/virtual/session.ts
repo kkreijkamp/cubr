@@ -3,7 +3,7 @@
 // solves it stops the timer at that key press. Esc gives up (a DNF while solving). Moves are applied
 // to the state at once and animated after, csTimer's way: 100 ms a turn by default, quicker when
 // moves queue up, parallel turns together.
-import type { Penalty } from '@cubetype/cubestats';
+import type { Penalty } from '@cubr/cubestats';
 import type { VirtualModel } from './models';
 
 export type VirtualPhase = 'idle' | 'inspecting' | 'ready' | 'running';

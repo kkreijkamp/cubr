@@ -21,7 +21,7 @@ schema `auth` (`users`, `user_settings`, `avatars`), migrated at startup. Fastif
 
 - Passwords: bcryptjs cost 10 (async). Unknown logins still run a bcrypt compare against a dummy hash
   so response time doesn't reveal whether an account exists.
-- Tokens: HS256 JWTs from `@cubetype/common` (`sub` = user id, `username`, `jti`), valid for 30 days.
+- Tokens: HS256 JWTs from `@cubr/common` (`sub` = user id, `username`, `jti`), valid for 30 days.
   Every service verifies them with `makeAuth`, which also rejects revoked `jti`s and every token of a deleted
   account (issued at or before `auth:revoked-user:<id>`).
 - Profile pictures: the browser crops/resizes to a 256x256 WebP/JPEG (~20-40 KB) before uploading, so the server
@@ -46,5 +46,5 @@ Env: `PORT`, `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, `INTERNAL_API_TOKEN`, `T
 `APP_VERSION`, `LOG_LEVEL`.
 
 Dev against the compose stack: `docker compose up -d postgres redis`, then
-`PORT=8081 DATABASE_URL=postgres://cubetype:cubetype@localhost:55433/cubetype REDIS_URL=redis://localhost:56380 npm run dev -w services/auth`
-Tests: `npx vitest run services/auth`. Image: `docker build -f services/auth/Dockerfile -t cubetype/auth:dev .`
+`PORT=8081 DATABASE_URL=postgres://cubr:cubr@localhost:55433/cubr REDIS_URL=redis://localhost:56380 npm run dev -w services/auth`
+Tests: `npx vitest run services/auth`. Image: `docker build -f services/auth/Dockerfile -t cubr/auth:dev .`

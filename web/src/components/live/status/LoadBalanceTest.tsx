@@ -36,8 +36,8 @@ function percentile(xs: number[], p: number): number | null {
  * the Kubernetes Service / Ingress spreading traffic over the replicas.
  */
 export function LoadBalanceTest({ vc, onLog }: { vc: (v: string) => string; onLog: (text: string, service: string) => void }) {
-  const [service, setService] = useStoredState<string>('cubetype.status.lbService', 'solve');
-  const [n, setN] = useStoredState<number>('cubetype.status.lbN', 50);
+  const [service, setService] = useStoredState<string>('cubr.status.lbService', 'solve');
+  const [n, setN] = useStoredState<number>('cubr.status.lbN', 50);
   const [result, setResult] = useState<LbResult | null>(null);
   const running = result !== null && result.durationMs === null;
   const runId = useRef(0);

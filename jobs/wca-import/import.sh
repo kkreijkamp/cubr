@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# cubetype WCA importer: loads the official WCA results export into PostgreSQL (schema `wca`).
+# cubr WCA importer: loads the official WCA results export into PostgreSQL (schema `wca`).
 #
 # Runs as a Kubernetes Job/CronJob (weekly refresh) and as a docker compose one-shot.
 #
@@ -37,7 +37,7 @@ WCA_EXPORT_API="${WCA_EXPORT_API:-https://www.worldcubeassociation.org/api/v0/ex
 WORK_DIR="${WORK_DIR:-/tmp/wca-import}"
 FORCE="${FORCE:-0}"
 KEEP_ZIP="${KEEP_ZIP:-0}"
-: "${DATABASE_URL:?DATABASE_URL must be set, e.g. postgres://cubetype:cubetype@postgres:5432/cubetype}"
+: "${DATABASE_URL:?DATABASE_URL must be set, e.g. postgres://cubr:cubr@postgres:5432/cubr}"
 
 export PGCLIENTENCODING=UTF8            # the export is UTF-8 (e.g. names written in Chinese characters)
 export PGAPPNAME=wca-import
@@ -62,7 +62,7 @@ psql_run() { psql "$DATABASE_URL" --no-psqlrc -v ON_ERROR_STOP=1 --quiet "$@"; }
 psql_value() { psql_run --tuples-only --no-align "$@"; }
 
 JOB_START=$(now)
-log "cubetype WCA importer starting (FORCE=$FORCE)"
+log "cubr WCA importer starting (FORCE=$FORCE)"
 
 # ---- 0. wait for Postgres (the Job may start before the database pod is ready) -----------
 step "waiting for PostgreSQL"

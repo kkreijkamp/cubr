@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { rollingAverage, type Penalty } from '@cubetype/cubestats';
+import { rollingAverage, type Penalty } from '@cubr/cubestats';
 import { Section, WidgetEmpty, WidgetError } from './Widget';
 import { eventLabel } from './util';
 import { fmtAvg, fmtSolveLong } from '../timer/statsUtil';

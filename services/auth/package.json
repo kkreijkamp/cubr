@@ -1,5 +1,5 @@
 {
-  "name": "@cubetype/auth",
+  "name": "@cubr/auth",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -8,7 +8,7 @@
     "build": "node ../../scripts/build-service.mjs ."
   },
   "dependencies": {
-    "@cubetype/common": "*",
+    "@cubr/common": "*",
     "fastify": "^5.12.7",
     "zod": "^3.25.76",
     "bcryptjs": "^3.0.3",

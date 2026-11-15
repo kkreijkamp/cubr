@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeftIcon, ArrowTopRightOnSquareIcon, CircleStackIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
-import { EVENTS, getEvent } from '@cubetype/cubestats';
+import { EVENTS, getEvent } from '@cubr/cubestats';
 import { api } from '../../../lib/api';
 import { useAuth } from '../../../lib/auth';
 import { flagEmoji, formatNumber, formatPercent } from '../../../lib/format';

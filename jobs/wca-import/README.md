@@ -77,7 +77,7 @@ Indexes: `ranks_*(event_id, best)` (rank counts, records, neighbours), `persons(
 ## Environment
 | Var | Default | |
 |---|---|---|
-| `DATABASE_URL` | (required) | e.g. `postgres://cubetype:cubetype@postgres:5432/cubetype` |
+| `DATABASE_URL` | (required) | e.g. `postgres://cubr:cubr@postgres:5432/cubr` |
 | `WCA_TSV_DIR` | - | folder with the unzipped `WCA_export_*.tsv` + `metadata.json` (local dev, fastest) |
 | `WCA_TSV_ZIP` | - | path to a downloaded `WCA_export_v2_tsv.zip` |
 | `WCA_EXPORT_API` | WCA public API | |
@@ -92,13 +92,13 @@ Use `concurrencyPolicy: Forbid` on the CronJob (two concurrent runs would share 
 
 ## Run
 ```bash
-docker build -f jobs/wca-import/Dockerfile -t cubetype/wca-import:dev .
+docker build -f jobs/wca-import/Dockerfile -t cubr/wca-import:dev .
 # local folder (read-only bind mount), Postgres of the docker compose stack (127.0.0.1:55433)
 docker run --rm --add-host=host.docker.internal:host-gateway \
   -v "$PWD/data/wca/tsv:/data:ro" -e WCA_TSV_DIR=/data \
-  -e DATABASE_URL=postgres://cubetype:cubetype@host.docker.internal:55433/cubetype cubetype/wca-import:dev
+  -e DATABASE_URL=postgres://cubr:cubr@host.docker.internal:55433/cubr cubr/wca-import:dev
 # download the latest export (what the CronJob does)
-docker run --rm -e DATABASE_URL=... cubetype/wca-import:dev
+docker run --rm -e DATABASE_URL=... cubr/wca-import:dev
 ```
 Kubernetes (CronJob sketch; the initial load is the same pod spec as a Job):
 ```yaml
@@ -116,7 +116,7 @@ spec:
           securityContext: { runAsNonRoot: true, runAsUser: 70, runAsGroup: 70, fsGroup: 70 }
           containers:
             - name: wca-import
-              image: .../cubetype/wca-import:<version>
+              image: .../cubr/wca-import:<version>
               env:
                 - { name: DATABASE_URL, valueFrom: { secretKeyRef: { name: pg-app, key: uri } } }
                 - { name: WORK_DIR, value: /work }
@@ -129,11 +129,11 @@ docker compose one-shot (`docker compose --profile jobs run --rm wca-import`):
 ```yaml
 wca-import:
   profiles: ["jobs"]
-  image: cubetype/wca-import:dev
+  image: cubr/wca-import:dev
   build: { context: ., dockerfile: jobs/wca-import/Dockerfile, args: *build-args }
   restart: "no"
   environment:
-    DATABASE_URL: postgres://cubetype:cubetype@postgres:5432/cubetype
+    DATABASE_URL: postgres://cubr:cubr@postgres:5432/cubr
     FORCE: ${FORCE:-0}
   depends_on: { postgres: { condition: service_healthy } }
 ```

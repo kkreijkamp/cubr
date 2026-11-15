@@ -1,5 +1,5 @@
 {
-  "name": "@cubetype/scramble",
+  "name": "@cubr/scramble",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -8,15 +8,15 @@
     "build": "node ../../scripts/build-service.mjs ."
   },
   "dependencies": {
-    "@cubetype/common": "*",
-    "@cubetype/cubestats": "*",
+    "@cubr/common": "*",
+    "@cubr/cubestats": "*",
     "fastify": "^5.12.7",
     "zod": "^3.25.76",
     "cubing": "^0.65.1",
     "ioredis": "^5.11.1",
     "pg": "^8.23.1"
   },
-  "cubetype": {
+  "cubr": {
     "external": ["cubing"]
   }
 }

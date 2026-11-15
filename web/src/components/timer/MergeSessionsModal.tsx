@@ -1,6 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { ArrowsPointingInIcon, CheckIcon, Square3Stack3DIcon } from '@heroicons/react/24/outline';
-import { formatTime, getEvent, sessionStats, type Penalty, type Precision } from '@cubetype/cubestats';
+import { formatTime, getEvent, sessionStats, type Penalty, type Precision } from '@cubr/cubestats';
 import { Modal } from '../Modal';
 import { Spinner } from '../Spinner';
 import { api } from '../../lib/api';

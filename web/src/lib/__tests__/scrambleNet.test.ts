@@ -255,7 +255,7 @@ describe('stickerColour / schemes', () => {
     expect(SCHEMES.flatMap((s) => s.puzzles).sort()).toEqual([...ALL].sort());
   });
 
-  it("draws cubetype's colours by default and leaves unknown colours alone", async () => {
+  it("draws cubr's colours by default and leaves unknown colours alone", async () => {
     const cube = schemeFor('3x3x3')!;
     for (const id of ALL) {
       for (const fill of await fills(id)) expect(stickerColour(fill, schemeFor(id)), `${id} ${fill}`).not.toBe(fill);

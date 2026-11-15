@@ -15,6 +15,6 @@ BEGIN
   END IF;
 END $$;
 ALTER SCHEMA wca_staging RENAME TO wca;
-COMMENT ON SCHEMA wca IS 'cubetype: official WCA results export (loaded by jobs/wca-import, read by the wca service)';
+COMMENT ON SCHEMA wca IS 'cubr: official WCA results export (loaded by jobs/wca-import, read by the wca service)';
 DROP SCHEMA IF EXISTS wca_old CASCADE;
 COMMIT;

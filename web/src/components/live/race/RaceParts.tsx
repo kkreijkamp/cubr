@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChatBubbleLeftIcon, PaperAirplaneIcon, StarIcon, TrophyIcon, UsersIcon } from '@heroicons/react/24/outline';
-import { effectiveMs, formatTime, fromApiValue, type Penalty, type Precision } from '@cubetype/cubestats';
+import { effectiveMs, formatTime, fromApiValue, type Penalty, type Precision } from '@cubr/cubestats';
 import type { ChatMessage, LivePlayer, LiveRoomState } from '../../../lib/race';
 import { Dot, type DotState } from '../ui';
 

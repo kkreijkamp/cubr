@@ -184,7 +184,7 @@ function RegisterForm({ active, focusFirst }: FormProps) {
     setBusy(true);
     try {
       await register(username.trim(), email.trim(), password);
-      toast.success(`welcome to cubetype, ${username.trim()}!`);
+      toast.success(`welcome to cubr, ${username.trim()}!`);
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         const field = /mail/i.test(err.message) ? 'email' : 'username';
@@ -369,11 +369,11 @@ export default function LoginPage() {
   };
 
   useEffect(() => {
-    document.title = `${tab.label} | cubetype`;
+    document.title = `${tab.label} | cubr`;
   }, [tab.label]);
   useEffect(
     () => () => {
-      document.title = 'cubetype';
+      document.title = 'cubr';
     },
     [],
   );

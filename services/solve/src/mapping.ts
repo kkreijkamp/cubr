@@ -1,4 +1,4 @@
-import type { Penalty } from '@cubetype/cubestats';
+import type { Penalty } from '@cubr/cubestats';
 
 // The one place where database rows (snake_case, Date objects) become the API shapes of
 // docs/SPEC.md section 9 (camelCase, ISO-8601 strings).

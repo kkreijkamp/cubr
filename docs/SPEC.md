@@ -1,9 +1,9 @@
-# cubetype - system specification
+# cubr - system specification
 
-> cubetype = csTimer's speedcubing functionality + Monkeytype's polish, delivered as a
+> cubr = csTimer's speedcubing functionality + Monkeytype's polish, delivered as a
 > cloud-native microservice application on Kubernetes (GKE). INFS3208 Type I project.
 
-This document describes the design of cubetype: the repository layout, the services and what each
+This document describes the design of cubr: the repository layout, the services and what each
 of them owns, the database schemas, the domain events and the HTTP contracts between the services
 and the web client. The contracts come first: every service is built and tested on its own against
 them, and this document changes together with the code whenever a contract changes. The deployment
@@ -14,7 +14,7 @@ is covered in `deploy/README.md`.
 ## 1. Repository layout
 
 ```
-cubetype/
+cubr/
   package.json                # npm workspaces: packages/*, services/*, jobs/*
   tsconfig.base.json          # strict TypeScript settings shared by all workspaces
   vitest.config.ts            # unit tests of packages, services and jobs
@@ -22,8 +22,8 @@ cubetype/
   cloudbuild.yaml             # Cloud Build: all images in parallel
   .github/workflows/ci.yml    # typecheck, tests, bundles, web build and kustomize render on every push
   packages/
-    common/                   # @cubetype/common  (server bootstrap, db, redis, auth, events, http, internal calls)
-    cubestats/                # @cubetype/cubestats (WCA averaging, formatting, events, solve import/export) - used by web AND services
+    common/                   # @cubr/common  (server bootstrap, db, redis, auth, events, http, internal calls)
+    cubestats/                # @cubr/cubestats (WCA averaging, formatting, events, solve import/export) - used by web AND services
   services/
     auth/  scramble/  solve/  stats/  leaderboard/  race/  wca/
   jobs/
@@ -44,10 +44,10 @@ cubetype/
 ```
 
 Each service folder: `src/index.ts` (entry), `src/routes/*.ts`, `src/migrations.ts` (if it owns a
-schema), `Dockerfile`, `package.json` (name `@cubetype/<svc>`), `README.md` (short), and
+schema), `Dockerfile`, `package.json` (name `@cubr/<svc>`), `README.md` (short), and
 `test/*.test.ts` (vitest, for the pure logic).
 
-The web app has its own `package.json` and lockfile. It uses `@cubetype/cubestats` straight from
+The web app has its own `package.json` and lockfile. It uses `@cubr/cubestats` straight from
 `packages/cubestats/src` (Vite alias + TypeScript path), so averages are computed by the same code
 in the browser and in the services.
 
@@ -104,7 +104,7 @@ JSON 404 instead of the SPA's `index.html`.
 | `APP_VERSION` | `dev` | baked in at image build via `--build-arg APP_VERSION` |
 | `POD_NAME` | `os.hostname()` | K8s downward API |
 | `NODE_NAME` | `local` | K8s downward API (spec.nodeName) |
-| `DATABASE_URL` | `postgres://cubetype:cubetype@postgres:5432/cubetype` | |
+| `DATABASE_URL` | `postgres://cubr:cubr@postgres:5432/cubr` | |
 | `REDIS_URL` | `redis://redis:6379` | |
 | `JWT_SECRET` | `dev-secret-change-me` | shared by all services (K8s Secret) |
 | `AUTH_URL` `SCRAMBLE_URL` `SOLVE_URL` `STATS_URL` `LEADERBOARD_URL` `WCA_URL` `RACE_URL` | `http://<name>:8080` | internal base URLs |
@@ -112,15 +112,15 @@ JSON 404 instead of the SPA's `index.html`.
 | `INTERNAL_API_TOKEN` | empty | shared secret for service-to-service calls (K8s Secret): `/internal/*` routes require it in `X-Internal-Token` (403 otherwise) and callers send it; auth also exempts such callers (the seed job) from its per-IP rate limits. Empty = not enforced, with a warning at startup (local development). |
 | `TRUST_PROXY_HOPS` | `1` | proxies in front of the service whose `X-Forwarded-For` entries are trusted when deriving the client IP (rate limits): 1 behind the compose/kind gateway, 2 behind the Google load balancer. Entries a client adds itself are never trusted. |
 
-Compose sets these in its `x-service-env` block; Kubernetes in the `cubetype-config` ConfigMap and
-the `cubetype-secrets` Secret (plus CloudNativePG's `pg-app` Secret for `DATABASE_URL`).
+Compose sets these in its `x-service-env` block; Kubernetes in the `cubr-config` ConfigMap and
+the `cubr-secrets` Secret (plus CloudNativePG's `pg-app` Secret for `DATABASE_URL`).
 Service-specific variables (e.g. scramble's `SCRAMBLE_WORKERS`, the seed job's `SEED_USERS`) are
 documented in the service READMEs.
 
 ## 5. Cross-cutting conventions
 
-- **JSON everywhere.** Errors: HTTP status + `{ "error": { "code": "BAD_REQUEST"|"UNAUTHORIZED"|"FORBIDDEN"|"NOT_FOUND"|"CONFLICT"|"RATE_LIMITED"|"UNAVAILABLE"|"INTERNAL", "message": "human readable" } }`. Use `HttpError` from `@cubetype/common`. zod failures -> 400 BAD_REQUEST with the first issue as message; a body over the size limit -> 413 `PAYLOAD_TOO_LARGE`.
-- **Auth:** `Authorization: Bearer <jwt>`. JWT HS256, issuer `cubetype`, claims `{ sub: userId, username, jti }`, TTL 30 days. Verify with `requireAuth` / `optionalAuth` from common (also checks Redis `auth:revoked:<jti>`; fails open if Redis is down).
+- **JSON everywhere.** Errors: HTTP status + `{ "error": { "code": "BAD_REQUEST"|"UNAUTHORIZED"|"FORBIDDEN"|"NOT_FOUND"|"CONFLICT"|"RATE_LIMITED"|"UNAVAILABLE"|"INTERNAL", "message": "human readable" } }`. Use `HttpError` from `@cubr/common`. zod failures -> 400 BAD_REQUEST with the first issue as message; a body over the size limit -> 413 `PAYLOAD_TOO_LARGE`.
+- **Auth:** `Authorization: Bearer <jwt>`. JWT HS256, issuer `cubr`, claims `{ sub: userId, username, jti }`, TTL 30 days. Verify with `requireAuth` / `optionalAuth` from common (also checks Redis `auth:revoked:<jti>`; fails open if Redis is down).
 - **Internal calls:** `/internal/*` routes are guarded by `requireInternal(config.internalToken)` from common (constant-time comparison of `X-Internal-Token`, 403 FORBIDDEN on mismatch); callers add `internalHeaders(config.internalToken)` to their requests.
 - **Rate limits:** `rateLimit()` from common, a fixed window per key (`INCR` + `EXPIRE ... NX` in one `MULTI`); it fails open while Redis is down, so an outage never locks users out.
 - **Times are integer milliseconds.** In averages/PBs JSON: a number = ms, `-1` = DNF, `null` = not available. Raw solves have `timeMs` (without penalty) + `penalty` in `"OK" | "+2" | "DNF"`.
@@ -138,13 +138,13 @@ documented in the service READMEs.
 
 Supported event ids (WCA ids): `333, 222, 444, 555, 666, 777, 333oh, 333bf, 333fm, 444bf, 555bf, clock, minx, pyram, skewb, sq1`.
 Event metadata (names, cubing.js puzzle ids, inspection, default scramble count) lives in
-`@cubetype/cubestats` `EVENTS`. `333oh` scrambles like `333`; `333bf/444bf/555bf` use the cubing.js
+`@cubr/cubestats` `EVENTS`. `333oh` scrambles like `333`; `333bf/444bf/555bf` use the cubing.js
 bld scramblers (orientation-randomised); `333fm` uses `333fm` scrambler. The daily challenge uses
 `333, 222, 444, pyram, skewb` (`DAILY_EVENTS`).
 
 ## 7. Database design (PostgreSQL, schema-per-service)
 
-One Postgres database `cubetype`; each service owns one schema and never reads another
+One Postgres database `cubr`; each service owns one schema and never reads another
 service's schema (communication is via HTTP or events). UUID default `gen_random_uuid()`.
 
 ### 7.1 `auth` schema (auth-service)
@@ -294,8 +294,8 @@ trigram/lower index on person name for search.
 ### 7.6 Redis keyspace
 | Key | Type | Owner | Purpose |
 |---|---|---|---|
-| `cubetype:events` | Stream (MAXLEN ~200000) | solve/auth/stats publish | domain event bus, consumer groups `stats`, `leaderboard`, `solve` (user.deleted only) |
-| `cubetype:events:dlq` | Stream | consumers | dead letters: entries a consumer group could not handle |
+| `cubr:events` | Stream (MAXLEN ~200000) | solve/auth/stats publish | domain event bus, consumer groups `stats`, `leaderboard`, `solve` (user.deleted only) |
+| `cubr:events:dlq` | Stream | consumers | dead letters: entries a consumer group could not handle |
 | `auth:revoked:<jti>` | string, TTL = token remaining life | auth | logout / revocation |
 | `auth:revoked-user:<userId>` | string (unix seconds), TTL 30 d | auth | account deleted: every token issued at or before then is revoked |
 | `rl:<scope>:<key>` | counter, TTL | any | rate limiting |
@@ -313,14 +313,14 @@ trigram/lower index on person name for search.
 | `cache:stats:global` | string JSON, TTL 10 s | stats | global counters |
 | `cache:wca:<exportDate>.<importedAt>:*` | string JSON, TTL | wca | cache-aside for expensive queries (the dataset version in the key invalidates it on re-import) |
 
-## 8. Domain events (Redis Stream `cubetype:events`)
+## 8. Domain events (Redis Stream `cubr:events`)
 
 Each stream entry has fields `type` and `data` (JSON string). Every `data` contains `eventId`
 (globally unique string - solve outbox uses `solve-<outboxId>`, others use `<svc>-<uuid>`) and
 `occurredAt` (ISO). Consumers use consumer groups, ack after successful handling, reclaim stale
 pending entries (XAUTOCLAIM, idle > 60 s), and are idempotent (stats keeps `processed_events`).
 An entry that still fails after 5 attempts (20 for stats, whose recomputes depend on solve) is moved
-to `cubetype:events:dlq`. Use `publishEvent()` / `consumeEvents()` from common.
+to `cubr:events:dlq`. Use `publishEvent()` / `consumeEvents()` from common.
 
 | type | publisher | data fields (besides eventId, occurredAt) |
 |---|---|---|
@@ -427,7 +427,7 @@ Published rows older than a day are deleted.
 
 Streak = consecutive days (in the user's tz as bucketed) with >= 1 solve, ending today or yesterday.
 PB rules: single = best effective time; mo3/aoN = best rolling value within a single session
-(chronological), using `@cubetype/cubestats`; practice sessions never count. On `solve.created`
+(chronological), using `@cubr/cubestats`; practice sessions never count. On `solve.created`
 compare incrementally (single + rolling ao5/ao12 from the payload; recompute others cheaply if
 needed; a `practice` solve only updates the counters). On `solve.updated`, `solve.deleted`,
 `session.deleted`, `session.updated`, `sessions.merged`, `solves.imported`: recompute that user's
@@ -516,7 +516,7 @@ custom properties, command palette (Esc / Ctrl+K), focus mode while timing, toas
 
 ## 11. Kubernetes overview (deploy/k8s)
 
-Namespace `cubetype`. One Deployment + ClusterIP Service per microservice (2+ replicas,
+Namespace `cubr`. One Deployment + ClusterIP Service per microservice (2+ replicas,
 rolling update maxSurge 1 / maxUnavailable 0, readiness/liveness probes on /readyz /healthz,
 resource requests/limits, topology spread across nodes, PDB minAvailable 1, preStop sleep),
 HPA (CPU) for scramble, solve, web, race; HPA-managed Deployments don't set `replicas`. Pods run as
@@ -528,5 +528,5 @@ Ingress) and `gke` (GKE Ingress = external Application Load Balancer with contai
 balancing, BackendConfigs with `/readyz` health checks and a 1 h timeout for the race WebSockets,
 three Postgres instances, `TRUST_PROXY_HOPS=2`). The Ingress serves plain HTTP on a reserved static
 IP; TLS with a Google-managed certificate is possible future work. Images in Artifact Registry
-`australia-southeast1-docker.pkg.dev/<project>/cubetype/<svc>:<version>`. Details and the demo
+`australia-southeast1-docker.pkg.dev/<project>/cubr/<svc>:<version>`. Details and the demo
 runbook: `deploy/README.md`.

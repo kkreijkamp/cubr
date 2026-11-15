@@ -14,7 +14,7 @@ import {
   UserIcon,
   UserMinusIcon,
 } from '@heroicons/react/24/outline';
-import { DAILY_EVENTS, EVENTS } from '@cubetype/cubestats';
+import { DAILY_EVENTS, EVENTS } from '@cubr/cubestats';
 import { Avatar } from '../components/Avatar';
 import { Modal } from '../components/Modal';
 import { ErrorState, Loading, Spinner } from '../components/Spinner';
@@ -335,9 +335,9 @@ export default function LeaderboardsPage() {
   const myPage = me ? Math.ceil(me.rank / PAGE_SIZE) : null;
 
   useEffect(() => {
-    document.title = `${boardTitle(sel)} | cubetype`;
+    document.title = `${boardTitle(sel)} | cubr`;
     return () => {
-      document.title = 'cubetype';
+      document.title = 'cubr';
     };
   }, [sel]);
 

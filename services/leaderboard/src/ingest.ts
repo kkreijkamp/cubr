@@ -1,4 +1,4 @@
-import type { EventEnvelope, Redis } from '@cubetype/common';
+import type { EventEnvelope, Redis } from '@cubr/common';
 import type { FastifyBaseLogger } from 'fastify';
 import { isBelowFloor, type FloorSource } from './floors.js';
 import {

@@ -1,7 +1,7 @@
 // What the page's timer does with a bluetooth timer: csTimer's timer/bttimer.js. The timer times the
 // solve; the page follows it, adds inspection (space, or the GAN timer's reset button while it
 // reads zero) and records the time the timer stopped at.
-import type { Penalty } from '@cubetype/cubestats';
+import type { Penalty } from '@cubr/cubestats';
 import { TimerEvent, type TimerEventData } from './timers';
 
 export type BtTimerPhase = 'idle' | 'inspect-ready' | 'inspecting' | 'running';

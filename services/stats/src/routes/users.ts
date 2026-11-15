@@ -1,5 +1,5 @@
-import { badRequest, dayKey, parse, type Pool } from '@cubetype/common';
-import { EVENT_IDS, isEventId } from '@cubetype/cubestats';
+import { badRequest, dayKey, parse, type Pool } from '@cubr/common';
+import { EVENT_IDS, isEventId } from '@cubr/cubestats';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { PB_KINDS, type PbKind } from '../domain/pbs.js';

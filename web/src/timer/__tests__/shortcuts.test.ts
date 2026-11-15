@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EVENTS } from '@cubetype/cubestats';
+import { EVENTS } from '@cubr/cubestats';
 import { shortcutFor } from '../shortcuts';
 
 const key = (code: string, mods: { alt?: boolean; ctrl?: boolean; meta?: boolean } = {}) =>
@@ -53,7 +53,7 @@ describe('csTimer shortcuts', () => {
     expect(ctrl('Digit4')).toBeNull();
   });
 
-  it("ctrl + alt + a letter: csTimer's inputs; last layer training says cubetype hasn't got it", () => {
+  it("ctrl + alt + a letter: csTimer's inputs; last layer training says cubr hasn't got it", () => {
     const inputs: Record<string, string> = { KeyT: 'timer', KeyI: 'typing', KeyS: 'stackmat', KeyM: 'moyu', KeyV: 'virtual', KeyG: 'smartcube', KeyQ: 'qcube', KeyB: 'bttimer' };
     for (const [code, input] of Object.entries(inputs)) expect(ctrlAlt(code), code).toEqual({ kind: 'input', input });
     expect(ctrlAlt('KeyL')?.kind).toBe('missingInput');
@@ -63,7 +63,7 @@ describe('csTimer shortcuts', () => {
   });
 });
 
-describe("cubetype's own", () => {
+describe("cubr's own", () => {
   it('alt + backspace deletes, alt + n comments, alt + w toggles inspection', () => {
     expect(alt('Backspace')).toEqual({ kind: 'deleteLast' });
     expect(alt('KeyN')).toEqual({ kind: 'comment' });

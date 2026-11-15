@@ -10,7 +10,7 @@ import { Loading } from '../Spinner';
 const pbText = (pb: PB | null | undefined, precision: 2 | 3) =>
   pb && pb.valueMs !== null ? formatTime(pb.valueMs === -1 ? -1 : pb.valueMs, precision) : null;
 
-/** "#101 on cubetype" with the share of ranked cubers, linking to that leaderboard page. */
+/** "#101 on cubr" with the share of ranked cubers, linking to that leaderboard page. */
 function RankLink({ rank, full }: { rank: UserRank; full?: boolean }) {
   const top = rank.total > 0 ? (rank.rank / rank.total) * 100 : 100;
   return (
@@ -21,7 +21,7 @@ function RankLink({ rank, full }: { rank: UserRank; full?: boolean }) {
       data-tip={`top ${formatPercent(top)} of ${formatNumber(rank.total)} on the leaderboard`}
     >
       #{formatNumber(rank.rank)}
-      {full && ' on cubetype'}
+      {full && ' on cubr'}
     </Link>
   );
 }

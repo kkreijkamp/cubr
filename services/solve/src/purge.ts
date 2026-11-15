@@ -1,4 +1,4 @@
-import { withTx, type EventEnvelope, type Pool } from '@cubetype/common';
+import { withTx, type EventEnvelope, type Pool } from '@cubr/common';
 import type { FastifyBaseLogger } from 'fastify';
 import { uuid } from './schemas.js';
 

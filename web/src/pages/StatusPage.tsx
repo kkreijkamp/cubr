@@ -27,12 +27,12 @@ function Cheatsheet({ services }: { services: ServiceView[] }) {
   const [copied, setCopied] = useState<string | null>(null);
   const solvePod = services.find((s) => s.name === 'solve')?.pods.find((p) => !p.stale)?.pod ?? '<solve-pod>';
   const rows: [string, string][] = [
-    ['watch pods', 'kubectl -n cubetype get pods -o wide -w'],
-    ['scale out', 'kubectl -n cubetype scale deploy/stats --replicas=4'],
-    ['self-healing', `kubectl -n cubetype delete pod ${solvePod}`],
-    ['rolling update', 'kubectl -n cubetype rollout restart deploy/web'],
-    ['rollout status', 'kubectl -n cubetype rollout status deploy/web'],
-    ['autoscaler', 'kubectl -n cubetype get hpa -w'],
+    ['watch pods', 'kubectl -n cubr get pods -o wide -w'],
+    ['scale out', 'kubectl -n cubr scale deploy/stats --replicas=4'],
+    ['self-healing', `kubectl -n cubr delete pod ${solvePod}`],
+    ['rolling update', 'kubectl -n cubr rollout restart deploy/web'],
+    ['rollout status', 'kubectl -n cubr rollout status deploy/web'],
+    ['autoscaler', 'kubectl -n cubr get hpa -w'],
   ];
   return (
     <div className="card cheatsheet">

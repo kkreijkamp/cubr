@@ -7,7 +7,7 @@ export interface Microphone {
 }
 
 // collects 1024 samples at a time and hands them to the page (an AudioWorklet runs off the main thread)
-const WORKLET = `class CubetypeStackmat extends AudioWorkletProcessor {
+const WORKLET = `class CubrStackmat extends AudioWorkletProcessor {
   constructor() { super(); this.buf = new Float32Array(1024); this.n = 0; }
   process(inputs) {
     const ch = inputs[0] && inputs[0][0];
@@ -18,7 +18,7 @@ const WORKLET = `class CubetypeStackmat extends AudioWorkletProcessor {
     return true;
   }
 }
-registerProcessor('cubetype-stackmat', CubetypeStackmat);`;
+registerProcessor('cubr-stackmat', CubrStackmat);`;
 
 export class MicrophoneError extends Error {
   constructor(
@@ -72,7 +72,7 @@ export async function openMicrophone(deviceId: string, onSamples: (s: Float32Arr
     const url = URL.createObjectURL(new Blob([WORKLET], { type: 'application/javascript' }));
     await ctx.audioWorklet.addModule(url);
     URL.revokeObjectURL(url);
-    const w = new AudioWorkletNode(ctx, 'cubetype-stackmat', { numberOfInputs: 1, numberOfOutputs: 1, channelCount: 1 });
+    const w = new AudioWorkletNode(ctx, 'cubr-stackmat', { numberOfInputs: 1, numberOfOutputs: 1, channelCount: 1 });
     w.port.onmessage = (e: MessageEvent<Float32Array>) => onSamples(e.data);
     node = w;
   } catch {

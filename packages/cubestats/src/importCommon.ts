@@ -15,14 +15,14 @@ export interface ImportedSession {
   event: string;
   /** The source timer's own puzzle / scramble type, e.g. "444wca" or "pyra". */
   sourceType: string;
-  /** a cubetype practice session (its solves count for no PB or leaderboard) */
+  /** a cubr practice session (its solves count for no PB or leaderboard) */
   practice?: boolean;
   solves: ImportedSolve[];
 }
 
 /** Solves an import leaves out instead of failing the whole file. */
 export interface ImportSkipped {
-  /** Multi-blind attempts: cubetype has no multi-blind event. */
+  /** Multi-blind attempts: cubr has no multi-blind event. */
   multiBlind: number;
   /** No usable time (missing, zero, or above the server's 24 h limit). */
   invalid: number;

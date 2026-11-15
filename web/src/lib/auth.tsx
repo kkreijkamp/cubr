@@ -33,7 +33,7 @@ export function getCurrentUser(): PrivateUser | null {
 }
 
 /** The last signed-in user, so the app stays signed in while the auth service is unreachable. */
-const USER_KEY = 'cubetype.user';
+const USER_KEY = 'cubr.user';
 function cachedUser(): PrivateUser | null {
   const u = loadJson<PrivateUser | null>(USER_KEY, null);
   return u && typeof u.id === 'string' && typeof u.username === 'string' ? u : null;

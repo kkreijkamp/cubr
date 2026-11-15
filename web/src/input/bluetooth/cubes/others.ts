@@ -277,7 +277,7 @@ function moyu(): CubeModel {
       const gatt = await device.gatt!.connect();
       const all = await (await gatt.getPrimaryService(SERVICE)).getCharacteristics();
       const turn = findUUID(all, CHR.turn);
-      if (!turn) throw new Error("this MoYu cube doesn't answer the way cubetype expects");
+      if (!turn) throw new Error("this MoYu cube doesn't answer the way cubr expects");
       chrs = [turn];
       turn.addEventListener('characteristicvaluechanged', onTurn);
       await turn.startNotifications();
@@ -427,7 +427,7 @@ function moyu32(): CubeModel & { debug: Record<string, unknown> } {
       const chrs = await (await gatt.getPrimaryService(SERVICE)).getCharacteristics();
       read = findUUID(chrs, READ);
       write = findUUID(chrs, WRITE);
-      if (!read) throw new Error("this MoYu cube doesn't answer the way cubetype expects");
+      if (!read) throw new Error("this MoYu cube doesn't answer the way cubr expects");
       read.addEventListener('characteristicvaluechanged', onChange);
       await read.startNotifications();
       const suggested = /^WCU_MY32_[0-9A-F]{4}$/.test(name) ? `CF:30:16:00:${name.slice(9, 11)}:${name.slice(11, 13)}` : null;
@@ -602,7 +602,7 @@ function qiyi(): CubeModel & { debug: Record<string, unknown> } {
       }
       const gatt = await device.gatt!.connect();
       chr = findUUID(await (await gatt.getPrimaryService(SERVICE)).getCharacteristics(), CHR);
-      if (!chr) throw new Error("this QiYi cube doesn't answer the way cubetype expects");
+      if (!chr) throw new Error("this QiYi cube doesn't answer the way cubr expects");
       chr.addEventListener('characteristicvaluechanged', onChange);
       await chr.startNotifications();
       const suggested = /^(QY-QYSC|XMD-TornadoV4-i)-.-[0-9A-F]{4}$/.test(name) ? `CC:A3:00:00:${name.slice(-4, -2)}:${name.slice(-2)}` : null;

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { ChartConfiguration } from 'chart.js';
-import { rollingAverage } from '@cubetype/cubestats';
+import { rollingAverage } from '@cubr/cubestats';
 import { Section, WidgetError } from './Widget';
 import { eventLabel } from './util';
 import { api } from '../../lib/api';
@@ -12,7 +12,7 @@ import { Loading, Spinner } from '../Spinner';
 /**
  * Monkeytype-style history chart: every solve as a point, with toggleable overlays for the PB
  * progression and rolling averages (ao5 ... ao1000). Averages are computed over the user's whole
- * chronological solve history with the shared WCA rules (@cubetype/cubestats), so a window that
+ * chronological solve history with the shared WCA rules (@cubr/cubestats), so a window that
  * starts mid-history still shows correct averages from its first point.
  */
 

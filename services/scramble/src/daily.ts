@@ -1,6 +1,6 @@
 import type { FastifyBaseLogger } from 'fastify';
-import { HttpError, unavailable, type Pool } from '@cubetype/common';
-import { DAILY_EVENTS } from '@cubetype/cubestats';
+import { HttpError, unavailable, type Pool } from '@cubr/common';
+import { DAILY_EVENTS } from '@cubr/cubestats';
 import type { ScrambleGenerator } from './generator.js';
 import { errorMessage } from './util.js';
 

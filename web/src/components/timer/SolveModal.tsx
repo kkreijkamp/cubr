@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon, Square2StackIcon, TrashIcon } from '@heroicons/react/24/outline';
-import { getEvent, type Penalty, type Precision } from '@cubetype/cubestats';
+import { getEvent, type Penalty, type Precision } from '@cubr/cubestats';
 import { Modal } from '../Modal';
 import { TwistyPreview } from '../TwistyPreview';
 import type { Solve } from '../../lib/types';

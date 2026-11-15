@@ -1,6 +1,6 @@
 import { useMemo, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { EVENT_IDS } from '@cubetype/cubestats';
+import { EVENT_IDS } from '@cubr/cubestats';
 import { HourlyChart } from './Charts';
 import { EventBests } from './EventBests';
 import { SolveHistoryChart } from './HistoryChart';

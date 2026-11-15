@@ -42,7 +42,7 @@ export function DistributionChart({ dist, value, markerLabel = 'you', height = 2
     const buckets = dist.buckets;
     const beaten = (b: { from: number; to: number }) => value !== null && b.from >= value;
     const marker: Plugin<'bar'> = {
-      id: 'cubetypeMarker',
+      id: 'cubrMarker',
       afterDatasetsDraw(chart) {
         const x = chart.scales.x;
         const area = chart.chartArea;

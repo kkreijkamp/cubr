@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import type { BaseConfig, Pool, Redis, makeAuth } from '@cubetype/common';
+import type { BaseConfig, Pool, Redis, makeAuth } from '@cubr/common';
 import { registerAuthRoutes } from './auth.js';
 import { registerAvatarRoutes } from './avatars.js';
 import { registerUserRoutes } from './users.js';

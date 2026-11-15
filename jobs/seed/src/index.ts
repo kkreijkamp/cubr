@@ -1,4 +1,4 @@
-// cubetype seed job creates realistic synthetic cubers through the PUBLIC APIs, so the whole
+// cubr seed job creates realistic synthetic cubers through the PUBLIC APIs, so the whole
 // pipeline (solve -> outbox -> Redis Stream -> stats / leaderboard) is exercised exactly like real
 // traffic. Runs as a Kubernetes Job (deploy/k8s) or `docker compose --profile jobs run seed`.
 //
@@ -20,7 +20,7 @@ const CONCURRENCY = Number(process.env.SEED_CONCURRENCY ?? 6);
 const SEED = Number(process.env.SEED_RANDOM_SEED ?? 3208);
 const PASSWORD_PREFIX = process.env.SEED_PASSWORD_PREFIX ?? 'seed-pass-';
 const DEMO_USER = process.env.SEED_DEMO_USER ?? 'demo';
-const DEMO_PASSWORD = process.env.SEED_DEMO_PASSWORD ?? 'cubetype-demo';
+const DEMO_PASSWORD = process.env.SEED_DEMO_PASSWORD ?? 'cubr-demo';
 // Lets auth skip its per-IP registration/login rate limits for this trusted job (all requests
 // come from one pod IP). Must match auth's INTERNAL_API_TOKEN.
 const INTERNAL_TOKEN = process.env.INTERNAL_API_TOKEN ?? '';
@@ -253,7 +253,7 @@ function makeUsers(): SeedUser[] {
       .map(([e]) => e);
     users.push({
       username,
-      email: `${username}@seed.cubetype.dev`,
+      email: `${username}@seed.cubr.dev`,
       password: `${PASSWORD_PREFIX}${i}`,
       country: pick(COUNTRIES),
       displayName: rand() < 0.5 ? username.replace(/_\d+$/, '').replace(/^\w/, (c) => c.toUpperCase()) : null,
@@ -267,11 +267,11 @@ function makeUsers(): SeedUser[] {
   // the demo account used in the presentation: a committed sub-15 cuber with lots of history
   users.unshift({
     username: DEMO_USER,
-    email: `${DEMO_USER}@cubetype.dev`,
+    email: `${DEMO_USER}@cubr.dev`,
     password: DEMO_PASSWORD,
     country: 'AU',
     displayName: 'Demo Cuber',
-    bio: 'the account used in the cubetype demo - sub-13 3x3, learning 4x4 parity',
+    bio: 'the account used in the cubr demo - sub-13 3x3, learning 4x4 parity',
     base333: 12_600,
     solves: 2600,
     events: ['333', '222', '444', '333oh', 'pyram', 'skewb'],
@@ -417,7 +417,7 @@ async function seedUser(u: SeedUser, idx: number, daily: Record<string, string[]
 
 async function main() {
   const t0 = Date.now();
-  console.log(`cubetype seed: ${USERS} users (+ demo), ~${AVG_SOLVES} solves each, concurrency ${CONCURRENCY}`);
+  console.log(`cubr seed: ${USERS} users (+ demo), ~${AVG_SOLVES} solves each, concurrency ${CONCURRENCY}`);
   if (!INTERNAL_TOKEN) console.warn('INTERNAL_API_TOKEN not set - auth rate limits will cap how many users can be created');
   await waitFor(`${AUTH_URL}/readyz`, 'auth');
   await waitFor(`${SOLVE_URL}/readyz`, 'solve');

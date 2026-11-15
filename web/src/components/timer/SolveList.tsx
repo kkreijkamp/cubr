@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { ChatBubbleLeftEllipsisIcon, ListBulletIcon } from '@heroicons/react/24/outline';
-import type { Precision } from '@cubetype/cubestats';
+import type { Precision } from '@cubr/cubestats';
 import type { Solve } from '../../lib/types';
 import { fmtAvg, fmtSolveShort } from './statsUtil';
 import { Loading } from '../Spinner';

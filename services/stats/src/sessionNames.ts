@@ -1,4 +1,4 @@
-import { fetchJson, internalHeaders, type Pool, type PoolClient } from '@cubetype/common';
+import { fetchJson, internalHeaders, type Pool, type PoolClient } from '@cubr/common';
 import type { FastifyBaseLogger } from 'fastify';
 import { sessionListSchema } from './eventSchemas.js';
 

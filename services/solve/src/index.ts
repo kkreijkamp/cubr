@@ -1,7 +1,7 @@
 import {
   loadConfig, createServer, start, createPool, pingPostgres, waitForPostgres, migrate, createRedis, makeAuth, consumeEvents,
   type Consumer,
-} from '@cubetype/common';
+} from '@cubr/common';
 import { migrations } from './migrations.js';
 import { startOutboxRelay, type Relay } from './outbox.js';
 import { makeUserPurge, PURGE_TYPES } from './purge.js';

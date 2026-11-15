@@ -219,7 +219,7 @@ function qiyiTimer(): BtModel<TimerCtx> {
       const chrs = await service.getCharacteristics();
       write = findUUID(chrs, QY_WRITE);
       read = findUUID(chrs, QY_READ);
-      if (!read || !write) throw new Error("this QiYi timer doesn't answer the way cubetype expects");
+      if (!read || !write) throw new Error("this QiYi timer doesn't answer the way cubr expects");
       read.addEventListener('characteristicvaluechanged', onRead);
       await read.startNotifications();
       const m = /^QY-(?:Timer|Adapter).*-([0-9A-F]{4})$/.exec(name);

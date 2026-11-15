@@ -40,9 +40,9 @@ function Header() {
   const { user, status } = useAuth();
   return (
     <header className="header">
-      <Link to="/" className="logo" aria-label="cubetype home">
+      <Link to="/" className="logo" aria-label="cubr home">
         <CubeLogo className="logo-icon" />
-        <span className="logo-text">cubetype</span>
+        <span className="logo-text">cubr</span>
       </Link>
       <nav className="nav nav-main">
         {NAV.map(({ to, icon: Icon, label, end, hideMobile }) => (

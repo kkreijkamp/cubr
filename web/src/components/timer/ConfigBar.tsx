@@ -15,7 +15,7 @@ import {
   Square3Stack3DIcon,
   TrashIcon,
 } from '@heroicons/react/24/outline';
-import { EVENTS, getEvent, type EventInfo } from '@cubetype/cubestats';
+import { EVENTS, getEvent, type EventInfo } from '@cubr/cubestats';
 import { INPUT_MODES, modeInfo, type InputMode } from '../../input/inputMode';
 import type { Session } from '../../lib/types';
 import { formatNumber } from '../../lib/format';

@@ -13,7 +13,7 @@ metadata:
   name: scramble
   labels:
     app.kubernetes.io/name: scramble
-    app.kubernetes.io/part-of: cubetype
+    app.kubernetes.io/part-of: cubr
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
@@ -52,7 +52,7 @@ metadata:
   name: solve
   labels:
     app.kubernetes.io/name: solve
-    app.kubernetes.io/part-of: cubetype
+    app.kubernetes.io/part-of: cubr
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
@@ -91,7 +91,7 @@ metadata:
   name: race
   labels:
     app.kubernetes.io/name: race
-    app.kubernetes.io/part-of: cubetype
+    app.kubernetes.io/part-of: cubr
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
@@ -130,7 +130,7 @@ metadata:
   name: web
   labels:
     app.kubernetes.io/name: web
-    app.kubernetes.io/part-of: cubetype
+    app.kubernetes.io/part-of: cubr
 spec:
   scaleTargetRef:
     apiVersion: apps/v1

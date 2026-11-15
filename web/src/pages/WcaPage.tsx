@@ -4,7 +4,7 @@
 import { useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { GlobeAltIcon, MagnifyingGlassIcon, StarIcon, UsersIcon } from '@heroicons/react/24/outline';
-import { EVENTS } from '@cubetype/cubestats';
+import { EVENTS } from '@cubr/cubestats';
 import { api } from '../lib/api';
 import { formatDate } from '../lib/format';
 import { useRegisterCommands } from '../lib/commands';

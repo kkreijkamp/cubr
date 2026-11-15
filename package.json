@@ -1,8 +1,8 @@
 {
-  "name": "cubetype",
+  "name": "cubr",
   "private": true,
   "type": "module",
-  "description": "cubetype - a cloud-native speedcubing timer on Kubernetes",
+  "description": "cubr - a cloud-native speedcubing timer on Kubernetes",
   "workspaces": [
     "packages/*",
     "services/*",

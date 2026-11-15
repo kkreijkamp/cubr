@@ -1,4 +1,4 @@
-import { formatTime, parseTimeInput } from '@cubetype/cubestats';
+import { formatTime, parseTimeInput } from '@cubr/cubestats';
 import { ApiError } from '../../../lib/api';
 
 export const isFmc = (event: string) => event === '333fm';

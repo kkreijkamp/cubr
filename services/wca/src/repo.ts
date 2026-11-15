@@ -1,4 +1,4 @@
-import type { Pool } from '@cubetype/common';
+import type { Pool } from '@cubr/common';
 import type { Kind } from './units.js';
 
 /**

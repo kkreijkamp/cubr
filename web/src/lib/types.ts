@@ -1,5 +1,5 @@
 // API types - mirror docs/SPEC.md section 9 exactly.
-import type { Penalty } from '@cubetype/cubestats';
+import type { Penalty } from '@cubr/cubestats';
 
 export type { Penalty };
 

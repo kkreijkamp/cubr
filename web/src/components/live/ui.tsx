@@ -1,7 +1,7 @@
 // Small presentational pieces shared by the live pages (daily, race, wca, status).
 import { useState, type ReactNode } from 'react';
 import { CheckIcon, Square2StackIcon } from '@heroicons/react/24/outline';
-import { getEvent } from '@cubetype/cubestats';
+import { getEvent } from '@cubr/cubestats';
 import { copyText } from './hooks';
 import './live.css';
 

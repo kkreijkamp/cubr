@@ -2,7 +2,7 @@
 # The importer loads into wca_staging and swaps it in atomically, so the wca service keeps
 # serving the old data until the new data is complete (zero-downtime refresh).
 # Run it immediately (initial load) without waiting for the schedule:
-#   kubectl -n cubetype create job --from=cronjob/wca-import wca-import-now
+#   kubectl -n cubr create job --from=cronjob/wca-import wca-import-now
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -10,7 +10,7 @@ metadata:
   labels:
     app.kubernetes.io/name: wca-import
     app.kubernetes.io/component: batch
-    app.kubernetes.io/part-of: cubetype
+    app.kubernetes.io/part-of: cubr
 spec:
   schedule: "0 4 * * 1"                 # every Monday 04:00 (the WCA refreshes its export weekly)
   timeZone: Australia/Brisbane          # interpret the schedule in local (UQ) time
@@ -22,7 +22,7 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: wca-import
-        app.kubernetes.io/part-of: cubetype
+        app.kubernetes.io/part-of: cubr
     spec:
       backoffLimit: 3                   # retry a failed import up to 3 times (new pod each time)
       activeDeadlineSeconds: 3600       # kill a stuck import after 1 h
@@ -32,7 +32,7 @@ spec:
           labels:
             app.kubernetes.io/name: wca-import
             app.kubernetes.io/component: batch
-            app.kubernetes.io/part-of: cubetype
+            app.kubernetes.io/part-of: cubr
         spec:
           restartPolicy: Never          # a failed pod stays around (logs) and the Job creates a new one
           automountServiceAccountToken: false
@@ -45,7 +45,7 @@ spec:
               type: RuntimeDefault
           containers:
             - name: wca-import
-              image: cubetype/wca-import:dev   # rewritten per overlay
+              image: cubr/wca-import:dev       # rewritten per overlay
               imagePullPolicy: IfNotPresent
               env:
                 - name: DATABASE_URL    # CloudNativePG-generated connection string (primary, pg-rw)

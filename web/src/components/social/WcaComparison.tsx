@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ClockIcon } from '@heroicons/react/24/outline';
-import { EVENT_IDS } from '@cubetype/cubestats';
+import { EVENT_IDS } from '@cubr/cubestats';
 import { countryName } from './countries';
 import { Section, WidgetEmpty, WidgetError } from './Widget';
 import { eventLabel, isWcaComparable, isWcaNotLoaded, wcaAverageKind } from './util';

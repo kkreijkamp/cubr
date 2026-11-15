@@ -1,4 +1,4 @@
-import { badRequest, conflict, forbidden } from '@cubetype/common';
+import { badRequest, conflict, forbidden } from '@cubr/common';
 import { computeStandings } from './standings.js';
 import type {
   Identity, Penalty, PlayerStatus, Presence, RoomState, ScrambleSource, StoredRoom,

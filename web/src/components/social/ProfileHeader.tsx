@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CameraIcon, LinkIcon, PencilIcon } from '@heroicons/react/24/outline';
-import { formatDuration } from '@cubetype/cubestats';
+import { formatDuration } from '@cubr/cubestats';
 import { AvatarEditor } from './AvatarEditor';
 import { EventDonut } from './EventDonut';
 import { countryName } from './countries';

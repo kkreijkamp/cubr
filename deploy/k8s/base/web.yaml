@@ -10,7 +10,7 @@ metadata:
   labels:
     app.kubernetes.io/name: web
     app.kubernetes.io/component: frontend
-    app.kubernetes.io/part-of: cubetype
+    app.kubernetes.io/part-of: cubr
 spec:
   # no `replicas:` -- the HorizontalPodAutoscaler (hpa.yaml) owns the count (min 2). Leaving it out
   # means `kubectl apply` never resets a scaled-out Deployment back to 2 in the middle of a demo.
@@ -29,7 +29,7 @@ spec:
       labels:
         app.kubernetes.io/name: web
         app.kubernetes.io/component: frontend
-        app.kubernetes.io/part-of: cubetype
+        app.kubernetes.io/part-of: cubr
     spec:
       automountServiceAccountToken: false
       terminationGracePeriodSeconds: 30
@@ -49,7 +49,7 @@ spec:
           matchLabelKeys: ["pod-template-hash"]
       containers:
         - name: web
-          image: cubetype/web:dev       # rewritten per overlay (GKE: Artifact Registry, tag set in overlays/gke)
+          image: cubr/web:dev           # rewritten per overlay (GKE: Artifact Registry, tag set in overlays/gke)
           imagePullPolicy: IfNotPresent
           # APP_VERSION comes from the image (build arg); /_info reports it with the pod name.
           env:
@@ -116,7 +116,7 @@ metadata:
   labels:
     app.kubernetes.io/name: web
     app.kubernetes.io/component: frontend
-    app.kubernetes.io/part-of: cubetype
+    app.kubernetes.io/part-of: cubr
 spec:
   type: ClusterIP
   selector:
@@ -132,7 +132,7 @@ metadata:
   name: web
   labels:
     app.kubernetes.io/name: web
-    app.kubernetes.io/part-of: cubetype
+    app.kubernetes.io/part-of: cubr
 spec:
   minAvailable: 1
   selector:

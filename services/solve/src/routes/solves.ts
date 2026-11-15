@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import { conflict, notFound, parse, withTx, type AuthUser, type PoolClient } from '@cubetype/common';
-import type { Penalty } from '@cubetype/cubestats';
+import { conflict, notFound, parse, withTx, type AuthUser, type PoolClient } from '@cubr/common';
+import type { Penalty } from '@cubr/cubestats';
 import { currentUser, FK_VIOLATION, pgCode, pgConstraint, tzFrom, UNIQUE_VIOLATION, type RouteContext } from '../context.js';
 import { SOLVE_COLUMNS, toSolve, type Solve, type SolveRow } from '../mapping.js';
 import { enqueue } from '../outbox.js';

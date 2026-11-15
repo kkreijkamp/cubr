@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowPathIcon, ArrowRightEndOnRectangleIcon, ArrowRightIcon, FlagIcon, HashtagIcon, PlusIcon, UserIcon } from '@heroicons/react/24/outline';
-import { EVENTS, getEvent } from '@cubetype/cubestats';
+import { EVENTS, getEvent } from '@cubr/cubestats';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useRegisterCommands } from '../lib/commands';
@@ -103,7 +103,7 @@ export default function RaceLobbyPage() {
   const { user, status } = useAuth();
   const [nick, setNick] = useState(getGuestName());
   const [name, setName] = useState('');
-  const [event, setEvent] = useStoredState<string>('cubetype.race.event', '333');
+  const [event, setEvent] = useStoredState<string>('cubr.race.event', '333');
   const [isPrivate, setIsPrivate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);

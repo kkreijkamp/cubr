@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# cubetype web - React SPA built with Vite, served by unprivileged nginx.
+# cubr web - React SPA built with Vite, served by unprivileged nginx.
 # Build context: repository root (needs packages/cubestats for shared stats code).
 
 # ---- build stage (native arch; output is static files)

@@ -1,5 +1,5 @@
-import type { Redis } from '@cubetype/common';
-import { EVENT_IDS } from '@cubetype/cubestats';
+import type { Redis } from '@cubr/common';
+import { EVENT_IDS } from '@cubr/cubestats';
 import { withTimeout } from './util.js';
 
 /** Target length of `scramble:pool:<event>` (SPEC section 9.2): popular + cheap events get deeper pools. */

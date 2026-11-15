@@ -14,9 +14,9 @@ export default function ProfilePage() {
   const profile = useAsync((signal) => api.auth.user(username, signal), [username]);
 
   useEffect(() => {
-    document.title = `${username} | cubetype`;
+    document.title = `${username} | cubr`;
     return () => {
-      document.title = 'cubetype';
+      document.title = 'cubr';
     };
   }, [username]);
 

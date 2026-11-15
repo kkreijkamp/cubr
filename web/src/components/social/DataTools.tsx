@@ -8,7 +8,7 @@ import {
   PencilIcon,
   UserCircleIcon,
 } from '@heroicons/react/24/outline';
-import { parseTimerFile, toCsTimerExport, TimerFormatError, type ImportedSession, type TimerImport } from '@cubetype/cubestats';
+import { parseTimerFile, toCsTimerExport, TimerFormatError, type ImportedSession, type TimerImport } from '@cubr/cubestats';
 import { csTimerFileName, downloadFile, eventLabel, friendlyError, plural, skippedNotes } from './util';
 import { Section } from './Widget';
 import { useAuth } from '../../lib/auth';
@@ -136,7 +136,7 @@ function ImportPreview({ fileName, parsed, onClose }: { fileName: string; parsed
   );
 }
 
-/** Account-only section: import (cubetype and every format csTimer imports), JSON and csTimer export, profile + logout. */
+/** Account-only section: import (cubr and every format csTimer imports), JSON and csTimer export, profile + logout. */
 export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: () => void }) {
   const { logout } = useAuth();
   const navigate = useNavigate();
@@ -172,7 +172,7 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
     try {
       const data = await exportAll();
       const solves = data.sessions.reduce((a, s) => a + s.solves.length, 0);
-      if (format === 'json') downloadFile(`cubetype-export-${localDateKey()}.json`, JSON.stringify(data, null, solves > 20_000 ? undefined : 2));
+      if (format === 'json') downloadFile(`cubr-export-${localDateKey()}.json`, JSON.stringify(data, null, solves > 20_000 ? undefined : 2));
       else downloadFile(csTimerFileName(), toCsTimerExport(data.sessions), 'text/plain');
       toast.success(`exported ${plural(data.sessions.length, 'session')} - ${plural(solves, 'solve')}`);
     } catch (err) {
@@ -208,7 +208,7 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
               <DocumentArrowUpIcon /> import solves
             </div>
             <div className="d">
-              a cubetype export, or any file csTimer can import: csTimer (<span className="text">export -&gt; export to file</span>), Twisty Timer, Cubic Timer,
+              a cubr export, or any file csTimer can import: csTimer (<span className="text">export -&gt; export to file</span>), Twisty Timer, Cubic Timer,
               Block Keeper, CubeDesk, DCTimer, mateus Cubetimer or GAN CubeStation. you will see a preview before anything is imported.
             </div>
           </div>
@@ -225,7 +225,7 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
               <ArrowDownTrayIcon /> export
             </div>
             <div className="d">
-              every session and solve. json re-imports here or on another cubetype server; the csTimer file goes into csTimer with{' '}
+              every session and solve. json re-imports here or on another cubr server; the csTimer file goes into csTimer with{' '}
               <span className="text">export -&gt; import session(s) from other timers</span>, which adds sessions without replacing yours.
             </div>
           </div>

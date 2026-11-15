@@ -1,5 +1,5 @@
-import { fetchJson, HttpError, internalHeaders, parse, type PoolClient } from '@cubetype/common';
-import { effectiveMs } from '@cubetype/cubestats';
+import { fetchJson, HttpError, internalHeaders, parse, type PoolClient } from '@cubr/common';
+import { effectiveMs } from '@cubr/cubestats';
 import type { FastifyBaseLogger } from 'fastify';
 import { bucketSolves } from './domain/buckets.js';
 import { computePbs, PB_KINDS, replayHistory, type ListSolve } from './domain/pbs.js';

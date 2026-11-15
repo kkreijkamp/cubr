@@ -95,8 +95,8 @@ const mmss = (ms: number) => {
  * 4x4 scrambles back-to-back - CPU-heavy work - for 30/60/120 s.
  */
 export function CpuBurst({ onLog }: { onLog: (text: string, service: string) => void }) {
-  const [concurrency, setConcurrency] = useStoredState<number>('cubetype.status.burstC', 8);
-  const [duration, setDuration] = useStoredState<number>('cubetype.status.burstD', 60);
+  const [concurrency, setConcurrency] = useStoredState<number>('cubr.status.burstC', 8);
+  const [duration, setDuration] = useStoredState<number>('cubr.status.burstD', 60);
   const [view, setView] = useState<View | null>(null);
   const stats = useRef<Stats | null>(null);
   const ctrl = useRef<AbortController | null>(null);
@@ -236,7 +236,7 @@ export function CpuBurst({ onLog }: { onLog: (text: string, service: string) => 
       </div>
 
       {!view ? (
-        <div className="panel-empty">tip: run <code>kubectl -n cubetype get hpa scramble -w</code> next to this page.</div>
+        <div className="panel-empty">tip: run <code>kubectl -n cubr get hpa scramble -w</code> next to this page.</div>
       ) : (
         <div className="burst-live">
           <div className={`burst-progress${running ? ' on' : ''}`} aria-hidden="true">

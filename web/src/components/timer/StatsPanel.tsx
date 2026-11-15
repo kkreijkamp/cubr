@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { ChartBarIcon } from '@heroicons/react/24/outline';
-import { avgKey, formatTime, type Precision, type SessionStats } from '@cubetype/cubestats';
+import { avgKey, formatTime, type Precision, type SessionStats } from '@cubr/cubestats';
 import type { Solve } from '../../lib/types';
 import { fmtAvg, fmtSolveShort } from './statsUtil';
 import { formatNumber } from '../../lib/format';

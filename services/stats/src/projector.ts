@@ -1,5 +1,5 @@
-import { DLQ_STREAM, withTx, type EventEnvelope, type Pool, type PoolClient, type Redis } from '@cubetype/common';
-import { effectiveMs } from '@cubetype/cubestats';
+import { DLQ_STREAM, withTx, type EventEnvelope, type Pool, type PoolClient, type Redis } from '@cubr/common';
+import { effectiveMs } from '@cubr/cubestats';
 import type { FastifyBaseLogger } from 'fastify';
 import type { ZodType, ZodTypeDef } from 'zod';
 import { makeBucketer, validTz } from './domain/buckets.js';

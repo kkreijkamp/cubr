@@ -1,6 +1,6 @@
-# cubetype deployment
+# cubr deployment
 
-This folder holds everything needed to run cubetype outside a developer's editor:
+This folder holds everything needed to run cubr outside a developer's editor:
 
 - a **docker compose** stack for local development;
 - **GKE Standard** in `infs3208-a2-koen` / `australia-southeast1-a` for the real deployment.
@@ -26,9 +26,9 @@ Both use the same container images and the same routing table.
 
 ```
                     Internet
-                       |  http://<cubetype-ip>/
+                       |  http://<cubr-ip>/
          +-------------v-------------+   GKE Ingress (class gce) = Google external Application LB
-         |  URL map: path prefixes   |   static global IP "cubetype-ip", health checks on /readyz
+         |  URL map: path prefixes   |   static global IP "cubr-ip", health checks on /readyz
          +--+---+---+---+---+---+--+-+   container-native LB: traffic goes straight to pod IPs (NEGs)
             |   |   |   |   |   |  +------------- default -> web (nginx, SPA)         HPA 2-6
    /api/auth|   |   |   |   |   +- /api/race, /socket.io -> race (WebSockets)       HPA 2-6
@@ -67,7 +67,7 @@ Both use the same container images and the same routing table.
 - **Security.**
   - Pods run as non-root (`runAsNonRoot`, numeric UID), with no privilege escalation, all capabilities dropped and a read-only root filesystem (writable `/tmp` via emptyDir).
   - No ServiceAccount token is mounted.
-  - Secrets are never committed. `cubetype-secrets` holds `JWT_SECRET` and `INTERNAL_API_TOKEN` (required on `/internal/*` calls between services) and is created by `commands.sh` section 8.
+  - Secrets are never committed. `cubr-secrets` holds `JWT_SECRET` and `INTERNAL_API_TOKEN` (required on `/internal/*` calls between services) and is created by `commands.sh` section 8.
 - **Images.** One image per service, tagged `<version>` and built with `--build-arg APP_VERSION`. The version shows in `X-Service` and on the `/status` page.
 
 ### Resource sizing (requests -> limits)
@@ -117,15 +117,15 @@ Run `scripts/commands.sh` section by section (`scripts/commands.sh list` prints 
 
 | section  | Step |
 |---|---|
-| 0 | Variables (`PROJECT_ID=infs3208-a2-koen`, `ZONE=australia-southeast1-a`, `CLUSTER=cubetype`, `REPO=cubetype`, `VERSION=1.0.80`) |
+| 0 | Variables (`PROJECT_ID=infs3208-a2-koen`, `ZONE=australia-southeast1-a`, `CLUSTER=cubr`, `REPO=cubr`, `VERSION=1.0.81`) |
 | 1 | `gcloud auth list`, select `koen@mangotree.info`, set project/region/zone |
 | 2 | Enable container, artifactregistry, cloudbuild and compute APIs |
 | 3 | Artifact Registry repo. IAM: nodes get `artifactregistry.reader` and `container.defaultNodeServiceAccount`; the build SA gets `artifactregistry.writer`, `logging.logWriter` and `storage.objectViewer`. |
-| 4 | `gcloud builds submit --config cloudbuild.yaml --substitutions _VERSION=1.0.80,...` (10 images in parallel, native amd64) |
+| 4 | `gcloud builds submit --config cloudbuild.yaml --substitutions _VERSION=1.0.81,...` (10 images in parallel, native amd64) |
 | 5 | `gcloud container clusters create` (3x e2-standard-2, autoscaling 3-5, 30 GB pd-balanced, regular channel, VPC-native) + `get-credentials` |
-| 6 | Reserve the global static IP `cubetype-ip` |
+| 6 | Reserve the global static IP `cubr-ip` |
 | 7 | Install CloudNativePG 1.30.1 (server-side apply) and wait for the operator |
-| 8 | Namespace + `cubetype-secrets` (random `JWT_SECRET`, `INTERNAL_API_TOKEN`) |
+| 8 | Namespace + `cubr-secrets` (random `JWT_SECRET`, `INTERNAL_API_TOKEN`) |
 | 9 | `kubectl apply -k deploy/k8s/overlays/gke`, wait for pg/redis/rollouts, wait for the Ingress IP (up to 25 min: ~17 min on a first deploy) and for the load balancer to answer (up to 10 min), smoke test |
 | 10 | `kubectl create job --from=cronjob/wca-import wca-import-now`, seed Job |
 | 11-14 | Demos: scalability, load balancing, reliability, rolling update / rollback |
@@ -145,17 +145,17 @@ To release a new version permanently: commit (the pre-commit hook bumps the vers
 
 | Symptom | Cause / fix |
 |---|---|
-| Ingress answers **404 / 502** for 5-10 min after deploy | The Google LB is still being programmed and health checks are warming up. Check `kubectl -n cubetype describe ingress cubetype` until the `ingress.kubernetes.io/backends` annotation shows `HEALTHY` everywhere. BackendConfigs probe `/readyz:8080`, so a backend whose Postgres/Redis is down stays unhealthy on purpose. |
-| A single backend permanently `UNHEALTHY` | `kubectl -n cubetype logs deploy/<svc>` and `curl` its `/readyz` via `kubectl port-forward`. BackendConfig changes can take minutes to sync. |
-| **ImagePullBackOff** with 403 on GKE | The node SA can't read Artifact Registry: re-run the `artifactregistry.reader` binding (section 3). Check the image path `australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubetype/<svc>:<tag>` exists (`gcloud artifacts docker images list ...`). |
+| Ingress answers **404 / 502** for 5-10 min after deploy | The Google LB is still being programmed and health checks are warming up. Check `kubectl -n cubr describe ingress cubr` until the `ingress.kubernetes.io/backends` annotation shows `HEALTHY` everywhere. BackendConfigs probe `/readyz:8080`, so a backend whose Postgres/Redis is down stays unhealthy on purpose. |
+| A single backend permanently `UNHEALTHY` | `kubectl -n cubr logs deploy/<svc>` and `curl` its `/readyz` via `kubectl port-forward`. BackendConfig changes can take minutes to sync. |
+| **ImagePullBackOff** with 403 on GKE | The node SA can't read Artifact Registry: re-run the `artifactregistry.reader` binding (section 3). Check the image path `australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubr/<svc>:<tag>` exists (`gcloud artifacts docker images list ...`). |
 | `exec format error` | arm64 image on amd64 nodes. Build with Cloud Build or `scripts/build-push.sh` (`--platform linux/amd64`). |
 | Cloud Build: permission denied pushing / writing logs | The build SA lacks `artifactregistry.writer` / `logging.logWriter` (section 3). New projects build as the Compute default SA. |
 | `failed calling webhook "...cnpg.io"` when applying | The CNPG operator isn't ready yet: `kubectl rollout status deployment/cnpg-controller-manager -n cnpg-system`, then re-apply. On private-node clusters, open TCP 9443 from the control plane. |
-| Pods stuck `CreateContainerConfigError` | The Secret is missing: `cubetype-secrets` (section 8) or `pg-app` (created by CNPG once the Cluster exists; pods recover automatically). |
+| Pods stuck `CreateContainerConfigError` | The Secret is missing: `cubr-secrets` (section 8) or `pg-app` (created by CNPG once the Cluster exists; pods recover automatically). |
 | wca-import Job fails `curl: (22) ... 429` | The WCA export endpoint is rate-limiting your IP. Retry later (`kubectl delete job wca-import-now` then create it again). Locally with docker compose, import offline from an unzipped export (see section 2 above). |
 | HPA `TARGETS <unknown>` | metrics-server missing (GKE runs it by default) or the container has no CPU request. |
 | WebSocket drops every 30 s on GKE | The race BackendConfig must have `timeoutSec: 3600`. The classic ALB closes WebSockets at the backend timeout. |
-| `kubectl drain` hangs | A PDB is blocking (by design, e.g. only one ready replica). Wait for the replacement pod, or check `kubectl get pdb -n cubetype`. Use `--delete-emptydir-data`. |
+| `kubectl drain` hangs | A PDB is blocking (by design, e.g. only one ready replica). Wait for the replacement pod, or check `kubectl get pdb -n cubr`. Use `--delete-emptydir-data`. |
 
 ## 5. Demo runbook (4-minute presentation)
 
@@ -165,10 +165,10 @@ To release a new version permanently: commit (the pre-commit hook bumps the vers
 - In **both terminals**, start `bash`: zsh on macOS has `interactivecomments` off, so every pasted comment line would print `command not found: #`. Then paste the variables and the `ingress_ip` helper that the `scripts/commands.sh` sections use. Without them, `$REGISTRY` is empty and the rollout's `set image ... web=$REGISTRY/web:1.1.0` becomes `web=/web:1.1.0`, an invalid image name. Don't `source scripts/commands.sh` instead: its `set -euo pipefail` would close the terminal at the first failing command.
   ```bash
   # Same values as the variable block at the top of scripts/commands.sh.
-  export PROJECT_ID=infs3208-a2-koen REGION=australia-southeast1 REPO=cubetype NS=cubetype
+  export PROJECT_ID=infs3208-a2-koen REGION=australia-southeast1 REPO=cubr NS=cubr
   export REGISTRY="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO"
   # Prints the Ingress's public IP; -o jsonpath extracts only that field.
-  ingress_ip() { kubectl -n "$NS" get ingress cubetype -o jsonpath='{.status.loadBalancer.ingress[0].ip}'; }
+  ingress_ip() { kubectl -n "$NS" get ingress cubr -o jsonpath='{.status.loadBalancer.ingress[0].ip}'; }
   # Both must show a value. An empty IP means kubectl points at another cluster:
   # check `kubectl config current-context`.
   IP=$(ingress_ip); echo "IP=$IP REGISTRY=$REGISTRY"
@@ -178,7 +178,7 @@ To release a new version permanently: commit (the pre-commit hook bumps the vers
 - Terminal 2: the probe loop from section 13. It polls the demo user's sessions, so every request goes through the gateway, a solve pod and the PostgreSQL primary. (A leaderboard route is served from Redis alone and would print `200` whatever solve or PostgreSQL do.)
   ```bash
   # Log in as the seeded demo user; -d sends the credentials as JSON, jq -r .token prints the raw token.
-  TOKEN=$(curl -s -X POST http://$IP/api/auth/login -H 'content-type: application/json' -d '{"login":"demo","password":"cubetype-demo"}' | jq -r .token)
+  TOKEN=$(curl -s -X POST http://$IP/api/auth/login -H 'content-type: application/json' -d '{"login":"demo","password":"cubr-demo"}' | jq -r .token)
   # Print one status code every 0.5 s: -m 2 gives up after 2 s (prints 000), -o /dev/null discards
   # the body, -w prints only the status code, -H sends the token.
   while true; do curl -s -m 2 -o /dev/null -w '%{http_code} ' -H "authorization: Bearer $TOKEN" http://$IP/api/sessions; sleep 0.5; done
@@ -186,11 +186,11 @@ To release a new version permanently: commit (the pre-commit hook bumps the vers
 
 | Time | Show | Commands |
 |---|---|---|
-| 0:00-0:30 | **Microservices + orchestration** | `kubectl -n cubetype get deploy,svc,hpa,pdb`, then `kubectl -n cubetype get pods -o wide`: 8 services x 2 replicas spread over 3 nodes, the CNPG cluster and Redis |
+| 0:00-0:30 | **Microservices + orchestration** | `kubectl -n cubr get deploy,svc,hpa,pdb`, then `kubectl -n cubr get pods -o wide`: 8 services x 2 replicas spread over 3 nodes, the CNPG cluster and Redis |
 | 0:30-1:15 | **Load balancing** | section 12 curl loop: `X-Served-By` alternates between pods. The `/status` page shows requests hitting different replicas and nodes. |
-| 1:15-2:15 | **Scalability** | Start `kubectl -n cubetype delete job loadgen --ignore-not-found; kubectl apply -k deploy/k8s/jobs/loadgen` (a Job runs only once: without the delete, a leftover run makes the apply a silent no-op), then `kubectl -n cubetype get hpa scramble -w`: CPU climbs past 60 % and replicas go 2 -> 8 within about 1 min. Pods appear on `/status`. Mention the cluster autoscaler (3-5 nodes). |
-| 2:15-3:15 | **Reliability** | Delete a solve pod (section 13.1); the probe in terminal 2 keeps printing `200`. Delete the Postgres primary (section 13.3) and watch `kubectl -n cubetype get pods -l cnpg.io/cluster=pg -L cnpg.io/instanceRole -w` promote a replica in about 15 s. Say beforehand that the probe will show a few `500`s for about a second while that happens, then `200` again. Optional if time allows: `kubectl drain` a node. |
-| 3:15-4:00 | **Rollout + rollback** | `kubectl -n cubetype set image deployment/web web=$REGISTRY/web:1.1.0`, then `rollout status`; `/status` flips versions pod by pod. Then `set image ...:9.9.9-broken` (ErrImagePull, old pods keep serving), `rollout history`, `rollout undo --to-revision=1`. |
+| 1:15-2:15 | **Scalability** | Start `kubectl -n cubr delete job loadgen --ignore-not-found; kubectl apply -k deploy/k8s/jobs/loadgen` (a Job runs only once: without the delete, a leftover run makes the apply a silent no-op), then `kubectl -n cubr get hpa scramble -w`: CPU climbs past 60 % and replicas go 2 -> 8 within about 1 min. Pods appear on `/status`. Mention the cluster autoscaler (3-5 nodes). |
+| 2:15-3:15 | **Reliability** | Delete a solve pod (section 13.1); the probe in terminal 2 keeps printing `200`. Delete the Postgres primary (section 13.3) and watch `kubectl -n cubr get pods -l cnpg.io/cluster=pg -L cnpg.io/instanceRole -w` promote a replica in about 15 s. Say beforehand that the probe will show a few `500`s for about a second while that happens, then `200` again. Optional if time allows: `kubectl drain` a node. |
+| 3:15-4:00 | **Rollout + rollback** | `kubectl -n cubr set image deployment/web web=$REGISTRY/web:1.1.0`, then `rollout status`; `/status` flips versions pod by pod. Then `set image ...:9.9.9-broken` (ErrImagePull, old pods keep serving), `rollout history`, `rollout undo --to-revision=1`. |
 
 Tips:
 

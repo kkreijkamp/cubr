@@ -1,4 +1,4 @@
-import { averageOfN, bestRolling, effectiveMs, rollingAverage, type Penalty } from '@cubetype/cubestats';
+import { averageOfN, bestRolling, effectiveMs, rollingAverage, type Penalty } from '@cubr/cubestats';
 
 /** PB kinds in display order (SPEC section 7.3 CHECK constraint). */
 export const PB_KINDS = ['single', 'mo3', 'ao5', 'ao12', 'ao50', 'ao100'] as const;

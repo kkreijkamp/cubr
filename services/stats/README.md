@@ -2,7 +2,7 @@
 
 Event-driven **read model (CQRS)** for player analytics: personal bests, activity heatmap, streaks,
 time-of-day profile and global counters. It never reads another service's schema - it projects the
-domain events from the Redis stream `cubetype:events` into schema `stats`, and it is the authority
+domain events from the Redis stream `cubr:events` into schema `stats`, and it is the authority
 for personal bests (emits `pb.updated`, consumed by leaderboard).
 
 ## Routes (SPEC section 9.4)
@@ -43,7 +43,7 @@ Consumes (group `stats`, consumer = `POD_NAME`): `user.registered`, `user.update
   stays pending -> retried via XAUTOCLAIM (`maxAttempts` 20 before the DLQ). Measured locally: 20 000
   solves of one event recompute in ~0.38 s (65 ms of it fetching); a 21 000-solve `solves.imported`
   is visible 0.42 s after publish.
-  Malformed payloads (e.g. non-UUID ids) go straight to `cubetype:events:dlq` instead of being retried.
+  Malformed payloads (e.g. non-UUID ids) go straight to `cubr:events:dlq` instead of being retried.
 * **session.renamed** - updates the session's display name (no statistics change).
 
 ## Design notes (consistency)
@@ -79,4 +79,4 @@ Common vars (SPEC section 4); uses `DATABASE_URL`, `REDIS_URL`, `SOLVE_URL`, `PO
 `INTERNAL_API_TOKEN` (required on `/internal/pbs`, sent to solve's `/internal` routes).
 Dev against the compose stack's Postgres and Redis (`docker compose up -d postgres redis`; recomputes
 and the session-name backfill need a solve instance at `SOLVE_URL`):
-`PORT=8081 DATABASE_URL=postgres://cubetype:cubetype@localhost:55433/cubetype REDIS_URL=redis://localhost:56380 SOLVE_URL=http://localhost:8083 npx tsx services/stats/src/index.ts`
+`PORT=8081 DATABASE_URL=postgres://cubr:cubr@localhost:55433/cubr REDIS_URL=redis://localhost:56380 SOLVE_URL=http://localhost:8083 npx tsx services/stats/src/index.ts`

@@ -1,6 +1,6 @@
 // Pure helpers behind lib/solves.ts (kept free of browser globals so they can be unit-tested):
 // compact localStorage codec, retry-queue coalescing, optimistic overlays, import chunking, backoff.
-import type { Penalty } from '@cubetype/cubestats';
+import type { Penalty } from '@cubr/cubestats';
 import type { ImportPayload, NewSolve } from '../lib/api';
 import type { Session, Solve } from '../lib/types';
 
@@ -56,7 +56,7 @@ export function insertChrono(list: Solve[], solve: Solve): Solve[] {
 
 // ---------------------------------------------------------------- local storage codec
 
-export const LOCAL_KEY = 'cubetype.local.v1';
+export const LOCAL_KEY = 'cubr.local.v1';
 
 /** [id, timeMs, penalty (0 OK, 1 +2, 2 DNF), scramble, comment, createdAt epoch ms, source (omitted = timer)] */
 export type SolveTuple = [string, number, 0 | 1 | 2, string, string | null, number, string?];
@@ -192,7 +192,7 @@ export function encodeLocalDb(db: LocalDb): string {
 
 // ---------------------------------------------------------------- retry queue
 
-export const QUEUE_KEY = 'cubetype.queue.v1';
+export const QUEUE_KEY = 'cubr.queue.v1';
 
 export type SyncOp =
   /** keepCreatedAt: send createdAt too (a cleared session's replacement keeps the old one's place) */

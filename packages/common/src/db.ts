@@ -27,7 +27,7 @@ export function createPool(
     keepAliveInitialDelayMillis: 10_000,
     query_timeout: opts.queryTimeoutMs ?? 30_000,
     statement_timeout: opts.queryTimeoutMs ?? 30_000,
-    application_name: process.env.SERVICE_NAME ?? 'cubetype',
+    application_name: process.env.SERVICE_NAME ?? 'cubr',
   });
   // An idle client erroring (e.g. Postgres failover) must not crash the process.
   pool.on('error', (err) => opts.log?.warn({ err }, 'postgres idle client error'));
@@ -95,7 +95,7 @@ export interface Migration {
 export async function migrate(pool: pg.Pool, schema: string, migrations: Migration[], log?: FastifyBaseLogger): Promise<void> {
   const client = await pool.connect();
   try {
-    await client.query('select pg_advisory_lock(hashtext($1))', [`cubetype:migrate:${schema}`]);
+    await client.query('select pg_advisory_lock(hashtext($1))', [`cubr:migrate:${schema}`]);
     await client.query(`create schema if not exists ${schema}`);
     await client.query(
       `create table if not exists ${schema}.schema_migrations (id text primary key, applied_at timestamptz not null default now())`,
@@ -116,7 +116,7 @@ export async function migrate(pool: pg.Pool, schema: string, migrations: Migrati
       }
     }
   } finally {
-    await client.query('select pg_advisory_unlock(hashtext($1))', [`cubetype:migrate:${schema}`]).catch(() => {});
+    await client.query('select pg_advisory_unlock(hashtext($1))', [`cubr:migrate:${schema}`]).catch(() => {});
     client.release();
   }
 }

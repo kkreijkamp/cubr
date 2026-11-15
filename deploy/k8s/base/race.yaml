@@ -12,7 +12,7 @@ metadata:
   labels:
     app.kubernetes.io/name: race
     app.kubernetes.io/component: api
-    app.kubernetes.io/part-of: cubetype
+    app.kubernetes.io/part-of: cubr
 spec:
   # no `replicas:` -- the HorizontalPodAutoscaler (hpa.yaml) owns the count (min 2). Leaving it out
   # means `kubectl apply` never resets a scaled-out Deployment back to 2 in the middle of a demo.
@@ -31,7 +31,7 @@ spec:
       labels:
         app.kubernetes.io/name: race
         app.kubernetes.io/component: api
-        app.kubernetes.io/part-of: cubetype
+        app.kubernetes.io/part-of: cubr
     spec:
       automountServiceAccountToken: false   # the app never talks to the Kubernetes API
       terminationGracePeriodSeconds: 30     # preStop 10 s + up to 20 s graceful shutdown (common/start())
@@ -51,17 +51,17 @@ spec:
           matchLabelKeys: ["pod-template-hash"]   # spread each ReplicaSet (rollout) separately
       containers:
         - name: race
-          image: cubetype/race:dev    # rewritten per overlay (GKE: Artifact Registry, tag set in overlays/gke)
+          image: cubr/race:dev        # rewritten per overlay (GKE: Artifact Registry, tag set in overlays/gke)
           imagePullPolicy: IfNotPresent
           # APP_VERSION is baked into the image at build time (--build-arg) and deliberately not overridden here.
           envFrom:
             - configMapRef:
-                name: cubetype-config   # REDIS_URL, LOG_LEVEL, *_URL service addresses
+                name: cubr-config       # REDIS_URL, LOG_LEVEL, *_URL service addresses
           env:
             - name: JWT_SECRET          # shared HS256 signing key
               valueFrom:
                 secretKeyRef:
-                  name: cubetype-secrets
+                  name: cubr-secrets
                   key: JWT_SECRET
             - name: POD_NAME            # downward API -> X-Served-By header / status page
               valueFrom:
@@ -125,7 +125,7 @@ metadata:
   labels:
     app.kubernetes.io/name: race
     app.kubernetes.io/component: api
-    app.kubernetes.io/part-of: cubetype
+    app.kubernetes.io/part-of: cubr
 spec:
   type: ClusterIP                       # internal virtual IP; kube-proxy load-balances over ready pods
   selector:
@@ -141,7 +141,7 @@ metadata:
   name: race
   labels:
     app.kubernetes.io/name: race
-    app.kubernetes.io/part-of: cubetype
+    app.kubernetes.io/part-of: cubr
 spec:
   minAvailable: 1                       # `kubectl drain` / node upgrades may never evict the last ready pod
   selector:

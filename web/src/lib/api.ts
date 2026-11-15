@@ -1,4 +1,4 @@
-// Thin typed client for every cubetype microservice. All calls are same-origin paths that the
+// Thin typed client for every cubr microservice. All calls are same-origin paths that the
 // Ingress (cloud) or gateway (local) routes to the right service - see docs/SPEC.md section 3.
 import type {
   ActivityDay,
@@ -38,7 +38,7 @@ export class ApiError extends Error {
   }
 }
 
-const TOKEN_KEY = 'cubetype.token';
+const TOKEN_KEY = 'cubr.token';
 let token: string | null = null;
 try {
   token = localStorage.getItem(TOKEN_KEY);

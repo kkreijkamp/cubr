@@ -1,9 +1,9 @@
 {
-  "name": "@cubetype/common",
+  "name": "@cubr/common",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Shared server plumbing for cubetype microservices (config, Fastify bootstrap, Postgres, Redis, JWT auth, domain events)",
+  "description": "Shared server plumbing for cubr microservices (config, Fastify bootstrap, Postgres, Redis, JWT auth, domain events)",
   "exports": {
     ".": "./src/index.ts"
   },

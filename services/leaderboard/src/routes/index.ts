@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { badRequest, parse, type Redis, type makeAuth } from '@cubetype/common';
-import { DAILY_EVENTS, isEventId } from '@cubetype/cubestats';
+import { badRequest, parse, type Redis, type makeAuth } from '@cubr/common';
+import { DAILY_EVENTS, isEventId } from '@cubr/cubestats';
 import { readBoard, readUserRanks } from '../board.js';
 import {
   PERIODS,

@@ -8,14 +8,14 @@
 //  - Switches automatically on login/logout (onAuthChange from ./auth).
 //
 // Implementation notes
-//  - Local data: `cubetype.local.v1` (compact tuples, see timer/storeUtils.ts), written debounced
-//    and flushed on pagehide. Corrupt data is backed up to `cubetype.local.v1.corrupt`, never lost.
-//  - Cloud writes go through a persistent FIFO queue (`cubetype.queue.v1`) processed one op at a
+//  - Local data: `cubr.local.v1` (compact tuples, see timer/storeUtils.ts), written debounced
+//    and flushed on pagehide. Corrupt data is backed up to `cubr.local.v1.corrupt`, never lost.
+//  - Cloud writes go through a persistent FIFO queue (`cubr.queue.v1`) processed one op at a
 //    time; unsent edits are coalesced into their create. Network/5xx/429 -> exponential backoff
 //    (1 s ... 60 s, retried immediately on `online`). Server reads are overlaid with queued ops so
-//    optimistic changes survive reloads. The current session is cached (`cubetype.cloudcache.v1`)
+//    optimistic changes survive reloads. The current session is cached (`cubr.cloudcache.v1`)
 //    so a logged-in user can keep timing while solve-service is down.
-import { getEvent, isEventId, type ImportedSession, type Penalty } from '@cubetype/cubestats';
+import { getEvent, isEventId, type ImportedSession, type Penalty } from '@cubr/cubestats';
 import { api, ApiError, getToken, type ImportPayload } from './api';
 import { getCurrentUser, onAuthChange } from './auth';
 import { settingsStore, updateSettings } from './settings';
@@ -97,9 +97,9 @@ export function getCurrentSession(): Session | null {
 // ================================================================ module state
 
 const browser = typeof window !== 'undefined' && typeof document !== 'undefined';
-const CLOUD_CACHE_KEY = 'cubetype.cloudcache.v1';
-const LAST_SESSION_KEY = 'cubetype.lastSession.v1';
-const OFFER_DISMISSED_KEY = 'cubetype.uploadOffer.dismissed';
+const CLOUD_CACHE_KEY = 'cubr.cloudcache.v1';
+const LAST_SESSION_KEY = 'cubr.lastSession.v1';
+const OFFER_DISMISSED_KEY = 'cubr.uploadOffer.dismissed';
 
 type Scope = { mode: 'local' } | { mode: 'cloud'; userId: string };
 let scope: Scope | null = null;

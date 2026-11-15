@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getEvent, type Penalty, type Precision } from '@cubetype/cubestats';
+import { getEvent, type Penalty, type Precision } from '@cubr/cubestats';
 import { TimerDisplay } from '../../../timer/TimerDisplay';
 import { alertAt, type TimerState } from '../../../timer/useTimerEngine';
 import { useKeyboardLayout } from '../../../lib/keyboardLayout';

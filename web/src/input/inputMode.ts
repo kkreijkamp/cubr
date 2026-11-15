@@ -35,7 +35,7 @@ export interface DeviceInputState {
   smartSolved: Record<string, string>;
 }
 
-const KEY = 'cubetype.input';
+const KEY = 'cubr.input';
 const MODES = new Set(INPUT_MODES.map((m) => m.id));
 
 function load(): DeviceInputState {

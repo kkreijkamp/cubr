@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HttpError, parse } from '@cubetype/common';
+import { HttpError, parse } from '@cubr/common';
 import {
   assertDailyAllowed, createSessionBody, createSolveBody, importBody, MAX_IMPORT_SOLVES, mergeSessionsBody, patchSessionBody, patchSolveBody,
   resolveCreatedAt, utcDay,

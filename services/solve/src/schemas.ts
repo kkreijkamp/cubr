@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { badRequest } from '@cubetype/common';
-import { isEventId, DAILY_EVENTS } from '@cubetype/cubestats';
+import { badRequest } from '@cubr/common';
+import { isEventId, DAILY_EVENTS } from '@cubr/cubestats';
 
 // Request validation (docs/SPEC.md section 5 limits, section 9.3 bodies). Route handlers call
 // `parse(schema, req.body ?? {})` from common, which turns failures into 400 BAD_REQUEST.

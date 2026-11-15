@@ -1,5 +1,5 @@
 import { Square2StackIcon } from '@heroicons/react/24/outline';
-import type { Precision } from '@cubetype/cubestats';
+import type { Precision } from '@cubr/cubestats';
 import { Modal } from '../Modal';
 import { toast } from '../../lib/toast';
 import { formatDateTime } from '../../lib/format';

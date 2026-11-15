@@ -1,4 +1,4 @@
-import { dayKey, type Pool, type Redis } from '@cubetype/common';
+import { dayKey, type Pool, type Redis } from '@cubr/common';
 import type { FastifyInstance } from 'fastify';
 
 export const CACHE_KEY = 'cache:stats:global';

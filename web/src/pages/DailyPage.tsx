@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRightEndOnRectangleIcon, ArrowUturnLeftIcon, CalendarDaysIcon, SignalSlashIcon } from '@heroicons/react/24/outline';
-import { averageOfN, DAILY_EVENTS, effectiveMs, formatSolve, formatTime, getEvent, type Penalty } from '@cubetype/cubestats';
+import { averageOfN, DAILY_EVENTS, effectiveMs, formatSolve, formatTime, getEvent, type Penalty } from '@cubr/cubestats';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useSettings } from '../lib/settings';
@@ -23,7 +23,7 @@ import '../components/live/live.css';
 import '../components/live/daily/daily.css';
 
 const ATTEMPTS = 5;
-const PRACTICE_KEY = 'cubetype.daily.practice';
+const PRACTICE_KEY = 'cubr.daily.practice';
 
 interface Attempt {
   index: number;
@@ -101,7 +101,7 @@ export default function DailyPage() {
   const now = useNow(1000);
   const today = utcDateKey(new Date(now));
   const [date, setDate] = useState(today);
-  const [event, setEvent] = useStoredState<string>('cubetype.daily.event', '333');
+  const [event, setEvent] = useStoredState<string>('cubr.daily.event', '333');
   const [local, setLocal] = useState<Record<string, Attempt[]>>({});
   const [practice, setPractice] = useState<PracticeStore>(loadPractice);
   const [boardKey, setBoardKey] = useState(0);

@@ -4,13 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#323437" />
-    <meta name="description" content="cubetype - a minimal, fast speedcubing timer with stats, leaderboards, daily challenges and live races." />
+    <meta name="description" content="cubr - a minimal, fast speedcubing timer with stats, leaderboards, daily challenges and live races." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>cubetype</title>
+    <title>cubr</title>
     <script>
       // Apply the saved theme before first paint to avoid a flash of the default theme.
       try {
-        var t = JSON.parse(localStorage.getItem('cubetype.themeColors') || 'null');
+        var t = JSON.parse(localStorage.getItem('cubr.themeColors') || 'null');
         if (t) for (var k in t) document.documentElement.style.setProperty(k, t[k]);
       } catch (e) {}
     </script>

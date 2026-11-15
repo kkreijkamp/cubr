@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { parse, rateLimit, rateLimited, type Redis, type makeAuth } from '@cubetype/common';
-import { isEventId } from '@cubetype/cubestats';
+import { parse, rateLimit, rateLimited, type Redis, type makeAuth } from '@cubr/common';
+import { isEventId } from '@cubr/cubestats';
 import { sanitizeText } from './sanitize.js';
 import type { RoomStore } from './store.js';
 

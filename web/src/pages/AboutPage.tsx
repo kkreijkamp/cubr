@@ -117,7 +117,7 @@ function WcaCitation() {
       <a href="https://www.worldcubeassociation.org/results" target="_blank" rel="noreferrer noopener">
         worldcubeassociation.org/results
       </a>
-      {meta.data ? ` as of ${formatDate(meta.data.exportDate)}` : ''}. cubetype is not affiliated with the WCA.
+      {meta.data ? ` as of ${formatDate(meta.data.exportDate)}` : ''}. cubr is not affiliated with the WCA.
     </div>
   );
 }
@@ -141,9 +141,9 @@ function FlowSwatch({ main }: { main?: boolean }) {
 
 export default function AboutPage() {
   useEffect(() => {
-    document.title = 'about | cubetype';
+    document.title = 'about | cubr';
     return () => {
-      document.title = 'cubetype';
+      document.title = 'cubr';
     };
   }, []);
 
@@ -151,7 +151,7 @@ export default function AboutPage() {
     <div className="ab">
       <section className="ab-hero">
         <h1 className="ab-logo">
-          <CubeLogo /> cubetype
+          <CubeLogo /> cubr
         </h1>
         <p className="ab-lead">
           a minimal, keyboard-first speedcubing timer - <span className="text">csTimer</span>&apos;s depth with <span className="text">monkeytype</span>
@@ -198,7 +198,7 @@ export default function AboutPage() {
         <div className="arch-steps">
           <div>
             <span className="text">solve-service</span> writes your solve and an outbox row in one postgres transaction, then relays it to the{' '}
-            <span className="text">cubetype:events</span> stream.
+            <span className="text">cubr:events</span> stream.
           </div>
           <div>
             <span className="text">stats-service</span> consumes the stream (consumer group) and updates pbs, streaks, the heatmap and time-of-day read

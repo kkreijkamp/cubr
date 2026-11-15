@@ -1,7 +1,7 @@
 // The speedcubing timer state machine (keyboard + touch), modelled on csTimer with WCA rules.
 //   Esc: cancels holding/ready/inspection; while running it stops the solve as a DNF.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Penalty } from '@cubetype/cubestats';
+import type { Penalty } from '@cubr/cubestats';
 
 export type TimerPhase = 'idle' | 'holding' | 'ready' | 'inspecting' | 'running' | 'stopped';
 

@@ -1,5 +1,5 @@
 import type { FastifyBaseLogger } from 'fastify';
-import { HttpError, type Redis } from '@cubetype/common';
+import { HttpError, type Redis } from '@cubr/common';
 import { POD_TTL_MS, keys, type RoomStore } from './store.js';
 
 const HEARTBEAT_MS = 5000;

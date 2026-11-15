@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getEvent, type Penalty, type Precision } from '@cubetype/cubestats';
+import { getEvent, type Penalty, type Precision } from '@cubr/cubestats';
 import { TimerDisplay } from '../../../timer/TimerDisplay';
 import { alertAt, beep, type TimerState } from '../../../timer/useTimerEngine';
 import type { Settings, TimerUpdate } from '../../../lib/settings';

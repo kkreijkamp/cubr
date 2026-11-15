@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HttpError, parse } from '@cubetype/common';
+import { HttpError, parse } from '@cubr/common';
 import { loadScrambleSettings } from '../src/settings.js';
 import { resolveDailyDate, scrambleQuerySchema } from '../src/validation.js';
 

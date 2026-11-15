@@ -1,7 +1,7 @@
 // What the page's timer does with a stackmat (or MoYu timer): csTimer's timer/stackmat.js. The timer
 // itself times the solve; the page follows it, adds WCA inspection (started with space, or by
 // putting one hand on the mat while it reads zero) and records the time when the timer stops.
-import type { Penalty } from '@cubetype/cubestats';
+import type { Penalty } from '@cubr/cubestats';
 import type { StackmatState } from './decoder';
 
 export type StackmatPhase = 'idle' | 'inspect-ready' | 'inspecting' | 'running';

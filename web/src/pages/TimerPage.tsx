@@ -17,7 +17,7 @@ import {
   TrophyIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
-import { EVENTS, effectiveMs, formatTime, getEvent, rollingAverage, sessionStats, type Penalty } from '@cubetype/cubestats';
+import { EVENTS, effectiveMs, formatTime, getEvent, rollingAverage, sessionStats, type Penalty } from '@cubr/cubestats';
 import { TimerDisplay } from '../timer/TimerDisplay';
 import { useTimerEngine, type TimerResult, type TimerState } from '../timer/useTimerEngine';
 import { useScrambleQueue } from '../timer/useScrambleQueue';
@@ -76,7 +76,7 @@ type ModalState =
   | { kind: 'comment'; solveId: string }
   | null;
 
-const GUEST_HINT_KEY = 'cubetype.guestHintDismissed';
+const GUEST_HINT_KEY = 'cubr.guestHintDismissed';
 const IDLE: TimerState = { phase: 'idle', inInspection: false, startedAt: null, inspectionStartedAt: null, result: null };
 const AVAILABLE = AVAILABLE_INPUTS;
 const PB_KINDS_NS = [5, 12, 100];
@@ -346,10 +346,10 @@ export default function TimerPage() {
           if (AVAILABLE.includes(a.input)) {
             setInput(a.input);
             toast.notice(`entering times with: ${modeInfo(a.input).label}`, { durationMs: 1500 });
-          } else toast.notice(`cubetype has no ${modeInfo(a.input).label} input yet`);
+          } else toast.notice(`cubr has no ${modeInfo(a.input).label} input yet`);
           return;
         case 'missingInput':
-          toast.notice(`cubetype has no ${a.name} input`);
+          toast.notice(`cubr has no ${a.name} input`);
           return;
         case 'comment':
           return commentLast();

@@ -3,8 +3,8 @@ import type { Redis } from 'ioredis';
 import type { FastifyBaseLogger } from 'fastify';
 
 /** The single domain-event stream (see docs/SPEC.md section 8). */
-export const EVENT_STREAM = 'cubetype:events';
-export const DLQ_STREAM = 'cubetype:events:dlq';
+export const EVENT_STREAM = 'cubr:events';
+export const DLQ_STREAM = 'cubr:events:dlq';
 const MAXLEN = 200_000;
 
 export type EventData = Record<string, unknown> & { eventId: string; occurredAt: string };

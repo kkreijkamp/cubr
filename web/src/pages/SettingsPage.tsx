@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowDownTrayIcon, ArrowUpRightIcon, ArrowUpTrayIcon, ArrowUturnLeftIcon, ArrowsRightLeftIcon, CubeIcon, MagnifyingGlassIcon, PlayIcon } from '@heroicons/react/24/outline';
-import { CsTimerFormatError, EVENTS, parseTimerFile, toCsTimerExport, type TimerImport } from '@cubetype/cubestats';
+import { CsTimerFormatError, EVENTS, parseTimerFile, toCsTimerExport, type TimerImport } from '@cubr/cubestats';
 import { Modal } from '../components/Modal';
 import { csTimerFileName, skippedNotes } from '../components/social/util';
 import { ConfirmModal } from '../components/timer/Dialogs';
@@ -162,7 +162,7 @@ const CSTIMER_KEYS: [ReactNode, string][] = [
   ],
 ];
 
-// cubetype's own, on keys csTimer leaves free
+// cubr's own, on keys csTimer leaves free
 const OWN_KEYS: [ReactNode, string][] = [
   [
     <>
@@ -495,7 +495,7 @@ export default function SettingsPage() {
             </p>
             <KeyList keys={CSTIMER_KEYS} />
           </Group>
-          <Group title="cubetype's own">
+          <Group title="cubr's own">
             <KeyList keys={OWN_KEYS} />
           </Group>
           <VirtualKeys maps={s.virtualKeys} />
@@ -1026,7 +1026,7 @@ function ThemePicker({ current }: { current: string }) {
             <span className="name">{themeLabel(now.name)}</span>
             <span className="meta">
               {isLightTheme(now) ? 'light' : 'dark'}
-              {now.original && ' - a cubetype original'}
+              {now.original && ' - a cubr original'}
             </span>
           </div>
           <button className="btn-text st-random" onClick={shuffle} data-tip="a random theme from the list below">
@@ -1070,7 +1070,7 @@ function ThemePicker({ current }: { current: string }) {
             >
               <ThemeSwatch theme={t} />
               <span className="st-theme-name">{themeLabel(t.name)}</span>
-              {t.original && <CubeIcon width={12} height={12} className="st-theme-original" aria-label="cubetype original" aria-hidden={false} />}
+              {t.original && <CubeIcon width={12} height={12} className="st-theme-original" aria-label="cubr original" aria-hidden={false} />}
             </button>
           ))}
         </div>
@@ -1125,7 +1125,7 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
     setBusy(format === 'json' ? 'export' : 'export-cstimer');
     try {
       const data = await exportAll();
-      if (format === 'json') download(`cubetype-export-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data));
+      if (format === 'json') download(`cubr-export-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data));
       else download(csTimerFileName(), toCsTimerExport(data.sessions));
       const n = data.sessions.reduce((a, x) => a + x.solves.length, 0);
       toast.success(`exported ${formatNumber(n)} solves`);
@@ -1144,8 +1144,8 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
           wide={parsed !== null}
           description={
             <>
-              A cubetype export, or any file csTimer can import: csTimer (<span className="text">export -&gt; export to file</span>), Twisty Timer, Cubic Timer, Block Keeper,
-              CubeDesk, DCTimer, mateus Cubetimer or GAN CubeStation. Each session becomes a cubetype session {loggedIn ? 'in your account' : 'in this browser'}.
+              A cubr export, or any file csTimer can import: csTimer (<span className="text">export -&gt; export to file</span>), Twisty Timer, Cubic Timer, Block Keeper,
+              CubeDesk, DCTimer, mateus Cubetimer or GAN CubeStation. Each session becomes a cubr session {loggedIn ? 'in your account' : 'in this browser'}.
             </>
           }
         >
@@ -1186,7 +1186,7 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
           title="export"
           description={
             <>
-              Every session and solve. JSON re-imports here or on another cubetype server; the csTimer file goes into csTimer with{' '}
+              Every session and solve. JSON re-imports here or on another cubr server; the csTimer file goes into csTimer with{' '}
               <span className="text">export -&gt; import session(s) from other timers</span>, which adds sessions without replacing yours.
             </>
           }

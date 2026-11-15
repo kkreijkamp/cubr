@@ -11,7 +11,7 @@ interface Props {
 }
 
 /**
- * A scramble preview: in 2D cubetype's own flat net (ScrambleNet), in 3D cubing.js's <twisty-player>.
+ * A scramble preview: in 2D cubr's own flat net (ScrambleNet), in 3D cubing.js's <twisty-player>.
  * The clock's net is dials and hands rather than stickers, so cubing.js draws that too.
  */
 export function TwistyPreview(props: Props) {

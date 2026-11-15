@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { formatDuration } from '@cubetype/cubestats';
+import { formatDuration } from '@cubr/cubestats';
 import { Dot, Sparkline } from '../ui';
 import { vlabel, type PodView, type ServiceView } from './monitor';
 

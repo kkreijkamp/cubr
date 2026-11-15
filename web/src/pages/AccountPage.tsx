@@ -12,9 +12,9 @@ export default function AccountPage() {
   const openEdit = useCallback(() => setEditing(true), []);
 
   useEffect(() => {
-    document.title = 'account | cubetype';
+    document.title = 'account | cubr';
     return () => {
-      document.title = 'cubetype';
+      document.title = 'cubr';
     };
   }, []);
 

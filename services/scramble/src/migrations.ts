@@ -1,4 +1,4 @@
-import type { Migration } from '@cubetype/common';
+import type { Migration } from '@cubr/common';
 
 export const migrations: Migration[] = [
   {

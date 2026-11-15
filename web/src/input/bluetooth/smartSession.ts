@@ -3,7 +3,7 @@
 // when it matches the scramble (or after a pause, a few turns of one face, or space); inspection
 // runs from then; the first turn starts the timer and the turn that solves it stops it. The time is
 // the cube's own timestamps of those two turns, fitted to the local clock.
-import type { Penalty } from '@cubetype/cubestats';
+import type { Penalty } from '@cubr/cubestats';
 import { CubieCube, isFaceletSolved, moveIndex, moveName, MOVE_CUBE, SOLVED_FACELET } from '../cube/cubie';
 
 export type SmartPhase = 'idle' | 'scrambled' | 'running';

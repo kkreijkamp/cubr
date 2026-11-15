@@ -1,5 +1,5 @@
-import { dayKey, isoWeekKey } from '@cubetype/common';
-import { isEventId } from '@cubetype/cubestats';
+import { dayKey, isoWeekKey } from '@cubr/common';
+import { isEventId } from '@cubr/cubestats';
 
 // ---------------------------------------------------------------------------------------------
 // Redis key builders and period / paging math (pure, unit-tested). Keyspace: docs/SPEC.md section 7.6.

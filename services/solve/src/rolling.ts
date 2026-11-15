@@ -1,4 +1,4 @@
-import { averageOfN, currentAverage, effectiveMs, toApiValue, type SolveLike } from '@cubetype/cubestats';
+import { averageOfN, currentAverage, effectiveMs, toApiValue, type SolveLike } from '@cubr/cubestats';
 
 /** API-encoded averages: ms, -1 = DNF, null = not enough solves. */
 export interface Rolling {

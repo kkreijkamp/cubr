@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
-import { notFound, parse } from '@cubetype/common';
-import { EVENTS, isEventId } from '@cubetype/cubestats';
+import { notFound, parse } from '@cubr/common';
+import { EVENTS, isEventId } from '@cubr/cubestats';
 import { toHttpError } from '../errors.js';
 import type { ScrambleGenerator } from '../generator.js';
 import type { ScramblePool } from '../pool.js';

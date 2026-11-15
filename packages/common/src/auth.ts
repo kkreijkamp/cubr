@@ -20,7 +20,7 @@ declare module 'fastify' {
   }
 }
 
-const ISSUER = 'cubetype';
+const ISSUER = 'cubr';
 export const TOKEN_TTL_SEC = 30 * 24 * 3600;
 
 const keyCache = new Map<string, Uint8Array>();

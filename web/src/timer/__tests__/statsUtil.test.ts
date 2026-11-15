@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { effectiveMs, parseTimeInput, rollingAverage, sessionStats } from '@cubetype/cubestats';
+import { effectiveMs, parseTimeInput, rollingAverage, sessionStats } from '@cubr/cubestats';
 import {
   averageReport,
   averageWindow,

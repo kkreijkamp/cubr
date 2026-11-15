@@ -1,4 +1,4 @@
-import { revokedKey, verifyToken, type Redis } from '@cubetype/common';
+import { revokedKey, verifyToken, type Redis } from '@cubr/common';
 import { defaultGuestName, generateGuestId, sanitizeGuestId, sanitizeName } from './sanitize.js';
 import type { Identity } from './types.js';
 

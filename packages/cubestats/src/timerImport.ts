@@ -5,11 +5,11 @@ import { finishImport, type ImportedSession, type ImportSkipped, type RawSession
 import { isSqliteFile, readSqliteTables, type SqlValue } from './sqlite.js';
 
 /**
- * Reads a solve export from cubetype itself or from any timer whose files csTimer's
+ * Reads a solve export from cubr itself or from any timer whose files csTimer's
  * "Import session(s) from other timers" understands (csTimer src/js/lib/tdconverter.js):
  * csTimer (JSON and session CSV), Twisty Timer, Cubic Timer, Block Keeper, DCTimer (text export
  * and SQLite backup), mateus' Cubetimer, CubeDesk and GAN CubeStation. The field layouts follow
- * csTimer's converter; the code is cubetype's own. csTimer also recognises ZYXTimer and
+ * csTimer's converter; the code is cubr's own. csTimer also recognises ZYXTimer and
  * PrismaTimer files but imports nothing from them, so neither is supported here.
  */
 
@@ -23,7 +23,7 @@ export interface TimerImport {
 }
 
 export const IMPORT_FORMATS = [
-  'cubetype',
+  'cubr',
   'csTimer',
   'Twisty Timer',
   'Cubic Timer',
@@ -48,7 +48,7 @@ export function parseTimerFile(input: Uint8Array | string): TimerImport {
   const { sessions, skipped } = finishImport(raw);
   if (!sessions.length) {
     const why = skipped.multiBlind ? ' (multi-blind attempts are not supported)' : '';
-    throw new TimerFormatError(`This ${format} file has no solves cubetype can import${why}.`);
+    throw new TimerFormatError(`This ${format} file has no solves cubr can import${why}.`);
   }
   return { format, sessions, skipped };
 }
@@ -60,7 +60,7 @@ function decodeText(bytes: Uint8Array): string {
 }
 
 const unsupported = (): never => {
-  throw new TimerFormatError(`This file isn't an export cubetype can read. Supported: ${IMPORT_FORMATS.join(', ')}.`);
+  throw new TimerFormatError(`This file isn't an export cubr can read. Supported: ${IMPORT_FORMATS.join(', ')}.`);
 };
 
 function detect(text: string): [string, RawSession[]] {
@@ -76,7 +76,7 @@ function detect(text: string): [string, RawSession[]] {
     const obj = root as Record<string, unknown>;
     const data = obj.data as Record<string, unknown> | undefined;
     if (Array.isArray(obj.sessions) && !Array.isArray(obj.solves) && obj.sessions.every((s) => s && Array.isArray((s as { solves?: unknown }).solves))) {
-      return ['cubetype', cubetype(obj.sessions)];
+      return ['cubr', cubr(obj.sessions)];
     }
     if (Array.isArray(obj.sessions) && Array.isArray(obj.solves)) return ['CubeDesk', cubeDesk(obj)];
     if (Object.keys(obj).some((k) => /^session\d+$/.test(k))) return ['csTimer', csTimerSessions(obj)];
@@ -176,9 +176,9 @@ class Grouper {
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : v === null || v === undefined ? '' : String(v));
 
-// ---------------------------------------------------------------- cubetype
+// ---------------------------------------------------------------- cubr
 
-function cubetype(sessions: unknown[]): RawSession[] {
+function cubr(sessions: unknown[]): RawSession[] {
   return sessions.map((raw) => {
     const s = raw as { name?: unknown; event?: unknown; practice?: unknown; solves: Record<string, unknown>[] };
     const event = typeof s.event === 'string' && isEventId(s.event) ? s.event : '333';

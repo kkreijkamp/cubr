@@ -1,4 +1,4 @@
-import { HttpError, unavailable } from '@cubetype/common';
+import { HttpError, unavailable } from '@cubr/common';
 
 /** A scramble did not finish (queue wait + search) within SCRAMBLE_TIMEOUT_MS. */
 export class GenerationTimeoutError extends Error {

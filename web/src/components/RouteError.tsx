@@ -15,7 +15,7 @@ export function RouteError() {
   if (reloading) return <Loading label="loading the new version" />;
   return (
     <div className="empty stack" style={{ justifyItems: 'center', paddingTop: '4rem' }}>
-      <div className="sub">{stale ? 'cubetype was just updated.' : 'something went wrong.'}</div>
+      <div className="sub">{stale ? 'cubr was just updated.' : 'something went wrong.'}</div>
       {!stale && error instanceof Error && <div className="error">{error.message}</div>}
       <button className="btn" onClick={() => location.reload()}>
         reload

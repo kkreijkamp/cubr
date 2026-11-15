@@ -24,7 +24,7 @@ rank?" estimator, result distributions for charts, and person lookup.
 **Units.** WCA centiseconds x 10 -> `value` in **ms** for timed events; 333fm in **moves**
 (`unit: "moves"`; averages are stored x100 in the export and divided here, e.g. `24.67`).
 The `value` query parameter of `/rank` uses the same units (integer ms, or moves for 333fm).
-Only the 16 cubetype events are served (333mbf and retired events -> 404).
+Only the 16 cubr events are served (333mbf and retired events -> 404).
 
 **Response details.** Every object with `countryId` also has `countryIso2` (for flag emojis);
 neighbours carry `personName` as well as `name`; rank, distribution, records and person PBs carry
@@ -69,7 +69,7 @@ Standard (`PORT`, `DATABASE_URL`, `REDIS_URL`, `INTERNAL_API_TOKEN`, `LOG_LEVEL`
 ## Local run
 ```
 docker compose up -d postgres redis      # then load the export: docker compose --profile jobs run --rm wca-import
-PORT=8081 DATABASE_URL=postgres://cubetype:cubetype@localhost:55433/cubetype \
+PORT=8081 DATABASE_URL=postgres://cubr:cubr@localhost:55433/cubr \
   REDIS_URL=redis://localhost:56380 npx tsx services/wca/src/index.ts
 curl 'localhost:8081/api/wca/rank?event=333&kind=single&value=12000&country=AU'
 ```

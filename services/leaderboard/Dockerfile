@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Build context = repo root:  docker build -f services/leaderboard/Dockerfile -t cubetype/leaderboard:dev .
+# Build context = repo root:  docker build -f services/leaderboard/Dockerfile -t cubr/leaderboard:dev .
 # ---- build stage: runs natively on the build machine; output is architecture-independent JS
 FROM --platform=$BUILDPLATFORM node:22-alpine AS build
 WORKDIR /repo

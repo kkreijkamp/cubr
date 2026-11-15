@@ -1,5 +1,5 @@
-import { parse, requireInternal, type Pool } from '@cubetype/common';
-import { isEventId } from '@cubetype/cubestats';
+import { parse, requireInternal, type Pool } from '@cubr/common';
+import { isEventId } from '@cubr/cubestats';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { PB_KINDS, type PbKind } from '../domain/pbs.js';

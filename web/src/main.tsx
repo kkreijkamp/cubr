@@ -1,3 +1,4 @@
+import './lib/legacyStorageBoot'; // first: moves pre-rename (cubetype.*) browser data before anything reads it
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@fontsource/lexend-deca/400.css';

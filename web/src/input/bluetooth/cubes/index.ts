@@ -1,4 +1,4 @@
-// Every smart cube cubetype knows, as one bluetooth group (csTimer's GiikerCube).
+// Every smart cube cubr knows, as one bluetooth group (csTimer's GiikerCube).
 import { BtGroup } from '../device';
 import type { CubeCtx } from './context';
 import { ganCube } from './gan';

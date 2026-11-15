@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { parse, requireInternal } from '@cubetype/common';
+import { parse, requireInternal } from '@cubr/common';
 import type { RouteContext } from '../context.js';
 import { internalParams, internalQuery } from '../schemas.js';
 

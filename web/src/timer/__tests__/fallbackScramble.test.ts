@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EVENT_IDS } from '@cubetype/cubestats';
+import { EVENT_IDS } from '@cubr/cubestats';
 import { clockScramble, cubeScramble, fallbackScramble, megaminxScramble, pyraminxScramble, skewbScramble, square1Scramble } from '../fallbackScramble';
 
 function seeded(seed: number) {

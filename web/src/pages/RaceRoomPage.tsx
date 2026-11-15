@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeftIcon, ArrowRightStartOnRectangleIcon, FlagIcon, ForwardIcon, LinkIcon, PencilIcon, SignalSlashIcon } from '@heroicons/react/24/outline';
-import { getEvent, formatTime, type Penalty } from '@cubetype/cubestats';
+import { getEvent, formatTime, type Penalty } from '@cubr/cubestats';
 import { useAuth } from '../lib/auth';
 import { useSettings } from '../lib/settings';
 import { useRegisterCommands } from '../lib/commands';
@@ -70,7 +70,7 @@ export default function RaceRoomPage() {
   const [pending, setPending] = useState<Pending | null>(null);
   const [busy, setBusy] = useState(false);
   const [nickOpen, setNickOpen] = useState(false);
-  const [saveSolves, setSaveSolves] = useStoredState<boolean>('cubetype.race.saveSolves', false);
+  const [saveSolves, setSaveSolves] = useStoredState<boolean>('cubr.race.saveSolves', false);
   const solveRound = useRef<number | null>(null);
   const saveWarned = useRef(false);
 

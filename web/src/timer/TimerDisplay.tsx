@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
-import { formatTime, type Precision } from '@cubetype/cubestats';
+import { formatTime, type Precision } from '@cubr/cubestats';
 import type { TimerState } from './useTimerEngine';
 import { INSPECTION_MS } from './useTimerEngine';
 import type { TimerUpdate } from '../lib/settings';

@@ -458,7 +458,7 @@ export function ganCube(): BtModel<CubeCtx> & { battery(): Promise<number | null
   };
 
   async function listen(read: BluetoothRemoteGATTCharacteristic | null) {
-    if (!read) throw new Error("this GAN cube doesn't answer the way cubetype expects");
+    if (!read) throw new Error("this GAN cube doesn't answer the way cubr expects");
     listening = read;
     read.addEventListener('characteristicvaluechanged', onNotify);
     await read.startNotifications();
@@ -524,7 +524,7 @@ export function ganCube(): BtModel<CubeCtx> & { battery(): Promise<number | null
         version = 1;
         await v1init(services);
       } else {
-        throw new Error("this GAN cube isn't one cubetype knows");
+        throw new Error("this GAN cube isn't one cubr knows");
       }
       void group;
       void device;

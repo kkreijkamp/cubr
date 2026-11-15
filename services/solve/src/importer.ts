@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { PoolClient } from '@cubetype/common';
+import type { PoolClient } from '@cubr/common';
 import type { ImportBody } from './schemas.js';
 
 /** Rows per INSERT statement. ~2000 keeps each statement's parameter arrays at a few hundred KB. */

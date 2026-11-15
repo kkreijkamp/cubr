@@ -1,5 +1,5 @@
 {
-  "name": "@cubetype/solve",
+  "name": "@cubr/solve",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -8,8 +8,8 @@
     "build": "node ../../scripts/build-service.mjs ."
   },
   "dependencies": {
-    "@cubetype/common": "*",
-    "@cubetype/cubestats": "*",
+    "@cubr/common": "*",
+    "@cubr/cubestats": "*",
     "fastify": "^5.12.7",
     "zod": "^3.25.76",
     "ioredis": "^5.11.1",

@@ -18,7 +18,7 @@ import {
   unauthorized,
   unavailable,
   withTx,
-} from '@cubetype/common';
+} from '@cubr/common';
 import type { Deps } from './index.js';
 import {
   SETTINGS_MAX_BYTES,

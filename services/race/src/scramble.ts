@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { fetchJson } from '@cubetype/common';
+import { fetchJson } from '@cubr/common';
 import type { FastifyBaseLogger } from 'fastify';
 import type { ScrambleSource } from './types.js';
 
