@@ -114,6 +114,3 @@ csTimer (inspiration for timer behaviour and statistics), Monkeytype (design lan
 palettes), cubing.js (scrambles and previews, MPL-2.0/GPL-3.0). This information is based on
 competition results owned and maintained by the World Cube Association, published at
 https://worldcubeassociation.org/results.
-
-## AI USAGE
-Throughout the project, I used assistence from claude opus 4.8 (through claude code) in order to test, and to help generate test files, as well as assisting with deployment issues I faced. I also used claude to help come up with the initial design, and much of the architecture was influenced under claude's advice. That said, I oversaw all of claude's actions, and am confident in my understanding of everything produced.
