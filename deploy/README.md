@@ -3,7 +3,7 @@
 This folder holds everything needed to run cubr outside a developer's editor:
 
 - a **docker compose** stack for local development;
-- **GKE Standard** in `infs3208-a2-koen` / `australia-southeast1-a` for the real deployment.
+- **GKE Standard** in `cubr-app` / `australia-southeast1-a` when one VM is no longer enough (production runs on one VM today, see `deploy/vps/README.md`). The INFS3208 deployment ran in project `infs3208-a2-koen`, deleted on 2026-11-16.
 
 Both use the same container images and the same routing table.
 
@@ -117,11 +117,11 @@ Run `scripts/commands.sh` section by section (`scripts/commands.sh list` prints 
 
 | section  | Step |
 |---|---|
-| 0 | Variables (`PROJECT_ID=infs3208-a2-koen`, `ZONE=australia-southeast1-a`, `CLUSTER=cubr`, `REPO=cubr`, `VERSION=1.1.2`) |
+| 0 | Variables (`PROJECT_ID=cubr-app`, `ZONE=australia-southeast1-a`, `CLUSTER=cubr`, `REPO=cubr`, `VERSION=1.1.3`) |
 | 1 | `gcloud auth list`, select `koen@mangotree.info`, set project/region/zone |
 | 2 | Enable container, artifactregistry, cloudbuild and compute APIs |
 | 3 | Artifact Registry repo. IAM: nodes get `artifactregistry.reader` and `container.defaultNodeServiceAccount`; the build SA gets `artifactregistry.writer`, `logging.logWriter` and `storage.objectViewer`. |
-| 4 | `gcloud builds submit --config cloudbuild.yaml --substitutions _VERSION=1.1.2,...` (10 images in parallel, native amd64) |
+| 4 | `gcloud builds submit --config cloudbuild.yaml --substitutions _VERSION=1.1.3,...` (10 images in parallel, native amd64) |
 | 5 | `gcloud container clusters create` (3x e2-standard-2, autoscaling 3-5, 30 GB pd-balanced, regular channel, VPC-native) + `get-credentials` |
 | 6 | Reserve the global static IP `cubr-ip` |
 | 7 | Install CloudNativePG 1.30.1 (server-side apply) and wait for the operator |
@@ -133,7 +133,7 @@ Run `scripts/commands.sh` section by section (`scripts/commands.sh list` prints 
 
 To release a new version permanently: commit (the pre-commit hook bumps the version in every deploy file and the commit is tagged `vX.Y.Z`; enable the hooks once per clone with `git config core.hooksPath .githooks`, and see `scripts/bump-version.sh` for the details), build that version with section 4, then apply it with section 9. Don't edit `newTag` by hand, and always build before applying: until section 4 has run, the overlay names images that don't exist yet. `kubectl set image` is for the demo; a later `kubectl apply -k` reverts to the overlay's tag.
 
-**Verified on GKE** (first deploy to `infs3208-a2-koen`, Kubernetes 1.36.4, 3x e2-standard-2):
+**Verified on GKE** (first deploy to `infs3208-a2-koen`, since deleted; Kubernetes 1.36.4, 3x e2-standard-2):
 
 - Cloud Build: all 10 images in about 2-2.5 min.
 - First deploy: the Ingress got its address after about 17 min (Google configures the 8 backend services one after another, about 90 s each), and the load balancer answered 3 min later, with all 8 backends `HEALTHY`.
@@ -147,7 +147,7 @@ To release a new version permanently: commit (the pre-commit hook bumps the vers
 |---|---|
 | Ingress answers **404 / 502** for 5-10 min after deploy | The Google LB is still being programmed and health checks are warming up. Check `kubectl -n cubr describe ingress cubr` until the `ingress.kubernetes.io/backends` annotation shows `HEALTHY` everywhere. BackendConfigs probe `/readyz:8080`, so a backend whose Postgres/Redis is down stays unhealthy on purpose. |
 | A single backend permanently `UNHEALTHY` | `kubectl -n cubr logs deploy/<svc>` and `curl` its `/readyz` via `kubectl port-forward`. BackendConfig changes can take minutes to sync. |
-| **ImagePullBackOff** with 403 on GKE | The node SA can't read Artifact Registry: re-run the `artifactregistry.reader` binding (section 3). Check the image path `australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubr/<svc>:<tag>` exists (`gcloud artifacts docker images list ...`). |
+| **ImagePullBackOff** with 403 on GKE | The node SA can't read Artifact Registry: re-run the `artifactregistry.reader` binding (section 3). Check the image path `australia-southeast1-docker.pkg.dev/cubr-app/cubr/<svc>:<tag>` exists (`gcloud artifacts docker images list ...`). |
 | `exec format error` | arm64 image on amd64 nodes. Build with Cloud Build or `scripts/build-push.sh` (`--platform linux/amd64`). |
 | Cloud Build: permission denied pushing / writing logs | The build SA lacks `artifactregistry.writer` / `logging.logWriter` (section 3). New projects build as the Compute default SA. |
 | `failed calling webhook "...cnpg.io"` when applying | The CNPG operator isn't ready yet: `kubectl rollout status deployment/cnpg-controller-manager -n cnpg-system`, then re-apply. On private-node clusters, open TCP 9443 from the control plane. |
@@ -165,7 +165,7 @@ To release a new version permanently: commit (the pre-commit hook bumps the vers
 - In **both terminals**, start `bash`: zsh on macOS has `interactivecomments` off, so every pasted comment line would print `command not found: #`. Then paste the variables and the `ingress_ip` helper that the `scripts/commands.sh` sections use. Without them, `$REGISTRY` is empty and the rollout's `set image ... web=$REGISTRY/web:1.1.0` becomes `web=/web:1.1.0`, an invalid image name. Don't `source scripts/commands.sh` instead: its `set -euo pipefail` would close the terminal at the first failing command.
   ```bash
   # Same values as the variable block at the top of scripts/commands.sh.
-  export PROJECT_ID=infs3208-a2-koen REGION=australia-southeast1 REPO=cubr NS=cubr
+  export PROJECT_ID=cubr-app REGION=australia-southeast1 REPO=cubr NS=cubr
   export REGISTRY="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO"
   # Prints the Ingress's public IP; -o jsonpath extracts only that field.
   ingress_ip() { kubectl -n "$NS" get ingress cubr -o jsonpath='{.status.loadBalancer.ingress[0].ip}'; }

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================================
 # cubr -- every command used to build, deploy, demonstrate and tear down cubr on
-# Google Kubernetes Engine (GKE Standard, project infs3208-a2-koen, zone australia-southeast1-a).
+# Google Kubernetes Engine (GKE Standard, project cubr-app, zone australia-southeast1-a).
 #
 # HOW TO USE
 #   This file is organised in numbered sections (0-15) that are meant to be executed IN ORDER,
@@ -25,25 +25,22 @@ cd "$(dirname "$0")/.."                 # all relative paths below are relative 
 # =============================================================================================
 # 0. Variables (used by every section)
 # =============================================================================================
-PROJECT_ID="infs3208-a2-koen"           # Google Cloud project
+PROJECT_ID="cubr-app"                   # Google Cloud project (production; the INFS3208 one was deleted)
 ACCOUNT="koen@mangotree.info"           # Google account that owns / is Owner of the project
 REGION="australia-southeast1"           # Sydney: Artifact Registry + Cloud Build region
 ZONE="australia-southeast1-a"           # zonal cluster = free GKE management fee (free tier)
 CLUSTER="cubr"                          # GKE cluster name
 REPO="cubr"                             # Artifact Registry Docker repository name
-VERSION="1.1.2"                         # release being deployed (image tag + APP_VERSION)
+VERSION="1.1.3"                         # release being deployed (image tag + APP_VERSION)
 NS="cubr"                               # Kubernetes namespace of the app
-REGISTRY="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO"   # full image prefix, e.g. $REGISTRY/web:1.1.2
+REGISTRY="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO"   # full image prefix, e.g. $REGISTRY/web:1.1.3
 CNPG_VERSION="1.30.1"                   # CloudNativePG (PostgreSQL operator) release
 DEPLOYMENTS="auth scramble solve stats leaderboard race wca web"
 
-# Legacy names: the INFS3208 deployment in this project predates the cubetype -> cubr rename
-# (2026-11) and still runs under the OLD names: cluster "cubetype", namespace "cubetype",
-# Artifact Registry repo "cubetype", global IP "cubetype-ip". Section 15 uses the new names, so
-# to remove that old deployment, run its clean-up commands with the old names instead, e.g.
-#   gcloud container clusters delete cubetype --zone="$ZONE" --quiet
-#   gcloud compute addresses delete cubetype-ip --global --quiet
-#   gcloud artifacts repositories delete cubetype --location="$REGION" --quiet
+# History: the INFS3208 deployment (old names: cluster, namespace and registry "cubetype",
+# global IP "cubetype-ip") ran in project infs3208-a2-koen, which was deleted on 2026-11-16.
+# Production now runs on one VM in cubr-app (deploy/vps/README.md); this script is the path to
+# GKE in that project once one VM is no longer enough.
 
 # Prints the public IP of the GKE Ingress (empty until Google has provisioned the load balancer).
 ingress_ip() {

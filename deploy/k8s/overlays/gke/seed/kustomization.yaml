@@ -6,5 +6,5 @@ resources:
   - ../../../jobs/seed
 images:
   - name: cubr/seed
-    newName: australia-southeast1-docker.pkg.dev/infs3208-a2-koen/cubr/seed
-    newTag: "1.1.2"
+    newName: australia-southeast1-docker.pkg.dev/cubr-app/cubr/seed
+    newTag: "1.1.3"
