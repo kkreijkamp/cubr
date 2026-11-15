@@ -17,35 +17,34 @@ resources:
 # bumps it (scripts/bump-version.sh, run by .githooks/pre-commit) and is tagged vX.Y.Z, so don't
 # edit them by hand and never reuse one: images are pulled IfNotPresent, so nodes would keep
 # running the old image under a reused tag.
-# For the rollout demo use `kubectl set image` instead (scripts/commands.sh section 14).
 images:
   - name: cubr/auth
     newName: australia-southeast1-docker.pkg.dev/cubr-app/cubr/auth
-    newTag: "1.1.3"
+    newTag: "1.1.4"
   - name: cubr/scramble
     newName: australia-southeast1-docker.pkg.dev/cubr-app/cubr/scramble
-    newTag: "1.1.3"
+    newTag: "1.1.4"
   - name: cubr/solve
     newName: australia-southeast1-docker.pkg.dev/cubr-app/cubr/solve
-    newTag: "1.1.3"
+    newTag: "1.1.4"
   - name: cubr/stats
     newName: australia-southeast1-docker.pkg.dev/cubr-app/cubr/stats
-    newTag: "1.1.3"
+    newTag: "1.1.4"
   - name: cubr/leaderboard
     newName: australia-southeast1-docker.pkg.dev/cubr-app/cubr/leaderboard
-    newTag: "1.1.3"
+    newTag: "1.1.4"
   - name: cubr/race
     newName: australia-southeast1-docker.pkg.dev/cubr-app/cubr/race
-    newTag: "1.1.3"
+    newTag: "1.1.4"
   - name: cubr/wca
     newName: australia-southeast1-docker.pkg.dev/cubr-app/cubr/wca
-    newTag: "1.1.3"
+    newTag: "1.1.4"
   - name: cubr/web
     newName: australia-southeast1-docker.pkg.dev/cubr-app/cubr/web
-    newTag: "1.1.3"
+    newTag: "1.1.4"
   - name: cubr/wca-import
     newName: australia-southeast1-docker.pkg.dev/cubr-app/cubr/wca-import
-    newTag: "1.1.3"
+    newTag: "1.1.4"
 
 patches:
   # Behind the Google load balancer X-Forwarded-For is "<client-ip>, <lb-ip>" -> trust 2 hops.

@@ -50,7 +50,7 @@ spec:
               value: "650"
             - name: SEED_CONCURRENCY    # users seeded in parallel
               value: "6"
-            - name: SEED_DEMO_USER      # presentation account
+            - name: SEED_DEMO_USER      # demo account
               value: demo
             - name: SEED_DEMO_PASSWORD
               value: cubr-demo

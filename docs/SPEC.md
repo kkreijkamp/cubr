@@ -1,7 +1,8 @@
 # cubr - system specification
 
 > cubr = csTimer's speedcubing functionality + Monkeytype's polish, delivered as a
-> cloud-native microservice application on Kubernetes (GKE). INFS3208 Type I project.
+> cloud-native microservice application: one VM behind Cloudflare in production, Kubernetes
+> (GKE) manifests for scaling out.
 
 This document describes the design of cubr: the repository layout, the services and what each
 of them owns, the database schemas, the domain events and the HTTP contracts between the services
@@ -32,15 +33,12 @@ cubr/
   web/                        # React 18 + Vite + TypeScript SPA, served by nginx (own package.json, not a workspace)
   deploy/
     gateway/nginx.conf        # compose gateway mimicking the K8s Ingress routes
-    k8s/                      # Kubernetes manifests (kustomize): base/, overlays/gke/, jobs/{seed,loadgen}/
-    cloudbuild/               # Cloud Build for a single image (rollout demo)
+    k8s/                      # Kubernetes manifests (kustomize): base/, overlays/gke/, jobs/seed/
   scripts/
     build-service.mjs         # esbuild bundler: node scripts/build-service.mjs services/auth
     smoke.mjs                 # end-to-end check through any entry point: node scripts/smoke.mjs <baseUrl>
-    build-push.sh             # alternative to Cloud Build: docker buildx --platform linux/amd64 --push
-    commands.sh               # every deploy/demo command, each with a comment (marking requirement)
-    package-submission.sh     # builds the submission archive
-  docs/                       # SPEC.md (this file), proposal/
+    commands.sh               # every GKE command, each with a comment
+  docs/                       # SPEC.md (this file)
 ```
 
 Each service folder: `src/index.ts` (entry), `src/routes/*.ts`, `src/migrations.ts` (if it owns a

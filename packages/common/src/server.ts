@@ -117,7 +117,7 @@ export function createServer(config: BaseConfig, opts: ServerOptions): Server {
   const allChecks = { ...checks, ...(opts.softChecks ?? {}) };
   const infoHandler = async () => {
     // The service's extra fields may query a dependency too. Run them alongside the checks and
-    // under the same deadline (left out if late), so _info answers within ~2 s: the status page
+    // under the same deadline (left out if late), so _info answers within ~2 s: a caller
     // gives up after 2.5 s and would show "timeout" instead of which dependency is down.
     const [entries, extra] = await Promise.all([
       Promise.all(Object.entries(allChecks).map(async ([name, fn]) => [name, await runCheck(fn)] as const)),

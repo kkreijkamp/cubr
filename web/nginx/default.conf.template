@@ -24,7 +24,7 @@ server {
     return 200 '{"status":"ready"}';
   }
 
-  # which pod/version served this request - used by the in-app cluster status page
+  # which pod/version served this request - handy when debugging load balancing
   location = /_info {
     access_log off;
     default_type application/json;

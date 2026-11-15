@@ -1,8 +1,8 @@
 # HorizontalPodAutoscalers (autoscaling/v2): add/remove pods based on average CPU usage
 # relative to the pod's CPU *request* (e.g. scramble requests 250m, target 60% => scale out when
 # pods average > 150m). metrics-server provides the numbers (pre-installed on GKE).
-# The behavior block is tuned for a live demo: scale up immediately (no stabilization, up to
-# +100% or +2 pods every 15 s), scale down after only 60 s of low load (default is 300 s).
+# The behavior block scales up immediately (no stabilization, up to +100% or +2 pods every 15 s)
+# and back down after only 60 s of low load (the default is 300 s; raise it for steadier traffic).
 # NOTE: these Deployments have no spec.replicas (the HPA owns the count; a fresh Deployment starts
 # with 1 pod and the HPA raises it to minReplicas within seconds). Change capacity via min/max
 # here, not with `kubectl scale` (the HPA would undo it).
@@ -27,7 +27,7 @@ spec:
         name: cpu
         target:
           type: Utilization
-          averageUtilization: 60       # % of the CPU request -- CPU-bound scramble generation, the HPA demo target
+          averageUtilization: 60       # % of the CPU request -- CPU-bound scramble generation, the main scale-out target
   behavior:
     scaleUp:
       stabilizationWindowSeconds: 0     # react at once

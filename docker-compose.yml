@@ -193,7 +193,7 @@ services:
       SEED_USERS: ${SEED_USERS:-150}             # synthetic users (+1 demo account)
       SEED_AVG_SOLVES: ${SEED_AVG_SOLVES:-650}   # average history per user (~100k solves total)
       SEED_CONCURRENCY: ${SEED_CONCURRENCY:-6}   # users seeded in parallel
-      SEED_DEMO_USER: demo                       # presentation account
+      SEED_DEMO_USER: demo                       # demo account (local data)
       SEED_DEMO_PASSWORD: cubr-demo
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-dev-internal-token-0123456789}   # must match auth's
     depends_on:

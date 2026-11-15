@@ -75,7 +75,7 @@ function Header() {
   );
 }
 
-/** The source code (a private repository: it opens for the people who have access). */
+/** The source code on GitHub. */
 const REPO_URL = 'https://github.com/kkreijkamp/cubr';
 
 function Footer() {
@@ -97,7 +97,7 @@ function Footer() {
         <Link to="/about" className="btn-text">
           <InformationCircleIcon width={14} height={14} /> about
         </Link>
-        <a href={REPO_URL} className="btn-text" target="_blank" rel="noreferrer noopener" data-tip="source code (private repo)">
+        <a href={REPO_URL} className="btn-text" target="_blank" rel="noreferrer noopener" data-tip="source code">
           <CodeBracketIcon width={14} height={14} /> github
         </a>
       </div>

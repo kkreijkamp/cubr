@@ -264,7 +264,7 @@ function makeUsers(): SeedUser[] {
       activity: 0.15 + rand() * 0.7,
     });
   }
-  // the demo account used in the presentation: a committed sub-15 cuber with lots of history
+  // the demo account: a committed sub-15 cuber with lots of history
   users.unshift({
     username: DEMO_USER,
     email: `${DEMO_USER}@cubr.dev`,

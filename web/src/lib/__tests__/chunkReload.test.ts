@@ -27,10 +27,10 @@ afterEach(() => {
 
 describe('isChunkLoadError', () => {
   it.each([
-    'Failed to fetch dynamically imported module: http://x/assets/StatusPage-a1b2.js', // Chrome
-    'error loading dynamically imported module: http://x/assets/StatusPage-a1b2.js', // Firefox
+    'Failed to fetch dynamically imported module: http://x/assets/AboutPage-a1b2.js', // Chrome
+    'error loading dynamically imported module: http://x/assets/AboutPage-a1b2.js', // Firefox
     'Importing a module script failed.', // Safari
-    'Unable to preload CSS for /assets/StatusPage-a1b2.css', // Vite
+    'Unable to preload CSS for /assets/AboutPage-a1b2.css', // Vite
   ])('recognises "%s"', (message) => {
     expect(isChunkLoadError(new TypeError(message))).toBe(true);
   });
