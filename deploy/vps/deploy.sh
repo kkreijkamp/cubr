@@ -1,12 +1,12 @@
 #!/bin/bash
 # Deploys cubr to the production VM over IAP SSH (no public SSH port needed).
 #   deploy/vps/deploy.sh init        once: create /opt/cubr/.env with fresh random secrets
-#   deploy/vps/deploy.sh [version]   copy the compose files + gateway config to /opt/cubr, pull
-#                                    the images for that version (default: the repo's current
-#                                    version, scripts/bump-version.sh --current) from Artifact
+#   deploy/vps/deploy.sh <version>   deploy a release: copy the compose files + gateway config
+#                                    from its tag to /opt/cubr, pull its images from Artifact
 #                                    Registry, then set CUBR_VERSION and (re)start the stack
-# Images for a version are built and pushed first with:
-#   gcloud builds submit --config=cloudbuild.yaml --ignore-file=.dockerignore --region=australia-southeast1 .
+# Only releases merged to main run in production: the version's tag must be on origin/main, and
+# everything copied to the VM comes from that tag, not from the working tree. Normally you run
+# deploy/vps/release.sh, which builds the images from the tag first and then calls this.
 # Settings (env): CUBR_VM (cubr-1), CUBR_ZONE (australia-southeast1-a), CUBR_GCLOUD_CONFIG (cubr).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -33,16 +33,22 @@ if [ "${1:-}" = "init" ]; then
   exit 0
 fi
 
-VERSION="${1:-$(scripts/bump-version.sh --current)}"
-[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "not a version: '${VERSION}'" >&2; exit 1; }
+VERSION="${1:-}"
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "usage: deploy.sh <version>, e.g. 1.1.0 (got '${VERSION}')" >&2; exit 1; }
+TAG="v${VERSION}"
+git fetch -q origin main --tags 2>/dev/null \
+  || echo "warning: couldn't fetch origin, checking the last fetched copy of main" >&2
+git rev-parse -q --verify "refs/tags/${TAG}^{commit}" >/dev/null || { echo "no tag ${TAG}" >&2; exit 1; }
+git merge-base --is-ancestor "$TAG" origin/main \
+  || { echo "${TAG} is not on main: only releases merged to main may run in production" >&2; exit 1; }
 gcloud artifacts docker images describe "${REGISTRY_HOST}/cubr-app/cubr/web:${VERSION}" --configuration "$CONF" >/dev/null 2>&1 \
-  || { echo "no images for ${VERSION} in Artifact Registry: build them first (see the header)" >&2; exit 1; }
-echo "deploying cubr ${VERSION} to ${VM}"
+  || { echo "no images for ${VERSION} in Artifact Registry: build them with deploy/vps/release.sh" >&2; exit 1; }
+echo "deploying cubr ${VERSION} (${TAG} on main) to ${VM}"
 
-# 1. compose files, gateway config, backup script and systemd timers, laid out like the repo so
-#    relative paths keep working; (re)install the timers (nightly backup, weekly WCA import)
-COPYFILE_DISABLE=1 tar --no-xattrs -czf - docker-compose.yml deploy/vps/compose.prod.yml deploy/gateway/nginx.conf \
-    deploy/vps/backup.sh deploy/vps/systemd \
+# 1. compose files, gateway config, backup script and systemd timers from the release tag, laid out
+#    like the repo so relative paths keep working; (re)install the timers (backup, WCA import)
+git archive --format=tar "$TAG" docker-compose.yml deploy/vps/compose.prod.yml deploy/gateway/nginx.conf \
+    deploy/vps/backup.sh deploy/vps/systemd | gzip \
   | on_vm 'set -e; test -f /opt/cubr/.env || { echo "no /opt/cubr/.env: run deploy.sh init first" >&2; exit 1; }
       tar -xzf - -C /opt/cubr
       sudo install -m 644 /opt/cubr/deploy/vps/systemd/cubr-* /etc/systemd/system/

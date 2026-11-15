@@ -10,22 +10,32 @@ visitor --HTTPS--> Cloudflare edge --tunnel--> cloudflared --> gateway (nginx) -
                                                 (VM, compose network; Postgres + Redis on the VM)
 ```
 
-Files here: `bootstrap.sh` (host setup), `compose.prod.yml` (production override of
-`docker-compose.yml`), `deploy.sh` (copy + pull + restart), `.env.example` (what `/opt/cubr/.env`
-holds). The hosting decision and costs are in `A4/cubetype-aws-migration-2026-11-15.md` section 9.
+Files here:
+- `bootstrap.sh`: host setup.
+- `compose.prod.yml`: production override of `docker-compose.yml`.
+- `release.sh`: build a release from its tag, then deploy it.
+- `deploy.sh`: copy, pull and restart.
+- `.env.example`: what `/opt/cubr/.env` holds.
 
-## Everyday: ship a new version
+The hosting decision and costs are in `A4/cubetype-aws-migration-2026-11-15.md` section 9.
 
-```sh
-git push                                   # commit first: hooks bump the version + tag
-gcloud builds submit --configuration=cubr --config=cloudbuild.yaml \
-  --ignore-file=.dockerignore --region=australia-southeast1 .     # ~2 min, pushes all images
-deploy/vps/deploy.sh                       # defaults to the current version (scripts/bump-version.sh --current)
-```
+## Everyday: ship a release (only `main` runs in production)
 
-`deploy.sh` copies the compose files and gateway config to `/opt/cubr`, sets `CUBR_VERSION`,
-pulls and restarts what changed, waits for health checks, then checks the gateway. Roll back by
-passing an older version: `deploy/vps/deploy.sh 1.0.82`.
+Work happens on `dev`; every commit gets a patch version and tag from the hooks. A release:
+
+1. Bump the version on `dev`: `scripts/bump-version.sh 1.2.0`, then add the patch notes for it in
+   `web/src/content/patchNotes.ts` and commit. The hooks tag it `v1.2.0`.
+2. Open a pull request `dev` → `main` and merge it with a merge commit, so the tag lands on main.
+3. `deploy/vps/release.sh` (~3 min).
+
+`release.sh` refuses any version whose tag isn't on `origin/main`, builds the images on Cloud
+Build from the tag itself (`git archive`, never the working tree), then runs `deploy.sh`.
+`deploy.sh` makes the same main-only check, copies the compose files and gateway config from the
+tag to `/opt/cubr`, pulls the images, sets `CUBR_VERSION`, restarts what changed, waits for the
+health checks, then checks the gateway.
+
+Roll back to an earlier release with `deploy/vps/deploy.sh 1.1.0`. Its images are still in
+Artifact Registry; if they aren't, use `release.sh 1.1.0`.
 
 ## Operating
 
