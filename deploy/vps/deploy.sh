@@ -35,9 +35,15 @@ fi
 VERSION="${1:-$(node -p "require('./package.json').version")}"
 echo "deploying cubr ${VERSION} to ${VM}"
 
-# 1. compose files + gateway config, laid out like the repo so relative paths keep working
+# 1. compose files, gateway config, backup script and systemd timers, laid out like the repo so
+#    relative paths keep working; (re)install the timers (nightly backup, weekly WCA import)
 COPYFILE_DISABLE=1 tar --no-xattrs -czf - docker-compose.yml deploy/vps/compose.prod.yml deploy/gateway/nginx.conf \
-  | on_vm 'set -e; test -f /opt/cubr/.env || { echo "no /opt/cubr/.env: run deploy.sh init first" >&2; exit 1; }; tar -xzf - -C /opt/cubr'
+    deploy/vps/backup.sh deploy/vps/systemd \
+  | on_vm 'set -e; test -f /opt/cubr/.env || { echo "no /opt/cubr/.env: run deploy.sh init first" >&2; exit 1; }
+      tar -xzf - -C /opt/cubr
+      sudo install -m 644 /opt/cubr/deploy/vps/systemd/cubr-* /etc/systemd/system/
+      sudo systemctl daemon-reload
+      sudo systemctl enable --now cubr-backup.timer cubr-wca-import.timer 2>/dev/null'
 
 # 2. version, registry login (VM service account), pull, start, wait for health
 on_vm "set -e; cd /opt/cubr

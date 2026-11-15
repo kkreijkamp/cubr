@@ -42,6 +42,26 @@ The gateway is also on the VM's `127.0.0.1:8080`, so `curl http://127.0.0.1:8080
 works over SSH. Docker restarts crashed containers and starts the stack on boot
 (`restart: unless-stopped`).
 
+## Backups and scheduled jobs
+
+systemd timers on the VM (installed by `deploy.sh`):
+- **`cubr-backup.timer`, nightly 02:30 Brisbane.** Runs `backup.sh`: a `pg_dump` of everything
+  except the WCA schemas, checked with `pg_restore --list`, then copied to
+  `gs://cubr-app-backups/postgres/` (Melbourne). Copies are deleted after 30 days. The VM can
+  add and read backups but not delete them.
+- **`cubr-wca-import.timer`, Mondays 04:00 Brisbane.** Refreshes the WCA export (~3 min).
+
+```sh
+systemctl list-timers 'cubr-*'                         # next runs
+sudo systemctl start cubr-backup.service               # back up now
+journalctl -u cubr-backup.service -n 20                # last result
+gcloud storage ls -l gs://cubr-app-backups/postgres/   # what's stored
+```
+
+Restore: copy a dump to the VM, then
+`$C exec -T postgres pg_restore -U cubr -d cubr --clean --if-exists < cubr-<date>.dump`,
+and run the WCA import.
+
 ## How the pieces fit
 
 - **Secrets** live only in `/opt/cubr/.env` (mode 600): `deploy.sh init` generated the Postgres

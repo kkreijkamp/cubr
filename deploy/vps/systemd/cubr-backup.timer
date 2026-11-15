@@ -1,0 +1,10 @@
+[Unit]
+Description=cubr: nightly Postgres backup
+
+[Timer]
+OnCalendar=*-*-* 02:30 Australia/Brisbane
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
