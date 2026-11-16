@@ -96,6 +96,9 @@ export const importBody = z
 export type ImportBody = z.infer<typeof importBody>;
 
 export const dailyQuery = z.object({ date: ymd.optional() });
+export const dailyHistoryQuery = z.object({
+  event: z.string().refine((e) => DAILY_EVENTS.includes(e), { message: 'no daily challenge for this event' }),
+});
 
 export const internalParams = z.object({ userId: uuid });
 export const internalQuery = z.object({ event: eventId.optional() });

@@ -98,6 +98,15 @@ export interface ActivityDay {
   totalMs: number;
 }
 
+/** One UTC day of your daily challenges in one event (GET /api/solves/daily/history). */
+export interface DailyDay {
+  date: string;
+  /** attempts made, 1-5 */
+  attempts: number;
+  /** the official ao5 in ms, -1 = DNF, null until all five attempts exist */
+  ao5: number | null;
+}
+
 export interface GlobalStats {
   users: number;
   solves: number;

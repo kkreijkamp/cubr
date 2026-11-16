@@ -1,6 +1,6 @@
 // Thin typed client for every cubr microservice. All calls are same-origin paths that the
 // Ingress (cloud) or gateway (local) routes to the right service - see docs/SPEC.md section 3.
-import type { ActivityDay, GlobalStats, Leaderboard, LbKind, PbKind, Penalty, PrivateUser, PublicUser, RaceRoomSummary, ServiceInfo, Session, Solve, StatsSummary, UserRank, WcaDistribution, WcaMeta, WcaPerson, WcaPersonSummary, WcaRank, WcaRecord, OAuthProvider, SignInMethods } from './types';
+import type { ActivityDay, DailyDay, GlobalStats, Leaderboard, LbKind, PbKind, Penalty, PrivateUser, PublicUser, RaceRoomSummary, ServiceInfo, Session, Solve, StatsSummary, UserRank, WcaDistribution, WcaMeta, WcaPerson, WcaPersonSummary, WcaRank, WcaRecord, OAuthProvider, SignInMethods } from './types';
 
 export class ApiError extends Error {
   constructor(
@@ -253,6 +253,8 @@ export const api = {
       request<{ exportedAt: string; sessions: (Session & { solves: Solve[] })[] }>('GET', '/api/solves/export', undefined, { timeoutMs: 120_000 }),
     daily: (date?: string) =>
       get<{ date: string; events: Record<string, { solves: Solve[]; ao5: number | null }> }>(`/api/solves/daily${qs({ date })}`),
+    /** every day you did this event's daily challenge, oldest first */
+    dailyHistory: (event: string, signal?: AbortSignal) => get<{ event: string; days: DailyDay[] }>(`/api/solves/daily/history${qs({ event })}`, signal),
   },
   stats: {
     summary: (userId: string, signal?: AbortSignal) => get<StatsSummary>(`/api/stats/users/${enc(userId)}/summary`, signal),

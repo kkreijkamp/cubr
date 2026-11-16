@@ -6,8 +6,8 @@ import { currentUser, FK_VIOLATION, pgCode, pgConstraint, tzFrom, UNIQUE_VIOLATI
 import { SOLVE_COLUMNS, toSolve, type Solve, type SolveRow } from '../mapping.js';
 import { enqueue } from '../outbox.js';
 import { sessionRolling, solveDeletedPayload, solveEventPayload } from '../repo.js';
-import { dailyOverview, dailyResult, type Rolling } from '../rolling.js';
-import { assertDailyAllowed, createSolveBody, dailyQuery, idParams, isDailyOpen, patchSolveBody, resolveCreatedAt, utcDay } from '../schemas.js';
+import { dailyHistory, dailyOverview, dailyResult, type Rolling } from '../rolling.js';
+import { assertDailyAllowed, createSolveBody, dailyHistoryQuery, dailyQuery, idParams, isDailyOpen, patchSolveBody, resolveCreatedAt, utcDay } from '../schemas.js';
 
 /** Translates constraint violations raised inside a solve transaction into API errors. */
 function mapPgError(err: unknown): never {
@@ -208,5 +208,19 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
     ]);
     const official = attempts.rows.map((a) => ({ event: a.event, timeMs: a.time_ms, penalty: a.penalty }));
     return { date, events: dailyOverview(solves.rows.map(toSolve), official) };
+  });
+
+  // Every day the user did one event's daily challenge: the number of attempts and the official
+  // ao5 (from the recorded attempts, as on the board). One row per day, oldest first; the web app
+  // colours its calendar by how each day compares with the others.
+  app.get('/api/solves/daily/history', authed, async (req) => {
+    const user = currentUser(req);
+    const { event } = parse(dailyHistoryQuery, req.query ?? {});
+    const { rows } = await pool.query<{ daily_date: string; time_ms: number; penalty: Penalty }>(
+      `SELECT daily_date, time_ms, penalty FROM solve.daily_attempts
+        WHERE user_id = $1 AND event = $2 ORDER BY daily_date, daily_index`,
+      [user.id, event],
+    );
+    return { event, days: dailyHistory(rows.map((r) => ({ date: r.daily_date, timeMs: r.time_ms, penalty: r.penalty }))) };
   });
 }

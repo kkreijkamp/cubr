@@ -545,43 +545,10 @@
 }
 
 /* ---------------------------------------------------------------- activity heatmap */
-/* the title's range picker: subtle text + chevron, with the native select invisible on top.
-   Focus (mouse or keyboard) only brightens the label - no ring. */
-.hm-range {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25em;
-  border-radius: var(--roundness);
-  cursor: pointer;
-  transition: color var(--dur);
-}
-.hm-range:hover,
-.hm-range:focus-within {
-  color: var(--text-color);
-}
+/* the calendar's squares, tooltip, legend and range picker are in global.css (the daily page has one too) */
 .pv-title .hm-range svg {
   width: 0.75em;
   height: 0.75em;
-}
-.hm-range select {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  padding: 0;
-  opacity: 0;
-  appearance: none;
-  font: inherit;
-  cursor: pointer;
-}
-.hm-range select:focus,
-.hm-range select:focus-visible {
-  outline: none;
-  box-shadow: none;
-}
-.hm-wrap {
-  position: relative;
 }
 .hm-scroll {
   overflow-x: auto;
@@ -592,66 +559,6 @@
   display: grid;
   gap: 3px;
   min-width: 640px;
-}
-.hm-cell {
-  aspect-ratio: 1;
-  border-radius: 0.2em;
-}
-.hm-cell[data-level]:hover {
-  outline: 2px solid var(--text-color);
-  outline-offset: 0;
-}
-.hm-day {
-  display: flex;
-  align-items: center;
-  height: 0;
-  align-self: center;
-  padding-right: 0.5rem;
-  color: var(--sub-color);
-  font-size: 0.65rem;
-  line-height: 0;
-}
-.hm-month {
-  padding-top: 0.4rem;
-  color: var(--sub-color);
-  font-size: 0.65rem;
-  white-space: nowrap;
-}
-.hm-tip {
-  position: absolute;
-  z-index: 20;
-  transform: translate(-50%, calc(-100% - 0.45rem));
-  padding: 0.4em 0.7em;
-  border-radius: calc(var(--roundness) / 2);
-  background: var(--sub-color);
-  color: var(--bg-color);
-  font-size: 0.75rem;
-  white-space: nowrap;
-  pointer-events: none;
-}
-.hm-foot {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.5rem 1rem;
-  margin-top: 0.75rem;
-  color: var(--sub-color);
-  font-size: 0.7rem;
-}
-.hm-legend {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-.hm-legend i {
-  display: block;
-  width: 0.8rem;
-  height: 0.8rem;
-  border-radius: 0.2em;
-}
-.hm-legend span {
-  margin: 0 0.25rem;
 }
 
 

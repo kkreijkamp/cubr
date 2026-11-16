@@ -17,6 +17,7 @@ import { formatCountdown, isTypingTarget, useNow, useStoredState } from '../comp
 import { TimerArea, useLiveTimer } from '../components/live/LiveTimer';
 import { EventPicker, Notice, ScrambleText, Segmented } from '../components/live/ui';
 import { DailyBoard } from '../components/live/daily/DailyBoard';
+import { DailyHistory } from '../components/live/daily/DailyHistory';
 import { QuickActions } from '../components/timer/QuickActions';
 import { shortcutFor } from '../timer/shortcuts';
 import { uuid } from '../timer/storeUtils';
@@ -138,6 +139,8 @@ export default function DailyPage() {
   const [local, setLocal] = useState<Record<string, Attempt[]>>({});
   const [practice, setPractice] = useState<PracticeStore>(loadPractice);
   const [boardKey, setBoardKey] = useState(0);
+  /** bumped when an attempt or a penalty is saved: your results reload (they come from solve-service) */
+  const [historyKey, setHistoryKey] = useState(0);
   const [me, setMe] = useState<{ rank: number; valueMs: number; total: number } | null>(null);
   const [ranking, setRanking] = useState(false);
   /** penalties marked after the solve on this page (solveId -> penalty), shown before the server confirms */
@@ -208,12 +211,14 @@ export default function DailyPage() {
       submitDaily(ev2, d, a.index, { timeMs: a.timeMs, penalty: a.penalty }, scr2, a.solveId)
         .then((sessionId) => {
           setLocalAttempt(k, { ...a, state: 'saved', sessionId });
+          setHistoryKey((x) => x + 1);
           if (a.index === ATTEMPTS - 1) rerank();
         })
         .catch((e: Error) => {
           if (e instanceof ApiError && e.status === 409) {
             // already submitted (e.g. from another tab) - the server copy wins
             progress.reload();
+            setHistoryKey((x) => x + 1);
             setLocal((m) => ({ ...m, [k]: (m[k] ?? []).filter((x) => x.index !== a.index) }));
             toast.notice(`attempt ${a.index + 1} was already submitted`);
             return;
@@ -278,7 +283,9 @@ export default function DailyPage() {
     const wasDone = done;
     saveDailyPenalty(id, p, a.sessionId)
       .then(() => {
-        if (penaltySeq.current.get(id) === seq && wasDone) rerank();
+        if (penaltySeq.current.get(id) !== seq) return;
+        setHistoryKey((x) => x + 1);
+        if (wasDone) rerank();
       })
       .catch(() => {
         if (penaltySeq.current.get(id) !== seq) return;
@@ -551,6 +558,7 @@ export default function DailyPage() {
         </div>
 
         <aside className="daily-side fade-on-focus">
+          {authed && <DailyHistory event={event} today={today} refreshKey={historyKey} userId={user.id} precision={settings.precision} />}
           <DailyBoard
             event={event}
             date={date}

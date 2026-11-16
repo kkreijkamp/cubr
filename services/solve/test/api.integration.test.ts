@@ -81,6 +81,7 @@ describeIntegration('solve API', () => {
       ['PATCH', `/api/solves/${id}`],
       ['DELETE', `/api/solves/${id}`],
       ['GET', '/api/solves/daily'],
+      ['GET', '/api/solves/daily/history?event=333'],
       ['POST', '/api/sessions/import'],
       ['GET', '/api/solves/export'],
     ] as const) {
@@ -339,6 +340,63 @@ describeIntegration('solve API', () => {
       expect(rows.map((r) => r.penalty)).toEqual(['OK', 'OK', 'DNF', 'DNF', 'OK']);
       // events carry a DNF average as -1 (docs/SPEC.md 8): one DNF is trimmed, two make the ao5 a DNF
       expect((await outbox('daily.updated', u.id)).map((e) => e.payload.ao5)).toEqual([10_000, -1]);
+      // and the history (the daily page's calendar) reads the same record
+      expect((await as(u).get('/api/solves/daily/history?event=333')).json().days).toEqual([{ date: today(), attempts: 5, ao5: -1 }]);
+    });
+
+    /** Attempts of a past day, straight into the record (the API only takes open days). */
+    async function recorded(userId: string, date: string, event: string, attempts: [number, string][]) {
+      for (const [i, [ms, penalty]] of attempts.entries()) {
+        await s.pool.query(
+          'INSERT INTO solve.daily_attempts (user_id, daily_date, event, daily_index, solve_id, time_ms, penalty) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+          [userId, date, event, i, randomUUID(), ms, penalty],
+        );
+      }
+    }
+
+    it('history: one entry per day of the event, oldest first, with the attempts and the official ao5', async () => {
+      const [u, other] = [await newUser(), await newUser()];
+      const sess = await newSession(u);
+      for (const [i, ms] of [10_000, 12_000, 11_000, 9_000, 13_000].entries()) expect((await attempt(u, sess.id, i, ms)).statusCode).toBe(201);
+      const five = (ms: number): [number, string][] => Array.from({ length: 5 }, () => [ms, 'OK']);
+      await recorded(u.id, '2026-01-02', '333', [[9_000, 'OK'], [9_000, 'DNF'], [9_000, 'DNF'], [9_000, 'OK'], [9_000, 'OK']]);
+      await recorded(u.id, '2026-01-01', '333', [[8_000, 'OK'], [8_000, '+2']]);
+      await recorded(u.id, '2026-01-03', '333', [[10_000, 'OK'], [11_000, '+2'], [12_000, 'OK'], [14_000, 'DNF'], [9_000, 'OK']]);
+      await recorded(u.id, '2026-01-01', '222', five(3_000));
+      await recorded(other.id, '2026-01-01', '333', five(1_000));
+
+      const res = await as(u).get('/api/solves/daily/history?event=333');
+      expect(res.statusCode, res.body).toBe(200);
+      expect(res.json()).toEqual({
+        event: '333',
+        days: [
+          { date: '2026-01-01', attempts: 2, ao5: null }, // not finished: no ao5
+          { date: '2026-01-02', attempts: 5, ao5: -1 }, // two DNFs
+          { date: '2026-01-03', attempts: 5, ao5: 11_667 }, // 10, 13 (+2), 12; the 9 and the DNF trimmed
+          { date: today(), attempts: 5, ao5: 11_000 },
+        ],
+      });
+      expect((await as(u).get('/api/solves/daily/history?event=222')).json()).toEqual({ event: '222', days: [{ date: '2026-01-01', attempts: 5, ao5: 3_000 }] });
+      expect((await as(u).get('/api/solves/daily/history?event=pyram')).json()).toEqual({ event: 'pyram', days: [] });
+      expect((await as(other).get('/api/solves/daily/history?event=333')).json().days).toEqual([{ date: '2026-01-01', attempts: 5, ao5: 1_000 }]);
+    });
+
+    it('history: keeps a day whose solves were deleted, as the board does', async () => {
+      const u = await newUser();
+      const sess = await newSession(u);
+      const ids: string[] = [];
+      for (const [i, ms] of [10_000, 10_000, 10_000, 10_000, 10_000].entries()) {
+        const id = randomUUID();
+        ids.push(id);
+        await attempt(u, sess.id, i, ms, id);
+      }
+      for (const id of ids) expect((await as(u).del(`/api/solves/${id}`)).statusCode).toBe(204);
+      expect((await as(u).get('/api/solves/daily/history?event=333')).json().days).toEqual([{ date: today(), attempts: 5, ao5: 10_000 }]);
+    });
+
+    it.each([['no event', ''], ['an event without a daily challenge', '?event=333fm'], ['an unknown event', '?event=999']])('history: answers 400 to %s', async (_, query) => {
+      const res = await as(await newUser()).get(`/api/solves/daily/history${query}`);
+      expect(res.statusCode).toBe(400);
     });
   });
 
