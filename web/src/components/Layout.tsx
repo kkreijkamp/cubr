@@ -112,6 +112,12 @@ function Footer() {
         </a>
       </div>
       <div className="footer-right">
+        <Link to="/terms" className="btn-text">
+          terms
+        </Link>
+        <Link to="/privacy" className="btn-text">
+          privacy
+        </Link>
         <button className="btn-text" onClick={() => openPalette('theme')} data-tip="change theme" aria-label="change theme">
           <SwatchIcon width={14} height={14} /> {themeLabel(settings.theme)}
         </button>
