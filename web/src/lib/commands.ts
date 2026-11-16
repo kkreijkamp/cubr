@@ -7,6 +7,8 @@ export interface Command {
   id: string;
   label: string;
   icon?: ReactNode;
+  /** shown right after the label (e.g. the practice bottle after a session's name) */
+  after?: ReactNode;
   /** extra words that should match the search */
   keywords?: string[];
   /** shows a check mark (currently selected option) */

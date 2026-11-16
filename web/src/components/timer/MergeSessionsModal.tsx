@@ -2,6 +2,7 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState, type FormEvent,
 import { ArrowsPointingInIcon, CheckIcon, Square3Stack3DIcon } from '@heroicons/react/24/outline';
 import { formatTime, getEvent, sessionStats, type Penalty, type Precision } from '@cubr/cubestats';
 import { Modal } from '../Modal';
+import { SessionName } from '../SessionName';
 import { Spinner } from '../Spinner';
 import { api } from '../../lib/api';
 import { formatDate, formatNumber } from '../../lib/format';
@@ -255,7 +256,9 @@ export function MergeSessionsModal({ sessions, currentSessionId, event, mode, us
           <div className="merge-target">
             <Square3Stack3DIcon width={16} height={16} className="merge-target-icon" />
             <div className="merge-target-text">
-              <div className="merge-target-name">{target.name}</div>
+              <div className="merge-target-name">
+                <SessionName name={target.name} practice={target.practice} />
+              </div>
               <div className="merge-target-meta">
                 {eventLabel} - {plural(target.solveCount, 'solve')}
                 {targetRange ? ` - ${targetRange}` : ''}
@@ -277,7 +280,9 @@ export function MergeSessionsModal({ sessions, currentSessionId, event, mode, us
                   autoFocus={s.id === target.id || (i === 0 && !eventSessions.some((x) => x.id === target.id))}
                 >
                   <span className="merge-pick-check">{s.id === target.id && <CheckIcon width={14} height={14} />}</span>
-                  <span className="merge-name">{s.name}</span>
+                  <span className="merge-name">
+                    <SessionName name={s.name} practice={s.practice} />
+                  </span>
                   <span className="merge-count">{formatNumber(s.solveCount)}</span>
                 </button>
               ))}
@@ -309,7 +314,9 @@ export function MergeSessionsModal({ sessions, currentSessionId, event, mode, us
               return (
                 <label key={s.id} className={`merge-row${checked ? ' checked' : ''}`}>
                   <input type="checkbox" checked={checked} onChange={() => toggle(s.id)} disabled={busy} autoFocus={i === 0 && !picking} />
-                  <span className="merge-name">{s.name}</span>
+                  <span className="merge-name">
+                    <SessionName name={s.name} practice={s.practice} />
+                  </span>
                   <span className="merge-count">{plural(s.solveCount, 'solve')}</span>
                   {range && <span className="merge-range">{range}</span>}
                 </label>

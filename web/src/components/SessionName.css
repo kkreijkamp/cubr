@@ -1,0 +1,21 @@
+/* A session's name and the practice bottle after it: the name takes the ellipsis, the bottle never
+   shrinks. Icon rules of the surrounding control (e.g. .btn-text svg) may size the bottle to match
+   their other icons. */
+.session-name {
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
+  min-width: 0;
+}
+.session-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.practice-bottle {
+  flex: none;
+  width: 1em;
+  height: 1em;
+  /* when it follows plain text (the command palette) instead of sitting in .session-name */
+  vertical-align: -0.15em;
+}

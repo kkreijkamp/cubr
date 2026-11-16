@@ -917,6 +917,9 @@ body.focus .toast:not(.important) {
   width: 0.9rem;
   height: 0.9rem;
 }
+.palette .palette-row .practice-bottle {
+  margin-left: 0.4em;
+}
 .palette .palette-row.active {
   background: var(--text-color);
   color: var(--bg-color);

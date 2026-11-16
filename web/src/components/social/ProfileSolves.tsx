@@ -6,6 +6,7 @@ import { fmtAvg, fmtSolveLong } from '../timer/statsUtil';
 import { api } from '../../lib/api';
 import { formatDate, formatDateTime, formatNumber, timeAgo } from '../../lib/format';
 import { useAsync } from '../../lib/useAsync';
+import { SessionName } from '../SessionName';
 import { Loading, Spinner } from '../Spinner';
 
 const PAGE = 25;
@@ -51,6 +52,7 @@ export function ProfileSolves({ userId, event, precision }: { userId: string; ev
         ao100: fmtAvg(ao100[i], precision),
         ao1000: fmtAvg(ao1000[i], precision),
         session: s ? (s.name ?? `session ${session + 1}`) : '-',
+        practice: s?.practice === true,
       });
     }
     return out;
@@ -88,7 +90,9 @@ export function ProfileSolves({ userId, event, precision }: { userId: string; ev
                   <td>{r.ao12}</td>
                   <td className="ps-long">{r.ao100}</td>
                   <td className="ps-long">{r.ao1000}</td>
-                  <td className="left sub hide-mobile-cell">{r.session}</td>
+                  <td className="left sub hide-mobile-cell">
+                    <SessionName name={r.session} practice={r.practice} />
+                  </td>
                   <td className="sub" title={`${formatDateTime(r.at)} - ${timeAgo(r.at)}`}>
                     {formatDate(r.at)}
                     {/* phones: the day only, so the row fits without scrolling sideways */}

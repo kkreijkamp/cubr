@@ -18,6 +18,7 @@ import { EVENTS, getEvent, type EventInfo } from '@cubr/cubestats';
 import { INPUT_MODES, modeInfo, type InputMode } from '../../input/inputMode';
 import type { Session } from '../../lib/types';
 import { formatNumber, practiceMarker } from '../../lib/format';
+import { SessionName } from '../SessionName';
 
 /** Buttons on the timer page never take focus on click, so Space can't re-trigger them. */
 export const noFocus = { onMouseDown: (e: React.MouseEvent) => e.preventDefault() };
@@ -229,7 +230,7 @@ function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, 
   return (
     <div className="tp-session" ref={ref}>
       <button
-        className={`btn-text tp-session-btn${open ? ' open' : ''}`}
+        className={`btn-text tp-session-btn${current?.practice ? ' practice' : ''}${open ? ' open' : ''}`}
         onClick={() => setOpen(!open)}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -238,8 +239,8 @@ function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, 
         data-tip-pos="down"
         {...noFocus}
       >
-        {current?.practice ? <BeakerIcon width={14} height={14} /> : <Square3Stack3DIcon width={14} height={14} />}
-        <span className="tp-session-name">{current?.name ?? '...'}</span>
+        <Square3Stack3DIcon width={14} height={14} className="tp-session-icon" />
+        <span className="tp-session-name">{current ? <SessionName name={current.name} practice={current.practice} /> : '...'}</span>
         <ChevronDownIcon width={14} height={14} className="tp-chevron" />
       </button>
       {open && (
@@ -257,8 +258,7 @@ function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, 
               >
                 <span className="tp-menu-check">{s.id === current?.id && <CheckIcon width={14} height={14} />}</span>
                 <span className="tp-menu-label">
-                  {s.name}
-                  {practiceMarker(s.name, s.practice, 'practice') && <span className="tp-menu-tag">practice</span>}
+                  <SessionName name={s.name} practice={s.practice} />
                 </span>
                 <span className="tp-menu-count">{formatNumber(s.solveCount)}</span>
               </button>

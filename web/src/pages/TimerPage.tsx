@@ -22,6 +22,7 @@ import { TimerDisplay } from '../timer/TimerDisplay';
 import { useTimerEngine, type TimerResult, type TimerState } from '../timer/useTimerEngine';
 import { useScrambleQueue } from '../timer/useScrambleQueue';
 import { shortcutFor, type ShortcutAction } from '../timer/shortcuts';
+import { PracticeBottle } from '../components/SessionName';
 import { TwistyPreview } from '../components/TwistyPreview';
 import { ConfigBar } from '../components/timer/ConfigBar';
 import { ScrambleBar } from '../components/timer/ScrambleBar';
@@ -397,6 +398,7 @@ export default function TimerPage() {
             eventSessions.map((s) => ({
               id: `timer-session-${s.id}`,
               label: `${s.name} (${s.solveCount})`,
+              after: s.practice ? <PracticeBottle name={s.name} /> : undefined,
               active: s.id === session?.id,
               run: () => void switchSession(s.id),
             })),
