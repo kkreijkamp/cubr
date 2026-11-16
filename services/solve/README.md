@@ -14,8 +14,8 @@ migrated at startup. Port 8080.
 | `GET /api/sessions/:id/solves` | ascending; capped at the **latest** 50 000 (`truncated: true` when cut) |
 | `POST /api/solves` | idempotent on `id` (`ON CONFLICT DO NOTHING`): retry -> 200, no second event; id of another user -> 409. Returns `{solve, rolling:{ao5,ao12}}` |
 | `PATCH /api/solves/:id` `{penalty?, comment?}` / `DELETE /api/solves/:id` | emit `solve.updated` / `solve.deleted`; a changed solve is returned with the session's `rolling` |
-| `POST /api/sessions/import` | <= 100 000 solves, body <= 25 MB; one transaction, `unnest()` batches of 2000, one `solves.imported` event. 100k solves take ~1.3 s locally |
-| `GET /api/solves/export` | `{exportedAt, sessions:[Session & {solves}]}` |
+| `POST /api/sessions/import` | <= 100 000 solves, body <= 25 MB; one transaction, `unnest()` batches of 2000, one `solves.imported` event. 100k solves take ~1.3 s locally. 10 imports/h per user (checked onRequest, before the body is read); at most 250 000 solves per account (advisory lock per account, then a count) |
+| `GET /api/solves/export` | `{exportedAt, sessions:[Session & {solves}]}`, streamed: one `REPEATABLE READ READ ONLY` transaction, keyset pages of 2000 solves per session (`created_at::text`, id), so memory stays flat (200k solves fine under the 192 MB production heap). 10 exports/h per user |
 | `GET /api/solves/daily?date=` | the user's daily solves per event + the official ao5 (from the recorded attempts) |
 | `GET /api/solves/_info`, `/api/sessions/_info` | info incl. `outbox: {backlog, published, lastPublishedAt, lastError, healthy}` |
 | `GET /internal/users/:userId/solves?event=` | **service-to-service only**: not routed by the gateway/Ingress and requires `X-Internal-Token` (403 otherwise): `{solves:[{id, sessionId, timeMs, penalty, createdAt, practice?}]}` ordered by session, time (stats recompute; `practice: true` marks a practice session's solves) |
