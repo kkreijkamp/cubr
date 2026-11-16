@@ -1,22 +1,11 @@
-import { revokedKey, verifyToken, type Redis } from '@cubr/common';
+import { isTokenRevoked, verifyToken, type Redis } from '@cubr/common';
 import { defaultGuestName, generateGuestId, sanitizeGuestId, sanitizeName } from './sanitize.js';
 import type { Identity } from './types.js';
 
-async function isRevoked(redis: Redis, jti: string): Promise<boolean> {
-  try {
-    const hit = await Promise.race([
-      redis.exists(revokedKey(jti)),
-      new Promise<number>((resolve) => setTimeout(() => resolve(0), 300)),
-    ]);
-    return hit === 1;
-  } catch {
-    return false; // fail open, like requireAuth in common
-  }
-}
-
 /**
  * Socket handshake `auth: {token?, name?, guestId?}` -> who is playing.
- * - valid, non-revoked JWT: playerId = userId, name = username
+ * - valid JWT that wasn't revoked (by logout, or for the whole account by a password reset or the
+ *   account's deletion: the same check as every HTTP route): playerId = userId, name = username
  * - otherwise a guest: playerId = the client's stored guestId if well-formed (so a refresh or a
  *   reconnect to a different pod keeps the same identity), else a fresh `guest-<random>`;
  *   name = sanitised nickname or "guest-xxxx".
@@ -26,7 +15,7 @@ export async function resolveIdentity(auth: unknown, jwtSecret: string, redis: R
   if (typeof a.token === 'string' && a.token.length > 0 && a.token.length < 4096) {
     try {
       const user = await verifyToken(jwtSecret, a.token);
-      if (!(await isRevoked(redis, user.jti))) {
+      if (!(await isTokenRevoked(redis, user))) {
         return { playerId: user.id, name: user.username, userId: user.id, guest: false };
       }
     } catch {

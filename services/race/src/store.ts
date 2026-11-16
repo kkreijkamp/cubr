@@ -146,7 +146,13 @@ export class RoomStore {
     const token = randomUUID();
     const deadline = Date.now() + LOCK_WAIT_MS;
     for (let attempt = 0; ; attempt++) {
-      const ok = await this.redis.set(key, token, 'PX', LOCK_TTL_MS, 'NX');
+      let ok: string | null;
+      try {
+        ok = await this.redis.set(key, token, 'PX', LOCK_TTL_MS, 'NX');
+      } catch {
+        // Redis unreachable: no lock, so no room change (README, "Redis outages")
+        throw new HttpError(503, 'UNAVAILABLE', 'Rooms are unavailable while the server reconnects, please retry');
+      }
       if (ok === 'OK') break;
       if (Date.now() > deadline) throw new HttpError(503, 'UNAVAILABLE', 'Room is busy, please retry');
       await sleep(Math.min(5 * 2 ** attempt, 100) + Math.random() * 10);
