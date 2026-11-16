@@ -89,6 +89,24 @@ jobs:
             bash scripts/bump-version.sh --check
           fi
 
+  nginx:
+    # A typo in either config takes the site down on the next deploy: check both with the
+    # images production runs (the gateway's nginx.conf as is, the web template rendered the way
+    # the web image renders it at start-up).
+    name: nginx configs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Gateway (deploy/gateway/nginx.conf)
+        run: docker run --rm -v "$PWD/deploy/gateway/nginx.conf:/etc/nginx/nginx.conf:ro" nginx:1.27-alpine nginx -t
+      - name: Web container (web/nginx/default.conf.template)
+        run: >-
+          docker run --rm -e APP_VERSION=ci -e NODE_NAME=ci
+          -v "$PWD/web/nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro"
+          nginxinc/nginx-unprivileged:1.27-alpine
+          sh -c '/docker-entrypoint.d/20-envsubst-on-templates.sh > /dev/null && nginx -t'
+
   image:
     # scramble is the one image that ships an npm package next to its bundle (cubing.js),
     # so it is the one most likely to break when dependencies or the Dockerfile change.
