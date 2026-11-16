@@ -63,7 +63,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
+// Node's setImmediate, which the fake timers leave alone; typed here because the web app has no Node
+// types (the Docker image and CI type-check web/ on its own)
+const setImmediateReal = (globalThis as unknown as { setImmediate(cb: () => void): void }).setImmediate;
+const flush = () => new Promise<void>((resolve) => setImmediateReal(resolve));
 const load = () => import('../race');
 
 const player = (id: string, extra: Partial<LivePlayer> = {}): LivePlayer => ({ id, name: id, userId: null, status: 'idle', connected: true, ...extra });

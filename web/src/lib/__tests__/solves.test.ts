@@ -215,7 +215,10 @@ function stubPage(): void {
 }
 
 /** settles every promise chain that is not waiting for a (fake) timer */
-const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
+// Node's setImmediate, which the fake timers leave alone; typed here because the web app has no Node
+// types (the Docker image and CI type-check web/ on its own)
+const setImmediateReal = (globalThis as unknown as { setImmediate(cb: () => void): void }).setImmediate;
+const flush = () => new Promise<void>((resolve) => setImmediateReal(resolve));
 const advance = async (ms: number) => {
   await vi.advanceTimersByTimeAsync(ms);
   await flush();
