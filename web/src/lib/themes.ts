@@ -15,7 +15,7 @@ export interface Theme {
 
 export const THEMES: Theme[] = [
   {"name":"stickerless","bg":"#161616","main":"#ffd500","caret":"#ffd500","sub":"#6b6b6b","subAlt":"#202020","text":"#f1f1f1","error":"#e8263c","errorExtra":"#9c1426","colorfulError":"#ff6a13","colorfulErrorExtra":"#b34507"},
-  {"name":"white_cross","bg":"#ffffff","main":"#00a04d","caret":"#0046ad","sub":"#9a978d","subAlt":"#e3e1da","text":"#20201e","error":"#d0252f","errorExtra":"#8f1920","colorfulError":"#ff6a13","colorfulErrorExtra":"#b34507"},
+  {"name":"white_cross","bg":"#ffffff","main":"#00a04d","caret":"#0046ad","sub":"#959aa1","subAlt":"#e5e8eb","text":"#1d2024","error":"#d0252f","errorExtra":"#8f1920","colorfulError":"#ff6a13","colorfulErrorExtra":"#b34507"},
   {"name":"stackmat","bg":"#a3ad94","main":"#2b3a1f","caret":"#151a10","sub":"#5f6a52","subAlt":"#949f85","text":"#151a10","error":"#7d1d1d","errorExtra":"#5a1414","colorfulError":"#8a2a00","colorfulErrorExtra":"#5e1d00"},
   {"name":"sub_10","bg":"#10172a","main":"#f2c14e","caret":"#f2c14e","sub":"#4d5a7c","subAlt":"#0c1222","text":"#e6eaf4","error":"#ff5d6c","errorExtra":"#b33f4b","colorfulError":"#ff5d6c","colorfulErrorExtra":"#b33f4b"},
   {"name":"pll_skip","bg":"#1c1235","main":"#ff79d0","caret":"#6ef2ff","sub":"#6e5ca3","subAlt":"#160e2b","text":"#f3eeff","error":"#ffcc66","errorExtra":"#c99a3f","colorfulError":"#ffcc66","colorfulErrorExtra":"#c99a3f"},

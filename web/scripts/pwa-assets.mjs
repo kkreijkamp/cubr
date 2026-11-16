@@ -21,7 +21,7 @@ const CDP = process.env.CDP ?? 'http://127.0.0.1:9333';
 
 const BG = '#ffffff';
 const MAIN = '#00a04d';
-const CENTRE = '#20201e';
+const CENTRE = '#1d2024';
 
 /** The cube face: 3 x 3 stickers over `span` units from (x, y), as in the favicon (7.2 / 1.2 / 1.8 of 24). */
 function face(x, y, span, { centre = CENTRE, fill = MAIN } = {}) {
@@ -192,8 +192,11 @@ async function screenshots(base) {
     for (const [file, width, height, dpr, mobile, settings] of SHOTS) {
       await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: dpr, mobile });
       await send('Emulation.setTouchEmulationEnabled', { enabled: mobile });
-      await send('Page.navigate', { url: `${base}/about` });
-      await waitFor(ev, `!!document.querySelector('main')`);
+      // a clean browser: an earlier visit's service worker would serve the build it cached (and announce the new one)
+      await send('Storage.clearDataForOrigin', { origin: new URL(base).origin, storageTypes: 'all' });
+      // seed from a page that doesn't run the app: the app would save its own fresh guest data over it
+      await send('Page.navigate', { url: `${base}/favicon.svg` });
+      await waitFor(ev, `document.readyState === 'complete'`);
       await ev(
         `localStorage.clear(); localStorage.setItem('cubr.local.v1', ${JSON.stringify(JSON.stringify(guestData()))}); localStorage.setItem('cubr.settings', ${JSON.stringify(JSON.stringify(settings))}); true`,
       );
