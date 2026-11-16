@@ -10,7 +10,7 @@ import { describeIntegration, startTestServer, type TestServer } from '@cubr/tes
 import { floorFor } from '../src/floors.js';
 import { makeHandler } from '../src/ingest.js';
 import type { PeriodBests, PeriodQuery } from '../src/periods.js';
-import { DELETED_USERS_KEY, FLAGGED_KEY, USERS_KEY, allTimeKey, atKey, challengeKey, dailyKey, tsKey, weeklyKey } from '../src/keys.js';
+import { DELETED_USERS_KEY, FLAGGED_KEY, USERS_KEY, allTimeKey, atKey, challengeKey, dailyKey, flaggedKey, tsKey, weeklyKey } from '../src/keys.js';
 import { registerRoutes } from '../src/routes/index.js';
 import { defineScripts } from '../src/scripts.js';
 
@@ -88,7 +88,7 @@ describeIntegration('leaderboard API', () => {
         pb(c, '555', 'single', 45_000, '2026-10-03T10:00:00.000Z'),
       );
       expect(await board('555/single')).toEqual({
-        event: '555', kind: 'single', period: 'all', periodKey: 'all', total: 3, page: 1, size: 50, me: null,
+        event: '555', kind: 'single', period: 'all', periodKey: 'all', total: 3, page: 1, size: 50, me: null, flagged: null,
         entries: [
           { rank: 1, userId: b.id, username: b.username, country: null, avatarUrl: null, valueMs: 40_000, achievedAt: '2026-10-02T10:00:00.000Z' },
           { rank: 2, userId: c.id, username: c.username, country: null, avatarUrl: null, valueMs: 45_000, achievedAt: '2026-10-03T10:00:00.000Z' },
@@ -219,7 +219,7 @@ describeIntegration('leaderboard API', () => {
         daily(c, '2026-10-14', '222', 3_000, '2026-10-14T09:15:00.000Z', 'daily.updated'), // older than c's result: ignored
       );
       expect(await board('daily-challenge?date=2026-10-14&event=222')).toEqual({
-        event: '222', kind: 'ao5', period: 'challenge', periodKey: '2026-10-14', total: 2, page: 1, size: 50, me: null,
+        event: '222', kind: 'ao5', period: 'challenge', periodKey: '2026-10-14', total: 2, page: 1, size: 50, me: null, flagged: null,
         entries: [
           { rank: 1, userId: a.id, username: a.username, country: null, avatarUrl: null, valueMs: 4_500, achievedAt: '2026-10-14T10:00:00.000Z' },
           { rank: 2, userId: c.id, username: c.username, country: null, avatarUrl: null, valueMs: 5_000, achievedAt: '2026-10-14T09:30:00.000Z' },
@@ -333,6 +333,42 @@ describeIntegration('leaderboard API', () => {
       await feed(pb(u, 'sq1', 'single', 5_000)); // the world record itself is fine
       expect((await board('sq1/single')).entries).toEqual([expect.objectContaining({ userId: u.id, valueMs: 5_000 })]);
     });
+
+    it("tells a signed-in user why they aren't on a board, their refused time and the floor, and nobody else", async () => {
+      const [u, other] = [newUser(), newUser()];
+      // as for Barry: taps made an impossible PB
+      await feed(pb(u, 'sq1', 'single', 300, '2026-10-14T10:00:00.000Z'));
+      const mine = await board('sq1/single', await s.token(u));
+      expect(mine.me).toBeNull();
+      expect(mine.flagged).toEqual({ valueMs: 300, floorMs: 5_000, achievedAt: '2026-10-14T10:00:00.000Z' });
+      expect((await board('sq1/single')).flagged).toBeNull(); // nobody signed in
+      expect((await board('sq1/single', await s.token(other))).flagged).toBeNull(); // someone else
+      // the taps deleted: stats' next PB is a real one, and the note goes
+      await feed(pb(u, 'sq1', 'single', 12_000, '2026-10-14T10:05:00.000Z'));
+      expect(await board('sq1/single', await s.token(u))).toMatchObject({ me: { valueMs: 12_000 }, flagged: null });
+      // a refused PB after a real one: the real entry stays, and the note says why the new one isn't there
+      await feed(pb(u, 'sq1', 'single', 250, '2026-10-14T10:10:00.000Z'));
+      expect(await board('sq1/single', await s.token(u))).toMatchObject({ me: { valueMs: 12_000 }, flagged: { valueMs: 250 } });
+    });
+
+    it('does the same on daily and weekly boards, keeping the lowest refused time, with or without real solves', async () => {
+      pinNow('2026-10-14T12:00:00Z');
+      const u = newUser();
+      const token = await s.token(u);
+      await feed(solve(u, 'sq1', 400, '2026-10-14T10:00:00.000Z'));
+      expect(await board('sq1/single?period=daily', token)).toMatchObject({ me: null, flagged: { valueMs: 400, floorMs: 5_000, achievedAt: '2026-10-14T10:00:00.000Z' } });
+      await feed(solve(u, 'sq1', 300, '2026-10-14T10:01:00.000Z'), solve(u, 'sq1', 900, '2026-10-14T10:02:00.000Z'));
+      expect((await board('sq1/single?period=weekly', token)).flagged).toMatchObject({ valueMs: 300 });
+      await feed(solve(u, 'sq1', 15_000, '2026-10-14T10:03:00.000Z'));
+      expect(await board('sq1/single?period=daily', token)).toMatchObject({ me: { valueMs: 15_000 }, flagged: { valueMs: 300 } });
+      expect(await s.redis.ttl(flaggedKey(dailyKey('sq1', 'single', '2026-10-14')))).toBeGreaterThan(3 * 86_400 - 60); // gone with the board
+    });
+
+    it('does the same on the daily challenge board', async () => {
+      const u = newUser();
+      await feed(daily(u, '2026-10-22', '333', 1_000, '2026-10-22T10:00:00.000Z'));
+      expect(await board('daily-challenge?date=2026-10-22&event=333', await s.token(u))).toMatchObject({ me: null, flagged: { valueMs: 1_000, floorMs: 2_600 } });
+    });
   });
 
   describe('deleted accounts', () => {
@@ -362,6 +398,7 @@ describeIntegration('leaderboard API', () => {
       expect(await s.redis.hget(tsKey(challengeKey('2026-10-14', '333')), gone.id)).toBeNull();
       expect(await s.redis.hget(USERS_KEY, gone.id)).toBeNull();
       expect((await s.redis.lrange(FLAGGED_KEY, 0, -1)).some((x) => x.includes(gone.id))).toBe(false);
+      expect(await s.redis.hget(flaggedKey(dailyKey('sq1', 'single', '2026-10-14')), gone.id)).toBeNull(); // their refused tap too
       expect(await s.redis.sismember(DELETED_USERS_KEY, gone.id)).toBe(1);
 
       // events still on their way for the account bring nothing back
@@ -425,6 +462,19 @@ describeIntegration('leaderboard API', () => {
         ]);
         expect((await board(`666/ao5?period=${period}`)).total).toBe(0);
       }
+    });
+
+    it("keep the day's or week's refused time for its owner, and drop it once stats has none", async () => {
+      pinNow('2026-11-17T09:00:00Z');
+      const u = newUser();
+      const token = await s.token(u);
+      const tap = best(211, '2026-11-17T08:00:00.000Z');
+      answer = { days: { '2026-11-17': { flagged: { single: tap } } }, weeks: { '2026-W47': { flagged: { single: tap } } } };
+      await feedStats(changed(u, '666', '2026-11-17T08:30:00.000Z'));
+      expect(await board('666/single?period=daily', token)).toMatchObject({ me: null, flagged: { valueMs: 211, floorMs: 43_200, achievedAt: tap.achievedAt } });
+      answer = { days: {}, weeks: {} }; // the tap deleted
+      await feedStats(changed(u, '666', '2026-11-17T08:31:00.000Z'));
+      expect((await board('666/single?period=weekly', token)).flagged).toBeNull();
     });
 
     it('ignore a solve.created from before the change that is handled late, but take newer solves as usual', async () => {

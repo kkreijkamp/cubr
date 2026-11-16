@@ -117,6 +117,17 @@
 .lb-me .lb-me-who .sub {
   font-size: 0.75rem;
 }
+/* a faster time of yours was left off by the anti-cheat (tooltip says which) */
+.lb-me .lb-me-flag {
+  display: inline-flex;
+  margin-left: 0.4em;
+  vertical-align: -0.15em;
+  color: var(--sub-color);
+  cursor: help;
+}
+.lb-me .lb-me-flag:hover {
+  color: var(--text-color);
+}
 .lb-me .lb-me-value {
   color: var(--main-color);
   font-size: 1.75rem;

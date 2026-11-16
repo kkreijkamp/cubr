@@ -25,6 +25,11 @@ penalty marked after the solve can make it worse, and a DNF ao5 removes the entr
 `user.deleted` -> the user leaves every board (SCAN `lb:*`: ZREM / HDEL `:at` `:ts`), `lb:users` and `lb:flagged`, and
 goes into `lb:deleted-users`, so later events for them are ignored.
 Score + achievedAt (`<board>:at` hash) are written atomically by small Lua scripts (`src/scripts.ts`).
+A value the anti-cheat refuses also goes on `<board>:flagged` (the user's lowest refused value on that board: JSON
+`{valueMs, floorMs, achievedAt}`), set and cleared with the user's entry by the same scripts and time guard: a valid
+PB or a removal clears it, stats' `flagged` values after `periods.changed` replace it. The board API returns it to its
+owner only (`flagged` next to `me`), and the leaderboard page says why they aren't listed, or that a faster time of
+theirs wasn't counted.
 
 Decisions / simplifications:
 - Daily/weekly boards are global, so buckets are UTC days / ISO weeks of the solve's `createdAt`

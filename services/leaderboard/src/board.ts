@@ -1,6 +1,7 @@
 import type { Redis } from '@cubr/common';
 import { EVENT_IDS } from '@cubr/cubestats';
-import { KINDS, USERS_KEY, allTimeKey, atKey, pageRange, rankAt, type Kind } from './keys.js';
+import { parseFlag, type FlaggedValue } from './floors.js';
+import { KINDS, USERS_KEY, allTimeKey, atKey, flaggedKey, pageRange, rankAt, type Kind } from './keys.js';
 
 // Read side: turns sorted sets + side hashes into the response shapes of SPEC section 9.5.
 
@@ -18,6 +19,8 @@ export interface BoardPage {
   total: number;
   entries: BoardEntry[];
   me: { rank: number; valueMs: number } | null;
+  /** the caller's own best time on this board that the anti-cheat refused (they're told why) */
+  flagged: FlaggedValue | null;
 }
 
 /** Parses a lb:users value; unknown users show as 'unknown' so clients can always render a name. */
@@ -60,8 +63,8 @@ function unwrap<T>(results: [Error | null, unknown][] | null): T[] {
 export async function readBoard(redis: Redis, key: string, page: number, size: number, meId?: string): Promise<BoardPage> {
   const { start, stop } = pageRange(page, size);
   const p = redis.pipeline().zcard(key).zrange(key, start, stop, 'WITHSCORES');
-  if (meId) p.zrank(key, meId).zscore(key, meId);
-  const [total, flat, myRank, myScore] = unwrap<unknown>(await p.exec()) as [number, string[], number | null, string | null];
+  if (meId) p.zrank(key, meId).zscore(key, meId).hget(flaggedKey(key), meId);
+  const [total, flat, myRank, myScore, myFlag] = unwrap<unknown>(await p.exec()) as [number, string[], number | null, string | null, string | null];
 
   const { ids, scores } = splitWithScores(flat);
   let users: (string | null)[] = [];
@@ -75,7 +78,7 @@ export async function readBoard(redis: Redis, key: string, page: number, size: n
   });
 
   const me = meId && myRank !== null && myRank !== undefined && myScore !== null ? { rank: myRank + 1, valueMs: Number(myScore) } : null;
-  return { total, entries, me };
+  return { total, entries, me, flagged: meId ? parseFlag(myFlag) : null };
 }
 
 export interface UserRank {

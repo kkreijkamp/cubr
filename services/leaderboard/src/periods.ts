@@ -12,7 +12,9 @@ export interface PeriodBest {
   achievedAt: string;
 }
 
-export type PeriodEntry = { single?: PeriodBest; ao5?: PeriodBest };
+export type PeriodValues = { single?: PeriodBest; ao5?: PeriodBest };
+/** The best valid values, and under `flagged` the best ones below the floors (shown to their owner). */
+export type PeriodEntry = PeriodValues & { flagged?: PeriodValues };
 
 export interface PeriodBests {
   days: Record<string, PeriodEntry>;
@@ -42,15 +44,23 @@ export function parsePeriodBests(json: unknown): PeriodBests {
     const out: Record<string, PeriodEntry> = {};
     for (const [key, entry] of Object.entries(v as Record<string, unknown>)) {
       if (!keyRe.test(key) || !entry || typeof entry !== 'object') throw new Error(`malformed period-bests entry ${key}`);
-      const e: PeriodEntry = {};
-      for (const kind of ['single', 'ao5'] as const) {
-        const b = (entry as Record<string, unknown>)[kind] as { valueMs?: unknown; achievedAt?: unknown } | undefined;
-        if (b === undefined || b === null) continue;
-        if (typeof b.valueMs !== 'number' || !Number.isInteger(b.valueMs) || b.valueMs <= 0 || typeof b.achievedAt !== 'string' || Number.isNaN(Date.parse(b.achievedAt))) {
-          throw new Error(`malformed period-bests value ${key}.${kind}`);
+      const values = (raw: unknown, where: string): PeriodValues => {
+        const v: PeriodValues = {};
+        if (raw === undefined || raw === null) return v;
+        if (typeof raw !== 'object' || Array.isArray(raw)) throw new Error(`malformed period-bests entry ${where}`);
+        for (const kind of ['single', 'ao5'] as const) {
+          const b = (raw as Record<string, unknown>)[kind] as { valueMs?: unknown; achievedAt?: unknown } | undefined;
+          if (b === undefined || b === null) continue;
+          if (typeof b.valueMs !== 'number' || !Number.isInteger(b.valueMs) || b.valueMs <= 0 || typeof b.achievedAt !== 'string' || Number.isNaN(Date.parse(b.achievedAt))) {
+            throw new Error(`malformed period-bests value ${where}.${kind}`);
+          }
+          v[kind] = { valueMs: b.valueMs, achievedAt: b.achievedAt };
         }
-        e[kind] = { valueMs: b.valueMs, achievedAt: b.achievedAt };
-      }
+        return v;
+      };
+      const e: PeriodEntry = values(entry, key);
+      const flagged = values((entry as Record<string, unknown>).flagged, `${key}.flagged`);
+      if (Object.keys(flagged).length) e.flagged = flagged;
       out[key] = e;
     }
     return out;

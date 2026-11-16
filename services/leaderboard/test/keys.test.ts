@@ -12,6 +12,7 @@ import {
   challengeKey,
   currentPeriodKey,
   dailyKey,
+  flaggedKey,
   flaggedBy,
   hasBoards,
   isKind,
@@ -94,13 +95,14 @@ describe('paging / ranks', () => {
 
 describe('deleting an account', () => {
   const U = '00000000-0000-4000-8000-000000000001';
-  it('removes the user from boards (ZREM) and their :at / :ts hashes (HDEL), not from the bookkeeping keys', () => {
+  it('removes the user from boards (ZREM) and their :at / :ts / :flagged hashes (HDEL), not from the bookkeeping keys', () => {
     const board = allTimeKey('333', 'single');
-    const keys = [board, atKey(board), tsKey(board), dailyKey('333', 'ao5', '2026-10-26'), challengeKey('2026-10-26', '333'), USERS_KEY, FLAGGED_KEY, META_BUILT_KEY, REBUILD_LOCK_KEY, DELETED_USERS_KEY];
+    const keys = [board, atKey(board), tsKey(board), flaggedKey(board), dailyKey('333', 'ao5', '2026-10-26'), challengeKey('2026-10-26', '333'), USERS_KEY, FLAGGED_KEY, META_BUILT_KEY, REBUILD_LOCK_KEY, DELETED_USERS_KEY];
     expect(purgePlan(keys)).toEqual([
       { op: 'zrem', key: board },
       { op: 'hdel', key: atKey(board) },
       { op: 'hdel', key: tsKey(board) },
+      { op: 'hdel', key: flaggedKey(board) },
       { op: 'zrem', key: dailyKey('333', 'ao5', '2026-10-26') },
       { op: 'zrem', key: challengeKey('2026-10-26', '333') },
     ]);

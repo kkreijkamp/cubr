@@ -333,6 +333,7 @@ trigram/lower index on person name for search.
 | `lb:<event>:<kind>:w:<isoWeek>` / `:d:<YYYY-MM-DD>` | zset, TTL 15d/3d | leaderboard | weekly/daily boards |
 | `lb:dc:<YYYY-MM-DD>:<event>` | zset | leaderboard | daily-challenge ao5 board |
 | `<board>:at` / `<board>:ts` | hash userId -> ISO / ms | leaderboard | achievedAt per entry / last applied event time (drops stale events) |
+| `<board>:flagged` | hash userId -> JSON {valueMs, floorMs, achievedAt} | leaderboard | the user's best value the anti-cheat refused on that board (the API tells them why they aren't listed); expires with the board |
 | `lb:users` | hash userId -> JSON {username,country,avatarUrl} | leaderboard | display info |
 | `lb:flagged` | list | leaderboard | results rejected by the anti-cheat check |
 | `lb:meta:built` / `lb:rebuild-lock` | string | leaderboard | marks boards as rebuilt after Redis loss / one rebuilding replica |
@@ -476,7 +477,7 @@ Published rows older than a day are deleted.
 | GET `/api/stats/global` | `{users, solves, totalMs, solvesToday, activeUsersToday}` ("today" = UTC day; cached 10 s) |
 | GET `/api/stats/_info` | info |
 | GET `/internal/pbs?event=&kind=` | `{pbs: [{userId, username, event, kind, valueMs, achievedAt}]}` |
-| GET `/internal/users/:userId/period-bests?event=&from=&minSingle=&minAverage=` | `{days: {"YYYY-MM-DD": {single?, ao5?}}, weeks: {"YYYY-Www": {single?, ao5?}}}`, each `{valueMs, achievedAt}`: the best single and rolling ao5 (within a session, ending at a solve done that UTC day / ISO week, `from` on) of the user's non-practice sessions, from the ledger; values below the floors (the leaderboard sends its anti-cheat floors) are left out. Internal token. |
+| GET `/internal/users/:userId/period-bests?event=&from=&minSingle=&minAverage=` | `{days: {"YYYY-MM-DD": {single?, ao5?}}, weeks: {"YYYY-Www": {single?, ao5?}}}`, each `{valueMs, achievedAt}`: the best single and rolling ao5 (within a session, ending at a solve done that UTC day / ISO week, `from` on) of the user's non-practice sessions, from the ledger; values below the floors (the leaderboard sends its anti-cheat floors) are left out, and the lowest of those come under `flagged: {single?, ao5?}` per day / week. Internal token. |
 
 Streak = consecutive days (in the user's tz as bucketed) with >= 1 solve, ending today or yesterday.
 PB rules: single = best effective time; mo3/aoN = best rolling value within a single session
@@ -491,7 +492,7 @@ worsens or disappears).
 ### 9.5 leaderboard (`/api/leaderboards`)
 | Method & path | Response |
 |---|---|
-| GET `/api/leaderboards/:event/:kind?period=all\|weekly\|daily&page=1&size=50&key=` | `{event, kind, period, periodKey, total, page, size, entries: [{rank, userId, username, country, avatarUrl, valueMs, achievedAt}], me: {rank, valueMs}\|null}` - kind in single, ao5, ao12 (weekly/daily: single, ao5). `key` (optional) selects a past daily/weekly board (`YYYY-MM-DD` / `YYYY-Www`). `me` filled when a valid token is sent. |
+| GET `/api/leaderboards/:event/:kind?period=all\|weekly\|daily&page=1&size=50&key=` | `{event, kind, period, periodKey, total, page, size, entries: [{rank, userId, username, country, avatarUrl, valueMs, achievedAt}], me: {rank, valueMs}\|null, flagged: {valueMs, floorMs, achievedAt}\|null}` - kind in single, ao5, ao12 (weekly/daily: single, ao5). `key` (optional) selects a past daily/weekly board (`YYYY-MM-DD` / `YYYY-Www`). `me` filled when a valid token is sent; `flagged` = the caller's own best time on this board that the anti-cheat refused (only to them), so the page can say why they aren't listed. |
 | GET `/api/leaderboards/daily-challenge?date=&event=333&page=1&size=50` | same shape, kind `"ao5"`, period `"challenge"` |
 | GET `/api/leaderboards/users/:userId/ranks` | `{ranks: [{event, kind, period:"all", rank, total, valueMs}]}`; optional token, 403 for a private profile unless it's the owner's (the boards themselves still list them) |
 | GET `/api/leaderboards/_info` | info (+ consumer, rebuild and anti-cheat status) |
@@ -506,7 +507,7 @@ show there too. Those exact writes record their event time in `<board>:ts`; a ke
 Daily-challenge board from `daily.completed` / `daily.updated` (exact value, the latest result wins; ZREM for a DNF ao5). Display info (username, country, avatar URL) from `user.*` events and usernames in payloads.
 Board writes are small Lua scripts (score and achievedAt change atomically); exact writes (all-time and daily-challenge boards, and daily/weekly ones after `periods.changed`) drop events older than the last one applied for that user.
 Rank = position + 1 (equal values don't share a rank). 333fm has no boards (results are move counts).
-Anti-cheat: ignore values below the WCA world record for that event/kind (fetch `GET wca /internal/records`, cache 1 h, fallback hard-coded floors about a quarter below the records, e.g. 333 single 1800 ms) - store rejected entries in `lb:flagged`.
+Anti-cheat: ignore values below the WCA world record for that event/kind (fetch `GET wca /internal/records`, cache 1 h, fallback hard-coded floors about a quarter below the records, e.g. 333 single 1800 ms) - store rejected entries in `lb:flagged` (the admin's list), and the user's lowest refused value per board in `<board>:flagged` (set and cleared with the user's entry, by the same scripts and time guard; from stats' `flagged` values after `periods.changed`), which the board API returns to that user.
 Rebuild: a background loop checks for `lb:meta:built` every 60 s; when it is missing (Redis lost its
 data), one replica acquires `SET lb:rebuild-lock NX EX 120`, rebuilds the all-time boards from
 `GET stats /internal/pbs`, then sets `lb:meta:built`.

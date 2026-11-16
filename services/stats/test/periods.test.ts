@@ -31,7 +31,10 @@ describe('periodBests', () => {
 
   it('skips DNFs, a DNF ao5 (two DNFs), and values below the floors', () => {
     const r = periodBests([[solve(null, '2026-11-16T10:00:00Z'), solve(null, '2026-11-16T10:01:00Z'), solve(400, '2026-11-16T10:02:00Z'), solve(20_000, '2026-11-16T10:03:00Z'), solve(21_000, '2026-11-16T10:04:00Z')]], since, { single: 2_510, average: 3_510 });
-    expect(r.days['2026-11-16']).toEqual({ single: { valueMs: 20_000, achievedAt: '2026-11-16T10:03:00.000Z' } });
+    expect(r.days['2026-11-16']).toEqual({
+      single: { valueMs: 20_000, achievedAt: '2026-11-16T10:03:00.000Z' },
+      flagged: { single: { valueMs: 400, achievedAt: '2026-11-16T10:02:00.000Z' } }, // below the floor: reported apart
+    });
     // one DNF in an ao5 is trimmed as its worst time
     const one = periodBests([[solve(null, '2026-11-16T10:00:00Z'), ...[10_000, 11_000, 12_000, 13_000].map((t, i) => solve(t, `2026-11-16T10:0${i + 1}:00Z`))]], since);
     expect(one.days['2026-11-16'].ao5?.valueMs).toBe(12_000);

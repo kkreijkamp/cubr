@@ -208,14 +208,22 @@ describe('planPeriodRefresh (periods.changed)', () => {
   const at = '2026-11-16T14:00:00.000Z';
 
   it("writes stats' best for every live day and week, and an empty entry where stats has none", () => {
-    const writes = planPeriodRefresh('333', { days: { '2026-11-16': { single: { valueMs: 17_711, achievedAt: at } } }, weeks: { '2026-W47': { single: { valueMs: 17_711, achievedAt: at }, ao5: { valueMs: 20_122, achievedAt: at } } } }, live);
+    const tap = { valueMs: 211, achievedAt: '2026-11-17T08:00:00.000Z' };
+    const writes = planPeriodRefresh(
+      '333',
+      {
+        days: { '2026-11-17': { flagged: { single: tap } }, '2026-11-16': { single: { valueMs: 17_711, achievedAt: at } } },
+        weeks: { '2026-W47': { single: { valueMs: 17_711, achievedAt: at }, ao5: { valueMs: 20_122, achievedAt: at }, flagged: { single: tap } } },
+      },
+      live,
+    );
     expect(writes).toEqual([
-      { board: 'lb:333:single:d:2026-11-17', kind: 'single', valueMs: null, achievedAt: '', ttlSec: 3 * 86_400 },
-      { board: 'lb:333:ao5:d:2026-11-17', kind: 'ao5', valueMs: null, achievedAt: '', ttlSec: 3 * 86_400 },
-      { board: 'lb:333:single:d:2026-11-16', kind: 'single', valueMs: 17_711, achievedAt: at, ttlSec: 3 * 86_400 },
-      { board: 'lb:333:ao5:d:2026-11-16', kind: 'ao5', valueMs: null, achievedAt: '', ttlSec: 3 * 86_400 },
-      { board: 'lb:333:single:w:2026-W47', kind: 'single', valueMs: 17_711, achievedAt: at, ttlSec: 15 * 86_400 },
-      { board: 'lb:333:ao5:w:2026-W47', kind: 'ao5', valueMs: 20_122, achievedAt: at, ttlSec: 15 * 86_400 },
+      { board: 'lb:333:single:d:2026-11-17', kind: 'single', valueMs: null, achievedAt: '', ttlSec: 3 * 86_400, flagged: tap }, // only a refused tap
+      { board: 'lb:333:ao5:d:2026-11-17', kind: 'ao5', valueMs: null, achievedAt: '', ttlSec: 3 * 86_400, flagged: null },
+      { board: 'lb:333:single:d:2026-11-16', kind: 'single', valueMs: 17_711, achievedAt: at, ttlSec: 3 * 86_400, flagged: null },
+      { board: 'lb:333:ao5:d:2026-11-16', kind: 'ao5', valueMs: null, achievedAt: '', ttlSec: 3 * 86_400, flagged: null },
+      { board: 'lb:333:single:w:2026-W47', kind: 'single', valueMs: 17_711, achievedAt: at, ttlSec: 15 * 86_400, flagged: tap },
+      { board: 'lb:333:ao5:w:2026-W47', kind: 'ao5', valueMs: 20_122, achievedAt: at, ttlSec: 15 * 86_400, flagged: null },
     ]);
   });
 
@@ -228,9 +236,13 @@ describe('planPeriodRefresh (periods.changed)', () => {
 });
 
 describe('parsePeriodBests (stats\' answer)', () => {
-  it('keeps well-formed entries', () => {
-    const body = { days: { '2026-11-16': { single: { valueMs: 17_711, achievedAt: '2026-11-16T02:56:18.483Z' } } }, weeks: { '2026-W47': {} } };
+  it('keeps well-formed entries, refused values (flagged) included', () => {
+    const body = {
+      days: { '2026-11-16': { single: { valueMs: 17_711, achievedAt: '2026-11-16T02:56:18.483Z' }, flagged: { single: { valueMs: 211, achievedAt: '2026-11-16T11:14:36.134Z' } } } },
+      weeks: { '2026-W47': {} },
+    };
     expect(parsePeriodBests(body)).toEqual(body);
+    expect(parsePeriodBests({ days: { '2026-11-16': { flagged: {} } }, weeks: {} })).toEqual({ days: { '2026-11-16': {} }, weeks: {} });
   });
 
   it('throws on anything malformed, so the event is retried instead of wiping entries', () => {
@@ -242,6 +254,8 @@ describe('parsePeriodBests (stats\' answer)', () => {
       { days: { '2026-11-16': { single: { valueMs: -5, achievedAt: '2026-11-16T00:00:00Z' } } }, weeks: {} },
       { days: { '2026-11-16': { single: { valueMs: 1.5, achievedAt: '2026-11-16T00:00:00Z' } } }, weeks: {} },
       { days: {}, weeks: { '2026-W47': { ao5: { valueMs: 20_000, achievedAt: 'soon' } } } },
+      { days: { '2026-11-16': { flagged: [1] } }, weeks: {} },
+      { days: { '2026-11-16': { flagged: { single: { valueMs: 0, achievedAt: '2026-11-16T00:00:00Z' } } } }, weeks: {} },
     ]) {
       expect(() => parsePeriodBests(bad), JSON.stringify(bad)).toThrow();
     }

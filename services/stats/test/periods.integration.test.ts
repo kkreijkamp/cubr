@@ -126,11 +126,14 @@ describeIntegration('stats day and week bests', () => {
       await s.feed(...taps.map((x) => x.event), real.event);
       const from = { event: '333', from: '2026-11-16T00:00:00.000Z' };
       expect((await read(u, from)).days['2026-11-16'].single.valueMs).toBe(239);
-      // every ao5 has taps in it, so there is no ao5 at all above the floor
-      expect(await read(u, { ...from, minSingle: 2_510, minAverage: 3_510 })).toEqual({
-        days: { '2026-11-16': { single: { valueMs: 17_382, achievedAt: real.solve.createdAt } } },
-        weeks: { '2026-W47': { single: { valueMs: 17_382, achievedAt: real.solve.createdAt } } },
-      });
+      // every ao5 has taps in it, so there is no ao5 at all above the floor; the lowest refused values
+      // come apart, for the leaderboard to tell him why (ao5 of 648 612 418 481 239 = 504)
+      const tapAt = taps[4].solve.createdAt;
+      const entry = {
+        single: { valueMs: 17_382, achievedAt: real.solve.createdAt },
+        flagged: { single: { valueMs: 239, achievedAt: tapAt }, ao5: { valueMs: 504, achievedAt: tapAt } },
+      };
+      expect(await read(u, { ...from, minSingle: 2_510, minAverage: 3_510 })).toEqual({ days: { '2026-11-16': entry }, weeks: { '2026-W47': entry } });
     });
 
     it("follows a merge, which interleaves two sessions' solves into new ao5s", async () => {

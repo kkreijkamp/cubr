@@ -1,6 +1,6 @@
 import { fetchJson, internalHeaders, type FetchOptions, type Redis } from '@cubr/common';
 import type { FastifyBaseLogger } from 'fastify';
-import { isBelowFloor, type FloorSource } from './floors.js';
+import { flagJson, isBelowFloor, type FloorSource } from './floors.js';
 import {
   DELETED_USERS_KEY,
   KINDS,
@@ -9,6 +9,7 @@ import {
   USERS_KEY,
   allTimeKey,
   atKey,
+  flaggedKey,
   hasBoards,
   tsKey,
   type Kind,
@@ -118,17 +119,18 @@ export async function rebuildOnce(deps: RebuildDeps): Promise<{ entries: number;
         skipped++;
         continue;
       }
-      if (isBelowFloor(w.valueMs, await floors.floor(pb.event, kind))) {
-        flagged++; // not re-flagged on every rebuild; it was flagged when the event arrived
-        continue;
-      }
-      pipe.lbSetPb(w.board, atKey(w.board), tsKey(w.board), pb.userId, w.valueMs, w.achievedAt, snapshotMs);
+      const floorMs = await floors.floor(pb.event, kind);
+      // a refused PB goes back on the board's flagged hash only (so its owner learns why they
+      // aren't listed); lb:flagged, the admin's list, got it when the event first arrived
+      const flag = isBelowFloor(w.valueMs, floorMs) ? flagJson(w.valueMs, floorMs!, w.achievedAt) : '';
+      if (flag) flagged++;
+      pipe.lbSetPb(w.board, atKey(w.board), tsKey(w.board), flaggedKey(w.board), pb.userId, w.valueMs, w.achievedAt, snapshotMs, flag);
       queued++;
       if (typeof pb.username === 'string' && pb.username) {
         pipe.lbUser(USERS_KEY, pb.userId, pb.username, '0', '', '0', ''); // keeps known country/avatar
         queued++;
       }
-      entries++;
+      if (!flag) entries++;
       if (queued >= PIPELINE_CHUNK) await flush();
     }
   }

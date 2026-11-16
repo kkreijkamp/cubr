@@ -47,6 +47,27 @@ export function floorFor(event: string, kind: Kind, records: WcaRecords | null |
 /** Strictly below the floor = rejected. */
 export const isBelowFloor = (valueMs: number, floor: number | null): boolean => floor !== null && valueMs < floor;
 
+/** What a board's flagged hash keeps for a refused value: its owner is told why they aren't listed. */
+export interface FlaggedValue {
+  valueMs: number;
+  floorMs: number;
+  achievedAt: string | null;
+}
+
+export const flagJson = (valueMs: number, floorMs: number, achievedAt: string | null): string => JSON.stringify({ valueMs, floorMs, achievedAt } satisfies FlaggedValue);
+
+/** Reads a flagged-hash value back (null for anything malformed). */
+export function parseFlag(raw: string | null | undefined): FlaggedValue | null {
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw) as Partial<FlaggedValue>;
+    if (typeof v.valueMs !== 'number' || typeof v.floorMs !== 'number') return null;
+    return { valueMs: v.valueMs, floorMs: v.floorMs, achievedAt: typeof v.achievedAt === 'string' ? v.achievedAt : null };
+  } catch {
+    return null;
+  }
+}
+
 /** Validates the wca-service response `{records: {[event]: {single, average}}}`. */
 export function parseRecords(json: unknown): WcaRecords | null {
   const recs = (json as { records?: unknown } | null)?.records;
