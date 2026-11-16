@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Penalty } from '@cubr/cubestats';
-import { dailyHistory, dailyOverview, dailyResult, effectiveOrNull, rollingFromSolves } from '../src/rolling.js';
+import { dailyOverview, dailyResult, effectiveOrNull, rollingFromSolves } from '../src/rolling.js';
 
 const ok = (ms: number) => ({ timeMs: ms, penalty: 'OK' as Penalty });
 const dnf = (ms = 10_000) => ({ timeMs: ms, penalty: 'DNF' as Penalty });
@@ -71,32 +71,5 @@ describe('effectiveOrNull', () => {
     expect(effectiveOrNull(ok(5000))).toBe(5000);
     expect(effectiveOrNull(plus2(5000))).toBe(7000);
     expect(effectiveOrNull(dnf(5000))).toBeNull();
-  });
-});
-
-describe('dailyHistory', () => {
-  const at = (date: string, s: { timeMs: number; penalty: Penalty }) => ({ date, ...s });
-  it('folds the attempts into one entry per day, oldest first', () => {
-    const days = dailyHistory([
-      at('2026-03-02', ok(10_000)),
-      at('2026-03-02', ok(12_000)),
-      at('2026-03-02', ok(11_000)),
-      at('2026-03-02', ok(9_000)),
-      at('2026-03-02', ok(13_000)),
-      at('2026-02-28', ok(5_000)),
-      at('2026-03-01', dnf()),
-      at('2026-03-01', dnf()),
-      at('2026-03-01', ok(9_000)),
-      at('2026-03-01', ok(9_000)),
-      at('2026-03-01', ok(9_000)),
-    ]);
-    expect(days).toEqual([
-      { date: '2026-02-28', attempts: 1, ao5: null },
-      { date: '2026-03-01', attempts: 5, ao5: -1 },
-      { date: '2026-03-02', attempts: 5, ao5: 11_000 },
-    ]);
-  });
-  it('is empty without attempts', () => {
-    expect(dailyHistory([])).toEqual([]);
   });
 });

@@ -17,7 +17,7 @@
 - **Accounts & sync** - sign up with a password or with Google, Apple or GitHub; solves stored in the cloud with offline-tolerant optimistic sync; import and export compatible with csTimer and most others; settings follow you across devices; profile pictures.
 - **Installable app (PWA)** - install it on phones and computers: its own window, a home screen or dock icon and app shortcuts. The timer opens and works offline, and new versions download in the background with an "update ready" notice.
 - **Leaderboards** - all-time / weekly / daily per event (single, ao5, ao12), WCA-record anti-cheat.
-- **Daily challenge** - everyone gets the same 5 scrambles each UTC day; one attempt per scramble, ranked by ao5. A small calendar shows your own results over the last 30 days or any month, brighter on your faster days.
+- **Daily challenge** - everyone gets the same 5 scrambles each UTC day; one attempt per scramble, ranked by ao5.
 - **Race rooms** - real-time multiplayer rounds over WebSockets.
 - **Profiles & analytics** - PB cards, a solve history chart with rolling averages, activity heatmap, streaks, time-of-day performance.
 - **WCA comparison** - "where would I rank?" against ~2.3 M rows of official WCA data (rank, percentile, distribution).

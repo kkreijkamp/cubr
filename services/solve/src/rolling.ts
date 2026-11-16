@@ -53,31 +53,6 @@ export function dailyOverview<S extends { event: string }>(
   return events;
 }
 
-/** A recorded attempt of one event with its UTC day, as GET /api/solves/daily/history reads them. */
-export interface DatedAttempt extends SolveLike {
-  date: string;
-}
-
-/** One day of someone's daily challenges in one event: how many attempts, and the official ao5. */
-export interface DailyDay {
-  date: string;
-  attempts: number;
-  /** ms, -1 = DNF, null until all five attempts exist */
-  ao5: number | null;
-}
-
-/**
- * GET /api/solves/daily/history: the attempts (ordered by day, then index) folded into one entry
- * per day, oldest first.
- */
-export function dailyHistory(attempts: DatedAttempt[]): DailyDay[] {
-  const byDay = new Map<string, DatedAttempt[]>();
-  for (const a of attempts) byDay.set(a.date, [...(byDay.get(a.date) ?? []), a]);
-  return [...byDay.entries()]
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(([date, list]) => ({ date, attempts: list.length, ao5: dailyResult(list).ao5 }));
-}
-
 /** Event payload value for one solve: effective ms, or null for a DNF (SPEC section 8 `effectiveMs`). */
 export function effectiveOrNull(s: SolveLike): number | null {
   const v = effectiveMs(s);

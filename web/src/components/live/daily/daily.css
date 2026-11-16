@@ -40,9 +40,6 @@
   min-width: 0;
 }
 .daily-side {
-  display: grid;
-  gap: 1rem;
-  align-content: start;
   min-width: 0;
 }
 .daily-past {
@@ -186,39 +183,6 @@
   font-size: 0.85rem;
   line-height: 1.5;
   overflow-wrap: anywhere;
-}
-
-/* your results: the profile's activity calendar, a month at a time (its squares, balloon, legend
-   and picker are in global.css). An empty day is a hole in the card, as on Monkeytype. */
-.daily-history {
-  --dh-cell: 1.75rem;
-}
-.daily-history .live-section-title {
-  margin-bottom: 0.5rem;
-}
-.dh-grid {
-  display: grid;
-  grid-template-rows: repeat(7, var(--dh-cell)) auto;
-  gap: 3px;
-  justify-content: center;
-}
-.daily-history .hm-cell {
-  border-radius: 2px;
-}
-.dh-tip {
-  display: grid;
-  justify-items: center;
-  gap: 0.1rem;
-}
-.dh-tip-more {
-  opacity: 0.75;
-}
-.daily-history .hm-foot b {
-  color: var(--text-color);
-  font-weight: 400;
-}
-.daily-history .hm-legend {
-  margin-left: auto;
 }
 
 /* leaderboard */

@@ -17,7 +17,6 @@ migrated at startup. Port 8080.
 | `POST /api/sessions/import` | <= 100 000 solves, body <= 25 MB; one transaction, `unnest()` batches of 2000, one `solves.imported` event. 100k solves take ~1.3 s locally. 10 imports/h per user (checked onRequest, before the body is read); at most 250 000 solves per account (advisory lock per account, then a count) |
 | `GET /api/solves/export` | `{exportedAt, sessions:[Session & {solves}]}`, streamed: one `REPEATABLE READ READ ONLY` transaction, keyset pages of 2000 solves per session (`created_at::text`, id), so memory stays flat (200k solves fine under the 192 MB production heap). 10 exports/h per user |
 | `GET /api/solves/daily?date=` | the user's daily solves per event + the official ao5 (from the recorded attempts) |
-| `GET /api/solves/daily/history?event=` | every day the user attempted that event's daily challenge, oldest first: `{date, attempts, ao5}` (ao5 from the recorded attempts, -1 = DNF, null until all five exist). Read by the daily page's "your results" calendar |
 | `GET /api/solves/_info`, `/api/sessions/_info` | info incl. `outbox: {backlog, published, lastPublishedAt, lastError, healthy}` |
 | `GET /internal/users/:userId/solves?event=` | **service-to-service only**: not routed by the gateway/Ingress and requires `X-Internal-Token` (403 otherwise): `{solves:[{id, sessionId, timeMs, penalty, createdAt, practice?}]}` ordered by session, time (stats recompute; `practice: true` marks a practice session's solves) |
 | `GET /internal/users/:userId/sessions` | same protection: `{sessions:[{id, name, event, practice}]}` (read models backfill session names) |
@@ -57,7 +56,7 @@ scramble can't be redone. When all 5 attempts exist, `daily.completed` (ao5 + ti
 in the same transaction (advisory lock per user/date/event prevents a race). A penalty marked after the solve (`PATCH`
 ok / +2 / DNF) also changes the attempt while the day is still open, and a finished day's ao5 is re-sent as
 `daily.updated`. Deleting a daily solve, or re-penalising it after the day has closed, changes neither the result nor the
-ao5 reported by `GET /api/solves/daily` and `GET /api/solves/daily/history`.
+ao5 reported by `GET /api/solves/daily`.
 
 ## Choices worth knowing
 - `id` and `scramble`/`penalty` on `POST /api/solves` are optional (server generates the id; defaults `''`/`OK`). `source` may be

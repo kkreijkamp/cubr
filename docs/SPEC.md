@@ -447,7 +447,6 @@ Pool: keep `scramble:pool:<event>` topped up (333/222/pyram/skewb: 200; 444/sq1/
 | POST `/api/sessions/import` | `{sessions: [{name, event, practice?, solves: [{timeMs, penalty, scramble, comment?, createdAt}]}]}` (<= 1 000 sessions, <= 100 000 solves, body <= 25 MB) | `{imported: {sessions, solves}}` (+ one `solves.imported`) - bulk insert in batches inside a transaction; 10 imports/h per user (429, checked before the body is read); an account holds at most 250 000 solves (400 if the import would pass it; one import per account at a time) |
 | GET `/api/solves/export` | - | `{exportedAt, sessions: [Session & {solves: Solve[]}]}`, streamed from one read-only snapshot in pages of 2 000 solves (memory stays flat; 200k solves = 52 MB in ~2.5 s locally); 10 exports/h per user (429) |
 | GET `/api/solves/daily?date=` | - | `{date, events: {"333": {solves: Solve[], ao5: number\|-1\|null}, ...}}` (only events with >=1 attempt; ao5 = the official result of the five attempts: times as submitted, penalties as last set while the day was open) |
-| GET `/api/solves/daily/history?event=` | - | `{event, days: [{date, attempts, ao5: number\|-1\|null}]}`: every UTC day the user attempted that event's daily challenge, oldest first, with the number of attempts (1-5) and the official ao5 (as above; null until all five exist). 400 for an event without a daily challenge. The daily page's "your results" calendar. |
 | GET `/api/solves/_info`, `/api/sessions/_info` | - | info (+ outbox backlog and relay state) |
 | GET `/internal/users/:userId/solves?event=` | - | `{solves: [{id, sessionId, timeMs, penalty, createdAt, practice?}]}` ordered by session_id, created_at (for stats recompute; `practice: true` on a practice session's solves) |
 | GET `/internal/users/:userId/sessions` | - | `{sessions: [{id, name, event, practice}]}` (stats backfills session display names) |
@@ -460,8 +459,7 @@ same transaction, and a second attempt for that index -> 409, even after the fir
 is emitted with the ao5 of the attempts. A penalty marked after the solve (`PATCH` ok / +2 / DNF on a
 daily solve) also changes its attempt while the day is still open (same window), and a finished
 day's result is re-sent as `daily.updated`. Deletes, and penalty changes after the day has closed,
-change neither the result nor the board, nor the history (`GET /api/solves/daily/history` reads the
-same recorded attempts).
+change neither the result nor the board.
 
 Outbox relay: every 250 ms each replica claims unpublished rows (`FOR UPDATE SKIP LOCKED`, LIMIT 500),
 XADDs them, sets `published_at`. If Redis is down, solves still succeed and events are delivered later.
