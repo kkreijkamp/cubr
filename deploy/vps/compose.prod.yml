@@ -35,7 +35,10 @@ services:
   auth:
     image: australia-southeast1-docker.pkg.dev/cubr-app/cubr/auth:${CUBR_VERSION:?set CUBR_VERSION in .env}
     build: !reset null
-    environment: *prod-env
+    environment:
+      <<: *prod-env
+      PUBLIC_URL: https://cubr.dev
+      RESEND_API_KEY: ${RESEND_API_KEY:-}   # unset -> password-reset emails are only logged
 
   scramble:
     image: australia-southeast1-docker.pkg.dev/cubr-app/cubr/scramble:${CUBR_VERSION:?set CUBR_VERSION in .env}

@@ -204,6 +204,11 @@ export const api = {
       request<{ token: string; user: PrivateUser }>('POST', '/api/auth/register', body),
     login: (body: { login: string; password: string }) => request<{ token: string; user: PrivateUser }>('POST', '/api/auth/login', body),
     logout: () => request<void>('POST', '/api/auth/logout'),
+    /** Always 202: the answer doesn't say whether an account uses the address. */
+    forgotPassword: (email: string) => request<{ ok: true }>('POST', '/api/auth/password/forgot', { email }),
+    /** Uses a reset link's token once; signs out every other session and returns a fresh one. */
+    resetPassword: (body: { token: string; password: string }) =>
+      request<{ token: string; user: PrivateUser }>('POST', '/api/auth/password/reset', body),
     me: (signal?: AbortSignal) => get<{ user: PrivateUser; settings: Record<string, unknown> }>('/api/auth/me', signal),
     updateMe: (body: Partial<Pick<PublicUser, 'displayName' | 'bio' | 'country' | 'wcaId'>>) =>
       request<{ user: PrivateUser }>('PATCH', '/api/auth/me', body),

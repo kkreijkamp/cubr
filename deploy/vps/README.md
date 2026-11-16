@@ -76,7 +76,11 @@ and run the WCA import.
 
 - **Secrets** live only in `/opt/cubr/.env` (mode 600): `deploy.sh init` generated the Postgres
   password, JWT secret and internal token on the VM; the tunnel token comes from Cloudflare's API.
-  Changing `JWT_SECRET` signs everyone out.
+  Changing `JWT_SECRET` signs everyone out. `RESEND_API_KEY` (only the auth container gets it)
+  sends password-reset emails from `no-reply@cubr.dev`; without it they are only logged.
+- **Email DNS** (Cloudflare): `cubr.dev` MX to Google Workspace (`hello@cubr.dev`), SPF for Google,
+  `_dmarc` (report-only for now), and Resend's records (`resend._domainkey`, `send` MX/TXT,
+  `rsend` CNAME).
 - **Real client IPs.** Cloudflare sends the visitor's address in `CF-Connecting-IP`; the gateway
   (`deploy/gateway/nginx.conf`) uses it only for requests from Docker networks, so the per-IP rate
   limits (login 10/min, sign-up 20/h, race rooms 20/min) count visitors, not the tunnel.

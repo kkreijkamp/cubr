@@ -129,6 +129,44 @@
   margin-top: 0.2em;
   color: var(--main-color);
 }
+/* reset password: a single title in the tabs' type, the sign-in form's "forgot password?" link */
+.lg-title {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: inherit;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--text-color);
+}
+.lg-forgot {
+  justify-self: end;
+  color: var(--sub-color);
+  font-size: 0.75rem;
+  text-decoration: none;
+  border-radius: 0.25rem;
+  transition: color var(--dur);
+}
+.lg-forgot:hover {
+  color: var(--text-color);
+}
+.lg-sent p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+.lg-sent-to {
+  color: var(--main-color);
+  word-break: break-all;
+}
+.lg-sent .lg-sent-sub {
+  color: var(--sub-color);
+  font-size: 0.75rem;
+}
+.lg-sent .btn-text {
+  padding: 0;
+  font-size: inherit;
+  text-decoration: underline;
+}
 .lg-guest {
   justify-self: start;
   margin-top: 1.5rem;

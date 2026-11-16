@@ -94,6 +94,9 @@ services:
   auth:
     <<: *service
     image: cubr/auth:dev              # local tag, built by `docker compose up --build`
+    environment:
+      <<: *service-env
+      PUBLIC_URL: http://localhost:8080   # links in emails; no RESEND_API_KEY here -> emails are logged
     build: { context: ., dockerfile: services/auth/Dockerfile, args: *build-args }
 
   scramble:

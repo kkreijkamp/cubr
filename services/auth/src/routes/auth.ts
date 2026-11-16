@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
 import {
   HttpError,
   INTERNAL_TOKEN_HEADER,
   TOKEN_TTL_SEC,
+  badRequest,
   conflict,
   forbidden,
   internalTokenMatches,
@@ -38,6 +39,8 @@ import {
   type UserRow,
 } from '../users.js';
 import { allow, publishSafely, withTimeout } from '../safe.js';
+import { loadMailConfig, sendMail } from '../mail.js';
+import { RESET_TTL_MIN, forgotSchema, hashResetToken, newResetToken, resetEmail, resetLink, resetSchema } from '../reset.js';
 
 const BCRYPT_COST = 10;
 
@@ -116,6 +119,74 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
     const user = toPrivateUser(updated.rows[0] ?? found);
     const { token } = await signToken(config.jwtSecret, user);
     return { token, user };
+  });
+
+  // ---- password reset ---------------------------------------------------------------------------
+  const mail = loadMailConfig();
+  if (!mail.apiKey) app.log.warn('RESEND_API_KEY is not set: password-reset emails are logged, not sent');
+
+  /** Creates a reset link for the account of `email` (if there is one) and emails it. */
+  async function sendResetLink(email: string, log: FastifyBaseLogger): Promise<void> {
+    const { rows } = await pool.query<{ id: string; username: string; email: string }>(
+      'select id, username, email from auth.users where lower(email) = lower($1)',
+      [email],
+    );
+    const user = rows[0];
+    if (!user) return;
+    if (!(await allow(redis, `forgot-user:${user.id}`, 3, 3600))) {
+      log.warn({ userId: user.id }, 'password reset: too many links for this account this hour');
+      return;
+    }
+    const { token, hash } = newResetToken();
+    await pool.query('delete from auth.password_resets where expires_at < now()');
+    await pool.query(
+      `insert into auth.password_resets (token_hash, user_id, expires_at) values ($1, $2, now() + make_interval(mins => $3))`,
+      [hash, user.id, RESET_TTL_MIN],
+    );
+    const message = resetEmail({ username: user.username, link: resetLink(mail.publicUrl, token), minutes: RESET_TTL_MIN });
+    await sendMail(mail, { to: user.email, ...message }, log);
+    log.info({ userId: user.id }, 'password reset link sent');
+  }
+
+  // ---- POST /api/auth/password/forgot -----------------------------------------------------------
+  // Always 202, answered before any lookup: neither the reply nor its timing tells whether an
+  // account uses the address.
+  app.post('/api/auth/password/forgot', async (req, reply) => {
+    if (!(await allow(redis, `forgot:${req.ip}`, 10, 3600))) throw rateLimited('Too many reset requests, try again later');
+    const { email } = parse(forgotSchema, req.body ?? {});
+    sendResetLink(email, req.log).catch((err: Error) => req.log.error({ err: err.message }, 'password reset email failed'));
+    return reply.status(202).send({ ok: true });
+  });
+
+  // ---- POST /api/auth/password/reset ------------------------------------------------------------
+  // Uses the link once: sets the new password, ends every other reset link and every session of
+  // the account (fails closed like account deletion), and signs in with a fresh token.
+  app.post('/api/auth/password/reset', async (req) => {
+    if (!(await allow(redis, `reset:${req.ip}`, 20, 3600))) throw rateLimited('Too many attempts, try again later');
+    const { token, password } = parse(resetSchema, req.body ?? {});
+    const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
+    const { row, revokedAt } = await withTx(pool, async (c) => {
+      const used = await c.query<{ user_id: string }>(
+        'delete from auth.password_resets where token_hash = $1 and expires_at > now() returning user_id',
+        [hashResetToken(token)],
+      );
+      if (!used.rows[0]) throw badRequest('This reset link is invalid or has expired');
+      const userId = used.rows[0].user_id;
+      await c.query('delete from auth.password_resets where user_id = $1', [userId]);
+      const { rows } = await c.query<UserRow>(
+        `update auth.users set password_hash = $2, last_login_at = now() where id = $1 returning ${USER_COLUMNS}`,
+        [userId, passwordHash],
+      );
+      if (!rows[0]) throw badRequest('This reset link is invalid or has expired');
+      const at = Math.floor(Date.now() / 1000);
+      const revoked = await withTimeout(redis.set(revokedUserKey(userId), String(at), 'EX', TOKEN_TTL_SEC).then(() => true), 2000, false);
+      if (!revoked) throw unavailable('Could not reset the password right now, please retry');
+      return { row: rows[0], revokedAt: at };
+    });
+    req.log.info({ userId: row.id }, 'password reset');
+    const user = toPrivateUser(row);
+    const { token: jwt } = await signToken(config.jwtSecret, user, TOKEN_TTL_SEC, revokedAt + 1);
+    return { token: jwt, user };
   });
 
   // ---- POST /api/auth/logout ------------------------------------------------------------------

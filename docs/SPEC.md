@@ -176,6 +176,14 @@ CREATE TABLE auth.avatars (
   version      text NOT NULL,
   updated_at   timestamptz NOT NULL DEFAULT now()
 );
+-- password-reset links (migration 003): only the SHA-256 of the token; a row is deleted when used,
+-- together with every other row of the user
+CREATE TABLE auth.password_resets (
+  token_hash bytea PRIMARY KEY,
+  user_id    uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  expires_at timestamptz NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
 ```
 
 ### 7.2 `solve` schema (solve-service)
@@ -356,6 +364,8 @@ type PB = { valueMs: number; solveId: string|null; achievedAt: string };
 | POST `/api/auth/register` | - | `{username, email, password}` | 201 `{token, user: PrivateUser}`; 409 CONFLICT (username/email taken); 429 after 20 registrations/h/IP |
 | POST `/api/auth/login` | - | `{login, password}` (login = username or email) | 200 `{token, user: PrivateUser}`; 401; 429 after 10 attempts/min/IP |
 | POST `/api/auth/logout` | req | - | 204 (revokes jti) |
+| POST `/api/auth/password/forgot` | - | `{email}` | 202 `{ok: true}` for every address, answered before the lookup (no account enumeration by reply or timing); an account with that email gets a link `<PUBLIC_URL>/reset#<token>` (32 random bytes, valid 60 min, single use) through Resend; 429 after 10/h/IP; at most 3 links/h per account |
+| POST `/api/auth/password/reset` | - | `{token, password}` (password: 8-128 chars) | 200 `{token, user: PrivateUser}`: new password set, the user's other reset links deleted, every older token revoked (per-user revocation; the new token is issued after it); 400 invalid/expired/used link; 503 if the revocation can't be stored (nothing changes) |
 | GET `/api/auth/me` | req | - | `{user: PrivateUser, settings: object}` |
 | PATCH `/api/auth/me` | req | `{displayName?, bio?, country?, wcaId?}` (null clears) | `{user: PrivateUser}` (+ `user.updated`) |
 | PUT `/api/auth/me/settings` | req | `{settings: object}` (<= 16 KB JSON) | `{settings}` |

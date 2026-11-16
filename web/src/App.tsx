@@ -17,6 +17,7 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const WcaPage = lazy(() => import('./pages/WcaPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
+const ResetPasswordPage = lazy(() => import('./pages/LoginPage').then((m) => ({ default: m.ResetPasswordPage })));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 const s = (el: JSX.Element) => <Suspense fallback={<Loading />}>{el}</Suspense>;
@@ -41,6 +42,7 @@ const router = createBrowserRouter([
           { path: '/wca', element: s(<WcaPage />) },
           { path: '/about', element: s(<AboutPage />) },
           { path: '/login', element: s(<LoginPage />) },
+          { path: '/reset', element: s(<ResetPasswordPage />) },
           { path: '*', element: s(<NotFoundPage />) },
         ],
       },

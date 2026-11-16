@@ -41,4 +41,18 @@ export const migrations: Migration[] = [
       );
     `,
   },
+  {
+    id: '003_password_resets',
+    sql: `
+      -- password-reset links: only the SHA-256 of the token is stored (a leaked table resets
+      -- nothing); a row is deleted when used, and every row of the user goes with it
+      CREATE TABLE IF NOT EXISTS auth.password_resets (
+        token_hash bytea PRIMARY KEY,
+        user_id    uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+        expires_at timestamptz NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS password_resets_user ON auth.password_resets (user_id);
+    `,
+  },
 ];
