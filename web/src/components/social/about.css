@@ -20,7 +20,7 @@
 .ab-hero .ab-logo {
   display: flex;
   align-items: center;
-  gap: 0.9rem;
+  gap: 0.675rem;
   font-family: var(--logo-font);
   font-size: clamp(2.25rem, 1.6rem + 2.5vw, 3.5rem);
   color: var(--text-color);
