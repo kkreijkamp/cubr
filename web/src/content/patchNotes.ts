@@ -18,6 +18,33 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: '1.3.0',
+    date: '2026-11-16',
+    title: 'private profiles, supporters and the fine print',
+    sections: [
+      {
+        heading: 'new',
+        items: [
+          'private profiles: in edit profile, pick who can see yours. everyone else then sees only your picture and username',
+          'support cubr on ko-fi (ko-fi.com/cubrr): make it public there and your name shows on the about page',
+          'terms of service and a privacy policy, linked at the bottom of every page',
+        ],
+      },
+      {
+        heading: 'changed',
+        items: ['a shorter about page'],
+      },
+      {
+        heading: 'behind the scenes',
+        items: [
+          'scramble requests have per-address limits, so no one can tie up the scramble server',
+          'exports stream in batches, imports and exports have hourly limits, and an account holds up to 250,000 solves',
+          'server logs rotate on their own',
+        ],
+      },
+    ],
+  },
+  {
     version: '1.2.0',
     date: '2026-11-16',
     title: 'password reset, daily penalties and a white default theme',
