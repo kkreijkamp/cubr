@@ -15,6 +15,21 @@ jobs:
     name: Services, jobs and shared packages
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # throwaway Postgres and Redis for the integration suites (@cubr/testkit)
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: test
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U postgres" --health-interval 2s --health-timeout 2s --health-retries 30
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: --health-cmd "redis-cli ping" --health-interval 2s --health-timeout 2s --health-retries 30
+    env:
+      TEST_DATABASE_URL: postgres://postgres:test@localhost:5432/postgres
+      TEST_REDIS_URL: redis://localhost:6379
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -24,7 +39,7 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - name: Typecheck
         run: npm run typecheck
-      - name: Unit tests
+      - name: Tests (unit and integration)
         run: npm test
       - name: Bundle every service and the seed job
         run: npm run build:all
@@ -73,6 +88,24 @@ jobs:
           else
             bash scripts/bump-version.sh --check
           fi
+
+  nginx:
+    # A typo in either config takes the site down on the next deploy: check both with the
+    # images production runs (the gateway's nginx.conf as is, the web template rendered the way
+    # the web image renders it at start-up).
+    name: nginx configs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Gateway (deploy/gateway/nginx.conf)
+        run: docker run --rm -v "$PWD/deploy/gateway/nginx.conf:/etc/nginx/nginx.conf:ro" nginx:1.27-alpine nginx -t
+      - name: Web container (web/nginx/default.conf.template)
+        run: >-
+          docker run --rm -e APP_VERSION=ci -e NODE_NAME=ci
+          -v "$PWD/web/nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro"
+          nginxinc/nginx-unprivileged:1.27-alpine
+          sh -c '/docker-entrypoint.d/20-envsubst-on-templates.sh > /dev/null && nginx -t'
 
   image:
     # scramble is the one image that ships an npm package next to its bundle (cubing.js),

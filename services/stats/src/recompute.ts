@@ -1,4 +1,4 @@
-import { fetchJson, HttpError, internalHeaders, parse, type PoolClient } from '@cubr/common';
+import { fetchJson, internalHeaders, parse, type PoolClient } from '@cubr/common';
 import { effectiveMs } from '@cubr/cubestats';
 import type { FastifyBaseLogger } from 'fastify';
 import { bucketSolves } from './domain/buckets.js';
@@ -15,17 +15,15 @@ export interface RecomputeDeps {
 
 /**
  * All of a user's solves for one event from solve-service (ordered by session, created_at).
- * Throws (-> the stream entry stays pending and is retried) when solve-service is unreachable.
+ * Throws on any failure (-> the stream entry stays pending and is retried). That includes a 404:
+ * solve-service answers an unknown user with an empty list, so a 404 means the request went
+ * somewhere else (e.g. SOLVE_URL pointing at the gateway, which answers /internal/* with 404),
+ * and treating it as "no solves" would wipe the user's stats for the event.
  */
 export async function fetchSolveList(deps: RecomputeDeps, userId: string, event: string): Promise<ListSolve[]> {
   const url = `${deps.solveUrl}/internal/users/${encodeURIComponent(userId)}/solves?event=${encodeURIComponent(event)}`;
-  try {
-    const body = await fetchJson<unknown>(url, { timeoutMs: 15_000, retries: 1, headers: internalHeaders(deps.internalToken) });
-    return parse(solveListSchema, body).solves;
-  } catch (err) {
-    if (err instanceof HttpError && err.statusCode === 404) return []; // unknown user -> no solves
-    throw err;
-  }
+  const body = await fetchJson<unknown>(url, { timeoutMs: 15_000, retries: 1, headers: internalHeaders(deps.internalToken) });
+  return parse(solveListSchema, body).solves;
 }
 
 export interface RecomputeArgs {

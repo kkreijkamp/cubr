@@ -80,4 +80,24 @@ export const migrations: Migration[] = [
       );
     `,
   },
+  {
+    id: '006_identities',
+    sql: `
+      -- Sign-in with Google, Apple or GitHub (routes/oauth.ts). An account made that way has no
+      -- password until it sets one with a reset link.
+      ALTER TABLE auth.users ALTER COLUMN password_hash DROP NOT NULL;
+      -- one row per linked provider account; subject = the provider's stable user id
+      CREATE TABLE IF NOT EXISTS auth.user_identities (
+        provider     text NOT NULL CHECK (provider IN ('google', 'apple', 'github')),
+        subject      text NOT NULL,
+        user_id      uuid NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+        email        text,
+        created_at   timestamptz NOT NULL DEFAULT now(),
+        last_used_at timestamptz,
+        PRIMARY KEY (provider, subject)
+      );
+      -- at most one account per provider per cubr user
+      CREATE UNIQUE INDEX IF NOT EXISTS user_identities_user_provider ON auth.user_identities (user_id, provider);
+    `,
+  },
 ];

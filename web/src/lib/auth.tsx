@@ -15,8 +15,11 @@ interface AuthContextValue {
   /** Sets a new password with a reset link's token and signs in (every other session ends). */
   resetPassword(token: string, password: string): Promise<void>;
   logout(): Promise<void>;
-  /** Deletes the account for good (after checking the password), then signs out. */
-  deleteAccount(password: string): Promise<void>;
+  /** Deletes the account for good (after checking the password, or the username for an account
+   *  without one), then signs out. */
+  deleteAccount(proof: { password: string } | { confirm: string }): Promise<void>;
+  /** Signs in with a token from elsewhere (sign-in with Google, Apple or GitHub). */
+  signInWithToken(token: string, user: PrivateUser): Promise<void>;
   setUser(u: PrivateUser): void;
 }
 
@@ -155,8 +158,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(null);
         applyUser(null);
       },
-      async deleteAccount(password) {
-        await api.auth.deleteMe(password);
+      async signInWithToken(token, signedIn) {
+        setToken(token);
+        try {
+          const me = await api.auth.me();
+          mergeServerSettings(me.settings);
+        } catch {
+          /* settings are optional */
+        }
+        applyUser(signedIn);
+      },
+      async deleteAccount(proof) {
+        await api.auth.deleteMe(proof);
         setToken(null);
         applyUser(null);
       },

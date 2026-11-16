@@ -44,9 +44,13 @@ export const patchMeSchema = z.object({
 export type PatchMe = z.infer<typeof patchMeSchema>;
 
 /** DELETE /api/auth/me: the password again, so a stolen token alone cannot delete the account. */
-export const deleteMeSchema = z.object({
-  password: z.string().min(1).max(128),
-});
+export const deleteMeSchema = z
+  .object({
+    password: z.string().min(1).max(128).optional(),
+    /** an account without a password (made with Google, Apple or GitHub) types its username instead */
+    confirm: z.string().trim().min(1).max(40).optional(),
+  })
+  .refine((b) => b.password !== undefined || b.confirm !== undefined, { message: 'password: required' });
 
 export const settingsSchema = z.object({
   settings: z.record(z.unknown()),
@@ -73,6 +77,8 @@ export interface UserRow {
   /** short content hash of the current profile picture (null = none); part of the avatar URL */
   avatar_version?: string | null;
   profile_private?: boolean | null;
+  /** false for an account made with Google, Apple or GitHub that hasn't set a password */
+  has_password?: boolean;
 }
 
 export interface PublicUser {
@@ -91,6 +97,8 @@ export interface PublicUser {
 }
 export interface PrivateUser extends PublicUser {
   email: string;
+  /** the account can sign in with a password (false: only with Google, Apple or GitHub) */
+  hasPassword: boolean;
 }
 
 const iso = (v: Date | string): string => (v instanceof Date ? v.toISOString() : new Date(v).toISOString());
@@ -133,13 +141,14 @@ export function avatarUrl(userId: string, version: string | null | undefined): s
   return version ? `/api/users/${userId}/avatar?v=${version}` : null;
 }
 
-/** The owner's own view: everything, plus the email. */
+/** The owner's own view: everything, plus the email and whether it has a password. */
 export function toPrivateUser(row: UserRow): PrivateUser {
-  return { ...toPublicUser(row, row.id), email: row.email };
+  return { ...toPublicUser(row, row.id), email: row.email, hasPassword: row.has_password !== false };
 }
 
 /** Columns selected everywhere a user is returned (never includes password_hash). */
-export const USER_COLUMNS = 'id, username, email, display_name, bio, country, wca_id, created_at, last_login_at, avatar_version, profile_private';
+export const USER_COLUMNS =
+  'id, username, email, display_name, bio, country, wca_id, created_at, last_login_at, avatar_version, profile_private, password_hash is not null as has_password';
 
 /** Maps validated PATCH /me fields to SQL columns. Only fixed identifiers, values stay parameterised. */
 export function buildUserUpdate(patch: PatchMe): { sets: string[]; values: unknown[] } {

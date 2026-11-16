@@ -18,6 +18,7 @@ const WcaPage = lazy(() => import('./pages/WcaPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const ResetPasswordPage = lazy(() => import('./pages/LoginPage').then((m) => ({ default: m.ResetPasswordPage })));
+const SsoPage = lazy(() => import('./pages/SsoPage'));
 const TermsPage = lazy(() => import('./pages/LegalPage').then((m) => ({ default: m.TermsPage })));
 const PrivacyPage = lazy(() => import('./pages/LegalPage').then((m) => ({ default: m.PrivacyPage })));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
@@ -44,6 +45,8 @@ const router = createBrowserRouter([
           { path: '/wca', element: s(<WcaPage />) },
           { path: '/about', element: s(<AboutPage />) },
           { path: '/login', element: s(<LoginPage />) },
+          // sign-in with Google, Apple or GitHub lands here
+          { path: '/login/sso', element: s(<SsoPage />) },
           { path: '/reset', element: s(<ResetPasswordPage />) },
           { path: '/terms', element: s(<TermsPage />) },
           { path: '/privacy', element: s(<PrivacyPage />) },

@@ -2,6 +2,8 @@ import { useNavigate } from 'react-router-dom';
 import {
   ArrowRightEndOnRectangleIcon,
   ArrowRightStartOnRectangleIcon,
+  ArrowDownTrayIcon,
+  ArrowPathIcon,
   ArrowsRightLeftIcon,
   BoldIcon,
   BoltIcon,
@@ -20,6 +22,8 @@ import { useRegisterCommands, type Command } from '../lib/commands';
 import { useAuth } from '../lib/auth';
 import { FONTS, updateSettings, useSettings, type Settings as S } from '../lib/settings';
 import { applyTheme, getTheme, isLightTheme, randomTheme, THEMES, themeLabel } from '../lib/themes';
+import { applyUpdate, checkForUpdate, promptInstall, usePwa } from '../lib/pwa';
+import { toast } from '../lib/toast';
 
 function ThemeBubbles({ name }: { name: string }) {
   const t = getTheme(name);
@@ -51,6 +55,7 @@ export function GlobalCommands() {
   const navigate = useNavigate();
   const settings = useSettings();
   const { user, logout } = useAuth();
+  const pwa = usePwa();
 
   useRegisterCommands(
     'global',
@@ -122,9 +127,30 @@ export function GlobalCommands() {
             { id: 'logout', label: 'Log out', icon: <ArrowRightStartOnRectangleIcon />, run: () => void logout() },
           ]
         : [{ id: 'login', label: 'Log in / register', icon: <ArrowRightEndOnRectangleIcon />, run: go('/login') }];
-      return [theme, font, ...timer, ...nav, ...auth];
+      // the installable app (lib/pwa.ts)
+      const app: Command[] = [
+        ...(pwa.canInstall ? [{ id: 'app-install', label: 'Install cubr as an app', icon: <ArrowDownTrayIcon />, keywords: ['pwa', 'home screen', 'offline'], run: () => void promptInstall() }] : []),
+        ...(pwa.update
+          ? [{ id: 'app-update', label: 'Reload to update cubr', icon: <ArrowPathIcon />, keywords: ['new version', 'refresh'], run: () => applyUpdate() }]
+          : pwa.offline !== 'off'
+            ? [
+                {
+                  id: 'app-check',
+                  label: 'Check for updates',
+                  icon: <ArrowPathIcon />,
+                  keywords: ['new version'],
+                  run: () => {
+                    void checkForUpdate().then((r) =>
+                      toast.notice(r === 'none' ? 'cubr is up to date' : r === 'found' ? 'downloading the new version...' : "couldn't check for updates - offline?", { durationMs: 2500 }),
+                    );
+                  },
+                },
+              ]
+            : []),
+      ];
+      return [theme, font, ...timer, ...nav, ...auth, ...app];
     },
-    [settings, user, navigate, logout],
+    [settings, user, navigate, logout, pwa],
   );
   return null;
 }

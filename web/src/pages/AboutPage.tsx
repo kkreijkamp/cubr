@@ -36,7 +36,7 @@ const FEATURES = [
   { icon: TrophyIcon, t: 'leaderboards', d: 'all-time, weekly and daily boards for every event, single, ao5 and ao12.' },
   { icon: GlobeAltIcon, t: 'wca comparison', d: 'see where your personal bests would rank among every official wca competitor.' },
   { icon: SwatchIcon, t: 'themes & command line', d: `${THEMES.length} cube-inspired themes with live preview. press esc and type - everything is a command.` },
-  { icon: SignalSlashIcon, t: 'offline first', d: 'guest mode works with no backend at all; sign in to sync solves to the cloud.' },
+  { icon: SignalSlashIcon, t: 'an app that works offline', d: "install it on your phone or computer. the timer opens and works without a connection, and your solves sync when you're back online." },
 ];
 
 /** Where to donate. Supporters who make their support public are listed from the Ko-fi webhook. */

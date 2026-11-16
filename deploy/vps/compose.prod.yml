@@ -51,6 +51,16 @@ services:
       PUBLIC_URL: https://cubr.dev
       RESEND_API_KEY: ${RESEND_API_KEY:-}   # unset -> password-reset emails are only logged
       KOFI_VERIFICATION_TOKEN: ${KOFI_VERIFICATION_TOKEN:-}   # unset -> the Ko-fi webhook refuses everything
+      # sign-in with Google, Apple and GitHub (services/auth/src/oauth.ts): a provider stays off
+      # (no button) until all of its values are set
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      APPLE_CLIENT_ID: ${APPLE_CLIENT_ID:-}
+      APPLE_TEAM_ID: ${APPLE_TEAM_ID:-}
+      APPLE_KEY_ID: ${APPLE_KEY_ID:-}
+      APPLE_PRIVATE_KEY: ${APPLE_PRIVATE_KEY:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
 
   scramble:
     logging: *logging

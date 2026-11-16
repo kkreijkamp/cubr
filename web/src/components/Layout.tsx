@@ -26,6 +26,7 @@ import { openPalette } from '../lib/commands';
 import { useSettings } from '../lib/settings';
 import { themeLabel } from '../lib/themes';
 import { api } from '../lib/api';
+import { useLaunchQueue } from '../lib/pwa';
 
 const NAV = [
   { to: '/', icon: ClockIcon, label: 'timer', end: true },
@@ -132,6 +133,7 @@ function Footer() {
 
 export function Layout() {
   usePaletteHotkeys();
+  useLaunchQueue();
   const location = useLocation();
   useEffect(() => {
     window.scrollTo(0, 0);

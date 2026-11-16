@@ -9,6 +9,7 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { Loading, Spinner } from '../components/Spinner';
+import { SsoButtons } from '../components/social/Sso';
 import { safeNext } from '../components/social/util';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -588,6 +589,7 @@ export default function LoginPage() {
         ))}
       </div>
       <p className="lg-lede">{tab.lede}</p>
+      <SsoButtons next={next} />
       <LoginForm active={mode === 'login'} focusFirst={!keyNav} />
       <RegisterForm active={mode === 'register'} focusFirst={!keyNav} />
       {guestSolves > 0 && (

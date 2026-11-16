@@ -6,7 +6,9 @@ import { Link } from 'react-router-dom';
 import { DocumentTextIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import './legal.css';
 
-const EFFECTIVE = '16 November 2026';
+// when each page last changed
+const TERMS_EFFECTIVE = '16 November 2026';
+const PRIVACY_EFFECTIVE = '17 November 2026'; // sign-in with Google, Apple and GitHub
 const CONTACT = 'hello@cubr.dev';
 
 const Mail = () => <a href={`mailto:${CONTACT}`}>{CONTACT}</a>;
@@ -20,7 +22,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function LegalShell({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {
+function LegalShell({ title, icon, children, effective }: { title: string; icon: ReactNode; children: ReactNode; effective: string }) {
   useEffect(() => {
     document.title = `${title} | cubr`;
     window.scrollTo(0, 0);
@@ -35,7 +37,7 @@ function LegalShell({ title, icon, children }: { title: string; icon: ReactNode;
           {icon} {title}
         </h1>
         <p className="legal-meta">
-          effective {EFFECTIVE} - questions: <Mail />
+          effective {effective} - questions: <Mail />
         </p>
       </header>
       {children}
@@ -45,7 +47,7 @@ function LegalShell({ title, icon, children }: { title: string; icon: ReactNode;
 
 export function PrivacyPage() {
   return (
-    <LegalShell title="privacy policy" icon={<ShieldCheckIcon />}>
+    <LegalShell title="privacy policy" effective={PRIVACY_EFFECTIVE} icon={<ShieldCheckIcon />}>
       <p className="legal-intro">
         cubr (cubr.dev) is a free speedcubing timer run by Koen Kreijkamp, an individual in Queensland, Australia (&quot;cubr&quot;,
         &quot;we&quot;). This policy explains what we collect, why, who helps us run cubr, and the choices you have. There are no ads,
@@ -57,6 +59,11 @@ export function PrivacyPage() {
           <li>
             <b>Account:</b> your username, email address and password. The password is stored only as a bcrypt hash, so we can&apos;t
             read it.
+          </li>
+          <li>
+            <b>Sign-in with Google, Apple or GitHub</b> (if you choose it): your account&apos;s id there and its verified email address.
+            When you sign up this way, your name there suggests a username and isn&apos;t kept. We never see your password for that
+            account. An account made this way has no password until you set one.
           </li>
           <li>
             <b>Profile</b> (all optional): display name, bio, country, WCA ID and profile picture.
@@ -138,6 +145,10 @@ export function PrivacyPage() {
           <li>
             <b>Ko-fi:</b> takes donations. The payment itself is between you and Ko-fi, under Ko-fi&apos;s own terms and privacy policy.
           </li>
+          <li>
+            <b>Google, Apple and GitHub:</b> if you sign in with one of them, it confirms who you are, under its own terms and privacy
+            policy. We only receive what is listed above.
+          </li>
         </ul>
         <p>Some of them are based in, or process data in, other countries, including the United States, under their own data processing terms.</p>
       </Section>
@@ -156,7 +167,8 @@ export function PrivacyPage() {
 
       <Section title="cookies and local storage">
         <p>
-          cubr sets no cookies of its own. Your browser&apos;s local storage keeps you signed in and holds your settings and offline solves,
+          cubr sets one cookie of its own, and only while you sign in with Google, Apple or GitHub: it ties that sign-in to your browser
+          and expires within minutes. Your browser&apos;s local storage keeps you signed in and holds your settings and offline solves,
           so the site works. None of it is used for tracking or advertising, which is why there is no cookie banner. Cloudflare may set a
           strictly necessary security cookie.
         </p>
@@ -223,7 +235,7 @@ export function PrivacyPage() {
 
 export function TermsPage() {
   return (
-    <LegalShell title="terms of service" icon={<DocumentTextIcon />}>
+    <LegalShell title="terms of service" effective={TERMS_EFFECTIVE} icon={<DocumentTextIcon />}>
       <p className="legal-intro">
         These terms apply when you use cubr (cubr.dev), a free speedcubing timer run by Koen Kreijkamp in Queensland, Australia
         (&quot;cubr&quot;, &quot;we&quot;). By using cubr or creating an account, you agree to them and to our{' '}

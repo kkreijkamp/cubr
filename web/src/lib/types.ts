@@ -20,6 +20,17 @@ export interface PublicUser {
 }
 export interface PrivateUser extends PublicUser {
   email: string;
+  /** false: the account was made with Google, Apple or GitHub and has no password (yet) */
+  hasPassword?: boolean;
+}
+
+/** Sign-in with a provider (services/auth/src/routes/oauth.ts) */
+export type OAuthProvider = 'google' | 'apple' | 'github';
+export interface SignInMethods {
+  password: boolean;
+  /** the providers this server has set up */
+  providers: OAuthProvider[];
+  identities: { provider: OAuthProvider; email: string | null; createdAt: string }[];
 }
 
 export interface Session {

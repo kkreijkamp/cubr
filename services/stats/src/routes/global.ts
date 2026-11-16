@@ -23,15 +23,18 @@ export async function registerGlobalRoutes(app: FastifyInstance, pool: Pool, red
       return JSON.parse(cached);
     }
     const today = dayKey(new Date(), 'UTC');
+    // "today" = the UTC day (SPEC 9.4). Not daily_activity: its days are in each solver's timezone.
+    const from = new Date(`${today}T00:00:00.000Z`);
+    const to = new Date(from.getTime() + 86_400_000);
     const [totals, todayRes] = await Promise.all([
       pool.query<{ users: number; solves: number; total_ms: number }>(
         `SELECT count(*)::int AS users, coalesce(sum(solves), 0)::bigint AS solves, coalesce(sum(total_ms), 0)::bigint AS total_ms
            FROM stats.user_totals`,
       ),
       pool.query<{ solves: number; users: number }>(
-        `SELECT coalesce(sum(solves), 0)::bigint AS solves, count(DISTINCT user_id)::int AS users
-           FROM stats.daily_activity WHERE day = $1`,
-        [today],
+        `SELECT count(*)::bigint AS solves, count(DISTINCT user_id)::int AS users
+           FROM stats.solve_ledger WHERE NOT deleted AND created_at >= $1 AND created_at < $2`,
+        [from, to],
       ),
     ]);
     const body = {

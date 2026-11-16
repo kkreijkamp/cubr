@@ -1,12 +1,19 @@
 #!/usr/bin/env node
 // End-to-end smoke test through the public entry point (local gateway, kind gateway or GKE Ingress).
-// Walks a real user journey across every microservice and checks the event pipeline:
+// Walks a real user journey across every microservice and checks the event pipeline, then deletes
+// its throwaway account and checks that the account's data left every service (also after a failed
+// step), so it leaves nothing behind:
 //   node scripts/smoke.mjs http://localhost:8080
 //   node scripts/smoke.mjs http://<INGRESS_IP>
 const BASE = (process.argv[2] ?? process.env.BASE_URL ?? 'http://localhost:8080').replace(/\/$/, '');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let failures = 0;
 let token = null;
+const PASSWORD = 'smoke-test-pw';
+let username = null;
+let userId = null;
+/** the all-time 3x3 single board's page that listed the test account */
+let boardPage = null;
 
 async function req(method, path, body) {
   const t = Date.now();
@@ -55,6 +62,9 @@ async function eventually(name, fn, timeoutMs = 15_000) {
 
 console.log(`cubr smoke test -> ${BASE}\n`);
 
+// the journey; deleteTestAccount() runs afterwards whatever happens
+try {
+
 console.log('health / info (every service answers through the entry point):');
 for (const p of ['/_info', '/api/auth/_info', '/api/scrambles/_info', '/api/solves/_info', '/api/stats/_info', '/api/leaderboards/_info', '/api/race/_info', '/api/wca/_info']) {
   const r = await req('GET', p);
@@ -68,8 +78,8 @@ const html = await fetch(BASE + '/leaderboards').then((r) => r.text());
 check('SPA served for client routes', html.includes('<div id="root">'));
 
 console.log('\nauth:');
-const username = `smoke_${Date.now().toString(36)}`;
-const reg = await req('POST', '/api/auth/register', { username, email: `${username}@example.com`, password: 'smoke-test-pw' });
+username = `smoke_${Date.now().toString(36)}`;
+const reg = await req('POST', '/api/auth/register', { username, email: `${username}@example.com`, password: PASSWORD });
 check('register', reg.status === 201, `${username}`);
 token = reg.data?.token;
 const me = await req('GET', '/api/auth/me');
@@ -95,7 +105,7 @@ for (const t of times) {
   lastRolling = r.data?.rolling;
 }
 check('6 solves saved, rolling ao5 computed', lastRolling?.ao5 > 0, `ao5=${lastRolling?.ao5}`);
-const userId = me.data?.user?.id;
+userId = me.data?.user?.id;
 await eventually('stats read model updated (single PB)', async () => {
   const s = await req('GET', `/api/stats/users/${userId}/summary`);
   const ev = s.data?.events?.find((e) => e.event === '333');
@@ -103,6 +113,7 @@ await eventually('stats read model updated (single PB)', async () => {
 });
 await eventually('leaderboard updated (all-time single)', async () => {
   const lb = await req('GET', '/api/leaderboards/333/single?period=all');
+  if (lb.data?.me?.rank) boardPage = Math.ceil(lb.data.me.rank / 100);
   return { ok: lb.data?.me?.valueMs === 59876, detail: `rank=${lb.data?.me?.rank} of ${lb.data?.total}` };
 });
 await eventually('daily leaderboard updated', async () => {
@@ -135,13 +146,47 @@ await Promise.all(Array.from({ length: 20 }, async () => {
 }));
 check('requests spread over >= 1 pod', pods.size >= 1, [...pods].map(([p, n]) => `${p}:${n}`).join(' '));
 
-console.log('\ncleanup:');
+console.log('\nsessions and logout:');
 const sessDel = await req('DELETE', `/api/sessions/${session.id}`);
 check('delete test session', sessDel.status === 204);
 const out = await req('POST', '/api/auth/logout');
 check('logout', out.status === 204);
 const after = await req('GET', '/api/auth/me');
 check('token revoked after logout', after.status === 401);
+} catch (err) {
+  check('the journey ran to the end', false, err.message);
+} finally {
+  await deleteTestAccount();
+}
+
+/** Deletes the throwaway account (signing in again if needed) and checks its data left every service. */
+async function deleteTestAccount() {
+  if (!username) return;
+  console.log('\ncleanup (the test account and its data):');
+  try {
+    token = (await req('POST', '/api/auth/login', { login: username, password: PASSWORD })).data?.token ?? null;
+    const gone = await req('DELETE', '/api/auth/me', { password: PASSWORD });
+    check('delete the test account', gone.status === 204, `status ${gone.status}`);
+    check('its token stops working', (await req('GET', '/api/auth/me')).status === 401);
+    token = null;
+    check('its profile is gone', (await req('GET', `/api/users/${username}`)).status === 404);
+    if (userId) {
+      await eventually('its stats are gone', async () => {
+        const s = await req('GET', `/api/stats/users/${userId}/summary`);
+        const solves = (s.data?.events ?? []).reduce((n, e) => n + (e.solves ?? 0), 0);
+        return { ok: s.status === 200 && solves === 0, detail: `${solves} solves left` };
+      });
+    }
+    if (userId && boardPage) {
+      await eventually('it left the leaderboards', async () => {
+        const lb = await req('GET', `/api/leaderboards/333/single?period=all&size=100&page=${boardPage}`);
+        return { ok: lb.status === 200 && !(lb.data?.entries ?? []).some((e) => e.userId === userId), detail: `page ${boardPage}` };
+      });
+    }
+  } catch (err) {
+    check('delete the test account', false, `${err.message} - delete ${username} by hand`);
+  }
+}
 
 console.log(failures ? `\n${failures} check(s) FAILED` : '\nall checks passed');
 process.exit(failures ? 1 : 0);

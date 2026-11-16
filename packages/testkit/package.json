@@ -1,0 +1,14 @@
+{
+  "name": "@cubr/testkit",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Integration-test helpers for cubr services: a throwaway Postgres database and Redis per test file, the real routes in-process, signed tokens",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@cubr/common": "*",
+    "pg": "^8.23.1"
+  }
+}

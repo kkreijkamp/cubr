@@ -189,7 +189,10 @@ function PaletteInner({ initial }: { initial: string | null }) {
               onClick={() => choose(row)}
             >
               <span>{row.cmd.active ? <CheckIcon /> : row.cmd.icon ?? null}</span>
-              <span>{row.label}</span>
+              <span>
+                {row.label}
+                {row.cmd.after}
+              </span>
               <span>{row.cmd.children ? <ChevronRightIcon /> : null}</span>
             </div>
           ))}

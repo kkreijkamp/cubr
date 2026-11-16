@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HttpError } from '@cubr/common';
 import type { ScrambleBackend } from '../src/backends.js';
 import { GenerationTimeoutError, QueueFullError, toHttpError } from '../src/errors.js';
@@ -74,17 +74,60 @@ describe('ScrambleGenerator', () => {
     }
   });
 
-  it('times out stuck searches and expires tasks that waited too long', async () => {
-    const { backend, calls } = fakeBackend(1);
-    const gen = new ScrambleGenerator(backend, { timeoutMs: 50, maxQueue: 100 });
-    const stuck = gen.generate('hang');
-    const queued = gen.generate('333');
-    await expect(stuck).rejects.toBeInstanceOf(GenerationTimeoutError);
-    await expect(queued).rejects.toBeInstanceOf(GenerationTimeoutError);
-    expect(calls.map((c) => c.event)).toEqual(['hang']); // the queued one never ran
-    expect(gen.stats().timeouts).toBe(2);
-    // the slot is free again afterwards
-    await expect(gen.generate('333')).resolves.toMatch(/^333#/);
+  // Fake timers make the deadlines exact. With real ones the queued task is created a moment after
+  // the stuck one, so on a busy machine it could still have 1 ms of its budget left when the stuck
+  // search times out, and run (the test failed that way on CI once).
+  describe('deadlines', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('times out stuck searches and expires tasks that waited too long', async () => {
+      const { backend, calls } = fakeBackend(1);
+      const gen = new ScrambleGenerator(backend, { timeoutMs: 50, maxQueue: 100 });
+      const results = Promise.allSettled([gen.generate('hang'), gen.generate('333')]);
+      await vi.advanceTimersByTimeAsync(50);
+      const [stuck, queued] = await results;
+      expect(stuck).toMatchObject({ status: 'rejected', reason: expect.any(GenerationTimeoutError) });
+      expect(queued).toMatchObject({ status: 'rejected', reason: expect.any(GenerationTimeoutError) });
+      expect((queued as PromiseRejectedResult).reason.message).toMatch(/waiting in queue/);
+      expect(calls.map((c) => c.event)).toEqual(['hang']); // the queued one never ran
+      expect(gen.stats().timeouts).toBe(2);
+      // the slot is free again afterwards
+      const next = gen.generate('333');
+      await vi.advanceTimersByTimeAsync(5);
+      await expect(next).resolves.toMatch(/^333#/);
+    });
+
+    it('still runs a queued task that has some of its budget left', async () => {
+      const { backend, calls } = fakeBackend(1);
+      const gen = new ScrambleGenerator(backend, { timeoutMs: 50, maxQueue: 100 });
+      const stuck = gen.generate('hang');
+      void stuck.catch(() => undefined);
+      await vi.advanceTimersByTimeAsync(20);
+      const queued = gen.generate('333'); // deadline 70: 20 ms left when the stuck one times out at 50
+      await vi.advanceTimersByTimeAsync(30);
+      await expect(stuck).rejects.toBeInstanceOf(GenerationTimeoutError);
+      await vi.advanceTimersByTimeAsync(5);
+      await expect(queued).resolves.toMatch(/^333#/);
+      expect(calls.map((c) => c.event)).toEqual(['hang', '333']);
+    });
+
+    it('gives a search only what is left of its deadline', async () => {
+      const { backend, calls } = fakeBackend(1, 30); // each search takes 30 ms
+      const gen = new ScrambleGenerator(backend, { timeoutMs: 50, maxQueue: 100 });
+      const results = Promise.allSettled([gen.generate('a'), gen.generate('b')]);
+      await vi.advanceTimersByTimeAsync(60);
+      const [a, b] = await results;
+      expect(a.status).toBe('fulfilled');
+      // b waited 30 ms, then had 20 ms for a 30 ms search
+      expect(b).toMatchObject({ status: 'rejected', reason: expect.any(GenerationTimeoutError) });
+      expect(calls.map((c) => c.event)).toEqual(['a', 'b']);
+      expect(gen.stats()).toMatchObject({ generated: 1, timeouts: 1 });
+    });
   });
 
   it('sheds load when the queue is full', async () => {

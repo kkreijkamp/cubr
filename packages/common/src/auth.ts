@@ -84,7 +84,12 @@ export function tokenRevoked(user: Pick<AuthUser, 'iat'>, jtiHit: string | null,
   return (user.iat ?? 0) <= Number(userRevokedAt);
 }
 
-async function isRevoked(redis: Redis | undefined, user: AuthUser): Promise<boolean> {
+/**
+ * Whether a verified token was revoked: by logout (its jti) or for the whole account (a password
+ * reset or the account's deletion). Fails open after 300 ms or on a Redis error: an outage must not
+ * log everyone out. Every check of a token (HTTP and the race sockets) goes through this.
+ */
+export async function isTokenRevoked(redis: Redis | undefined, user: AuthUser): Promise<boolean> {
   if (!redis) return false;
   try {
     const hits = await Promise.race([
@@ -113,7 +118,7 @@ export function makeAuth(secret: string, redis?: Redis) {
     if (!token) return null;
     try {
       const user = await verifyToken(secret, token);
-      if (await isRevoked(redis, user)) return null;
+      if (await isTokenRevoked(redis, user)) return null;
       return user;
     } catch {
       return null;

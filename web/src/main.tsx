@@ -10,6 +10,7 @@ import '@fontsource/roboto-mono/700.css';
 import './styles/global.css';
 import { App } from './App';
 import { reloadForNewRelease } from './lib/chunkReload';
+import { startPwa } from './lib/pwa';
 import { applyVisualSettings } from './lib/settings';
 
 applyVisualSettings();
@@ -22,3 +23,6 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 );
+
+// the offline, installable app: the service worker (production builds only) and the install prompt
+startPwa();

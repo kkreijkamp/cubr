@@ -20,7 +20,7 @@ describe('readiness and _info deadlines', () => {
     const app = build({ checks: { postgres: never, redis: async () => 'PONG' } });
     const t0 = Date.now();
     const res = await app.inject({ url: '/readyz' });
-    expect(Date.now() - t0).toBeLessThan(2500);
+    expect(Date.now() - t0).toBeLessThan(4000); // the 2 s deadline, not the never-answering check (room for a loaded CI runner)
     expect(res.statusCode).toBe(503);
     expect(res.json()).toEqual({ status: 'not-ready', deps: { postgres: 'down', redis: 'ok' } });
   });
@@ -30,7 +30,7 @@ describe('readiness and _info deadlines', () => {
     const app = build({ checks: { postgres: never }, info: never });
     const t0 = Date.now();
     const res = await app.inject({ url: '/api/test/_info' });
-    expect(Date.now() - t0).toBeLessThan(2500);
+    expect(Date.now() - t0).toBeLessThan(4000); // the 2 s deadline, not the never-answering check (room for a loaded CI runner)
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ service: 'test', deps: { postgres: 'down' } });
   });

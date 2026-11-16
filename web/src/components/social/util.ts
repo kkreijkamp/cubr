@@ -37,6 +37,8 @@ export function isWcaNotLoaded(err: unknown): boolean {
 /** Friendly, lowercase message for a failed widget request. */
 export function friendlyError(err: unknown, what: string): string {
   if (err instanceof ApiError) {
+    // the device itself has no connection (the app still opens: it's cached)
+    if (err.status === 0 && typeof navigator !== 'undefined' && navigator.onLine === false) return "you're offline - this needs a connection";
     if (err.isUnavailable || err.status >= 500) return `${what} is unavailable right now`;
     if (err.status === 429) return 'too many requests, slow down a little';
     return err.message.charAt(0).toLowerCase() + err.message.slice(1);

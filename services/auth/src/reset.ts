@@ -56,7 +56,7 @@ export function resetEmail(o: { username: string; link: string; minutes: number 
   const user = escapeHtml(o.username);
   const link = escapeHtml(o.link);
   const html = `<!doctype html>
-<html><body style="margin:0;padding:32px 16px;background:#ffffff;color:#20201e;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.55">
+<html><body style="margin:0;padding:32px 16px;background:#ffffff;color:#1d2024;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.55">
 <div style="max-width:480px;margin:0 auto">
 <p style="font-size:20px;font-weight:600;margin:0 0 24px">cubr</p>
 <p style="margin:0 0 16px">Hi ${user},</p>

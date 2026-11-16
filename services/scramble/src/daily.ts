@@ -2,6 +2,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import { HttpError, unavailable, type Pool } from '@cubr/common';
 import { DAILY_EVENTS } from '@cubr/cubestats';
 import type { ScrambleGenerator } from './generator.js';
+import { GenerationTimeoutError, QueueFullError } from './errors.js';
 import { errorMessage } from './util.js';
 
 export const DAILY_SCRAMBLES = 5;
@@ -54,6 +55,10 @@ export class DailyChallenges {
       }
       if (err instanceof HttpError) throw err;
       this.deps.log.warn({ date, err: errorMessage(err) }, 'daily challenge unavailable');
+      // a search that timed out or a full queue is the generator's doing, not the database's
+      if (err instanceof GenerationTimeoutError || err instanceof QueueFullError) {
+        throw unavailable('Daily challenge unavailable: its scrambles could not be generated, please retry');
+      }
       throw unavailable('Daily challenge unavailable: database not reachable');
     }
   }

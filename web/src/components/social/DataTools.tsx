@@ -18,6 +18,8 @@ import { exportAll, importSessions } from '../../lib/solves';
 import { toast } from '../../lib/toast';
 import type { PrivateUser } from '../../lib/types';
 import { Modal } from '../Modal';
+import { SignInMethods } from './SignInMethods';
+import { SessionName } from '../SessionName';
 import { Spinner } from '../Spinner';
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
@@ -106,7 +108,7 @@ function ImportPreview({ fileName, parsed, onClose }: { fileName: string; parsed
                 <td className="left">
                   <label>
                     <input type="checkbox" checked={selected.has(i)} onChange={() => toggle(i)} disabled={busy} />
-                    <span title={s.name}>{s.name}</span>
+                    <SessionName name={s.name} practice={s.practice} title={s.name} />
                   </label>
                 </td>
                 <td className="left">{eventLabel(s.event)}</td>
@@ -238,6 +240,7 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
             </button>
           </div>
         </div>
+        <SignInMethods />
         <div className="ac-row">
           <div>
             <div className="t">

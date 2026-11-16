@@ -11,7 +11,11 @@ RUN --mount=type=cache,target=/root/.npm cd web && npm ci --no-audit --no-fund
 COPY web web
 # No APP_VERSION here: the bundle doesn't contain the version (the footer reads it from /_info),
 # so a release that doesn't change web/ builds identical chunk names and a rollout can't 404 them.
-# npm run build = tsc --noEmit (type errors fail the image build) + vite build
+# The offline app's service worker is built with the app (web/plugins/serviceWorker.ts). VITE_SW=off
+# builds its kill switch instead, which removes the worker and its caches from every browser: the
+# emergency switch in deploy/vps/README.md. Normally on.
+ARG VITE_SW=on
+# npm run build = typecheck (type errors fail the image build) + vite build
 RUN cd web && npm run build
 
 # ---- runtime stage: nginx as non-root (uid 101), listening on 8080

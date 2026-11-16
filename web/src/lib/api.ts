@@ -1,27 +1,6 @@
 // Thin typed client for every cubr microservice. All calls are same-origin paths that the
 // Ingress (cloud) or gateway (local) routes to the right service - see docs/SPEC.md section 3.
-import type {
-  ActivityDay,
-  GlobalStats,
-  Leaderboard,
-  LbKind,
-  PbKind,
-  Penalty,
-  PrivateUser,
-  PublicUser,
-  RaceRoomSummary,
-  ServiceInfo,
-  Session,
-  Solve,
-  StatsSummary,
-  UserRank,
-  WcaDistribution,
-  WcaMeta,
-  WcaPerson,
-  WcaPersonSummary,
-  WcaRank,
-  WcaRecord,
-} from './types';
+import type { ActivityDay, GlobalStats, Leaderboard, LbKind, PbKind, Penalty, PrivateUser, PublicUser, RaceRoomSummary, ServiceInfo, Session, Solve, StatsSummary, UserRank, WcaDistribution, WcaMeta, WcaPerson, WcaPersonSummary, WcaRank, WcaRecord, OAuthProvider, SignInMethods } from './types';
 
 export class ApiError extends Error {
   constructor(
@@ -216,8 +195,21 @@ export const api = {
     /** PUT the raw image bytes (image/webp | image/jpeg | image/png, <= 300 KB) -> user with the new avatarUrl. */
     uploadAvatar: (blob: Blob) => request<{ user: PrivateUser }>('PUT', '/api/auth/me/avatar', blob, { timeoutMs: 30_000 }),
     removeAvatar: () => request<{ user: PrivateUser }>('DELETE', '/api/auth/me/avatar'),
-    /** Deletes the account and everything in it; the password is asked again (403 if wrong). */
-    deleteMe: (password: string) => request<void>('DELETE', '/api/auth/me', { password }),
+    /** Deletes the account and everything in it; the password is asked again (403 if wrong), or the
+     *  username for an account without a password. */
+    deleteMe: (proof: { password: string } | { confirm: string }) => request<void>('DELETE', '/api/auth/me', proof),
+    /** Sign-in with Google, Apple or GitHub. The one-time code and a sign-up only work in the browser
+     *  that started them (a cookie the server set). */
+    oauth: {
+      providers: (signal?: AbortSignal) => get<{ providers: OAuthProvider[] }>('/api/auth/oauth/providers', signal),
+      /** The provider's sign-in page to send the browser to; `link` connects it to this account. */
+      start: (provider: OAuthProvider, mode: 'signin' | 'link', next?: string) => request<{ url: string }>('POST', `/api/auth/oauth/${provider}/start`, { mode, next }),
+      exchange: (code: string) => request<{ token: string; user: PrivateUser }>('POST', '/api/auth/oauth/exchange', { code }),
+      signup: (id: string, signal?: AbortSignal) => get<{ provider: OAuthProvider; email: string; username: string | null }>(`/api/auth/oauth/signup/${enc(id)}`, signal),
+      completeSignup: (id: string, username: string) => request<{ token: string; user: PrivateUser }>('POST', '/api/auth/oauth/signup', { id, username }),
+      methods: () => get<SignInMethods>('/api/auth/me/sign-in'),
+      disconnect: (provider: OAuthProvider) => request<void>('DELETE', `/api/auth/me/identities/${provider}`),
+    },
     user: (username: string, signal?: AbortSignal) => get<{ user: PublicUser }>(`/api/users/${enc(username)}`, signal),
     users: (ids: string[]) => get<{ users: PublicUser[] }>(`/api/users${qs({ ids: ids.join(',') })}`),
   },

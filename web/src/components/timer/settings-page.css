@@ -152,6 +152,17 @@
 .st-controls .btn {
   font-size: 0.85rem;
 }
+/* a state instead of a control (the app pane: installed, offline ready, up to date) */
+.st-status {
+  color: var(--sub-color);
+  font-size: 0.85rem;
+}
+.st-status.main {
+  color: var(--main-color);
+}
+.st-status.error {
+  color: var(--error-color);
+}
 .st-row.wide .st-controls {
   justify-content: flex-start;
 }

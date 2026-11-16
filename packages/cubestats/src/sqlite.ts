@@ -33,7 +33,8 @@ export function readSqliteTables(bytes: Uint8Array): Map<string, SqlValue[][]> {
     return start;
   };
 
-  // varint: 1-9 bytes, big-endian 7-bit groups; the 9th byte contributes all 8 bits
+  // varint: 1-9 bytes, big-endian 7-bit groups; the 9th byte contributes all 8 bits. A 9-byte
+  // varint is a 64-bit two's complement integer (e.g. a negative rowid), read exactly with BigInt.
   const varint = (pos: number): [value: number, next: number] => {
     let value = 0;
     for (let i = 0; i < 8; i++) {
@@ -41,7 +42,10 @@ export function readSqliteTables(bytes: Uint8Array): Map<string, SqlValue[][]> {
       value = value * 128 + (b & 0x7f);
       if (b < 0x80) return [value, pos + i + 1];
     }
-    return [value * 256 + bytes[pos + 8], pos + 9];
+    let big = 0n;
+    for (let i = 0; i < 8; i++) big = (big << 7n) | BigInt(bytes[pos + i] & 0x7f);
+    big = (big << 8n) | BigInt(bytes[pos + 8]);
+    return [Number(BigInt.asIntN(64, big)), pos + 9];
   };
 
   /** The whole payload of a table leaf cell, following its overflow chain. */

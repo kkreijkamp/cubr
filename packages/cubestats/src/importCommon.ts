@@ -57,9 +57,16 @@ const MAX_NAME = 40;
 
 const text = (v: unknown): string => (typeof v === 'string' ? v : typeof v === 'number' ? String(v) : '');
 
-/** ISO date, or the epoch for a missing/invalid date (sorts before everything else). */
+/** The first moment of the year 10000: from then on toISOString() writes "+010000-...", which the server's date check refuses. */
+const MAX_DATE_MS = Date.UTC(10000, 0, 1);
+
+/**
+ * ISO date, or the epoch for a missing or invalid date (sorts before everything else). A date past
+ * the year 9999 is invalid too (e.g. a csTimer timestamp written in ms instead of s): one such
+ * date would otherwise make the server refuse the whole import.
+ */
 function isoDate(at: number | null | undefined): string {
-  if (typeof at === 'number' && Number.isFinite(at) && at > 0 && at < 8.64e15) return new Date(at).toISOString();
+  if (typeof at === 'number' && Number.isFinite(at) && at > 0 && at < MAX_DATE_MS) return new Date(at).toISOString();
   return new Date(0).toISOString();
 }
 

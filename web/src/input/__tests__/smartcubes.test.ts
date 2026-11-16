@@ -218,7 +218,9 @@ describe('MoYu 32 (WCU)', () => {
     expect(states.slice(1).map((s) => s.moves[0])).toEqual(['F ', 'U ', "R'"]);
     expect(states.at(-1)!.facelet).toBe(scrambled("L B2 U F U R'").toFaceCube());
     const [, a, b, c] = states.map((s) => s.ts[0]!);
-    expect([b - a, c - b]).toEqual([340, 120]);
+    // from performance.now(), a fraction: the differences can be off by a rounding
+    expect(b - a).toBeCloseTo(340, 6);
+    expect(c - b).toBeCloseTo(120, 6);
   });
 });
 
