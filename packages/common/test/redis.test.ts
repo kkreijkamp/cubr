@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { rateLimit, type Redis } from '../src/redis.js';
 
-/** Just enough of ioredis' MULTI for rateLimit: INCR and EXPIRE NX on an in-memory store. */
+/** Just enough of ioredis' MULTI for rateLimit: INCRBY and EXPIRE NX on an in-memory store. */
 function fakeRedis(opts: { failExec?: boolean } = {}) {
   const counts = new Map<string, number>();
   const ttls = new Map<string, number>();
@@ -9,9 +9,9 @@ function fakeRedis(opts: { failExec?: boolean } = {}) {
     multi() {
       const ops: Array<() => [Error | null, unknown]> = [];
       const tx = {
-        incr(key: string) {
+        incrby(key: string, by: number) {
           ops.push(() => {
-            const n = (counts.get(key) ?? 0) + 1;
+            const n = (counts.get(key) ?? 0) + by;
             counts.set(key, n);
             return [null, n];
           });
@@ -59,6 +59,14 @@ describe('rateLimit', () => {
     ttls.set('rl:k', 12); // 12 s left
     await rateLimit(redis, 'k', 10, 60);
     expect(ttls.get('rl:k')).toBe(12);
+  });
+
+  it('counts a weighted call as several', async () => {
+    const { redis, counts } = fakeRedis();
+    expect(await rateLimit(redis, 'gen:1.2.3.4', 60, 60, 25)).toBe(true);
+    expect(await rateLimit(redis, 'gen:1.2.3.4', 60, 60, 25)).toBe(true);
+    expect(await rateLimit(redis, 'gen:1.2.3.4', 60, 60, 25)).toBe(false);
+    expect(counts.get('rl:gen:1.2.3.4')).toBe(75);
   });
 
   it('fails open when Redis is unavailable', async () => {

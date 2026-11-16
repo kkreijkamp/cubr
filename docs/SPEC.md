@@ -386,7 +386,7 @@ are skipped, and only logout answers 503 (the revocation could not be stored).
 |---|---|
 | GET `/api/scrambles/events` | `{events: [{id, name, short, puzzle}]}` |
 | GET `/api/scrambles/daily?date=YYYY-MM-DD` (default today, UTC; the last 30 days) | `{date, events: {"333": string[5], "222": [...], "444": [...], "pyram": [...], "skewb": [...]}}` (generated once, persisted, identical for everyone); 400 for future dates; 503 while Postgres is unreachable and nothing is cached |
-| GET `/api/scrambles/:event?count=1..25&fresh=0/1` | `{event, scrambles: string[], source: "pool"\|"generated"}`; `fresh=1` bypasses the pool (used for load tests / HPA demo); 404 unknown event; 503 when generation times out or the queue is full |
+| GET `/api/scrambles/:event?count=1..25&fresh=0/1` | `{event, scrambles: string[], source: "pool"\|"generated"}`; `fresh=1` bypasses the pool (load tests / HPA demo), honoured only with `X-Internal-Token`, which also skips the limits; per IP otherwise: 120 requests/min and 60 newly generated scrambles/min (weighted by count; past it the pool's scrambles are returned, or 429 if there are none); 404 unknown event; 503 when generation times out or the queue is full |
 | GET `/api/scrambles/_info` | info (+ warm-up, generator queue, pool sizes) |
 
 Pool: keep `scramble:pool:<event>` topped up (333/222/pyram/skewb: 200; 444/sq1/clock/minx/333oh/333bf/333fm: 50; 555-777/444bf/555bf: 20) by a background loop in every replica (check LLEN, generate up to the target, `LTRIM` to cap). The loop only uses idle CPU; requests that find the pool short generate the rest on the fly.

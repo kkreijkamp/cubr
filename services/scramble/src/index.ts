@@ -53,7 +53,7 @@ const scramblePool = new ScramblePool(redis);
 const daily = new DailyChallenges({ pool: pg, generator, isMigrated: () => migrated, log: app.log });
 app.log.info({ ...settings, backend: backend.kind }, 'scramble generator configured');
 
-await registerRoutes(app, { generator, pool: scramblePool, daily });
+await registerRoutes(app, { generator, pool: scramblePool, daily, redis, internalToken: config.internalToken });
 
 // Listen first so liveness passes; readiness stays 503 until the warm-up below has finished.
 await start(server, config, [
