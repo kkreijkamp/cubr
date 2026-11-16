@@ -67,7 +67,9 @@ describe('GAN smart cubes (a pretend cube, encrypted with the MAC-mixed key)', (
     sim.turn('U ', 250, false);
     await tick();
     const [a, b] = states.slice(1).map((s) => s.ts[0]!);
-    expect(b - a).toBe(250);
+    // the times start from performance.now(), a fraction, so the difference can be off by a rounding
+    // (250.00000000000006): exact equality failed about one run in four
+    expect(b - a).toBeCloseTo(250, 6);
   });
 
   it('gen4: the 251 UI 2x2 reports a 2x2', async () => {
