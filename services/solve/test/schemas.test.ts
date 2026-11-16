@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { HttpError, parse } from '@cubr/common';
 import {
-  assertDailyAllowed, createSessionBody, createSolveBody, importBody, MAX_IMPORT_SOLVES, mergeSessionsBody, patchSessionBody, patchSolveBody,
-  resolveCreatedAt, utcDay,
+  assertDailyAllowed, createSessionBody, createSolveBody, importBody, isDailyOpen, MAX_IMPORT_SOLVES, mergeSessionsBody, patchSessionBody,
+  patchSolveBody, resolveCreatedAt, utcDay,
 } from '../src/schemas.js';
 
 const SID = '33333333-3333-4333-8333-333333333333';
@@ -132,6 +132,10 @@ describe('assertDailyAllowed', () => {
     expect(errorOf(() => assertDailyAllowed('2026-10-12', '333', now)).statusCode).toBe(400);
     expect(errorOf(() => assertDailyAllowed('2026-10-16', '333', now)).statusCode).toBe(400);
     expect(errorOf(() => assertDailyAllowed('2026-10-14', '777', now)).message).toMatch(/no daily challenge/);
+  });
+  it('isDailyOpen: the same window decides when a penalty change still reaches the official attempt', () => {
+    for (const d of ['2026-10-13', '2026-10-14', '2026-10-15']) expect(isDailyOpen(d, now)).toBe(true);
+    for (const d of ['2026-10-12', '2026-10-16', '']) expect(isDailyOpen(d, now)).toBe(false);
   });
 });
 

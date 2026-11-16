@@ -10,7 +10,9 @@ import { isEventId } from '@cubr/cubestats';
 //   lb:dc:<YYYY-MM-DD>:<event>       zset  daily-challenge ao5 board
 //   <board>:at                       hash  userId -> achievedAt (ISO) for the score on <board>
 //   <board>:ts                       hash  userId -> occurredAt (epoch ms) of the last applied
-//                                          pb.updated (all-time boards only; drops stale events)
+//                                          exact write (all-time and daily-challenge boards:
+//                                          pb.updated, daily.completed / daily.updated; drops
+//                                          stale events)
 //   lb:users                         hash  userId -> JSON {username, country, avatarUrl}
 //   lb:flagged                       list  rejected (anti-cheat) entries, newest first, capped
 //   lb:meta:built / lb:rebuild-lock  string

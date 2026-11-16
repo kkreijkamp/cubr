@@ -20,7 +20,8 @@ export type OutboxType =
   | 'session.updated'
   | 'sessions.merged'
   | 'solves.imported'
-  | 'daily.completed';
+  | 'daily.completed'
+  | 'daily.updated';
 
 export async function enqueue(client: PoolClient, type: OutboxType, payload: Record<string, unknown>): Promise<void> {
   // occurredAt = when the change happened, not when the relay got round to publishing it.

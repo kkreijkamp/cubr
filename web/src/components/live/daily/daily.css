@@ -95,6 +95,16 @@
 .daily-strip li.failed {
   box-shadow: inset 0 0 0 2px var(--error-color);
 }
+/* today's attempts can be picked for ok / +2 / dnf (the latest one is used otherwise) */
+.daily-strip.pickable li.filled {
+  cursor: pointer;
+}
+.daily-strip li.picked {
+  box-shadow: inset 0 0 0 2px var(--sub-color);
+}
+.daily-quick {
+  justify-content: center;
+}
 .daily-strip .s {
   display: flex;
   align-items: center;

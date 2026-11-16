@@ -52,16 +52,21 @@ interface TimerAreaProps {
   /** dims the display when no solve can start */
   idleDim?: boolean;
   pb?: boolean;
+  /** shown instead of the engine's last result while idle (e.g. with a penalty marked after the solve) */
+  result?: TimerResult | null;
   children?: ReactNode;
 }
 
 /** Big timer + touch surface (tap / hold on phones). */
-export function TimerArea({ engine, scale = 1, idleDim, pb, children }: TimerAreaProps) {
+export function TimerArea({ engine, scale = 1, idleDim, pb, result, children }: TimerAreaProps) {
   const settings = useSettings();
   const size = Math.max(3, settings.timerSize * scale);
+  const s = engine.state;
+  const idle = s.phase === 'idle' || s.phase === 'stopped' || (s.phase === 'holding' && !s.inInspection);
+  const state = result !== undefined && idle ? { ...s, result } : s;
   return (
     <div className={`live-timer${idleDim && engine.state.phase === 'idle' ? ' dim' : ''}`} {...engine.touchHandlers}>
-      <TimerDisplay state={engine.state} precision={settings.precision} timerUpdate={settings.timerUpdate} sizeRem={size} pb={pb} />
+      <TimerDisplay state={state} precision={settings.precision} timerUpdate={settings.timerUpdate} sizeRem={size} pb={pb} />
       {children}
     </div>
   );

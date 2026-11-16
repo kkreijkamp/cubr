@@ -72,6 +72,8 @@ export interface AddSolveInput {
   daily?: { date: string; index: number };
   /** override target session (defaults to the current session) */
   sessionId?: string;
+  /** client-side id (generated when absent); lets a caller change the solve before it is synced */
+  id?: string;
 }
 
 const EMPTY: Solve[] = [];
@@ -775,7 +777,7 @@ export async function addSolve(input: AddSolveInput): Promise<Solve> {
     session = await ensureSession(defaultEvent());
   }
   const solve: Solve = {
-    id: uuid(),
+    id: input.id ?? uuid(),
     sessionId: session.id,
     event: session.event,
     timeMs,
@@ -820,21 +822,54 @@ export async function addSolve(input: AddSolveInput): Promise<Solve> {
   return solve;
 }
 
-function updateSolveLocal(solveId: string, patch: { penalty?: Penalty; comment?: string | null }): boolean {
+/** Changes a loaded solve; returns the id of the queued op (cloud mode), else null. */
+function updateSolveLocal(solveId: string, patch: { penalty?: Penalty; comment?: string | null }): string | null {
   const hit = locate(solveId);
-  if (!hit) return false;
+  if (!hit) return null;
   const next = hit.list.slice();
   next[hit.index] = { ...next[hit.index], ...patch };
   model.solves.set(hit.sid, next);
-  if (scope?.mode === 'cloud') enqueue({ kind: 'updateSolve', id: solveId, sessionId: hit.sid, patch });
+  const opId = scope?.mode === 'cloud' ? enqueue({ kind: 'updateSolve', id: solveId, sessionId: hit.sid, patch }) : null;
   commit();
-  return true;
+  return opId;
+}
+
+/**
+ * Resolves once a queued op has reached the server, was folded into another queued op, or is
+ * waiting to retry after a network error; rejects if the server refused it.
+ */
+function whenSent(opId: string | null): Promise<void> {
+  if (!opId) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    if (!queue.some((q) => q.opId === opId)) return resolve();
+    waiters.set(opId, { resolve, reject });
+  });
 }
 
 export async function setPenalty(solveId: string, penalty: Penalty): Promise<void> {
   const hit = locate(solveId);
   if (!hit || hit.list[hit.index].penalty === penalty) return;
   updateSolveLocal(solveId, { penalty });
+}
+
+/**
+ * Sets the penalty of an account's solve that may not be loaded here (cloud mode only fetches the
+ * sessions you open), e.g. a daily-challenge attempt. Queued like any other change, so it reaches
+ * the server after the solve itself. `sessionId` is needed only when neither the solve nor its
+ * queued creation is known here. See whenSent for when the promise settles.
+ */
+export async function setPenaltyIn(solveId: string, penalty: Penalty, sessionId?: string): Promise<void> {
+  if (!solveStore.get().ready) await whenReady();
+  if (scope?.mode !== 'cloud') throw new Error('not signed in');
+  const hit = locate(solveId);
+  if (hit) {
+    if (hit.list[hit.index].penalty === penalty) return;
+    return whenSent(updateSolveLocal(solveId, { penalty }));
+  }
+  const creating = queue.find((q) => q.op.kind === 'createSolve' && q.op.solve.id === solveId)?.op;
+  const sid = creating?.kind === 'createSolve' ? creating.solve.sessionId : sessionId;
+  if (!sid) throw new Error('unknown solve');
+  return whenSent(enqueue({ kind: 'updateSolve', id: solveId, sessionId: sid, patch: { penalty } }));
 }
 
 export async function setComment(solveId: string, comment: string | null): Promise<void> {
