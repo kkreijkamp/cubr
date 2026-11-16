@@ -64,6 +64,46 @@ describeIntegration('race rooms API', () => {
     expect((await stored(res.json().room.id)).createdBy).toBe(user.id);
   });
 
+  const del = (id: string, token?: string) =>
+    pod.inject({ method: 'DELETE', url: `/api/race/rooms/${id}`, headers: token ? { authorization: `Bearer ${token}` } : {} });
+
+  it('lets the signed-in creator delete an empty room: it leaves the lobby and its keys go at once', async () => {
+    const token = await pod.token({ id: randomUUID(), username: 'tidy_host' });
+    const { room } = (await post({ name: 'Short lived', event: '333' }, { token })).json();
+    const p = await join(room.id);
+    await p.emit('chat:send', { text: 'hi' });
+    p.close();
+    await settle(async () => expect((await lobby()).find((r) => r.id === room.id)?.players).toBe(0));
+
+    expect((await del(room.id, token)).statusCode).toBe(204);
+    expect((await lobby()).some((r) => r.id === room.id)).toBe(false);
+    expect(await base.exists(keys.room(room.id), keys.conns(room.id), keys.chat(room.id))).toBe(0);
+    expect(await base.zscore(keys.lobby, room.id)).toBeNull();
+    expect((await del(room.id, token)).statusCode).toBe(404); // already gone
+    const late = await connect(pod, { guestId: generateGuestId() });
+    expect((await late.emit('room:join', { roomId: room.id })).ok).toBe(false); // and can't be joined
+  });
+
+  it('deletes a room only for its signed-in creator, and not while somebody is in it', async () => {
+    const owner = await pod.token({ id: randomUUID(), username: 'owner' });
+    const other = await pod.token({ id: randomUUID(), username: 'other' });
+    const { room } = (await post({ name: 'Mine', event: '333' }, { token: owner })).json();
+    expect((await del(room.id)).statusCode).toBe(401); // a guest
+    expect((await del(room.id, other)).statusCode).toBe(403);
+    const guests = (await post({ name: 'Made by a guest', event: '333' })).json().room;
+    expect((await del(guests.id, other)).statusCode).toBe(403); // nobody owns a guest's room
+    expect((await del('NOT-a-room!', owner)).statusCode).toBe(404);
+    expect((await del('zzzzzzzz', owner)).statusCode).toBe(404);
+
+    const p = await join(room.id);
+    const busy = await del(room.id, owner);
+    expect(busy.statusCode).toBe(409);
+    expect(busy.json().error.code).toBe('CONFLICT');
+    expect(await stored(room.id)).toMatchObject({ name: 'Mine' });
+    p.close();
+    await settle(async () => expect((await del(room.id, owner)).statusCode).toBe(204));
+  });
+
   it.each([
     ['no name', { event: '333' }],
     ['an empty name', { name: '', event: '333' }],

@@ -247,6 +247,22 @@ export class RoomStore {
     });
   }
 
+  /**
+   * The signed-in account that created a room deletes it while nobody is connected (the smoke test
+   * cleans up after itself this way): its keys and its lobby entry go now instead of expiring. Under
+   * the room's lock, so nobody can join halfway.
+   */
+  async deleteRoom(id: string, userId: string): Promise<'deleted' | 'not_found' | 'not_creator' | 'occupied'> {
+    return this.withLock(id, async () => {
+      const loaded = await this.load(id);
+      if (!loaded) return 'not_found';
+      if (!loaded.room.createdBy || loaded.room.createdBy.toLowerCase() !== userId.toLowerCase()) return 'not_creator';
+      if (loaded.presence.size > 0) return 'occupied';
+      await this.redis.multi().del(keys.room(id), keys.conns(id), keys.chat(id)).zrem(keys.lobby, id).exec();
+      return 'deleted';
+    });
+  }
+
   /** Public lobby: newest activity first; lazily prunes expired, private and long-empty rooms. */
   async listPublic(limit = 50): Promise<LobbyRoom[]> {
     const now = Date.now();

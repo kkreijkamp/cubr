@@ -507,6 +507,7 @@ data), one replica acquires `SET lb:rebuild-lock NX EX 120`, rebuilds the all-ti
 ### 9.6 race (`/api/race`, Socket.IO at `/socket.io`)
 REST: GET `/api/race/rooms` -> `{rooms: [{id, name, event, players, status, createdAt}]}` (public rooms, most recently active first, <= 50; `players` = connected players);
 POST `/api/race/rooms` (optional auth) `{name, event, isPrivate?}` -> 201 `{room: {id, name, event, isPrivate}}` (20 rooms/min per user or IP);
+DELETE `/api/race/rooms/:id` (auth) -> 204: only the account that created the room, and only while nobody is connected; 401, 403 not the creator (or a guest's room), 404, 409 somebody is in it (otherwise a room leaves the lobby after 10 empty minutes and expires 2 h after its last change);
 GET `/api/race/_info` -> info.
 
 Socket.IO (client uses `transports: ["websocket"]` so no sticky sessions are needed; the Redis

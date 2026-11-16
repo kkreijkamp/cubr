@@ -12,6 +12,7 @@ connected to different pods.
 |---|---|
 | `GET /api/race/rooms` | `{rooms:[{id,name,event,players,status,createdAt}]}`: public rooms, most recent activity first, max 50; `players` = connected players |
 | `POST /api/race/rooms` (optional auth) | `{name 1-40, event, isPrivate?}` -> 201 `{room:{id,name,event,isPrivate}}`, id = 8 chars `[a-z0-9]`; 20 creations/min per user or IP |
+| `DELETE /api/race/rooms/:id` (auth) | 204: the account that created the room deletes it (its keys and lobby entry, under the room's lock) while nobody is connected. 403 for anyone else or a guest's room, 404, 409 while somebody is in it. The smoke test cleans up with it. |
 | `GET /api/race/_info`, `/healthz`, `/readyz` | readiness is gated on Redis (command connection + adapter subscriber) |
 | Socket.IO `/socket.io` (websocket only) | handshake `auth: {token?, name?, guestId?}` |
 
