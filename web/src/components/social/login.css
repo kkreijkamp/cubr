@@ -115,6 +115,23 @@
 .lg-form .btn {
   margin-top: 0.5rem;
 }
+/* sign up: what creating an account agrees to */
+.lg-agree {
+  margin: 0;
+  color: var(--sub-color);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  text-align: center;
+}
+.lg-agree a {
+  color: var(--sub-color);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  transition: color var(--dur);
+}
+.lg-agree a:hover {
+  color: var(--text-color);
+}
 .lg-note {
   display: flex;
   align-items: flex-start;

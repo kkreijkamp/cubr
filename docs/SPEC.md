@@ -74,7 +74,7 @@ logger (JSON to stdout). No pino transports (they break bundling).
 | Service | K8s/compose DNS name | Public route prefixes (Ingress) | Owns schema | Purpose |
 |---|---|---|---|---|
 | web | `web` | `/` | - | nginx serving the SPA |
-| auth | `auth` | `/api/auth`, `/api/users` | `auth` | accounts, JWT, settings, profiles, profile pictures |
+| auth | `auth` | `/api/auth`, `/api/users`, `/api/supporters` | `auth` | accounts, JWT, settings, profiles, profile pictures, Ko-fi supporters |
 | scramble | `scramble` | `/api/scrambles` | `scramble` | WCA random-state scrambles (CPU-bound, pooled in Redis), daily challenge |
 | solve | `solve` | `/api/sessions`, `/api/solves` | `solve` | sessions & solves CRUD, csTimer import/export, transactional outbox -> events |
 | stats | `stats` | `/api/stats` | `stats` | event-driven read model: PBs, activity heatmap, streaks, time-of-day, global stats |
@@ -169,6 +169,8 @@ CREATE TABLE auth.user_settings (
 -- profile pictures (migration 002): browser-resized <= 300 KB images; users.avatar_version is a
 -- content hash that makes each picture URL unique (immutable, cacheable forever)
 ALTER TABLE auth.users ADD COLUMN avatar_version text;
+-- private profile (migration 004): strangers see only username + picture; mirrored to auth:private-users
+ALTER TABLE auth.users ADD COLUMN profile_private boolean NOT NULL DEFAULT false;
 CREATE TABLE auth.avatars (
   user_id      uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   content_type text NOT NULL CHECK (content_type IN ('image/webp','image/jpeg','image/png')),
@@ -178,6 +180,12 @@ CREATE TABLE auth.avatars (
 );
 -- password-reset links (migration 003): only the SHA-256 of the token; a row is deleted when used,
 -- together with every other row of the user
+-- Ko-fi supporters (migration 005): one row per Ko-fi message; hidden = removed from the about page by hand
+CREATE TABLE auth.supporters (
+  message_id text PRIMARY KEY, kind text NOT NULL, name text, is_public boolean NOT NULL,
+  is_subscription boolean NOT NULL DEFAULT false, tier text, received_at timestamptz NOT NULL,
+  hidden boolean NOT NULL DEFAULT false
+);
 CREATE TABLE auth.password_resets (
   token_hash bytea PRIMARY KEY,
   user_id    uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -304,6 +312,7 @@ trigram/lower index on person name for search.
 | `cubr:events:dlq` | Stream | consumers | dead letters: entries a consumer group could not handle |
 | `auth:revoked:<jti>` | string, TTL = token remaining life | auth | logout / revocation |
 | `auth:revoked-user:<userId>` | string (unix seconds), TTL 30 d | auth | account deleted: every token issued at or before then is revoked |
+| `auth:private-users` | set of user ids | auth (stats, leaderboard read) | private profiles; added/removed in the same transaction as the flag (503 + rollback if Redis can't take it), re-added from Postgres at auth start-up and every 10 min (adds only); readers fail closed |
 | `rl:<scope>:<key>` | counter, TTL | any | rate limiting |
 | `scramble:pool:<event>` | list | scramble | pre-generated scrambles |
 | `lb:<event>:<kind>:all` | zset (score=ms, member=userId) | leaderboard | all-time boards |
@@ -331,7 +340,7 @@ to `cubr:events:dlq`. Use `publishEvent()` / `consumeEvents()` from common.
 | type | publisher | data fields (besides eventId, occurredAt) |
 |---|---|---|
 | `user.registered` | auth | `userId, username, displayName, country, wcaId, createdAt, avatarUrl` |
-| `user.updated` | auth | same as above |
+| `user.updated` | auth | same as above; also sent when the profile turns private or public. Payloads carry the stranger's view: a private profile sends null displayName, country, wcaId and createdAt |
 | `user.deleted` | auth | `userId, username` - the account is gone: solve deletes its sessions, solves and daily attempts; stats and leaderboard delete its rows and ignore later events for it (tombstones) |
 | `solve.created` | solve | `userId, username, event, sessionId, sessionName, practice, solveId, timeMs, penalty, effectiveMs (int or null=DNF), createdAt, tz, source, rolling: {ao5, ao12}` (rolling = session's current ao5/ao12 *including* this solve; ms, -1 DNF, null n/a; `practice` = the session is a practice one: stats counts the solve but never as a PB, leaderboard skips it); daily-challenge solves also carry `dailyDate, dailyIndex` |
 | `solve.updated` | solve | same fields as created (new values) |
@@ -358,7 +367,7 @@ type Solve = { id: string; sessionId: string; event: string; timeMs: number; pen
 type PB = { valueMs: number; solveId: string|null; achievedAt: string };
 ```
 
-### 9.1 auth (`/api/auth`, `/api/users`)
+### 9.1 auth (`/api/auth`, `/api/users`, `/api/supporters`)
 | Method & path | Auth | Body / query | Response |
 |---|---|---|---|
 | POST `/api/auth/register` | - | `{username, email, password}` | 201 `{token, user: PrivateUser}`; 409 CONFLICT (username/email taken); 429 after 20 registrations/h/IP |
@@ -367,14 +376,16 @@ type PB = { valueMs: number; solveId: string|null; achievedAt: string };
 | POST `/api/auth/password/forgot` | - | `{email}` | 202 `{ok: true}` for every address, answered before the lookup (no account enumeration by reply or timing); an account with that email gets a link `<PUBLIC_URL>/reset#<token>` (32 random bytes, valid 60 min, single use) through Resend; 429 after 10/h/IP; at most 3 links/h per account |
 | POST `/api/auth/password/reset` | - | `{token, password}` (password: 8-128 chars) | 200 `{token, user: PrivateUser}`: new password set, the user's other reset links deleted, every older token revoked (per-user revocation; the new token is issued after it); 400 invalid/expired/used link; 503 if the revocation can't be stored (nothing changes) |
 | GET `/api/auth/me` | req | - | `{user: PrivateUser, settings: object}` |
-| PATCH `/api/auth/me` | req | `{displayName?, bio?, country?, wcaId?}` (null clears) | `{user: PrivateUser}` (+ `user.updated`) |
+| PATCH `/api/auth/me` | req | `{displayName?, bio?, country?, wcaId?, private?}` (null clears; `private: true` = private profile) | `{user: PrivateUser}` (+ `user.updated`); 503 if the private flag can't be mirrored to Redis (nothing changes) |
 | PUT `/api/auth/me/settings` | req | `{settings: object}` (<= 16 KB JSON) | `{settings}` |
 | PUT `/api/auth/me/avatar` | req | raw image body, `Content-Type: image/webp\|image/jpeg\|image/png`, <= 300 KB (magic bytes must match) | `{user: PrivateUser}`; 400, 413, 429 (10/h) (+ `user.updated`) |
 | DELETE `/api/auth/me/avatar` | req | - | `{user: PrivateUser}` (+ `user.updated`) |
 | DELETE `/api/auth/me` | req | `{password}` | 204: the account is deleted and every token of it revoked (+ `user.deleted`, which makes the other services delete its data); 403 wrong password; 429 after 5 tries/10 min; 503 when Redis can't take the revocation or the event (then nothing is deleted) |
 | GET `/api/users/:idOrUsername/avatar` | - | `?v=` version | image bytes (immutable cache when `v` matches, ETag/304); 404 |
-| GET `/api/users/:username` | - | - | `{user: PublicUser}`; 404 |
-| GET `/api/users?ids=a,b,c` | - | <= 100 ids | `{users: PublicUser[]}` |
+| GET `/api/users/:username` | opt | - | `{user: PublicUser}` (`private: true` and only id, username, avatarUrl for a private profile unless the token is its owner's; displayName, bio, country, wcaId, createdAt null); 404 |
+| GET `/api/users?ids=a,b,c` | opt | <= 100 ids | `{users: PublicUser[]}` (private profiles as above) |
+| POST `/api/supporters/kofi` | Ko-fi verification token in the payload | form-encoded `data` = Ko-fi's payment JSON (body <= 64 KB) | 200 `{ok: true}` (a repeated `message_id` is ignored); 400 not Ko-fi JSON; 403 wrong token (constant-time check against `KOFI_VERIFICATION_TOKEN`); 503 token not configured; 60/min/IP. Stores only message_id, type, the name if `is_public`, subscription flag, tier and time - never email, amount, message or payment ids |
+| GET `/api/supporters` | - | - | `{supporters: [{name, member}]}`: public, not hidden, one per name (case-insensitive), most recent first, <= 200; member = a subscription payment in the last 35 days; cached 60 s |
 | GET `/api/auth/_info`, `/api/users/_info` | - | - | info |
 
 Rate limits are per client IP; callers that present `INTERNAL_API_TOKEN` (section 4) are exempt. Redis is
@@ -386,7 +397,7 @@ are skipped, and only logout answers 503 (the revocation could not be stored).
 |---|---|
 | GET `/api/scrambles/events` | `{events: [{id, name, short, puzzle}]}` |
 | GET `/api/scrambles/daily?date=YYYY-MM-DD` (default today, UTC; the last 30 days) | `{date, events: {"333": string[5], "222": [...], "444": [...], "pyram": [...], "skewb": [...]}}` (generated once, persisted, identical for everyone); 400 for future dates; 503 while Postgres is unreachable and nothing is cached |
-| GET `/api/scrambles/:event?count=1..25&fresh=0/1` | `{event, scrambles: string[], source: "pool"\|"generated"}`; `fresh=1` bypasses the pool (used for load tests / HPA demo); 404 unknown event; 503 when generation times out or the queue is full |
+| GET `/api/scrambles/:event?count=1..25&fresh=0/1` | `{event, scrambles: string[], source: "pool"\|"generated"}`; `fresh=1` bypasses the pool (load tests / HPA demo), honoured only with `X-Internal-Token`, which also skips the limits; per IP otherwise: 120 requests/min and 60 newly generated scrambles/min (weighted by count; past it the pool's scrambles are returned, or 429 if there are none); 404 unknown event; 503 when generation times out or the queue is full |
 | GET `/api/scrambles/_info` | info (+ warm-up, generator queue, pool sizes) |
 
 Pool: keep `scramble:pool:<event>` topped up (333/222/pyram/skewb: 200; 444/sq1/clock/minx/333oh/333bf/333fm: 50; 555-777/444bf/555bf: 20) by a background loop in every replica (check LLEN, generate up to the target, `LTRIM` to cap). The loop only uses idle CPU; requests that find the pool short generate the rest on the fly.
@@ -403,8 +414,8 @@ Pool: keep `scramble:pool:<event>` topped up (333/222/pyram/skewb: 200; 444/sq1/
 | POST `/api/solves` | `{id, sessionId, timeMs, penalty, scramble, comment?, source?, createdAt?, daily?: {date, index}}` | 201 `{solve, rolling: {ao5, ao12}}`; if `id` already exists for this user -> 200 same shape (idempotent). A `createdAt` in the future (fast device clock) is clamped to the server time. `daily` solves: see below. |
 | PATCH `/api/solves/:id` | `{penalty?, comment?}` | `{solve}` (+ `solve.updated`) |
 | DELETE `/api/solves/:id` | - | 204 (+ `solve.deleted`) |
-| POST `/api/sessions/import` | `{sessions: [{name, event, practice?, solves: [{timeMs, penalty, scramble, comment?, createdAt}]}]}` (<= 1 000 sessions, <= 100 000 solves, body <= 25 MB) | `{imported: {sessions, solves}}` (+ one `solves.imported`) - bulk insert in batches inside a transaction |
-| GET `/api/solves/export` | - | `{exportedAt, sessions: [Session & {solves: Solve[]}]}` |
+| POST `/api/sessions/import` | `{sessions: [{name, event, practice?, solves: [{timeMs, penalty, scramble, comment?, createdAt}]}]}` (<= 1 000 sessions, <= 100 000 solves, body <= 25 MB) | `{imported: {sessions, solves}}` (+ one `solves.imported`) - bulk insert in batches inside a transaction; 10 imports/h per user (429, checked before the body is read); an account holds at most 250 000 solves (400 if the import would pass it; one import per account at a time) |
+| GET `/api/solves/export` | - | `{exportedAt, sessions: [Session & {solves: Solve[]}]}`, streamed from one read-only snapshot in pages of 2 000 solves (memory stays flat; 200k solves = 52 MB in ~2.5 s locally); 10 exports/h per user (429) |
 | GET `/api/solves/daily?date=` | - | `{date, events: {"333": {solves: Solve[], ao5: number\|-1\|null}, ...}}` (only events with >=1 attempt; ao5 = the official result of the five attempts: times as submitted, penalties as last set while the day was open) |
 | GET `/api/solves/_info`, `/api/sessions/_info` | - | info (+ outbox backlog and relay state) |
 | GET `/internal/users/:userId/solves?event=` | - | `{solves: [{id, sessionId, timeMs, penalty, createdAt, practice?}]}` ordered by session_id, created_at (for stats recompute; `practice: true` on a practice session's solves) |
@@ -427,6 +438,7 @@ Published rows older than a day are deleted.
 ### 9.4 stats (`/api/stats`)
 | Method & path | Response |
 |---|---|
+| (all `/api/stats/users/:userId/*`) | optional token; 403 `This profile is private` for a private profile unless the token is its owner's |
 | GET `/api/stats/users/:userId/summary` | `{userId, username, totals: {solves, totalMs, firstSolveAt, lastSolveAt, activeDays, currentStreak, longestStreak, activeYears: number[] (newest first)}, events: [{event, solves, totalMs, meanMs, pbs: {single: PB\|null, mo3: PB\|null, ao5: PB\|null, ao12: PB\|null, ao50: PB\|null, ao100: PB\|null}}]}` (unknown user -> zeros) |
 | GET `/api/stats/users/:userId/activity?from=&to=&event=` (default the 365 days ending today in the user's tz, all events) | `{from, to, days: [{date: "YYYY-MM-DD", solves, totalMs}]}` (only days with solves; `event` counts that event's solves only) |
 | GET `/api/stats/users/:userId/pb-history?event=333` | `{history: [{kind, valueMs, achievedAt}]}` asc |
@@ -451,7 +463,7 @@ worsens or disappears).
 |---|---|
 | GET `/api/leaderboards/:event/:kind?period=all\|weekly\|daily&page=1&size=50&key=` | `{event, kind, period, periodKey, total, page, size, entries: [{rank, userId, username, country, avatarUrl, valueMs, achievedAt}], me: {rank, valueMs}\|null}` - kind in single, ao5, ao12 (weekly/daily: single, ao5). `key` (optional) selects a past daily/weekly board (`YYYY-MM-DD` / `YYYY-Www`). `me` filled when a valid token is sent. |
 | GET `/api/leaderboards/daily-challenge?date=&event=333&page=1&size=50` | same shape, kind `"ao5"`, period `"challenge"` |
-| GET `/api/leaderboards/users/:userId/ranks` | `{ranks: [{event, kind, period:"all", rank, total, valueMs}]}` |
+| GET `/api/leaderboards/users/:userId/ranks` | `{ranks: [{event, kind, period:"all", rank, total, valueMs}]}`; optional token, 403 for a private profile unless it's the owner's (the boards themselves still list them) |
 | GET `/api/leaderboards/_info` | info (+ consumer, rebuild and anti-cheat status) |
 
 Sources: all-time boards from `pb.updated` (ZADD exact value; ZREM when valueMs is null or -1).

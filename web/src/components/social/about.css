@@ -132,173 +132,6 @@
   line-height: 1.55;
 }
 
-/* architecture diagram */
-.arch {
-  width: 100%;
-}
-.arch-svg {
-  display: block;
-  width: 100%;
-  height: auto;
-  font-family: var(--font);
-}
-.arch.tall .arch-svg {
-  max-width: 420px;
-  margin: 0 auto;
-}
-.arch-title {
-  fill: var(--text-color);
-}
-.arch-sub {
-  fill: var(--sub-color);
-}
-.arch-node rect {
-  fill: var(--sub-alt-color);
-}
-.arch-node rect.arch-replica {
-  fill: none;
-  stroke: var(--sub-alt-color);
-  stroke-width: 2;
-}
-.arch-lb rect {
-  stroke: var(--sub-color);
-  stroke-width: 1.5;
-}
-.arch-chrome {
-  fill: var(--sub-color);
-}
-.arch-cluster {
-  fill: none;
-  stroke: var(--sub-color);
-  stroke-width: 1.5;
-  stroke-dasharray: 6 6;
-  opacity: 0.8;
-}
-.arch-store {
-  fill: none;
-  stroke: var(--sub-alt-color);
-  stroke-width: 2;
-}
-.arch-cyl path {
-  fill: var(--sub-alt-color);
-}
-.arch-cyl ellipse {
-  fill: var(--sub-alt-color);
-  stroke: var(--sub-color);
-  stroke-width: 1;
-}
-.arch-wire path {
-  fill: none;
-  stroke: var(--sub-color);
-  stroke-width: 1.5;
-}
-.arch-head {
-  fill: var(--sub-color);
-}
-.arch-head-main {
-  fill: var(--main-color);
-}
-.arch-dot circle {
-  fill: var(--sub-color);
-}
-.arch-hpa rect {
-  fill: var(--main-color);
-}
-.arch-hpa text {
-  fill: var(--bg-color);
-}
-.arch-stream rect {
-  stroke: var(--main-color);
-  stroke-width: 1.5;
-}
-.arch-flow path {
-  fill: none;
-  stroke: var(--main-color);
-  stroke-width: 2.5;
-  stroke-linecap: round;
-  stroke-dasharray: 7 6;
-  animation: archFlow 0.9s linear infinite;
-}
-@keyframes archFlow {
-  to {
-    stroke-dashoffset: -13;
-  }
-}
-.arch-chip rect {
-  fill: none;
-  stroke: var(--sub-alt-color);
-  stroke-width: 2;
-}
-.arch-chip-dot {
-  fill: var(--main-color);
-}
-.arch-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1.75rem;
-  margin-top: 1rem;
-  color: var(--sub-color);
-  font-size: 0.75rem;
-  line-height: 1.5;
-}
-.arch-legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5em;
-}
-.arch-legend svg {
-  flex-shrink: 0;
-}
-.arch-steps {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem 2rem;
-  margin-top: 1.5rem;
-  counter-reset: step;
-}
-.arch-steps div {
-  color: var(--sub-color);
-  font-size: 0.8rem;
-  line-height: 1.6;
-}
-.arch-steps div::before {
-  counter-increment: step;
-  content: counter(step);
-  display: inline-grid;
-  place-items: center;
-  width: 1.4rem;
-  height: 1.4rem;
-  margin-right: 0.5rem;
-  border-radius: 50%;
-  background: var(--main-color);
-  color: var(--bg-color);
-  font-size: 0.75rem;
-}
-.arch-steps .text {
-  color: var(--text-color);
-}
-
-/* tech stack + shortcuts */
-.ab-two {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 3rem;
-}
-.ab-dl {
-  display: grid;
-  grid-template-columns: 6.5rem minmax(0, 1fr);
-  gap: 0.75rem 1.25rem;
-  margin: 0;
-  font-size: 0.875rem;
-  line-height: 1.5;
-}
-.ab-dl dt {
-  color: var(--sub-color);
-}
-.ab-dl dd {
-  margin: 0;
-  color: var(--text-color);
-}
 .ab-keys {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -352,14 +185,8 @@
   .ab-features {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .ab-two {
-    grid-template-columns: minmax(0, 1fr);
-  }
   .ab-credits {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .arch-steps {
-    grid-template-columns: minmax(0, 1fr);
   }
 }
 @media (max-width: 720px) {
@@ -384,11 +211,20 @@
   .ab-credits {
     grid-template-columns: minmax(0, 1fr);
   }
-  .ab-dl {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0.15rem;
-  }
-  .ab-dl dd {
-    margin-bottom: 0.6rem;
-  }
+}
+
+/* supporters: names in a wrapped row */
+.ab-supporters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.25rem;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9rem;
+}
+.ab-supporters li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }

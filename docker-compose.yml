@@ -97,6 +97,7 @@ services:
     environment:
       <<: *service-env
       PUBLIC_URL: http://localhost:8080   # links in emails; no RESEND_API_KEY here -> emails are logged
+      KOFI_VERIFICATION_TOKEN: dev-kofi-token   # local only: test the webhook with this token
     build: { context: ., dockerfile: services/auth/Dockerfile, args: *build-args }
 
   scramble:

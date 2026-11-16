@@ -98,13 +98,18 @@ export function ProfileHeader({ user, summary, own, onEdit, event, onEvent }: Pr
                 {flag}
               </span>
             )}
-            <span data-tip={`${formatDate(user.createdAt)} - ${timeAgo(user.createdAt)}`}>joined {monthYear(user.createdAt)}</span>
+            {user.createdAt && <span data-tip={`${formatDate(user.createdAt)} - ${timeAgo(user.createdAt)}`}>joined {monthYear(user.createdAt)}</span>}
             {user.wcaId && (
               <Link to={`/wca?person=${encodeURIComponent(user.wcaId)}`} data-tip="official wca results">
                 {user.wcaId}
               </Link>
             )}
             {own && <span className="pill">you</span>}
+            {own && user.private && (
+              <span className="pill" data-tip="others only see your picture and username">
+                private
+              </span>
+            )}
             <span className="pf-actions">
               {own && onEdit && (
                 <button className="btn-text" onClick={onEdit} data-tip="edit profile" aria-label="edit profile">

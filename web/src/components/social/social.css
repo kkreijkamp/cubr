@@ -1175,3 +1175,23 @@ table.ps-table td.dnf {
     font-size: 1.5rem;
   }
 }
+
+/* a private profile seen by someone else: the picture and name above, this where the rest would be */
+.pf-private {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  padding: 4rem 1rem;
+  color: var(--sub-color);
+  text-align: center;
+  font-size: 0.85rem;
+}
+.pf-private-title {
+  color: var(--text-color);
+  font-size: 1.35rem;
+}
+
+/* edit profile: everyone / only me */
+.ep-visibility {
+  justify-self: start;
+}

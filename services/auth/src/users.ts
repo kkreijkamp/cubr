@@ -38,6 +38,8 @@ export const patchMeSchema = z.object({
   wcaId: z
     .preprocess(blankToNull, z.string().trim().toUpperCase().regex(WCA_ID_RE, 'must look like 2015ABCD01').nullable())
     .optional(),
+  /** private profile: strangers see only the username and picture */
+  private: z.boolean().optional(),
 });
 export type PatchMe = z.infer<typeof patchMeSchema>;
 
@@ -70,6 +72,7 @@ export interface UserRow {
   last_login_at?: Date | string | null;
   /** short content hash of the current profile picture (null = none); part of the avatar URL */
   avatar_version?: string | null;
+  profile_private?: boolean | null;
 }
 
 export interface PublicUser {
@@ -79,9 +82,12 @@ export interface PublicUser {
   bio: string | null;
   country: string | null;
   wcaId: string | null;
-  createdAt: string;
+  /** null when the profile is private and the viewer isn't its owner */
+  createdAt: string | null;
   /** same-origin, immutable (versioned) URL of the profile picture, or null */
   avatarUrl: string | null;
+  /** a private profile: strangers get only id, username and picture (everything else null) */
+  private: boolean;
 }
 export interface PrivateUser extends PublicUser {
   email: string;
@@ -89,7 +95,25 @@ export interface PrivateUser extends PublicUser {
 
 const iso = (v: Date | string): string => (v instanceof Date ? v.toISOString() : new Date(v).toISOString());
 
-export function toPublicUser(row: UserRow): PublicUser {
+/**
+ * The user as `viewerId` may see them (no viewer = a stranger, also what user.* events carry): a
+ * private profile shows anyone but its owner only the username and picture.
+ */
+export function toPublicUser(row: UserRow, viewerId?: string | null): PublicUser {
+  const isPrivate = row.profile_private === true;
+  if (isPrivate && viewerId?.toLowerCase() !== row.id.toLowerCase()) {
+    return {
+      id: row.id,
+      username: row.username,
+      displayName: null,
+      bio: null,
+      country: null,
+      wcaId: null,
+      createdAt: null,
+      avatarUrl: avatarUrl(row.id, row.avatar_version),
+      private: true,
+    };
+  }
   return {
     id: row.id,
     username: row.username,
@@ -100,6 +124,7 @@ export function toPublicUser(row: UserRow): PublicUser {
     wcaId: row.wca_id ?? null,
     createdAt: iso(row.created_at),
     avatarUrl: avatarUrl(row.id, row.avatar_version),
+    private: isPrivate,
   };
 }
 
@@ -108,12 +133,13 @@ export function avatarUrl(userId: string, version: string | null | undefined): s
   return version ? `/api/users/${userId}/avatar?v=${version}` : null;
 }
 
+/** The owner's own view: everything, plus the email. */
 export function toPrivateUser(row: UserRow): PrivateUser {
-  return { ...toPublicUser(row), email: row.email };
+  return { ...toPublicUser(row, row.id), email: row.email };
 }
 
 /** Columns selected everywhere a user is returned (never includes password_hash). */
-export const USER_COLUMNS = 'id, username, email, display_name, bio, country, wca_id, created_at, last_login_at, avatar_version';
+export const USER_COLUMNS = 'id, username, email, display_name, bio, country, wca_id, created_at, last_login_at, avatar_version, profile_private';
 
 /** Maps validated PATCH /me fields to SQL columns. Only fixed identifiers, values stay parameterised. */
 export function buildUserUpdate(patch: PatchMe): { sets: string[]; values: unknown[] } {
@@ -122,6 +148,7 @@ export function buildUserUpdate(patch: PatchMe): { sets: string[]; values: unkno
     bio: 'bio',
     country: 'country',
     wcaId: 'wca_id',
+    private: 'profile_private',
   };
   const sets: string[] = [];
   const values: unknown[] = [];
@@ -162,7 +189,11 @@ export function conflictMessage(constraint: string | undefined): string {
   return 'Username or email already in use';
 }
 
-/** Payload of user.registered / user.updated events (SPEC section 8, besides eventId/occurredAt). */
+/**
+ * Payload of user.registered / user.updated events (SPEC section 8, besides eventId/occurredAt).
+ * Pass the stranger's view (toPublicUser(row) without a viewer): a private profile then publishes
+ * no country or WCA id, so read models such as the leaderboards' display info drop them too.
+ */
 export function userEventData(user: PublicUser) {
   return {
     userId: user.id,

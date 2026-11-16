@@ -16,6 +16,14 @@
 # Needs Docker Compose >= 2.24 for !reset / !override.
 # =============================================================================================
 
+# Container logs (the gateway's access log holds visitors' IP addresses) are rotated by size, so they
+# are overwritten as they fill up instead of growing forever: at most 3 x 10 MB per container.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
 x-prod-env: &prod-env
   DATABASE_URL: postgres://cubr:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/cubr
   JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
@@ -25,62 +33,75 @@ x-prod-env: &prod-env
 
 services:
   postgres:
+    logging: *logging
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     ports: !reset []
 
   redis:
+    logging: *logging
     ports: !reset []
 
   auth:
+    logging: *logging
     image: australia-southeast1-docker.pkg.dev/cubr-app/cubr/auth:${CUBR_VERSION:?set CUBR_VERSION in .env}
     build: !reset null
     environment:
       <<: *prod-env
       PUBLIC_URL: https://cubr.dev
       RESEND_API_KEY: ${RESEND_API_KEY:-}   # unset -> password-reset emails are only logged
+      KOFI_VERIFICATION_TOKEN: ${KOFI_VERIFICATION_TOKEN:-}   # unset -> the Ko-fi webhook refuses everything
 
   scramble:
+    logging: *logging
     image: australia-southeast1-docker.pkg.dev/cubr-app/cubr/scramble:${CUBR_VERSION:?set CUBR_VERSION in .env}
     build: !reset null
     environment: *prod-env
 
   solve:
+    logging: *logging
     image: australia-southeast1-docker.pkg.dev/cubr-app/cubr/solve:${CUBR_VERSION:?set CUBR_VERSION in .env}
     build: !reset null
     environment: *prod-env
 
   stats:
+    logging: *logging
     image: australia-southeast1-docker.pkg.dev/cubr-app/cubr/stats:${CUBR_VERSION:?set CUBR_VERSION in .env}
     build: !reset null
     environment: *prod-env
 
   leaderboard:
+    logging: *logging
     image: australia-southeast1-docker.pkg.dev/cubr-app/cubr/leaderboard:${CUBR_VERSION:?set CUBR_VERSION in .env}
     build: !reset null
     environment: *prod-env
 
   race:
+    logging: *logging
     image: australia-southeast1-docker.pkg.dev/cubr-app/cubr/race:${CUBR_VERSION:?set CUBR_VERSION in .env}
     build: !reset null
     environment: *prod-env
 
   wca:
+    logging: *logging
     image: australia-southeast1-docker.pkg.dev/cubr-app/cubr/wca:${CUBR_VERSION:?set CUBR_VERSION in .env}
     build: !reset null
     environment: *prod-env
 
   web:
+    logging: *logging
     image: australia-southeast1-docker.pkg.dev/cubr-app/cubr/web:${CUBR_VERSION:?set CUBR_VERSION in .env}
     build: !reset null
     environment:
       NODE_NAME: ${NODE_NAME:-cubr-1}
 
   gateway:
+    logging: *logging
     ports: !override
       - "127.0.0.1:8080:8080"          # checks over SSH only; the public way in is cloudflared
 
   cloudflared:
+    logging: *logging
     image: cloudflare/cloudflared:2026.11.0
     restart: unless-stopped
     command: ["tunnel", "--no-autoupdate", "run"]
@@ -90,12 +111,14 @@ services:
       gateway: { condition: service_healthy }
 
   wca-import:
+    logging: *logging
     image: australia-southeast1-docker.pkg.dev/cubr-app/cubr/wca-import:${CUBR_VERSION:?set CUBR_VERSION in .env}
     build: !reset null
     environment:
       DATABASE_URL: postgres://cubr:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/cubr
 
   seed:
+    logging: *logging
     profiles: !override ["seed"]       # synthetic users never belong in production by accident
     image: australia-southeast1-docker.pkg.dev/cubr-app/cubr/seed:${CUBR_VERSION:?set CUBR_VERSION in .env}
     build: !reset null

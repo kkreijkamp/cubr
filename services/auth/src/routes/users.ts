@@ -6,10 +6,10 @@ import { MAX_IDS, USERNAME_RE, USER_COLUMNS, parseIdList, toPublicUser, type Use
 
 const idsQuery = z.object({ ids: z.string().max(10_000).optional() });
 
-/** Public profile routes (no auth). */
-export async function registerUserRoutes(app: FastifyInstance, { pool }: Deps) {
+/** Public profile routes. A token is optional: it only lets owners see their own private profile in full. */
+export async function registerUserRoutes(app: FastifyInstance, { pool, auth }: Deps) {
   // GET /api/users?ids=a,b,c -> {users: PublicUser[]} in the order requested (unknown ids omitted)
-  app.get('/api/users', async (req) => {
+  app.get('/api/users', { preHandler: auth.optionalAuth }, async (req) => {
     const { ids: raw } = parse(idsQuery, req.query);
     const ids = parseIdList(raw);
     if (ids === null) throw badRequest(`ids: at most ${MAX_IDS} ids allowed`);
@@ -18,13 +18,13 @@ export async function registerUserRoutes(app: FastifyInstance, { pool }: Deps) {
     const byId = new Map(rows.map((r) => [r.id, r]));
     const users = ids.flatMap((id) => {
       const row = byId.get(id);
-      return row ? [toPublicUser(row)] : [];
+      return row ? [toPublicUser(row, req.user?.id)] : [];
     });
     return { users };
   });
 
   // GET /api/users/:username (case-insensitive) -> {user: PublicUser}
-  app.get<{ Params: { username: string } }>('/api/users/:username', async (req) => {
+  app.get<{ Params: { username: string } }>('/api/users/:username', { preHandler: auth.optionalAuth }, async (req) => {
     const { username } = req.params;
     if (!USERNAME_RE.test(username)) throw notFound('User not found');
     const { rows } = await pool.query<UserRow>(
@@ -32,6 +32,6 @@ export async function registerUserRoutes(app: FastifyInstance, { pool }: Deps) {
       [username],
     );
     if (!rows[0]) throw notFound('User not found');
-    return { user: toPublicUser(rows[0]) };
+    return { user: toPublicUser(rows[0], req.user?.id) };
   });
 }

@@ -41,7 +41,7 @@ const presence = new PodPresence(redis, store, config.podName, app.log);
 const sockets = registerSocketHandlers({
   io,
   store,
-  scrambles: makeScrambleFetcher(config.urls.scramble, app.log),
+  scrambles: makeScrambleFetcher(config.urls.scramble, app.log, undefined, config.internalToken),
   redis,
   jwtSecret: config.jwtSecret,
   pod: config.podName,

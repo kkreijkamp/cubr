@@ -117,6 +117,7 @@ describe('row mapping', () => {
       wcaId: null,
       createdAt: '2026-01-02T03:04:05.000Z',
       avatarUrl: null,
+      private: false,
     });
     expect(u).not.toHaveProperty('email');
     expect(u).not.toHaveProperty('password_hash');
@@ -142,6 +143,32 @@ describe('row mapping', () => {
       createdAt: '2026-01-02T03:04:05.000Z',
       avatarUrl: null,
     });
+  });
+  it('shows strangers only the username and picture of a private profile', () => {
+    const priv = { ...row, profile_private: true, avatar_version: 'abc123def456' };
+    const stranger = {
+      id: row.id,
+      username: 'Felix_Z',
+      displayName: null,
+      bio: null,
+      country: null,
+      wcaId: null,
+      createdAt: null,
+      avatarUrl: `/api/users/${row.id}/avatar?v=abc123def456`,
+      private: true,
+    };
+    expect(toPublicUser(priv)).toEqual(stranger);
+    expect(toPublicUser(priv, '00000000-0000-4000-8000-0000000000ff')).toEqual(stranger);
+    // the owner (any id casing) and their own private view see everything
+    expect(toPublicUser(priv, row.id.toUpperCase())).toMatchObject({ displayName: 'Felix', country: 'AU', private: true });
+    expect(toPrivateUser(priv)).toMatchObject({ displayName: 'Felix', email: 'felix@example.com', private: true });
+    // events carry the stranger's view, so read models drop the country and WCA id too
+    expect(userEventData(toPublicUser(priv))).toMatchObject({ country: null, wcaId: null, displayName: null, username: 'Felix_Z' });
+  });
+  it('PATCH /me can switch the profile private or public', () => {
+    expect(patchMeSchema.parse({ private: true })).toEqual({ private: true });
+    expect(patchMeSchema.safeParse({ private: 'yes' }).success).toBe(false);
+    expect(buildUserUpdate({ private: true })).toEqual({ sets: ['profile_private = $1'], values: [true] });
   });
   it('exposes a versioned avatar URL only when a picture exists', () => {
     expect(toPublicUser({ ...row, avatar_version: 'abc123def456' }).avatarUrl).toBe(`/api/users/${row.id}/avatar?v=abc123def456`);

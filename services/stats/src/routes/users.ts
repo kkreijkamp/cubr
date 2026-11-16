@@ -1,6 +1,6 @@
-import { badRequest, dayKey, parse, type Pool } from '@cubr/common';
+import { badRequest, canViewProfile, dayKey, forbidden, makeAuth, parse, type Pool, type Redis } from '@cubr/common';
 import { EVENT_IDS, isEventId } from '@cubr/cubestats';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { PB_KINDS, type PbKind } from '../domain/pbs.js';
 import { activeYears, addDays, computeStreaks, dayNumber, dayString } from '../domain/streaks.js';
@@ -32,9 +32,22 @@ async function userTz(pool: Pool, userId: string): Promise<string> {
   return rows[0]?.tz ?? 'UTC';
 }
 
-export async function registerUserRoutes(app: FastifyInstance, pool: Pool): Promise<void> {
+export interface UserRouteDeps {
+  pool: Pool;
+  redis: Redis;
+  auth: ReturnType<typeof makeAuth>;
+}
+
+export async function registerUserRoutes(app: FastifyInstance, { pool, redis, auth }: UserRouteDeps): Promise<void> {
+  // Private profiles: only their owner gets these numbers (the token is optional, for that check).
+  const guard = async (req: FastifyRequest) => {
+    const { userId } = parse(userParams, req.params);
+    if (!(await canViewProfile(redis, req.user?.id, userId))) throw forbidden('This profile is private');
+  };
+  const profile = { preHandler: [auth.optionalAuth, guard] };
+
   // Profile summary. Unknown users get zeros (a brand-new account has a clean profile, not a 404).
-  app.get('/api/stats/users/:userId/summary', async (req) => {
+  app.get('/api/stats/users/:userId/summary', profile, async (req) => {
     const { userId } = parse(userParams, req.params);
     const [totals, days, daily, hourly, pbs] = await Promise.all([
       pool.query<{ username: string; solves: number; total_ms: number; first_solve_at: Date | null; last_solve_at: Date | null; tz: string }>(
@@ -98,7 +111,7 @@ export async function registerUserRoutes(app: FastifyInstance, pool: Pool): Prom
 
   // Heatmap data: only days with solves, default the last 365 days (in the user's timezone);
   // `event` narrows it to one event (default: all events).
-  app.get('/api/stats/users/:userId/activity', async (req) => {
+  app.get('/api/stats/users/:userId/activity', profile, async (req) => {
     const { userId } = parse(userParams, req.params);
     const q = parse(activityQuery, req.query);
     const to = q.to ?? (q.from ? addDays(q.from, 364) : dayKey(new Date(), await userTz(pool, userId)));
@@ -114,7 +127,7 @@ export async function registerUserRoutes(app: FastifyInstance, pool: Pool): Prom
   });
 
   // PB progression for one event (default 333), oldest first.
-  app.get('/api/stats/users/:userId/pb-history', async (req) => {
+  app.get('/api/stats/users/:userId/pb-history', profile, async (req) => {
     const { userId } = parse(userParams, req.params);
     const { event } = parse(pbHistoryQuery, req.query);
     const { rows } = await pool.query<{ kind: PbKind; value_ms: number; achieved_at: Date }>(
@@ -132,7 +145,7 @@ export async function registerUserRoutes(app: FastifyInstance, pool: Pool): Prom
   // points into `sessions` (display names come from this service's session-name read model).
   // Served from the read model (solve_ledger), so viewing a profile never touches solve-service.
   // Returns the newest `limit` solves (oldest first); `truncated` says there is older history.
-  app.get('/api/stats/users/:userId/solves', async (req) => {
+  app.get('/api/stats/users/:userId/solves', profile, async (req) => {
     const { userId } = parse(userParams, req.params);
     const { event, limit } = parse(solvesQuery, req.query);
     const [series, sessions] = await Promise.all([
@@ -176,7 +189,7 @@ export async function registerUserRoutes(app: FastifyInstance, pool: Pool): Prom
     };
   });
 
-  app.get('/api/stats/users/:userId/hourly', async (req) => {
+  app.get('/api/stats/users/:userId/hourly', profile, async (req) => {
     const { userId } = parse(userParams, req.params);
     const { event } = parse(hourlyQuery, req.query);
     const { rows } = await pool.query<{ hour: number; solves: number; sum_ms: number; dnfs: number }>(

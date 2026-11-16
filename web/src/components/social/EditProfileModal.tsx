@@ -30,6 +30,7 @@ export function EditProfileModal({ user, onClose }: { user: PrivateUser; onClose
   const [bio, setBio] = useState(user.bio ?? '');
   const [country, setCountry] = useState(user.country ?? '');
   const [wcaId, setWcaId] = useState(user.wcaId ?? '');
+  const [isPrivate, setIsPrivate] = useState(user.private === true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -50,12 +51,14 @@ export function EditProfileModal({ user, onClose }: { user: PrivateUser; onClose
     bio: bio.trim() || null,
     country: country || null,
     wcaId: wca || null,
+    private: isPrivate,
   };
   const changed =
     patch.displayName !== (user.displayName ?? null) ||
     patch.bio !== (user.bio ?? null) ||
     patch.country !== (user.country ?? null) ||
-    patch.wcaId !== (user.wcaId ?? null);
+    patch.wcaId !== (user.wcaId ?? null) ||
+    patch.private !== (user.private === true);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -153,6 +156,33 @@ export function EditProfileModal({ user, onClose }: { user: PrivateUser; onClose
             </a>
           </span>
         )}
+        <div className="field">
+          <span className="ep-label label" id="ep-visibility-label">
+            <span>who can see your profile</span>
+          </span>
+          <div className="config-card ep-visibility" role="radiogroup" aria-labelledby="ep-visibility-label">
+            {[
+              { value: false, label: 'everyone' },
+              { value: true, label: 'only me' },
+            ].map((o) => (
+              <button
+                key={o.label}
+                type="button"
+                role="radio"
+                aria-checked={isPrivate === o.value}
+                className={`btn-text${isPrivate === o.value ? ' active' : ''}`}
+                onClick={() => setIsPrivate(o.value)}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <span className="ep-hint">
+            {isPrivate
+              ? 'others see only your picture and username. your times still show on the leaderboards.'
+              : 'anyone can see your stats, solves and details.'}
+          </span>
+        </div>
         {error && (
           <div className="ep-error" role="alert">
             <ExclamationCircleIcon width={15} height={15} /> {error}

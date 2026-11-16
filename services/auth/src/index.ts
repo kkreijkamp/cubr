@@ -11,12 +11,13 @@ import {
 } from '@cubr/common';
 import { migrations } from './migrations.js';
 import { registerRoutes } from './routes/index.js';
+import { startPrivacySync } from './privacySync.js';
 
 const config = loadConfig('auth');
 
 let migrated = false;
 const server = createServer(config, {
-  infoPrefixes: ['/api/auth', '/api/users'],
+  infoPrefixes: ['/api/auth', '/api/users', '/api/supporters'],
   checks: {
     postgres: () => pingPostgres(pool),
     migrations: async () => {
@@ -38,4 +39,5 @@ await start(server, config, [() => pool.end(), () => redis.quit()]);
 await waitForPostgres(pool, app.log);
 await migrate(pool, 'auth', migrations, app.log);
 migrated = true;
+startPrivacySync(pool, redis, app.log);
 app.log.info('auth ready');

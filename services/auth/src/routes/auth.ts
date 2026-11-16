@@ -9,6 +9,7 @@ import {
   conflict,
   forbidden,
   internalTokenMatches,
+  PRIVATE_USERS_KEY,
   newEventId,
   parse,
   publishEvent,
@@ -228,6 +229,7 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
       // 403, not 401: a wrong password must not look like an expired session to the client
       if (!(await bcrypt.compare(password, rows[0].password_hash))) throw forbidden('Wrong password');
       await c.query('delete from auth.users where id = $1', [me.id]);
+      void withTimeout(redis.srem(PRIVATE_USERS_KEY, me.id.toLowerCase()), 2000, 0); // tidy-up only: the account is gone
 
       const revokedAt = String(Math.floor(Date.now() / 1000));
       const revoked = await withTimeout(redis.set(revokedUserKey(me.id), revokedAt, 'EX', TOKEN_TTL_SEC).then(() => true), 2000, false);
@@ -264,15 +266,26 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
     const { sets, values } = buildUserUpdate(patch);
     if (sets.length === 0) return { user: toPrivateUser(await currentUser(req.user!.id)) };
     if (!UUID_RE.test(req.user!.id)) throw unauthorized();
+    const userId = req.user!.id.toLowerCase();
 
-    values.push(req.user!.id);
-    const { rows } = await pool.query<UserRow>(
-      `update auth.users set ${sets.join(', ')} where id = $${values.length} returning ${USER_COLUMNS}`,
-      values,
-    );
-    if (!rows[0]) throw unauthorized('Account no longer exists');
-    await publishSafely(redis, req.log, 'user.updated', userEventData(toPublicUser(rows[0])));
-    return { user: toPrivateUser(rows[0]) };
+    values.push(userId);
+    const row = await withTx(pool, async (c) => {
+      const { rows } = await c.query<UserRow>(
+        `update auth.users set ${sets.join(', ')} where id = $${values.length} returning ${USER_COLUMNS}`,
+        values,
+      );
+      if (!rows[0]) throw unauthorized('Account no longer exists');
+      if (patch.private !== undefined) {
+        // Mirror the flag into the set the other services read, inside the transaction: if Redis
+        // can't take it, the change rolls back rather than leaving a "private" profile readable.
+        const op = patch.private ? redis.sadd(PRIVATE_USERS_KEY, userId) : redis.srem(PRIVATE_USERS_KEY, userId);
+        const mirrored = await withTimeout(op.then(() => true), 2000, false);
+        if (!mirrored) throw unavailable('Could not change who can see your profile right now, please retry');
+      }
+      return rows[0];
+    });
+    await publishSafely(redis, req.log, 'user.updated', userEventData(toPublicUser(row)));
+    return { user: toPrivateUser(row) };
   });
 
   // ---- PUT /api/auth/me/settings --------------------------------------------------------------

@@ -7,7 +7,7 @@ daily challenge (5 persisted scrambles per event per day).
 | Route | Response |
 |---|---|
 | `GET /api/scrambles/events` | `{events: [{id, name, short, puzzle}]}` (from `@cubr/cubestats` EVENTS) |
-| `GET /api/scrambles/:event?count=1..25&fresh=0\|1` | `{event, scrambles, source: "pool"\|"generated"}` - 404 unknown event (e.g. `333mbf`), 400 bad count, 503 on timeout/overload |
+| `GET /api/scrambles/:event?count=1..25&fresh=0\|1` | `{event, scrambles, source: "pool"\|"generated"}` - 404 unknown event (e.g. `333mbf`), 400 bad count, 429 over the per-IP limits (120 requests/min, 60 newly generated scrambles/min; past the generation budget the pool's scrambles are still returned), 503 on timeout/overload. `fresh=1` and no limits only with `X-Internal-Token` |
 | `GET /api/scrambles/daily?date=YYYY-MM-DD` | `{date, events: {333, 222, 444, pyram, skewb: string[5]}}` - default today (UTC), only the last 30 days; 503 while Postgres is unreachable |
 | `GET /api/scrambles/_info` | standard info + `warmup`, `generator` (queue depth, generated, timings), `pool` (LLEN per event), `refill`, `memory` |
 
@@ -19,7 +19,8 @@ A random-state scramble is not a list of random moves: cubing.js picks a uniform
 to find a short sequence reaching it. Each request is pure CPU - no I/O to wait on - so CPU
 utilisation tracks request rate almost linearly. The service is stateless (shared state lives in
 Redis/Postgres), so Kubernetes can add pods freely and the HPA scales it on CPU. `?fresh=1` always generates,
-bypassing the pool (for load tests).
+bypassing the pool (for load tests). It only works with the internal token (`X-Internal-Token`); from the internet it's
+ignored, and generation is limited per IP, so nobody can keep the CPU busy.
 
 Measured per pod (1 search thread, Apple M-series under load, `fresh=1` sequential): 333 ~6-12 ms
 (~100 req/s), pyram/minx/skewb/clock < 5 ms, **444 ~150-220 ms (~5 req/s)**, sq1 ~150-200 ms

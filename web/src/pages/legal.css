@@ -1,0 +1,56 @@
+/* terms of service and privacy policy: one readable column */
+.legal {
+  display: grid;
+  gap: 1.75rem;
+  max-width: 46rem;
+  width: 100%;
+  margin: 0 auto;
+  padding-top: 1rem;
+  line-height: 1.65;
+  font-size: 0.95rem;
+}
+.legal header {
+  display: grid;
+  gap: 0.35rem;
+}
+.legal-meta {
+  margin: 0;
+  color: var(--sub-color);
+  font-size: 0.8rem;
+}
+.legal-intro {
+  margin: 0;
+}
+.legal-sec {
+  display: grid;
+  gap: 0.6rem;
+}
+.legal-sec h2 {
+  font-size: 1.15rem;
+  color: var(--text-color);
+}
+.legal p,
+.legal ul {
+  margin: 0;
+}
+.legal ul {
+  display: grid;
+  gap: 0.4rem;
+  padding-left: 1.2rem;
+}
+.legal li::marker {
+  color: var(--sub-color);
+}
+.legal b {
+  font-weight: 500;
+  color: var(--text-color);
+}
+.legal a {
+  color: var(--main-color);
+}
+.legal-foot {
+  padding-top: 0.5rem;
+  border-top: 2px solid var(--sub-alt-color);
+  color: var(--sub-color);
+  font-size: 0.85rem;
+}

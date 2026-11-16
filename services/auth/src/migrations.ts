@@ -55,4 +55,29 @@ export const migrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS password_resets_user ON auth.password_resets (user_id);
     `,
   },
+  {
+    id: '004_private_profiles',
+    sql: `
+      -- a private profile shows strangers only the username and picture; mirrored into the Redis set
+      -- auth:private-users, which the services with public per-user endpoints read
+      ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS profile_private boolean NOT NULL DEFAULT false;
+    `,
+  },
+  {
+    id: '005_supporters',
+    sql: `
+      -- Ko-fi supporters for the about page: one row per Ko-fi message (retries collapse), keeping
+      -- only the public name, the kind of support and when; hidden lets the maintainer drop a name
+      CREATE TABLE IF NOT EXISTS auth.supporters (
+        message_id      text PRIMARY KEY,
+        kind            text NOT NULL,
+        name            text,
+        is_public       boolean NOT NULL,
+        is_subscription boolean NOT NULL DEFAULT false,
+        tier            text,
+        received_at     timestamptz NOT NULL,
+        hidden          boolean NOT NULL DEFAULT false
+      );
+    `,
+  },
 ];

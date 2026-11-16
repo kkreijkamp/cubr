@@ -251,6 +251,9 @@ function RegisterForm({ active, focusFirst }: FormProps) {
       <button type="submit" className="btn primary block" disabled={busy}>
         {busy && <Spinner size={16} />} create account
       </button>
+      <p className="lg-agree">
+        by signing up you agree to the <Link to="/terms">terms</Link> and <Link to="/privacy">privacy policy</Link>.
+      </p>
     </form>
   );
 }

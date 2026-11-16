@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { fetchJson } from '@cubr/common';
+import { INTERNAL_TOKEN_HEADER, fetchJson } from '@cubr/common';
 import type { FastifyBaseLogger } from 'fastify';
 import type { ScrambleSource } from './types.js';
 
@@ -182,17 +182,20 @@ export interface ScrambleFetcher {
 /**
  * Fetches one scramble from scramble-service, falling back to the local generator. After a
  * failure the service is skipped for `cooldownMs` (a tiny circuit breaker) so that while it is
- * down every new round starts instantly instead of waiting for timeouts.
+ * down every new round starts instantly instead of waiting for timeouts. `internalToken` exempts
+ * the requests from scramble-service's per-IP limits: every room's rounds come from this one
+ * container address.
  */
-export function makeScrambleFetcher(baseUrl: string, log: FastifyBaseLogger, cooldownMs = 15_000): ScrambleFetcher {
+export function makeScrambleFetcher(baseUrl: string, log: FastifyBaseLogger, cooldownMs = 15_000, internalToken = ''): ScrambleFetcher {
   let skipUntil = 0;
+  const headers = internalToken ? { [INTERNAL_TOKEN_HEADER]: internalToken } : undefined;
   return {
     async get(event) {
       if (Date.now() >= skipUntil) {
         try {
           const res = await fetchJson<{ scrambles?: unknown }>(
             `${baseUrl}/api/scrambles/${encodeURIComponent(event)}?count=1`,
-            { timeoutMs: 4000, retries: 1 },
+            { timeoutMs: 4000, retries: 1, headers },
           );
           const s = Array.isArray(res?.scrambles) ? res.scrambles[0] : undefined;
           if (typeof s === 'string' && s.trim() && s.length <= 2000) {

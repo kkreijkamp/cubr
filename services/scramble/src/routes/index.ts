@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import type { Redis } from '@cubr/common';
 import type { DailyChallenges } from '../daily.js';
 import type { ScrambleGenerator } from '../generator.js';
 import type { ScramblePool } from '../pool.js';
@@ -9,6 +10,8 @@ export interface RouteDeps {
   generator: ScrambleGenerator;
   pool: ScramblePool;
   daily: DailyChallenges;
+  redis: Redis;
+  internalToken: string;
 }
 
 export async function registerRoutes(app: FastifyInstance, deps: RouteDeps) {

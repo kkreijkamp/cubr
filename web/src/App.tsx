@@ -18,6 +18,8 @@ const WcaPage = lazy(() => import('./pages/WcaPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const ResetPasswordPage = lazy(() => import('./pages/LoginPage').then((m) => ({ default: m.ResetPasswordPage })));
+const TermsPage = lazy(() => import('./pages/LegalPage').then((m) => ({ default: m.TermsPage })));
+const PrivacyPage = lazy(() => import('./pages/LegalPage').then((m) => ({ default: m.PrivacyPage })));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 const s = (el: JSX.Element) => <Suspense fallback={<Loading />}>{el}</Suspense>;
@@ -43,6 +45,8 @@ const router = createBrowserRouter([
           { path: '/about', element: s(<AboutPage />) },
           { path: '/login', element: s(<LoginPage />) },
           { path: '/reset', element: s(<ResetPasswordPage />) },
+          { path: '/terms', element: s(<TermsPage />) },
+          { path: '/privacy', element: s(<PrivacyPage />) },
           { path: '*', element: s(<NotFoundPage />) },
         ],
       },
