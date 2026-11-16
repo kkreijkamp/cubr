@@ -10,10 +10,13 @@ export interface PublicUser {
   bio: string | null;
   country: string | null;
   wcaId: string | null;
-  createdAt: string;
+  /** null when the profile is private and you aren't its owner */
+  createdAt: string | null;
   /** same-origin, immutable URL of the profile picture (`/api/users/<id>/avatar?v=...`); null = none.
    *  Optional because older API responses don't include it. */
   avatarUrl?: string | null;
+  /** a private profile: strangers get only the username and picture (everything else null) */
+  private?: boolean;
 }
 export interface PrivateUser extends PublicUser {
   email: string;

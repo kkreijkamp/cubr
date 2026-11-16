@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { badRequest, parse, type Redis, type makeAuth } from '@cubr/common';
+import { badRequest, canViewProfile, forbidden, parse, type Redis, type makeAuth } from '@cubr/common';
 import { DAILY_EVENTS, isEventId } from '@cubr/cubestats';
 import { readBoard, readUserRanks } from '../board.js';
 import {
@@ -53,10 +53,12 @@ export async function registerRoutes(app: FastifyInstance, { redis, auth }: Deps
     return { event: q.event, kind: 'ao5', period: 'challenge', periodKey: date, total: board.total, page: q.page, size: q.size, entries: board.entries, me: board.me };
   });
 
-  // GET /api/leaderboards/users/:userId/ranks -> positions on every all-time board
-  app.get<{ Params: { userId: string } }>('/api/leaderboards/users/:userId/ranks', async (req) => {
+  // GET /api/leaderboards/users/:userId/ranks -> positions on every all-time board. A private
+  // profile's ranks go to its owner only (the boards themselves still list them).
+  app.get<{ Params: { userId: string } }>('/api/leaderboards/users/:userId/ranks', { preHandler: auth.optionalAuth }, async (req) => {
     const { userId } = req.params;
     if (!UUID_RE.test(userId)) throw badRequest('userId: expected a UUID');
+    if (!(await canViewProfile(redis, req.user?.id, userId))) throw forbidden('This profile is private');
     return { ranks: await readUserRanks(redis, userId.toLowerCase()) };
   });
 

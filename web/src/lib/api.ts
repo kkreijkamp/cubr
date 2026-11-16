@@ -210,7 +210,7 @@ export const api = {
     resetPassword: (body: { token: string; password: string }) =>
       request<{ token: string; user: PrivateUser }>('POST', '/api/auth/password/reset', body),
     me: (signal?: AbortSignal) => get<{ user: PrivateUser; settings: Record<string, unknown> }>('/api/auth/me', signal),
-    updateMe: (body: Partial<Pick<PublicUser, 'displayName' | 'bio' | 'country' | 'wcaId'>>) =>
+    updateMe: (body: Partial<Pick<PublicUser, 'displayName' | 'bio' | 'country' | 'wcaId' | 'private'>>) =>
       request<{ user: PrivateUser }>('PATCH', '/api/auth/me', body),
     saveSettings: (settings: Record<string, unknown>) => request<{ settings: Record<string, unknown> }>('PUT', '/api/auth/me/settings', { settings }),
     /** PUT the raw image bytes (image/webp | image/jpeg | image/png, <= 300 KB) -> user with the new avatarUrl. */

@@ -55,4 +55,12 @@ export const migrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS password_resets_user ON auth.password_resets (user_id);
     `,
   },
+  {
+    id: '004_private_profiles',
+    sql: `
+      -- a private profile shows strangers only the username and picture; mirrored into the Redis set
+      -- auth:private-users, which the services with public per-user endpoints read
+      ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS profile_private boolean NOT NULL DEFAULT false;
+    `,
+  },
 ];

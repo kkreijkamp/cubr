@@ -11,6 +11,7 @@ import {
 } from '@cubr/common';
 import { migrations } from './migrations.js';
 import { registerRoutes } from './routes/index.js';
+import { startPrivacySync } from './privacySync.js';
 
 const config = loadConfig('auth');
 
@@ -38,4 +39,5 @@ await start(server, config, [() => pool.end(), () => redis.quit()]);
 await waitForPostgres(pool, app.log);
 await migrate(pool, 'auth', migrations, app.log);
 migrated = true;
+startPrivacySync(pool, redis, app.log);
 app.log.info('auth ready');
