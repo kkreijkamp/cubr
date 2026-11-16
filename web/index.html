@@ -4,7 +4,18 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#ffffff" />
-    <meta name="description" content="cubr - a minimal, fast speedcubing timer with stats, leaderboards, daily challenges and live races." />
+    <meta name="description" content="a minimalist speedcubing timer" />
+    <!-- link previews (chat apps, social sites): the same card for every page, as crawlers don't run the app.
+         public/og.png is drawn by web/scripts/pwa-assets.mjs og; no og:url, so a shared page links to itself -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="cubr" />
+    <meta property="og:description" content="a minimalist speedcubing timer" />
+    <meta property="og:image" content="https://cubr.dev/og.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="the cubr logo: a green cube face and the word cubr" />
+    <meta name="twitter:card" content="summary_large_image" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <!-- the installable app (PWA): public/manifest.webmanifest, the service worker is src/sw/ -->
     <link rel="manifest" href="/manifest.webmanifest" />

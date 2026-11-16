@@ -10,8 +10,8 @@ describe('shouldPrecache', () => {
       expect(shouldPrecache(f), f).toBe(true);
     }
   });
-  it('leaves out the worker, source maps, the .woff fallbacks, the icons and the screenshots', () => {
-    for (const f of ['sw.js', 'assets/index-d3oOLUDV.js.map', 'assets/lexend-deca-latin-400-normal-x.woff', 'icons/icon-512.png', 'screenshots/timer-wide.png', 'apple-touch-icon.png', '.DS_Store']) {
+  it('leaves out the worker, source maps, the .woff fallbacks, the icons, the screenshots and the link preview', () => {
+    for (const f of ['sw.js', 'assets/index-d3oOLUDV.js.map', 'assets/lexend-deca-latin-400-normal-x.woff', 'icons/icon-512.png', 'screenshots/timer-wide.png', 'apple-touch-icon.png', 'og.png', '.DS_Store']) {
       expect(shouldPrecache(f), f).toBe(false);
     }
   });

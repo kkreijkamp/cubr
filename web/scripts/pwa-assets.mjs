@@ -1,4 +1,4 @@
-// Renders the installable app's images in web/public/ with headless Chrome (DevTools protocol).
+// Renders the installable app's images and the link preview in web/public/ with headless Chrome (DevTools protocol).
 //
 //   1. start Chrome with remote debugging, e.g. on macOS:
 //        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new \
@@ -7,6 +7,8 @@
 //        node web/scripts/pwa-assets.mjs icons
 //   3. screenshots for the install dialog, from a running app (e.g. the local stack on :8080):
 //        node web/scripts/pwa-assets.mjs screenshots http://localhost:8080
+//   4. the link preview image (index.html's og:image, shown next to links to cubr.dev):
+//        node web/scripts/pwa-assets.mjs og
 //
 // The icons follow the favicon (public/favicon.svg, lib/themes.ts faviconSvg): a 3x3 cube face in the
 // white cross colours. The shortcut icons use the header's heroicons. The screenshots show the timer
@@ -138,6 +140,49 @@ async function icons() {
   }
 }
 
+// ---------------------------------------------------------------- link preview
+
+// What chat apps and social sites show next to a link to cubr.dev (index.html: og:image): the
+// header's logo, centred on white cross's white. Same drawing as components/CubeLogo.tsx (26-unit
+// face, 7.25 stickers 8.25 apart, rx 1.8, the centre in the text colour) and the same proportions
+// as global.css .logo (icon 1.7, text 1.95, gap 0.375, letter-spacing -0.02em), at `scale` px per
+// rem: about 580 px wide, so a square crop of the middle still shows all of it.
+const OG = { file: 'og.png', width: 1200, height: 630, scale: 92, text: '#1d2024' };
+
+function lockup(scale) {
+  const stickers = [];
+  for (let r = 0; r < 3; r++)
+    for (let c = 0; c < 3; c++)
+      stickers.push(`<rect x="${1 + c * 8.25}" y="${1 + r * 8.25}" width="7.25" height="7.25" rx="1.8" fill="${r === 1 && c === 1 ? OG.text : MAIN}"/>`);
+  return `<div style="display:flex;align-items:center;gap:${0.375 * scale}px;color:${OG.text};font-family:'Lexend Deca';white-space:nowrap">
+    <svg viewBox="0 0 26 26" style="width:${1.7 * scale}px;height:${1.7 * scale}px;flex-shrink:0">${stickers.join('')}</svg>
+    <span style="font-size:${1.95 * scale}px;line-height:1;letter-spacing:-0.02em">cubr</span>
+  </div>`;
+}
+
+async function og() {
+  const font = fs.readFileSync(path.join(WEB, 'node_modules/@fontsource/lexend-deca/files/lexend-deca-latin-400-normal.woff2')).toString('base64');
+  const { send, ev, close } = await connect();
+  try {
+    await send('Emulation.setDeviceMetricsOverride', { width: OG.width, height: OG.height, deviceScaleFactor: 1, mobile: false });
+    const html = `<!doctype html><html><head><meta charset="utf-8"><style>
+      @font-face { font-family: 'Lexend Deca'; font-weight: 400; src: url(data:font/woff2;base64,${font}) format('woff2'); }
+      html, body { margin: 0 }
+      body { width: ${OG.width}px; height: ${OG.height}px; background: ${BG}; display: grid; place-items: center }
+    </style></head><body>${lockup(OG.scale)}</body></html>`;
+    await send('Page.navigate', { url: `data:text/html;base64,${Buffer.from(html).toString('base64')}` });
+    await waitFor(ev, `document.readyState === 'complete'`);
+    await ev(`document.fonts.ready.then(() => true)`);
+    // the word must be in Lexend Deca, not a fallback font
+    if (!(await ev(`[...document.fonts].some((f) => f.family.includes('Lexend Deca') && f.status === 'loaded')`))) throw new Error('Lexend Deca did not load');
+    const { data } = await send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 0, width: OG.width, height: OG.height, scale: 1 } });
+    save(OG.file, data);
+    console.log(`${OG.file} (${OG.width} x ${OG.height})`);
+  } finally {
+    await close();
+  }
+}
+
 // ---------------------------------------------------------------- screenshots
 
 /** Made-up guest solves (a seeded random walk around 11 s), so the stats and the list look lived in. */
@@ -216,8 +261,9 @@ async function screenshots(base) {
 
 const [what, base] = process.argv.slice(2);
 if (what === 'icons') await icons();
+else if (what === 'og') await og();
 else if (what === 'screenshots' && base) await screenshots(base.replace(/\/$/, ''));
 else {
-  console.error('usage: node web/scripts/pwa-assets.mjs icons | screenshots <app url>');
+  console.error('usage: node web/scripts/pwa-assets.mjs icons | og | screenshots <app url>');
   process.exit(1);
 }

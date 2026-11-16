@@ -98,3 +98,28 @@ describe('index.html', () => {
     expect(png('/apple-touch-icon.png')).toEqual({ width: 180, height: 180, alpha: false });
   });
 });
+
+describe('link previews (index.html)', () => {
+  // the tests run without a DOM: read <meta property|name="key" content="..."> with a pattern
+  const meta = (key: string) => indexHtml.match(new RegExp(`<meta (?:property|name)="${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}" content="([^"]*)"`))?.[1];
+  it('read "cubr" and "a minimalist speedcubing timer", as does the description for search engines', () => {
+    expect(meta('og:title')).toBe('cubr');
+    expect(meta('og:description')).toBe('a minimalist speedcubing timer');
+    expect(meta('description')).toBe('a minimalist speedcubing timer');
+    expect(meta('og:type')).toBe('website');
+  });
+  it('show the large image: an absolute https link, its real size, opaque (a transparent one shows black in some apps)', () => {
+    const url = new URL(meta('og:image')!);
+    expect(url.origin).toBe('https://cubr.dev');
+    const { width, height, alpha } = png(url.pathname);
+    expect([meta('og:image:width'), meta('og:image:height')]).toEqual([String(width), String(height)]);
+    expect([width, height]).toEqual([1200, 630]);
+    expect(alpha).toBe(false);
+    expect(meta('og:image:type')).toBe('image/png');
+    expect(meta('og:image:alt')).toBeTruthy();
+    expect(meta('twitter:card')).toBe('summary_large_image');
+  });
+  it('have no og:url: one shared from any page must link back to that page, not the home page', () => {
+    expect(meta('og:url')).toBeUndefined();
+  });
+});

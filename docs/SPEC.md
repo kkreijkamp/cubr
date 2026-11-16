@@ -586,10 +586,16 @@ custom properties, command palette (Esc / Ctrl+K), focus mode while timing, toas
   shortcut focuses the open window and `lib/pwa.ts` takes it to the shortcut's page). iOS:
   `apple-touch-icon.png` (180 px, opaque) and the apple meta tags in `index.html`. The images are
   drawn by `web/scripts/pwa-assets.mjs`.
+- **Link previews** (chat apps, social sites): `index.html` has Open Graph tags and
+  `twitter:card summary_large_image`, the same for every page, since crawlers don't run the app.
+  They give the title "cubr", the description "a minimalist speedcubing timer" (also the search
+  engines' description), and `https://cubr.dev/og.png`: the header's logo centred on white,
+  1200 x 630 and opaque (`pwa-assets.mjs og`). There's no `og:url`, so a link shared from any page
+  leads back to that page.
 - **Service worker** `/sw.js`, from `web/src/sw/sw.ts`, built after the app by
   `web/plugins/serviceWorker.ts`:
   - It precaches the whole build (about 2.4 MB) except source maps, the `.woff` font fallbacks,
-    the icons and the screenshots, in the cache `cubr-app-<version>`. The version is a hash of the
+    the icons, the screenshots and the link preview image, in the cache `cubr-app-<version>`. The version is a hash of the
     cached files' names and contents, so a release that doesn't change the web app ships the same
     `sw.js`, and browsers see no update.
   - Requests (`web/src/sw/policy.ts`):
