@@ -287,8 +287,9 @@ function writeLastSession(): void {
 // ================================================================ retry queue
 
 let queue: QueuedOp[] = browser ? decodeQueue(loadJson<unknown>(QUEUE_KEY, [])) : [];
-/** ops completed in the last minute - re-applied on reads to cover read-after-write races */
-let recent: { op: SyncOp; at: number }[] = [];
+/** ops completed in the last minute - re-applied on reads to cover read-after-write races (each
+ *  with its account: after switching accounts, the other account's ops must not show) */
+let recent: { op: SyncOp; at: number; userId: string }[] = [];
 let inflight: string | null = null;
 let pumping = false;
 let backoffN = 0;
@@ -312,7 +313,7 @@ function overlayOps(): SyncOp[] {
   const uid = userId();
   const cutoff = Date.now() - 60_000;
   recent = recent.filter((r) => r.at > cutoff);
-  return [...recent.map((r) => r.op), ...queue.filter((q) => q.userId === uid).map((q) => q.op)];
+  return [...recent.filter((r) => r.userId === uid).map((r) => r.op), ...queue.filter((q) => q.userId === uid).map((q) => q.op)];
 }
 
 function settle(opId: string, err?: Error): void {
@@ -409,7 +410,7 @@ async function pump(): Promise<void> {
         inflight = null;
         queue = queue.filter((q) => q.opId !== head.opId);
         saveQueue();
-        recent.push({ op: head.op, at: Date.now() });
+        recent.push({ op: head.op, at: Date.now(), userId: head.userId });
         if (recent.length > 200) recent = recent.slice(-200);
         backoffN = 0;
         const hadError = queueError || loadError;

@@ -86,8 +86,8 @@ function detect(text: string): [string, RawSession[]] {
   }
   const firstLine = trimmed.split(/\r?\n/, 1)[0];
   if (/^No\.;Time;Comment;Scramble;Date/i.test(firstLine)) return ['csTimer (CSV)', csTimerCsv(trimmed)];
-  if (/^Puzzle,Category,Time\(millis\),Date\(millis\),Scramble,Penalty,Comment/i.test(firstLine)) return ['Twisty Timer', twistyTimer(trimmed)];
-  if (/^"Puzzle";"Category";"Time\(millis\)";"Date\(millis\)";"Scramble";"Penalty";"Comment"/i.test(firstLine)) return ['Cubic Timer', twistyTimer(trimmed)];
+  if (/^Puzzle,Category,Time\(millis\),Date\(millis\),Scramble,Penalty,Comment/i.test(firstLine)) return ['Twisty Timer', twistyTimer(trimmed, true)];
+  if (/^"Puzzle";"Category";"Time\(millis\)";"Date\(millis\)";"Scramble";"Penalty";"Comment"/i.test(firstLine)) return ['Cubic Timer', twistyTimer(trimmed, false)];
   if (/^"Category";"Time \(MM:SS\.SSS\)";"Scrambler";"Date";"Penalty \+2 \(yes or no\)";"DNF \(yes or no\)";"Section"/i.test(firstLine)) {
     return ['mateus Cubetimer', mateus(trimmed)];
   }
@@ -241,7 +241,12 @@ const TWISTY_EVENTS: Record<string, string | null> = {
   '333fmc': '333fm',
 };
 
-function twistyTimer(text: string): RawSession[] {
+/**
+ * `plusTwoIncluded`: Twisty Timer adds the 2 s of a +2 to the solve's stored time
+ * (PuzzleUtils.applyPenalty) and its backup writes that time as is, so it comes off here: cubr
+ * keeps the time without the penalty. (Cubic Timer: no such evidence, read as is.)
+ */
+function twistyTimer(text: string, plusTwoIncluded: boolean): RawSession[] {
   const groups = new Grouper();
   for (const row of readDelimited(text, ';').slice(1)) {
     if (row.length !== 7) continue;
@@ -251,9 +256,11 @@ function twistyTimer(text: string): RawSession[] {
       event: puzzle in TWISTY_EVENTS ? TWISTY_EVENTS[puzzle] : '333',
       sourceType: puzzle,
     }));
+    const plusTwo = penalty === '1';
     session.solves.push({
-      timeMs: parseInt(time, 10),
-      penalty: penalty === '1' ? '+2' : penalty === '2' ? 'DNF' : 'OK',
+      // a +2 stored at under 2 s is broken: it comes out below 1 ms and is skipped as invalid
+      timeMs: parseInt(time, 10) - (plusTwo && plusTwoIncluded ? 2000 : 0),
+      penalty: plusTwo ? '+2' : penalty === '2' ? 'DNF' : 'OK',
       scramble,
       comment,
       at: Number(date),
@@ -471,9 +478,12 @@ function ganCubeStation(list: unknown[]): RawSession[] {
     const at = start > 1e12 ? start : start * 1000; // seconds (as csTimer reads it); tolerate ms
     const d = new Date(Number.isFinite(at) ? at : 0);
     const name = x.leagueId ? `League${str(x.leagueId)}` : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const ok = Boolean(x.normalScore);
     groups.session(name, () => ({ name, event: '333', sourceType: 'GAN' })).solves.push({
-      timeMs: Math.max(1, Number(x.duration)),
-      penalty: x.normalScore ? 'OK' : 'DNF',
+      // a DNF needs no real time; a finished solve of 0 ms is broken data (and would be a 0.001 s
+      // "PB"), so it stays below 1 ms and is skipped as invalid
+      timeMs: ok ? Number(x.duration) : Math.max(1, Number(x.duration)),
+      penalty: ok ? 'OK' : 'DNF',
       scramble: x.scramble,
       at,
     });
