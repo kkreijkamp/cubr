@@ -7,17 +7,15 @@ import {
   ClockIcon,
   CommandLineIcon,
   FlagIcon,
+  GiftIcon,
   GlobeAltIcon,
   HeartIcon,
-  RectangleGroupIcon,
   SignalSlashIcon,
   Square3Stack3DIcon,
   SwatchIcon,
   TrophyIcon,
-  WrenchIcon,
 } from '@heroicons/react/24/outline';
 import { CubeLogo } from '../components/CubeLogo';
-import { ArchitectureDiagram } from '../components/social/ArchitectureDiagram';
 import { useCountUp } from '../components/social/useCountUp';
 import { friendlyError } from '../components/social/util';
 import { api } from '../lib/api';
@@ -41,13 +39,12 @@ const FEATURES = [
   { icon: SignalSlashIcon, t: 'offline first', d: 'guest mode works with no backend at all; sign in to sync solves to the cloud.' },
 ];
 
-const STACK: [string, string][] = [
-  ['frontend', 'react 18 - typescript - vite - chart.js - cubing.js'],
-  ['services', 'node.js 22 - fastify 5 - zod - socket.io + redis adapter'],
-  ['data', 'postgresql 17 (cloudnativepg) - redis 7 streams'],
-  ['platform', 'google kubernetes engine - ingress - hpa - kustomize - artifact registry'],
-  ['patterns', 'transactional outbox - event-driven read models - consumer groups - cache-aside'],
-];
+/**
+ * Supporters. Fill in DONATE_URL once a donation page exists; SUPPORTERS is the hand-kept list of
+ * people who chipped in, newest first, until it's fed automatically.
+ */
+const DONATE_URL: string = '';
+const SUPPORTERS: { name: string; url?: string }[] = [];
 
 // the everyday ones - csTimer's keys; settings > keyboard shortcuts lists them all
 const KEYS: [string[], string][] = [
@@ -122,23 +119,6 @@ function WcaCitation() {
   );
 }
 
-function FlowSwatch({ main }: { main?: boolean }) {
-  return (
-    <svg width="26" height="8" viewBox="0 0 26 8" aria-hidden="true">
-      <line
-        x1="1"
-        y1="4"
-        x2="25"
-        y2="4"
-        style={{ stroke: main ? 'var(--main-color)' : 'var(--sub-color)' }}
-        strokeWidth={main ? 2.5 : 1.5}
-        strokeDasharray={main ? '7 6' : undefined}
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
 export default function AboutPage() {
   useEffect(() => {
     document.title = 'about | cubr';
@@ -154,8 +134,7 @@ export default function AboutPage() {
           <CubeLogo /> cubr
         </h1>
         <p className="ab-lead">
-          a minimal, keyboard-first speedcubing timer - <span className="text">csTimer</span>&apos;s depth with <span className="text">monkeytype</span>
-          &apos;s polish, running as cloud-native microservices on kubernetes.
+          a minimal speedcubing timer, made by <span className="text">Koen Kreijkamp</span>
         </p>
       </section>
 
@@ -176,79 +155,65 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section aria-labelledby="ab-arch">
-        <h2 className="ab-h" id="ab-arch">
-          <RectangleGroupIcon /> architecture
+      <section aria-labelledby="ab-keys">
+        <h2 className="ab-h" id="ab-keys">
+          <CommandLineIcon /> keyboard shortcuts
         </h2>
         <p className="ab-p">
-          the web app and seven microservices run as replicated deployments on google kubernetes engine behind a single cloud load balancer. services
-          that keep relational data own a postgres schema; leaderboards and race rooms live in redis. they talk to each other over http or through a
-          redis event stream - so a slow or crashed service only degrades its own feature. <span className="sub">try it: the timer keeps working with every backend down.</span>
+          The same keys as csTimer, so your habits carry over. The everyday ones are below; <Link to="/settings?tab=shortcuts">settings</Link> lists them all.
         </p>
-        <ArchitectureDiagram />
-        <div className="arch-legend">
-          <span>
-            <FlowSwatch /> request path (ingress -&gt; services -&gt; data)
-          </span>
-          <span>
-            <FlowSwatch main /> event flow over redis streams
-          </span>
-          <span>stacked boxes = 2+ replicas - hpa = horizontal pod autoscaler</span>
-        </div>
-        <div className="arch-steps">
-          <div>
-            <span className="text">solve-service</span> writes your solve and an outbox row in one postgres transaction, then relays it to the{' '}
-            <span className="text">cubr:events</span> stream.
-          </div>
-          <div>
-            <span className="text">stats-service</span> consumes the stream (consumer group) and updates pbs, streaks, the heatmap and time-of-day read
-            models.
-          </div>
-          <div>
-            <span className="text">leaderboard-service</span> consumes the same events and updates redis sorted sets - boards can be rebuilt from stats
-            at any time.
-          </div>
+        <div className="ab-keys">
+          {KEYS.map(([keys, label]) => (
+            <div key={label} style={{ display: 'contents' }}>
+              <span className="k">
+                {keys.map((k, i) => (
+                  <span key={k} style={{ display: 'contents' }}>
+                    {i > 0 && (keys[0] === '<-' ? ' ' : ' + ')}
+                    <kbd>{k}</kbd>
+                  </span>
+                ))}
+              </span>
+              <span className="v">{label}</span>
+            </div>
+          ))}
         </div>
       </section>
 
-      <div className="ab-two">
-        <section aria-labelledby="ab-stack">
-          <h2 className="ab-h" id="ab-stack">
-            <WrenchIcon /> tech stack
-          </h2>
-          <dl className="ab-dl">
-            {STACK.map(([k, v]) => (
-              <div key={k} style={{ display: 'contents' }}>
-                <dt>{k}</dt>
-                <dd>{v}</dd>
-              </div>
+      <section aria-labelledby="ab-supporters">
+        <h2 className="ab-h" id="ab-supporters">
+          <GiftIcon /> supporters
+        </h2>
+        <p className="ab-p">
+          cubr is free and has no ads. if you&apos;d like to help keep it running, donate to{' '}
+          {DONATE_URL ? (
+            <a href={DONATE_URL} target="_blank" rel="noreferrer noopener">
+              {DONATE_URL.replace(/^https?:\/\//, '')}
+            </a>
+          ) : (
+            '---'
+          )}
+          .
+        </p>
+        {SUPPORTERS.length > 0 ? (
+          <ul className="ab-supporters">
+            {SUPPORTERS.map((s) => (
+              <li key={s.name}>
+                {s.url ? (
+                  <a href={s.url} target="_blank" rel="noreferrer noopener">
+                    {s.name}
+                  </a>
+                ) : (
+                  s.name
+                )}
+              </li>
             ))}
-          </dl>
-        </section>
-        <section aria-labelledby="ab-keys">
-          <h2 className="ab-h" id="ab-keys">
-            <CommandLineIcon /> keyboard shortcuts
-          </h2>
+          </ul>
+        ) : (
           <p className="ab-p">
-            The same keys as csTimer, so your habits carry over. The everyday ones are below; <Link to="/settings?tab=shortcuts">settings</Link> lists them all.
+            <span className="sub">no supporters yet - the first ones get their name here.</span>
           </p>
-          <div className="ab-keys">
-            {KEYS.map(([keys, label]) => (
-              <div key={label} style={{ display: 'contents' }}>
-                <span className="k">
-                  {keys.map((k, i) => (
-                    <span key={k} style={{ display: 'contents' }}>
-                      {i > 0 && (keys[0] === '<-' ? ' ' : ' + ')}
-                      <kbd>{k}</kbd>
-                    </span>
-                  ))}
-                </span>
-                <span className="v">{label}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
+        )}
+      </section>
 
       <section aria-labelledby="ab-credits">
         <h2 className="ab-h" id="ab-credits">
