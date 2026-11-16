@@ -120,6 +120,8 @@ describeIntegration('stats projector', () => {
       expect(await totals(u)).toMatchObject({ solves: 3, total_ms: 33_000 });
     });
 
+    // 165 events one by one, then a full recompute: give it room under a loaded CI runner (a timed-out
+    // test keeps running in the background and would disturb the next ones)
     it('builds the same read model solve by solve as a full recompute builds from the solve list', async () => {
       const u = newCuber('Europe/Berlin');
       const a = s.solve.session(u, '333', { name: 'A' });
@@ -151,7 +153,7 @@ describeIntegration('stats projector', () => {
       expect(s.solve.recomputes(u.id)).toHaveLength(1);
       expect(await snapshot()).toEqual(incremental);
       expect(await pbEvents(u)).toHaveLength(published); // nothing changed, so nothing to tell leaderboard
-    });
+    }, 60_000);
   });
 
   describe('solve.updated and solve.deleted', () => {
