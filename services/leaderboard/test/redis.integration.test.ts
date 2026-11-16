@@ -32,11 +32,11 @@ describeIntegration('leaderboard Redis scripts and rebuild', () => {
     it('adds an entry, lowers it only for a better value, and moves achievedAt only with the value', async () => {
       const board = freshBoard();
       const u = randomUUID();
-      expect(await redis.lbBest(board, atKey(board), 10_000, u, 'first', 0)).toBe(1);
-      expect(await redis.lbBest(board, atKey(board), 11_000, u, 'worse', 0)).toBe(0);
-      expect(await redis.lbBest(board, atKey(board), 10_000, u, 'equal', 0)).toBe(0); // whoever got there first keeps it
+      expect(await redis.lbBest(board, atKey(board), tsKey(board), 10_000, u, 'first', 0, 1)).toBe(1);
+      expect(await redis.lbBest(board, atKey(board), tsKey(board), 11_000, u, 'worse', 0, 1)).toBe(0);
+      expect(await redis.lbBest(board, atKey(board), tsKey(board), 10_000, u, 'equal', 0, 1)).toBe(0); // whoever got there first keeps it
       expect([await redis.zscore(board, u), await redis.hget(atKey(board), u)]).toEqual(['10000', 'first']);
-      expect(await redis.lbBest(board, atKey(board), 9_000, u, 'better', 0)).toBe(1);
+      expect(await redis.lbBest(board, atKey(board), tsKey(board), 9_000, u, 'better', 0, 1)).toBe(1);
       expect([await redis.zscore(board, u), await redis.hget(atKey(board), u)]).toEqual(['9000', 'better']);
       expect(await redis.ttl(board)).toBe(-1); // 0 = no expiry
     });
@@ -44,12 +44,64 @@ describeIntegration('leaderboard Redis scripts and rebuild', () => {
     it('refreshes the expiry of the board and its achievedAt hash on every write, even one that changes nothing', async () => {
       const board = freshBoard();
       const u = randomUUID();
-      await redis.lbBest(board, atKey(board), 10_000, u, 'first', 1_000);
+      await redis.lbBest(board, atKey(board), tsKey(board), 10_000, u, 'first', 1_000, 1);
       await redis.expire(board, 5);
       await redis.expire(atKey(board), 5);
-      expect(await redis.lbBest(board, atKey(board), 12_000, u, 'worse', 1_000)).toBe(0);
+      expect(await redis.lbBest(board, atKey(board), tsKey(board), 12_000, u, 'worse', 1_000, 1)).toBe(0);
       expect(await redis.ttl(board)).toBeGreaterThan(990);
       expect(await redis.ttl(atKey(board))).toBeGreaterThan(990);
+    });
+  });
+
+  describe('lbSetPeriod (daily and weekly boards, after periods.changed)', () => {
+    it('sets the exact value, a worse one too, and removes the entry for an empty score', async () => {
+      const board = freshBoard();
+      const [u, other] = [randomUUID(), randomUUID()];
+      await redis.lbBest(board, atKey(board), tsKey(board), 3_567, u, 'deleted solve', 1_000, 1_000);
+      await redis.lbBest(board, atKey(board), tsKey(board), 15_000, other, 'O', 1_000, 1_000);
+      expect(await redis.lbSetPeriod(board, atKey(board), tsKey(board), u, 17_711, 'real best', 2_000, 1_000)).toBe(1);
+      expect([await redis.zscore(board, u), await redis.hget(atKey(board), u), await redis.hget(tsKey(board), u)]).toEqual(['17711', 'real best', '2000']);
+      expect(await redis.lbSetPeriod(board, atKey(board), tsKey(board), u, '', '', 3_000, 1_000)).toBe(0);
+      expect([await redis.zscore(board, u), await redis.hget(atKey(board), u), await redis.hget(tsKey(board), u)]).toEqual([null, null, '3000']);
+      expect(await redis.zscore(board, other)).toBe('15000');
+    });
+
+    it('drops a write older than the last one applied, and a keep-best write of a solve from before it', async () => {
+      const board = freshBoard();
+      const u = randomUUID();
+      await redis.lbSetPeriod(board, atKey(board), tsKey(board), u, 17_711, 'A', 2_000, 1_000);
+      expect(await redis.lbSetPeriod(board, atKey(board), tsKey(board), u, 9_000, 'stale', 1_999, 1_000)).toBe(-1);
+      // a solve.created handled late, from before the exact write: that solve may be gone by now
+      expect(await redis.lbBest(board, atKey(board), tsKey(board), 3_567, u, 'deleted solve', 1_000, 1_500)).toBe(-1);
+      expect(await redis.zscore(board, u)).toBe('17711');
+      // a newer solve still lowers the time
+      expect(await redis.lbBest(board, atKey(board), tsKey(board), 16_000, u, 'new solve', 1_000, 2_500)).toBe(1);
+      expect([await redis.zscore(board, u), await redis.hget(atKey(board), u)]).toEqual(['16000', 'new solve']);
+    });
+
+    it('keeps the time even when the board has no entry left, so a deleted solve cannot come back', async () => {
+      const board = freshBoard();
+      const u = randomUUID();
+      expect(await redis.lbSetPeriod(board, atKey(board), tsKey(board), u, '', '', 2_000, 1_000)).toBe(0);
+      expect(await redis.exists(board)).toBe(0);
+      expect(await redis.hget(tsKey(board), u)).toBe('2000');
+      expect(await redis.ttl(tsKey(board))).toBeGreaterThan(990); // and the record expires with the board's TTL
+      expect(await redis.lbBest(board, atKey(board), tsKey(board), 3_845, u, 'deleted solve', 1_000, 1_000)).toBe(-1);
+      expect(await redis.exists(board)).toBe(0);
+    });
+
+    it("gives new keys the board's TTL, but never extends one that has a TTL already", async () => {
+      const fresh = freshBoard();
+      const u = randomUUID();
+      await redis.lbSetPeriod(fresh, atKey(fresh), tsKey(fresh), u, 20_000, 'A', 1_000, 1_000);
+      for (const key of [fresh, atKey(fresh), tsKey(fresh)]) expect(await redis.ttl(key)).toBeGreaterThan(990);
+
+      const old = freshBoard();
+      await redis.lbBest(old, atKey(old), tsKey(old), 20_000, u, 'A', 1_000, 1_000);
+      for (const key of [old, atKey(old)]) await redis.expire(key, 50); // a day about to expire
+      await redis.lbSetPeriod(old, atKey(old), tsKey(old), u, 21_000, 'B', 2_000, 1_000);
+      expect(await redis.ttl(old)).toBeLessThanOrEqual(50);
+      expect(await redis.ttl(atKey(old))).toBeLessThanOrEqual(50);
     });
   });
 

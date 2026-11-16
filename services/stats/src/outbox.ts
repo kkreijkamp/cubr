@@ -5,7 +5,7 @@ const BATCH = 500;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export interface PbRelay {
-  /** Publishes queued pb.updated events (oldest first). Returns how many were published. */
+  /** Publishes queued events (pb.updated, periods.changed; oldest first). Returns how many were published. */
   flush(): Promise<number>;
   start(): void;
   stop(): Promise<void>;
@@ -13,7 +13,8 @@ export interface PbRelay {
 }
 
 /**
- * Relays stats.pb_outbox -> Redis stream `cubr:events` as `pb.updated`.
+ * Relays stats.pb_outbox -> Redis stream `cubr:events`, each row as its type (`pb.updated`, or
+ * `periods.changed` since migration 007).
  * Only one replica relays at a time (transaction-scoped advisory lock), which keeps events in
  * order. Rows are deleted only after XADD succeeded, so a crash or Redis outage can cause a
  * re-publish (same eventId - consumers are idempotent) but never a lost event.
@@ -31,15 +32,15 @@ export function createPbRelay(pool: Pool, redis: Redis, log: FastifyBaseLogger, 
         ['cubr:stats:pb-outbox'],
       );
       if (!lock[0].ok) return { published: 0, more: false }; // another replica is relaying right now
-      const { rows } = await c.query<{ id: number; payload: Record<string, unknown> }>(
-        'SELECT id, payload FROM stats.pb_outbox ORDER BY id LIMIT $1',
+      const { rows } = await c.query<{ id: number; type: string; payload: Record<string, unknown> }>(
+        'SELECT id, type, payload FROM stats.pb_outbox ORDER BY id LIMIT $1',
         [BATCH],
       );
       const done: number[] = [];
       let failure: unknown = null;
       for (const r of rows) {
         try {
-          await publishEvent(redis, 'pb.updated', r.payload);
+          await publishEvent(redis, r.type, r.payload);
           done.push(r.id);
         } catch (err) {
           failure = err;
@@ -47,7 +48,7 @@ export function createPbRelay(pool: Pool, redis: Redis, log: FastifyBaseLogger, 
         }
       }
       if (done.length) await c.query('DELETE FROM stats.pb_outbox WHERE id = ANY($1::bigint[])', [done]);
-      if (failure) log.warn({ err: (failure as Error).message, pending: rows.length - done.length }, 'pb.updated publish failed, will retry');
+      if (failure) log.warn({ err: (failure as Error).message, pending: rows.length - done.length }, 'stats outbox publish failed, will retry');
       return { published: done.length, more: !failure && rows.length === BATCH };
     });
   }

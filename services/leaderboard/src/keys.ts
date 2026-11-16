@@ -90,6 +90,24 @@ export function currentPeriodKey(period: Period, now: Date = new Date()): string
   return 'all';
 }
 
+const DAY_MS = 86_400_000;
+
+/**
+ * The daily and weekly boards a change can still touch: the ones solve.created writes to (solves
+ * up to 3 days / 15 days old), so the UTC days and ISO weeks of the last 3 and 15 days. `from` is
+ * the Monday (00:00 UTC) of the oldest of those weeks: solves from then on decide them all.
+ */
+export function livePeriods(now: Date = new Date()): { days: string[]; weeks: string[]; from: string } {
+  const days = new Set<string>();
+  for (let k = 0; k <= DAILY_TTL_SEC / 86_400; k++) days.add(utcDay(new Date(now.getTime() - k * DAY_MS)));
+  const weeks = new Set<string>();
+  for (let k = 0; k <= WEEKLY_TTL_SEC / 86_400; k++) weeks.add(utcWeek(new Date(now.getTime() - k * DAY_MS)));
+  const oldest = new Date(now.getTime() - (WEEKLY_TTL_SEC / 86_400) * DAY_MS);
+  const sinceMonday = (oldest.getUTCDay() + 6) % 7; // Monday = 0 ... Sunday = 6
+  const from = new Date(Date.UTC(oldest.getUTCFullYear(), oldest.getUTCMonth(), oldest.getUTCDate() - sinceMonday));
+  return { days: [...days], weeks: [...weeks], from: from.toISOString() };
+}
+
 /** True for a real calendar date written as YYYY-MM-DD. */
 export function isValidDay(s: string): boolean {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);

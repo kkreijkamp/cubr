@@ -16,6 +16,8 @@ import {
   hasBoards,
   isKind,
   isValidDay,
+  livePeriods,
+  PERIOD_KINDS,
   purgePlan,
   tsKey,
   utcDay,
@@ -23,6 +25,7 @@ import {
   weeklyKey,
   type Kind,
 } from './keys.js';
+import type { PeriodBests, PeriodSource } from './periods.js';
 
 // ---------------------------------------------------------------------------------------------
 // Turns domain events (SPEC section 8) into board writes. The plan* functions are pure (unit-tested);
@@ -30,7 +33,7 @@ import {
 // All writes are idempotent (exact set / keep-best), so at-least-once redelivery is harmless.
 // ---------------------------------------------------------------------------------------------
 
-export const CONSUMED_TYPES = ['pb.updated', 'solve.created', 'daily.completed', 'daily.updated', 'user.registered', 'user.updated', 'user.deleted'];
+export const CONSUMED_TYPES = ['pb.updated', 'solve.created', 'periods.changed', 'daily.completed', 'daily.updated', 'user.registered', 'user.updated', 'user.deleted'];
 
 /** A keep-best write (ZADD LT) to a period board. */
 export interface BestWrite {
@@ -38,6 +41,15 @@ export interface BestWrite {
   event: string;
   kind: Kind;
   valueMs: number;
+  achievedAt: string;
+  ttlSec: number;
+}
+
+/** An exact write (or removal when valueMs is null) to a daily or weekly board, after periods.changed. */
+export interface PeriodWrite {
+  board: string;
+  kind: Kind;
+  valueMs: number | null;
   achievedAt: string;
   ttlSec: number;
 }
@@ -113,6 +125,27 @@ export function planSolveCreated(d: Data, nowMs = Date.now()): BestWrite[] {
 }
 
 /**
+ * periods.changed -> an exact write for every live daily and weekly board of the event: stats' best
+ * of that day or week (already at or above the anti-cheat floor), or no entry when there is none.
+ * So a deleted or penalised solve, a deleted or practice session and a merge all show up there.
+ */
+export function planPeriodRefresh(event: string, bests: PeriodBests, live: { days: string[]; weeks: string[] }): PeriodWrite[] {
+  if (!hasBoards(event)) return [];
+  const out: PeriodWrite[] = [];
+  const plan = (periods: string[], bucket: PeriodBests['days'], kinds: readonly Kind[], key: (k: Kind, p: string) => string, ttlSec: number) => {
+    for (const p of periods) {
+      for (const kind of kinds) {
+        const b = bucket[p]?.[kind as 'single' | 'ao5'];
+        out.push({ board: key(kind, p), kind, valueMs: b?.valueMs ?? null, achievedAt: b?.achievedAt ?? '', ttlSec });
+      }
+    }
+  };
+  plan(live.days, bests.days, PERIOD_KINDS.daily, (k, p) => dailyKey(event, k, p), DAILY_TTL_SEC);
+  plan(live.weeks, bests.weeks, PERIOD_KINDS.weekly, (k, p) => weeklyKey(event, k, p), WEEKLY_TTL_SEC);
+  return out;
+}
+
+/**
  * daily.completed / daily.updated -> exact write to the daily-challenge ao5 board: the latest result
  * wins (a penalty marked after the solve can make it worse), and a DNF ao5 (-1) removes the entry.
  * Kept without TTL (history).
@@ -153,9 +186,11 @@ export interface IngestDeps {
   redis: Redis;
   floors: FloorSource;
   log: FastifyBaseLogger;
+  /** stats' day and week bests, read after periods.changed (without it that event is ignored) */
+  periods?: PeriodSource;
 }
 
-export function makeHandler({ redis, floors, log }: IngestDeps) {
+export function makeHandler({ redis, floors, log, periods }: IngestDeps) {
   /**
    * Anti-cheat gate: true if the value may be written, otherwise it is recorded in lb:flagged
    * once per event/kind/value per domain event (one solve feeds both a daily and a weekly board).
@@ -189,7 +224,26 @@ export function makeHandler({ redis, floors, log }: IngestDeps) {
 
   async function writeBest(evt: EventEnvelope, w: BestWrite, flagged: Set<string>) {
     if (!(await passesFloor(evt, w, flagged))) return;
-    await redis.lbBest(w.board, atKey(w.board), w.valueMs, evt.data.userId as string, w.achievedAt, w.ttlSec);
+    const occurredAtMs = parseTime((evt.data as Data).occurredAt) ?? Date.now();
+    await redis.lbBest(w.board, atKey(w.board), tsKey(w.board), w.valueMs, evt.data.userId as string, w.achievedAt, w.ttlSec, occurredAtMs);
+  }
+
+  /**
+   * periods.changed: the user's solves for an event changed, so their entry on every live daily
+   * and weekly board is set to stats' best of that day or week (above the anti-cheat floor), or
+   * removed. Each write carries the event's time: an older one, or a late solve.created from
+   * before it, is ignored (the scripts' ts-hash).
+   */
+  async function refreshPeriods(userId: string, d: Data) {
+    const event = String(d.event ?? '');
+    if (!periods || !hasBoards(event)) return;
+    const live = livePeriods();
+    const [minSingle, minAverage] = await Promise.all([floors.floor(event, 'single'), floors.floor(event, 'ao5')]);
+    const bests = await periods.bests({ userId, event, from: live.from, minSingle: minSingle ?? 0, minAverage: minAverage ?? 0 });
+    const occurredAtMs = parseTime(d.occurredAt) ?? Date.now();
+    for (const w of planPeriodRefresh(event, bests, live)) {
+      await redis.lbSetPeriod(w.board, atKey(w.board), tsKey(w.board), userId, w.valueMs ?? '', w.achievedAt, occurredAtMs, w.ttlSec);
+    }
   }
 
   /** A deleted account leaves every board, the display info and the anti-cheat list. */
@@ -245,6 +299,8 @@ export function makeHandler({ redis, floors, log }: IngestDeps) {
       case 'solve.created':
         for (const w of planSolveCreated(d)) await writeBest(evt, w, flagged);
         return;
+      case 'periods.changed':
+        return refreshPeriods(userId, d);
       default:
         return; // user.* - display info handled above
     }

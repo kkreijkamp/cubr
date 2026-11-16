@@ -122,4 +122,13 @@ ALTER TABLE stats.sessions ADD COLUMN practice boolean NOT NULL DEFAULT false;
 CREATE INDEX solve_ledger_created_at ON stats.solve_ledger (created_at) WHERE NOT deleted;
 `,
   },
+  {
+    // The outbox also carries periods.changed (a person's solves for an event changed, so the
+    // leaderboard re-reads their best of each day and week): each row names the type it is
+    // published as.
+    id: '007_outbox_type',
+    sql: `
+ALTER TABLE stats.pb_outbox ADD COLUMN IF NOT EXISTS type text NOT NULL DEFAULT 'pb.updated';
+`,
+  },
 ];

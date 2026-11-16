@@ -53,6 +53,16 @@ export async function ensureUser(
   return rows[0];
 }
 
+/**
+ * Queues periods.changed: the user's solves for `event` changed (one more, or one edited, deleted,
+ * moved...), so the leaderboard re-reads their best of each day and week (GET
+ * /internal/users/:id/period-bests). Same transaction as the change, published after it commits.
+ */
+export async function queuePeriodsChanged(c: PoolClient, change: { userId: string; username: string; event: string }): Promise<void> {
+  const payload = { eventId: newEventId('stats'), occurredAt: new Date().toISOString(), ...change };
+  await c.query(`INSERT INTO stats.pb_outbox (type, payload) VALUES ('periods.changed', $1)`, [JSON.stringify(payload)]);
+}
+
 /** Queues a pb.updated event in the outbox (same transaction as the PB change). */
 export async function queuePbUpdated(c: PoolClient, change: PbChange): Promise<void> {
   const payload = { eventId: newEventId('stats'), occurredAt: new Date().toISOString(), ...change };

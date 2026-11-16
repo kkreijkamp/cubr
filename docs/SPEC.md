@@ -290,14 +290,15 @@ CREATE TABLE stats.hourly (
 );
 CREATE TABLE stats.processed_events (event_id text PRIMARY KEY, processed_at timestamptz NOT NULL DEFAULT now());
 ```
-Two later migrations add the bookkeeping that keeps the read model exact (details in
+Later migrations add the bookkeeping that keeps the read model exact (details in
 `services/stats/README.md`): `002_ledger_outbox` - `solve_ledger` (one row per solve: idempotent
 projection, tombstones for deleted solves, the tail for incremental mo3/ao50/ao100),
 `deleted_sessions`, `pb_outbox` (transactional outbox for `pb.updated`), `user_totals.tz` (last
 timezone seen) and `hourly.dnfs`; `003_session_names` - `sessions` (display name per session for
 the history chart); `004_deleted_users` - `deleted_users` (tombstones of deleted accounts: their rows
 are gone and later events for them are ignored); `005_practice_sessions` - `sessions.practice` (the
-history chart's PB line leaves practice sessions out).
+history chart's PB line leaves practice sessions out); `006_ledger_created_at` - an index for "solves
+today"; `007_outbox_type` - `pb_outbox.type` (the outbox also publishes `periods.changed`).
 
 ### 7.4 `scramble` schema (scramble-service)
 ```sql
@@ -366,6 +367,7 @@ to `cubr:events:dlq`. Use `publishEvent()` / `consumeEvents()` from common.
 | `daily.completed` | solve | `userId, username, date, event, ao5 (ms or -1), times: number[], tz` (the five attempts, once the fifth is in) |
 | `daily.updated` | solve | same as `daily.completed` - the day's result again after a penalty change on one of its attempts while the challenge is open |
 | `pb.updated` | stats | `userId, username, event, kind, valueMs (int or null if no longer exists), previousMs, achievedAt` |
+| `periods.changed` | stats | `userId, username, event` - the user's solves for the event changed (a new one, or one edited, deleted, merged or imported, or its session deleted or marked practice), published after stats applied it: leaderboard re-reads the user's best of each live day and week (`GET stats /internal/users/:id/period-bests`) |
 
 ## 9. HTTP API contracts
 
@@ -474,6 +476,7 @@ Published rows older than a day are deleted.
 | GET `/api/stats/global` | `{users, solves, totalMs, solvesToday, activeUsersToday}` ("today" = UTC day; cached 10 s) |
 | GET `/api/stats/_info` | info |
 | GET `/internal/pbs?event=&kind=` | `{pbs: [{userId, username, event, kind, valueMs, achievedAt}]}` |
+| GET `/internal/users/:userId/period-bests?event=&from=&minSingle=&minAverage=` | `{days: {"YYYY-MM-DD": {single?, ao5?}}, weeks: {"YYYY-Www": {single?, ao5?}}}`, each `{valueMs, achievedAt}`: the best single and rolling ao5 (within a session, ending at a solve done that UTC day / ISO week, `from` on) of the user's non-practice sessions, from the ledger; values below the floors (the leaderboard sends its anti-cheat floors) are left out. Internal token. |
 
 Streak = consecutive days (in the user's tz as bucketed) with >= 1 solve, ending today or yesterday.
 PB rules: single = best effective time; mo3/aoN = best rolling value within a single session
@@ -495,9 +498,13 @@ worsens or disappears).
 
 Sources: all-time boards from `pb.updated` (ZADD exact value; ZREM when valueMs is null or -1).
 Weekly/daily boards from `solve.created` (single = effectiveMs, ao5 = rolling.ao5, `ZADD LT`, skip DNF),
-bucketed by the UTC day / ISO week of `createdAt`; later edits and deletes don't change them.
+bucketed by the UTC day / ISO week of `createdAt`. After `periods.changed` the user's entries on
+every live daily and weekly board (the UTC days of the last 3 days, the ISO weeks of the last 15) are
+set to stats' best of that day / week, or removed, so edits, deletions, merges and practice sessions
+show there too. Those exact writes record their event time in `<board>:ts`; a keep-best write from a
+`solve.created` older than that is ignored (that solve may have been deleted since).
 Daily-challenge board from `daily.completed` / `daily.updated` (exact value, the latest result wins; ZREM for a DNF ao5). Display info (username, country, avatar URL) from `user.*` events and usernames in payloads.
-Board writes are small Lua scripts (score and achievedAt change atomically); exact writes (all-time and daily-challenge boards) drop events older than the last one applied for that user.
+Board writes are small Lua scripts (score and achievedAt change atomically); exact writes (all-time and daily-challenge boards, and daily/weekly ones after `periods.changed`) drop events older than the last one applied for that user.
 Rank = position + 1 (equal values don't share a rank). 333fm has no boards (results are move counts).
 Anti-cheat: ignore values below the WCA world record for that event/kind (fetch `GET wca /internal/records`, cache 1 h, fallback hard-coded floors about a quarter below the records, e.g. 333 single 1800 ms) - store rejected entries in `lb:flagged`.
 Rebuild: a background loop checks for `lb:meta:built` every 60 s; when it is missing (Redis lost its

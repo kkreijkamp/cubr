@@ -16,6 +16,7 @@ import {
   hasBoards,
   isKind,
   isValidDay,
+  livePeriods,
   isValidWeek,
   isoWeeksInYear,
   pageRange,
@@ -108,5 +109,24 @@ describe('deleting an account', () => {
     expect(flaggedBy(JSON.stringify({ userId: U, valueMs: 1000 }), U)).toBe(true);
     expect(flaggedBy(JSON.stringify({ userId: 'someone-else' }), U)).toBe(false);
     expect(flaggedBy('not json', U)).toBe(false);
+  });
+});
+
+describe('livePeriods (the daily and weekly boards a periods.changed refreshes)', () => {
+  it('lists the UTC days of the last 3 days and the ISO weeks of the last 15, from the Monday of the oldest week', () => {
+    expect(livePeriods(new Date('2026-11-17T09:00:00Z'))).toEqual({
+      days: ['2026-11-17', '2026-11-16', '2026-11-15', '2026-11-14'],
+      weeks: ['2026-W47', '2026-W46', '2026-W45'],
+      from: '2026-11-02T00:00:00.000Z', // 15 days back is Monday 2 November
+    });
+  });
+
+  it('crosses a year, and starts from a Monday when 15 days back is a Sunday', () => {
+    expect(livePeriods(new Date('2027-01-02T00:30:00Z'))).toEqual({
+      days: ['2027-01-02', '2027-01-01', '2026-12-31', '2026-12-30'],
+      weeks: ['2026-W53', '2026-W52', '2026-W51'],
+      from: '2026-12-14T00:00:00.000Z', // 15 days back is Friday 18 December, in the week of Monday 14
+    });
+    expect(livePeriods(new Date('2026-11-23T12:00:00Z')).from).toBe('2026-11-02T00:00:00.000Z'); // Sunday 8 Nov -> Monday 2 Nov
   });
 });

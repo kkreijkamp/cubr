@@ -9,6 +9,7 @@ import {
 } from '@cubr/common';
 import { FloorProvider } from './floors.js';
 import { CONSUMED_TYPES, makeHandler } from './ingest.js';
+import { statsPeriodSource } from './periods.js';
 import { startRebuildLoop } from './rebuild.js';
 import { registerRoutes } from './routes/index.js';
 import { defineScripts } from './scripts.js';
@@ -50,7 +51,7 @@ consumer = consumeEvents(redis, {
   group: 'leaderboard',
   consumer: config.podName,
   types: CONSUMED_TYPES,
-  handler: makeHandler({ redis, floors, log: app.log }),
+  handler: makeHandler({ redis, floors, log: app.log, periods: statsPeriodSource(config.urls.stats, config.internalToken) }),
   log: app.log,
 });
 rebuild = startRebuildLoop({

@@ -9,6 +9,7 @@ import { PRIVATE_USERS_KEY, type EventEnvelope } from '@cubr/common';
 import { describeIntegration, startTestServer, type TestServer } from '@cubr/testkit';
 import { floorFor } from '../src/floors.js';
 import { makeHandler } from '../src/ingest.js';
+import type { PeriodBests, PeriodQuery } from '../src/periods.js';
 import { DELETED_USERS_KEY, FLAGGED_KEY, USERS_KEY, allTimeKey, atKey, challengeKey, dailyKey, tsKey, weeklyKey } from '../src/keys.js';
 import { registerRoutes } from '../src/routes/index.js';
 import { defineScripts } from '../src/scripts.js';
@@ -373,6 +374,119 @@ describeIntegration('leaderboard API', () => {
       for (const key of boards) expect(await s.redis.zscore(key, gone.id), `${key} after`).toBeNull();
       expect(await s.redis.hget(USERS_KEY, gone.id)).toBeNull();
       expect(ids(await board('555bf/single'))).toEqual([stays.id]);
+    });
+  });
+  describe('daily and weekly boards after an edit or a deletion (periods.changed)', () => {
+    let answer: PeriodBests = { days: {}, weeks: {} };
+    let failing = false;
+    const asked: PeriodQuery[] = [];
+    let withStats: (evt: EventEnvelope) => Promise<void>;
+    beforeAll(() => {
+      withStats = makeHandler({
+        redis: s.redis,
+        floors: { floor: async (event, kind) => floorFor(event, kind, RECORDS) },
+        log: s.app.log,
+        periods: {
+          bests: async (q) => {
+            asked.push(q);
+            if (failing) throw new Error('stats unavailable');
+            return answer;
+          },
+        },
+      });
+    });
+    const feedStats = async (...evts: EventEnvelope[]) => {
+      for (const e of evts) await withStats(e);
+    };
+    /** periods.changed as stats publishes it */
+    const changed = (u: User, event: string, occurredAt: string) => evt('periods.changed', { userId: u.id, username: u.username, event, occurredAt });
+    const best = (valueMs: number, achievedAt: string) => ({ valueMs, achievedAt });
+    const rows = (b: { entries: { userId: string; valueMs: number; achievedAt: string }[] }) => b.entries.map((e) => [e.userId, e.valueMs, e.achievedAt]);
+
+    it("replace a deleted solve's time with stats' best of the day and week, and drop an ao5 that is gone", async () => {
+      pinNow('2026-11-17T09:00:00Z');
+      const [koen, other] = [newUser(), newUser()];
+      // as on 16 November: a slip (deleted 3 s later), the real best, and someone else
+      await feedStats(
+        solve(koen, '666', 63_567, '2026-11-16T14:01:23.000Z', { occurredAt: '2026-11-16T14:01:23.100Z', rolling: { ao5: 70_000, ao12: null } }),
+        solve(koen, '666', 77_711, '2026-11-16T02:56:18.483Z', { occurredAt: '2026-11-16T02:56:18.600Z' }),
+        solve(other, '666', 75_000, '2026-11-16T09:00:00.000Z', { occurredAt: '2026-11-16T09:00:00.100Z' }),
+      );
+      expect(ids(await board('666/single?period=weekly'))).toEqual([koen.id, other.id]);
+
+      answer = { days: { '2026-11-16': { single: best(77_711, '2026-11-16T02:56:18.483Z') } }, weeks: { '2026-W47': { single: best(77_711, '2026-11-16T02:56:18.483Z') } } };
+      await feedStats(changed(koen, '666', '2026-11-16T14:01:26.500Z'));
+      // stats was asked from the Monday of the oldest live week, with the anti-cheat floors
+      expect(asked.at(-1)).toEqual({ userId: koen.id, event: '666', from: '2026-11-02T00:00:00.000Z', minSingle: 43_200, minAverage: 46_300 });
+      for (const period of ['daily&key=2026-11-16', 'weekly']) {
+        expect(rows(await board(`666/single?period=${period}`))).toEqual([
+          [other.id, 75_000, '2026-11-16T09:00:00.000Z'],
+          [koen.id, 77_711, '2026-11-16T02:56:18.483Z'],
+        ]);
+        expect((await board(`666/ao5?period=${period}`)).total).toBe(0);
+      }
+    });
+
+    it('ignore a solve.created from before the change that is handled late, but take newer solves as usual', async () => {
+      pinNow('2026-11-17T09:00:00Z');
+      const u = newUser();
+      answer = { days: { '2026-11-17': { single: best(95_000, '2026-11-17T07:00:00.000Z') } }, weeks: { '2026-W47': { single: best(95_000, '2026-11-17T07:00:00.000Z') } } };
+      await feedStats(changed(u, '777', '2026-11-17T08:30:00.000Z'));
+      // e.g. on another replica: a slip from 08:00 whose deletion the change above already knew of
+      await feedStats(solve(u, '777', 85_000, '2026-11-17T08:00:00.000Z', { occurredAt: '2026-11-17T08:00:00.100Z' }));
+      expect(rows(await board('777/single?period=daily'))).toEqual([[u.id, 95_000, '2026-11-17T07:00:00.000Z']]);
+      await feedStats(solve(u, '777', 92_000, '2026-11-17T08:45:00.000Z', { occurredAt: '2026-11-17T08:45:00.100Z' }));
+      expect(rows(await board('777/single?period=daily'))).toEqual([[u.id, 92_000, '2026-11-17T08:45:00.000Z']]);
+      expect(rows(await board('777/single?period=weekly'))).toEqual([[u.id, 92_000, '2026-11-17T08:45:00.000Z']]);
+      // stats then sends a change with the new solve in; a change older than that one, handled
+      // late with what was true then, can't undo it
+      answer = { days: { '2026-11-17': { single: best(92_000, '2026-11-17T08:45:00.000Z') } }, weeks: { '2026-W47': { single: best(92_000, '2026-11-17T08:45:00.000Z') } } };
+      await feedStats(changed(u, '777', '2026-11-17T08:45:00.200Z'));
+      answer = { days: { '2026-11-17': { single: best(95_000, '2026-11-17T07:00:00.000Z') } }, weeks: { '2026-W47': { single: best(95_000, '2026-11-17T07:00:00.000Z') } } };
+      await feedStats(changed(u, '777', '2026-11-17T08:40:00.000Z'));
+      expect(rows(await board('777/single?period=daily'))).toEqual([[u.id, 92_000, '2026-11-17T08:45:00.000Z']]);
+    });
+
+    it("leave days and weeks that aren't live any more as they were", async () => {
+      pinNow('2026-11-02T12:00:00Z');
+      const u = newUser();
+      await feed(solve(u, '444', 50_000, '2026-11-02T10:00:00.000Z'));
+      pinNow('2026-11-17T09:00:00Z'); // 2 November is now 15 days ago: its day board is history
+      answer = { days: { '2026-11-02': { single: best(49_000, '2026-11-02T09:00:00.000Z') } }, weeks: {} };
+      await feedStats(changed(u, '444', '2026-11-17T08:00:00.000Z'));
+      expect(await s.redis.zscore(dailyKey('444', 'single', '2026-11-02'), u.id)).toBe('50000');
+      // its week (45) is still live: nothing in stats' answer for it, so the entry goes
+      expect(await s.redis.zscore(weeklyKey('444', 'single', '2026-W45'), u.id)).toBeNull();
+    });
+
+    it('leave events without boards and deleted accounts alone, and do nothing without a stats source', async () => {
+      pinNow('2026-11-17T09:00:00Z');
+      const [u, gone] = [newUser(), newUser()];
+      const before = asked.length;
+      await feedStats(changed(u, '333fm', '2026-11-17T08:00:00.000Z'));
+      await s.redis.sadd(DELETED_USERS_KEY, gone.id);
+      await feedStats(changed(gone, '666', '2026-11-17T08:00:00.000Z'));
+      expect(asked.length).toBe(before);
+      expect(await s.redis.keys(`lb:333fm:*`)).toEqual([]);
+
+      await feed(solve(u, 'clock', 9_000, '2026-11-17T08:00:00.000Z'));
+      await feed(changed(u, 'clock', '2026-11-17T08:30:00.000Z')); // the handler without `periods`
+      expect(await s.redis.zscore(dailyKey('clock', 'single', '2026-11-17'), u.id)).toBe('9000');
+      expect(asked.length).toBe(before);
+    });
+
+    it('fail when stats cannot answer, so the event is retried, and change nothing meanwhile', async () => {
+      pinNow('2026-11-17T09:00:00Z');
+      const u = newUser();
+      await feedStats(solve(u, 'skewb', 9_500, '2026-11-17T08:00:00.000Z', { occurredAt: '2026-11-17T08:00:00.100Z' }));
+      failing = true;
+      try {
+        await expect(withStats(changed(u, 'skewb', '2026-11-17T08:30:00.000Z'))).rejects.toThrow('stats unavailable');
+      } finally {
+        failing = false;
+      }
+      expect(await s.redis.zscore(dailyKey('skewb', 'single', '2026-11-17'), u.id)).toBe('9500');
+      expect(await s.redis.hget(tsKey(dailyKey('skewb', 'single', '2026-11-17')), u.id)).toBeNull();
     });
   });
 });
