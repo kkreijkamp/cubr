@@ -202,7 +202,8 @@ h4 {
   .nav .btn-text {
     padding: 0.35rem;
   }
-  .nav .hide-mobile {
+  .nav .hide-mobile,
+  .footer .hide-mobile {
     display: none;
   }
   .nav {
