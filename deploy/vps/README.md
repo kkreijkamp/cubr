@@ -17,8 +17,6 @@ Files here:
 - `deploy.sh`: copy, pull and restart.
 - `.env.example`: what `/opt/cubr/.env` holds.
 
-The hosting decision and costs are in `A4/cubetype-aws-migration-2026-11-15.md` section 9.
-
 ## Everyday: ship a release (only `main` runs in production)
 
 Work happens on `dev`; every commit gets a patch version and tag from the hooks. A release:
