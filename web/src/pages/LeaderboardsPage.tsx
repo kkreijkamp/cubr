@@ -216,11 +216,14 @@ function MeCard({ board, sel, precision, onJump }: { board: Leaderboard | undefi
   const me = board.me;
   const flagged = board.flagged ?? null;
   if (!me && flagged) {
-    // the anti-cheat left your best off: say so, rather than "not on this leaderboard yet"
+    // the anti-cheat left your best off: say so, loudly, rather than "not on this leaderboard yet"
     return (
-      <div className="lb-me lb-me-empty" role="note">
-        <ShieldExclamationIcon width={20} height={20} />
-        <span>you are not on this leaderboard: {missingNote(flagged, sel.period, sel.kind, precision)}</span>
+      <div className="lb-me lb-me-empty lb-me-flagged" role="alert">
+        <ShieldExclamationIcon width={26} height={26} />
+        <span className="lb-flag-body">
+          <span className="pill error">not ranked: faster than the world record</span>
+          <span>{missingNote(flagged, sel.period, sel.kind, precision)}</span>
+        </span>
         <span />
       </div>
     );
@@ -254,14 +257,13 @@ function MeCard({ board, sel, precision, onJump }: { board: Leaderboard | undefi
           <Avatar user={user} size={20} />
           {user.username}
         </span>
-        <span className="sub">
-          {me.rank === 1 ? 'goat - nobody is faster' : `you - top ${formatPercent(top)} of ${formatNumber(board.total)}`}
-          {flagged && (
-            <span className="lb-me-flag" data-tip={hiddenNote(flagged, precision)} aria-label={hiddenNote(flagged, precision)} role="img">
-              <ShieldExclamationIcon width={14} height={14} />
-            </span>
-          )}
-        </span>
+        <span className="sub">{me.rank === 1 ? 'goat - nobody is faster' : `you - top ${formatPercent(top)} of ${formatNumber(board.total)}`}</span>
+        {flagged && (
+          <span className="lb-me-flag-note" role="note">
+            <ShieldExclamationIcon width={14} height={14} />
+            {hiddenNote(flagged, precision)}
+          </span>
+        )}
       </div>
       <div className="lb-me-value">{formatTime(me.valueMs, precision)}</div>
       <button className="btn small lb-me-jump" onClick={onJump} data-tip="jump to my rank">

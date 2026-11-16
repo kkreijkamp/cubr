@@ -117,16 +117,18 @@
 .lb-me .lb-me-who .sub {
   font-size: 0.75rem;
 }
-/* a faster time of yours was left off by the anti-cheat (tooltip says which) */
-.lb-me .lb-me-flag {
-  display: inline-flex;
-  margin-left: 0.4em;
-  vertical-align: -0.15em;
-  color: var(--sub-color);
-  cursor: help;
+/* a faster time of yours was left off by the anti-cheat: said in red, under your name */
+.lb-me .lb-me-flag-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35em;
+  color: var(--error-color);
+  font-size: 0.75rem;
+  line-height: 1.4;
 }
-.lb-me .lb-me-flag:hover {
-  color: var(--text-color);
+.lb-me .lb-me-flag-note svg {
+  flex: none;
+  margin-top: 0.1em;
 }
 .lb-me .lb-me-value {
   color: var(--main-color);
@@ -147,6 +149,24 @@
 }
 .lb-me.lb-me-empty a:hover {
   color: var(--text-color);
+}
+/* the anti-cheat left your best off this board: a red ring, tint, icon and pill, so you can't miss it */
+.lb-me.lb-me-flagged {
+  background: var(--sub-alt-color);
+  background: color-mix(in srgb, var(--error-color) 12%, var(--sub-alt-color));
+  box-shadow: inset 0 0 0 2px var(--error-color);
+  color: var(--text-color);
+}
+.lb-me.lb-me-flagged > svg {
+  color: var(--error-color);
+}
+.lb-me.lb-me-flagged .lb-flag-body {
+  display: grid;
+  justify-items: start;
+  gap: 0.4rem;
+}
+.lb-me.lb-me-flagged .pill.error {
+  font-weight: 600;
 }
 
 /* toolbar: count on the left, pagination on the right */
