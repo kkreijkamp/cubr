@@ -18,6 +18,43 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: '1.4.0',
+    date: '2026-11-17',
+    title: 'sign in with google or github, and an app that works offline',
+    sections: [
+      {
+        heading: 'new',
+        items: [
+          'sign in with google or github: one click on the sign-in page, then pick your username. already have an account? connect either one on your account page',
+          'install cubr as an app on your phone or computer, with its own window and icon. the timer opens and works offline, and your solves sync once you are back online',
+          'new versions download in the background: click "update ready" to switch, or it happens on your next click inside the app',
+          'practice sessions get a little bottle after their name',
+        ],
+      },
+      {
+        heading: 'changed',
+        items: ["white cross's greys are cooler and cleaner", 'a slightly tighter logo', 'the privacy policy covers signing in with google or github'],
+      },
+      {
+        heading: 'fixed',
+        items: [
+          'after a password reset, an old sign-in could still join race rooms. now it is signed out there too',
+          'twisty timer +2 solves imported 2 seconds too slow',
+          'an import with a date past the year 9999 failed as a whole',
+          'a 0 ms solve from a gan cube became a 0.001 s pb',
+          "right after switching accounts, the new one could briefly see the previous account's new sessions",
+          '"solves today" on the about page counts by the utc day',
+          'a deleted account could reappear on the leaderboards after a rebuild',
+          'clearer messages when race rooms or the daily challenge are briefly unavailable',
+        ],
+      },
+      {
+        heading: 'behind the scenes',
+        items: ['many more automated tests: about 1,200 for the servers and 420 for the app, which found most of the fixes above'],
+      },
+    ],
+  },
+  {
     version: '1.3.0',
     date: '2026-11-16',
     title: 'private profiles, supporters and the fine print',
