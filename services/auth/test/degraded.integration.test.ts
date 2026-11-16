@@ -22,6 +22,7 @@ describeIntegration('auth with Redis down', () => {
     vi.stubEnv('RESEND_API_KEY', '');
     // never connects and doesn't queue: every command fails at once, as when Redis is down
     deadRedis = new Redis('redis://127.0.0.1:1', { lazyConnect: true, enableOfflineQueue: false, maxRetriesPerRequest: 0, retryStrategy: () => null });
+    deadRedis.on('error', () => undefined); // expected: nothing listens there
     s = await startTestServer({
       service: 'auth',
       infoPrefixes: ['/api/auth', '/api/users', '/api/supporters'],

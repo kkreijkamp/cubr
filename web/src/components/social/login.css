@@ -115,6 +115,43 @@
 .lg-form .btn {
   margin-top: 0.5rem;
 }
+/* sign-in with Google, Apple or GitHub (components/social/Sso.tsx), above the forms */
+.lg-sso {
+  display: grid;
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+}
+.lg-sso-btn {
+  gap: 0.6rem;
+}
+.lg-sso-btn svg {
+  flex: none;
+}
+.lg-sso-error {
+  color: var(--error-color);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+.lg-or {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.4rem;
+  color: var(--sub-color);
+  font-size: 0.75rem;
+}
+.lg-or::before,
+.lg-or::after {
+  content: '';
+  flex: 1;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--sub-alt-color);
+}
+.lg-lede svg {
+  vertical-align: -0.15em;
+}
+
 /* sign up: what creating an account agrees to */
 .lg-agree {
   margin: 0;

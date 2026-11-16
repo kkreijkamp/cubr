@@ -18,6 +18,7 @@ import { exportAll, importSessions } from '../../lib/solves';
 import { toast } from '../../lib/toast';
 import type { PrivateUser } from '../../lib/types';
 import { Modal } from '../Modal';
+import { SignInMethods } from './SignInMethods';
 import { SessionName } from '../SessionName';
 import { Spinner } from '../Spinner';
 
@@ -239,6 +240,7 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
             </button>
           </div>
         </div>
+        <SignInMethods />
         <div className="ac-row">
           <div>
             <div className="t">

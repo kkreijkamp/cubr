@@ -878,7 +878,9 @@ function VirtualKeys({ maps }: { maps: Settings['virtualKeys'] }) {
 
 /** Deleting the account: the password is asked again, then it's gone for good. */
 function DeleteAccountModal({ username, onDeleted, onClose }: { username: string; onDeleted: () => void; onClose: () => void }) {
-  const { deleteAccount } = useAuth();
+  const { deleteAccount, user } = useAuth();
+  // an account made with Google, Apple or GitHub has no password: its username confirms instead
+  const byName = user?.hasPassword === false;
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -887,10 +889,11 @@ function DeleteAccountModal({ username, onDeleted, onClose }: { username: string
     setBusy(true);
     setError(null);
     try {
-      await deleteAccount(password);
+      await deleteAccount(byName ? { confirm: password } : { password });
       onDeleted();
     } catch (e) {
-      setError(e instanceof ApiError && e.status === 403 ? 'wrong password' : (e as Error).message || "couldn't delete the account, try again");
+      const wrong = byName ? "that isn't your username" : 'wrong password';
+      setError(e instanceof ApiError && e.status === 403 ? wrong : (e as Error).message || "couldn't delete the account, try again");
       setBusy(false);
     }
   };
@@ -907,11 +910,11 @@ function DeleteAccountModal({ username, onDeleted, onClose }: { username: string
           Delete <span className="main">{username}</span> with all its solves, sessions, stats and leaderboard places? <span className="error">This can't be undone.</span>
         </div>
         <div className="field">
-          <label htmlFor="delete-account-password">type your password to confirm</label>
+          <label htmlFor="delete-account-password">{byName ? 'type your username to confirm' : 'type your password to confirm'}</label>
           <input
             id="delete-account-password"
-            type="password"
-            autoComplete="current-password"
+            type={byName ? 'text' : 'password'}
+            autoComplete={byName ? 'off' : 'current-password'}
             autoFocus
             maxLength={128}
             value={password}

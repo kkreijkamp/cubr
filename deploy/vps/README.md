@@ -67,6 +67,54 @@ caches the web app in each visitor's browser. What that means for releases:
   `ARG VITE_SW=on` to `off` and release. Each browser removes the worker and its caches on its
   next visit and reloads from the network. Switch it back on in a later release.
 
+## Sign-in providers (Google, Apple, GitHub)
+
+"Continue with Google / Apple / GitHub" (services/auth/README.md) needs an app registered with each
+provider. A provider stays off, with no button on the site, until all of its values are in
+`/opt/cubr/.env`. After changing them, recreate the auth container and check:
+
+```sh
+$C up -d auth                                        # on the VM: picks up the new .env values
+curl -s https://cubr.dev/api/auth/oauth/providers    # {"providers":["google",...]}
+```
+
+The redirect (callback) URLs to register, exactly:
+`https://cubr.dev/api/auth/oauth/google/callback`, `.../apple/callback`, `.../github/callback`.
+
+- **Google** (free). In the Google Cloud console (project `cubr-app`), open Google Auth Platform.
+  1. Branding: app name `cubr`, support email `hello@cubr.dev`, home page `https://cubr.dev`,
+     privacy policy `https://cubr.dev/privacy`, terms `https://cubr.dev/terms`, authorised
+     domain `cubr.dev`. Skip the logo: adding one needs Google's brand review first.
+  2. Audience: External, then publish the app. While it is in testing, only listed test users
+     can sign in.
+  3. Data access: only `openid`, `email` and `profile`. These need no Google verification.
+  4. Clients: create a "Web application" client with the Google redirect URL above. No
+     JavaScript origins are needed: the server runs the flow. Copy the client secret right away,
+     because newer clients don't show it again. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
+- **GitHub** (free). Go to Settings, Developer settings, OAuth Apps, New OAuth App. Use name
+  `cubr`, home page `https://cubr.dev` and the GitHub callback URL above. Leave device flow off.
+  Generate a client secret, then set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`.
+- **Apple** needs a paid Apple Developer Program membership (US$99 a year). In Certificates,
+  Identifiers & Profiles:
+  1. An App ID (an explicit bundle id such as `dev.cubr.app`) with Sign in with Apple enabled.
+  2. A Services ID (for example `dev.cubr.signin`) with the description `cubr`, which people see
+     when they sign in. This is `APPLE_CLIENT_ID`. Enable Sign in with Apple on it and configure
+     it with the App ID above as primary, domain `cubr.dev` and the Apple return URL above. If
+     Apple asks to verify the domain, it gives a file to serve at
+     `/.well-known/apple-developer-domain-association.txt` (add it to `web/public/.well-known/`).
+  3. A key with Sign in with Apple enabled, linked to the App ID. Download the `.p8`: Apple
+     allows one download only. Its id is `APPLE_KEY_ID`. The team id at the top right is
+     `APPLE_TEAM_ID`. `APPLE_PRIVATE_KEY` is the `.p8` on one line, with line breaks written
+     as `\n`: `awk 'NF {printf "%s\\n", $0}' AuthKey_XXXXXXXXXX.p8`.
+  4. People who pick "Hide My Email" get an `@privaterelay.appleid.com` address, and Apple
+     forwards only mail from registered senders. Under Services, "Sign in with Apple for Email
+     Communication", register `cubr.dev` and `no-reply@cubr.dev`. Without that, their
+     password-reset emails don't arrive; signing in with Apple still works.
+
+Accounts made with a provider have no password until they use "forgot password?". The site never
+connects a provider to an existing account by matching emails. People connect providers
+themselves on the account page.
+
 ## Backups and scheduled jobs
 
 systemd timers on the VM (installed by `deploy.sh`):
@@ -93,6 +141,7 @@ and run the WCA import.
   password, JWT secret and internal token on the VM; the tunnel token comes from Cloudflare's API.
   Changing `JWT_SECRET` signs everyone out. `RESEND_API_KEY` (only the auth container gets it)
   sends password-reset emails from `no-reply@cubr.dev`; without it they are only logged.
+  The sign-in providers' client secrets and Apple's key are there too ("Sign-in providers").
 - **Email DNS** (Cloudflare): `cubr.dev` MX to Google Workspace (`hello@cubr.dev`), SPF for Google,
   `_dmarc` (report-only for now), and Resend's records (`resend._domainkey`, `send` MX/TXT,
   `rsend` CNAME).

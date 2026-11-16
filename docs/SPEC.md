@@ -151,7 +151,7 @@ CREATE TABLE auth.users (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   username      text NOT NULL,
   email         text NOT NULL,
-  password_hash text NOT NULL,
+  password_hash text,               -- null: made with Google, Apple or GitHub (migration 006)
   display_name  text,
   bio           text,
   country       char(2),            -- ISO 3166-1 alpha-2, nullable
@@ -192,6 +192,18 @@ CREATE TABLE auth.password_resets (
   expires_at timestamptz NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+-- sign-in with Google, Apple or GitHub (migration 006): one row per connected provider account;
+-- subject = the provider's stable user id, email = the verified address it gave
+CREATE TABLE auth.user_identities (
+  provider     text NOT NULL CHECK (provider IN ('google','apple','github')),
+  subject      text NOT NULL,
+  user_id      uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  email        text,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  last_used_at timestamptz,
+  PRIMARY KEY (provider, subject)
+);
+CREATE UNIQUE INDEX user_identities_user_provider ON auth.user_identities (user_id, provider);
 ```
 
 ### 7.2 `solve` schema (solve-service)
@@ -312,6 +324,7 @@ trigram/lower index on person name for search.
 | `cubr:events:dlq` | Stream | consumers | dead letters: entries a consumer group could not handle |
 | `auth:revoked:<jti>` | string, TTL = token remaining life | auth | logout / revocation |
 | `auth:revoked-user:<userId>` | string (unix seconds), TTL 30 d | auth | account deleted: every token issued at or before then is revoked |
+| `auth:oauth:flow:<state>` / `:login:<code>` / `:signup:<id>` | string JSON, TTL 10 min / 2 min / 15 min | auth | sign-in with a provider: the flow (provider, PKCE verifier, nonce, mode, next), a one-time login code, a new account waiting for its username; each read once (GETDEL, the sign-up when it completes) |
 | `auth:private-users` | set of user ids | auth (stats, leaderboard read) | private profiles; added/removed in the same transaction as the flag (503 + rollback if Redis can't take it), re-added from Postgres at auth start-up and every 10 min (adds only); readers fail closed |
 | `rl:<scope>:<key>` | counter, TTL | any | rate limiting |
 | `scramble:pool:<event>` | list | scramble | pre-generated scrambles |
@@ -361,7 +374,7 @@ always present. Responses may carry additional fields; clients ignore fields the
 
 ```ts
 type PublicUser = { id: string; username: string; displayName: string|null; bio: string|null; country: string|null; wcaId: string|null; createdAt: string; avatarUrl: string|null /* '/api/users/<id>/avatar?v=<version>' */ };
-type PrivateUser = PublicUser & { email: string };
+type PrivateUser = PublicUser & { email: string; hasPassword: boolean /* false: made with a provider, no password yet */ };
 type Session = { id: string; name: string; event: string; createdAt: string; updatedAt: string; solveCount: number };
 type Solve = { id: string; sessionId: string; event: string; timeMs: number; penalty: 'OK'|'+2'|'DNF'; scramble: string; comment: string|null; source: string; createdAt: string; dailyDate?: string|null; dailyIndex?: number|null };
 type PB = { valueMs: number; solveId: string|null; achievedAt: string };
@@ -371,7 +384,7 @@ type PB = { valueMs: number; solveId: string|null; achievedAt: string };
 | Method & path | Auth | Body / query | Response |
 |---|---|---|---|
 | POST `/api/auth/register` | - | `{username, email, password}` | 201 `{token, user: PrivateUser}`; 409 CONFLICT (username/email taken); 429 after 20 registrations/h/IP |
-| POST `/api/auth/login` | - | `{login, password}` (login = username or email) | 200 `{token, user: PrivateUser}`; 401; 429 after 10 attempts/min/IP |
+| POST `/api/auth/login` | - | `{login, password}` (login = username or email) | 200 `{token, user: PrivateUser}`; 401 (also for an account without a password, after the same dummy bcrypt compare); 429 after 10 attempts/min/IP |
 | POST `/api/auth/logout` | req | - | 204 (revokes jti) |
 | POST `/api/auth/password/forgot` | - | `{email}` | 202 `{ok: true}` for every address, answered before the lookup (no account enumeration by reply or timing); an account with that email gets a link `<PUBLIC_URL>/reset#<token>` (32 random bytes, valid 60 min, single use) through Resend; 429 after 10/h/IP; at most 3 links/h per account |
 | POST `/api/auth/password/reset` | - | `{token, password}` (password: 8-128 chars) | 200 `{token, user: PrivateUser}`: new password set, the user's other reset links deleted, every older token revoked (per-user revocation; the new token is issued after it); 400 invalid/expired/used link; 503 if the revocation can't be stored (nothing changes) |
@@ -380,13 +393,27 @@ type PB = { valueMs: number; solveId: string|null; achievedAt: string };
 | PUT `/api/auth/me/settings` | req | `{settings: object}` (<= 16 KB JSON) | `{settings}` |
 | PUT `/api/auth/me/avatar` | req | raw image body, `Content-Type: image/webp\|image/jpeg\|image/png`, <= 300 KB (magic bytes must match) | `{user: PrivateUser}`; 400, 413, 429 (10/h) (+ `user.updated`) |
 | DELETE `/api/auth/me/avatar` | req | - | `{user: PrivateUser}` (+ `user.updated`) |
-| DELETE `/api/auth/me` | req | `{password}` | 204: the account is deleted and every token of it revoked (+ `user.deleted`, which makes the other services delete its data); 403 wrong password; 429 after 5 tries/10 min; 503 when Redis can't take the revocation or the event (then nothing is deleted) |
+| DELETE `/api/auth/me` | req | `{password}`, or `{confirm: username}` (case-insensitive) for an account without a password | 204: the account is deleted and every token of it revoked (+ `user.deleted`, which makes the other services delete its data; its provider identities cascade); 403 wrong password or username; 429 after 5 tries/10 min; 503 when Redis can't take the revocation or the event (then nothing is deleted) |
+| GET `/api/auth/oauth/providers` | - | - | `{providers: ('google'\|'apple'\|'github')[]}`: the providers whose keys are set (none = no buttons); cached 5 min |
+| POST `/api/auth/oauth/:provider/start` | opt (req for `link`) | `{mode?: 'signin'\|'link', next?}` | `{url}`: the provider's sign-in page (authorization code + PKCE S256, `state`, OIDC `nonce`); sets the `cubr_oauth` cookie = state (HttpOnly, Secure, SameSite=None, Path=/api/auth/oauth, 10 min); 404 provider not set up; 401 `link` without a token; 429 after 30/10 min/IP; 503 Redis down |
+| GET or POST `/api/auth/oauth/:provider/callback` | `cubr_oauth` cookie | the provider's `code` + `state` (Apple: form POST, with `user` = the name the first time) | 303 to the web app, the result in the URL fragment: `/login/sso#code=<one-time code>&next=` (a connected account; the cookie becomes the code, 2 min), `#signup=<id>&next=` (a new account; the cookie becomes the id, 15 min), `/account#linked=<provider>` (mode `link`), or `#error=<cancelled\|expired\|failed\|no_email\|email_taken\|linked_elsewhere\|already_linked\|busy>&provider=`. The state must exist (single use), be for this provider and match the cookie; ID tokens (Google RS256, Apple ES256) are checked against the provider's JWKS (issuer, audience, nonce, expiry); only a verified email counts (GitHub: the primary verified one, from its API) and a new account needs one (`no_email`). A provider email that an account already has is never linked automatically (`email_taken`); 60/10 min/IP |
+| POST `/api/auth/oauth/exchange` | `cubr_oauth` cookie | `{code}` | `{token, user: PrivateUser}` (`last_login_at` set); 404 code not this browser's, expired or used (not 401: the web app signs out on a 401, and a link mustn't sign anyone out); 429 after 30/10 min/IP |
+| GET `/api/auth/oauth/signup/:id` | `cubr_oauth` cookie | - | `{provider, email, username}`: the new account, with a free username suggested from the provider's (null if none); 404 expired or not this browser's |
+| POST `/api/auth/oauth/signup` | `cubr_oauth` cookie | `{id, username}` | 201 `{token, user: PrivateUser}`: the account (no password) and its identity in one transaction (+ `user.registered`); 409 username taken (the sign-up is kept for another try), email taken, or already created; 404 expired; counts toward register's 20/h/IP |
+| GET `/api/auth/me/sign-in` | req | - | `{password: boolean, providers: [...] /* set up on the server */, identities: [{provider, email, createdAt}]}` |
+| DELETE `/api/auth/me/identities/:provider` | req | - | 204 disconnected; 409 it's the only way in (no password, no other provider); 404 not connected |
 | GET `/api/users/:idOrUsername/avatar` | - | `?v=` version | image bytes (immutable cache when `v` matches, ETag/304); 404 |
 | GET `/api/users/:username` | opt | - | `{user: PublicUser}` (`private: true` and only id, username, avatarUrl for a private profile unless the token is its owner's; displayName, bio, country, wcaId, createdAt null); 404 |
 | GET `/api/users?ids=a,b,c` | opt | <= 100 ids | `{users: PublicUser[]}` (private profiles as above) |
 | POST `/api/supporters/kofi` | Ko-fi verification token in the payload | form-encoded `data` = Ko-fi's payment JSON (body <= 64 KB) | 200 `{ok: true}` (a repeated `message_id` is ignored); 400 not Ko-fi JSON; 403 wrong token (constant-time check against `KOFI_VERIFICATION_TOKEN`); 503 token not configured; 60/min/IP. Stores only message_id, type, the name if `is_public`, subscription flag, tier and time - never email, amount, message or payment ids |
 | GET `/api/supporters` | - | - | `{supporters: [{name, member}]}`: public, not hidden, one per name (case-insensitive), most recent first, <= 200; member = a subscription payment in the last 35 days; cached 60 s |
 | GET `/api/auth/_info`, `/api/users/_info` | - | - | info |
+
+An account made with a provider has no password: it signs in with the provider, and "forgot password?"
+(a reset link to its email) gives it one. Connecting a provider to an existing account happens only
+signed in (mode `link`, from the account page), so owning an email at a provider never takes over a cubr
+account. Each provider is configured by environment variables on the auth service (services/auth/README.md);
+the redirect URI to register with it is `<PUBLIC_URL>/api/auth/oauth/<provider>/callback`.
 
 Rate limits are per client IP; callers that present `INTERNAL_API_TOKEN` (section 4) are exempt. Redis is
 a soft dependency: while it is down, rate limits and revocation checks fail open, `user.*` events
@@ -532,8 +559,8 @@ UNAVAILABLE with message "WCA data not loaded yet".
 ## 10. Frontend (web) overview
 
 React SPA, routes: `/` timer, `/leaderboards`, `/daily`, `/race`, `/race/:roomId`,
-`/profile/:username`, `/account`, `/settings`, `/wca`, `/about`, `/login`, `/reset`, `/terms`,
-`/privacy`. Guest mode works fully offline in localStorage; logged-in users sync to solve-service
+`/profile/:username`, `/account`, `/settings`, `/wca`, `/about`, `/login`, `/login/sso` (back from
+Google, Apple or GitHub: signs in, or asks a new account for its username), `/reset`, `/terms`, `/privacy`. Guest mode works fully offline in localStorage; logged-in users sync to solve-service
 with an optimistic local store + retry queue (idempotent ids). Monkeytype-style theme system via CSS
 custom properties, command palette (Esc / Ctrl+K), focus mode while timing, toasts.
 

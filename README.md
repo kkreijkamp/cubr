@@ -14,7 +14,7 @@
 - **Timer inputs** - keyboard and touch, smart cubes and timers over bluetooth, Stackmat through the audio input, and a virtual puzzle turned from the keyboard.
 - **Scrambles** - official random-state scrambles for all 16 WCA events (cubing.js), with 2D/3D previews.
 - **Statistics** - mo3/ao5/ao12/ao50/ao100/ao1000 (current & best, WCA trimming rules), mean, standard deviation, PB detection.
-- **Accounts & sync** - solves stored in the cloud with offline-tolerant optimistic sync; import and export compatible with csTimer and most others; settings follow you across devices; profile pictures.
+- **Accounts & sync** - sign up with a password or with Google, Apple or GitHub; solves stored in the cloud with offline-tolerant optimistic sync; import and export compatible with csTimer and most others; settings follow you across devices; profile pictures.
 - **Installable app (PWA)** - install it on phones and computers: its own window, a home screen or dock icon and app shortcuts. The timer opens and works offline, and new versions download in the background with an "update ready" notice.
 - **Leaderboards** - all-time / weekly / daily per event (single, ao5, ao12), WCA-record anti-cheat.
 - **Daily challenge** - everyone gets the same 5 scrambles each UTC day; one attempt per scramble, ranked by ao5.
@@ -55,7 +55,7 @@ browser --HTTP/WS--> Google Cloud Load Balancer (GKE Ingress, path routing)
 | Service | Responsibility | Data |
 |---|---|---|
 | `web` | React SPA on unprivileged nginx | - |
-| `auth` | register/login (bcrypt, JWT), profile, settings, profile pictures, logout revocation | `auth` schema |
+| `auth` | register/login (bcrypt, JWT), sign-in with Google, Apple and GitHub (OAuth/OIDC), profile, settings, profile pictures, logout revocation | `auth` schema |
 | `scramble` | random-state scrambles (cubing.js), Redis pre-generated pool, daily challenge scrambles | `scramble` schema, Redis lists |
 | `solve` | sessions & solves CRUD, idempotent writes, daily-challenge attempts, csTimer bulk import, export, transactional outbox -> Redis Stream | `solve` schema |
 | `stats` | event-driven read model: PBs (authority, emits `pb.updated`), heatmap, streaks, hourly, global counters | `stats` schema |

@@ -103,15 +103,16 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
     }
     const body = parse(loginSchema, req.body);
     // Usernames cannot contain '@' and emails always do, so at most one row matches.
-    const { rows } = await pool.query<UserRow & { password_hash: string }>(
+    const { rows } = await pool.query<UserRow & { password_hash: string | null }>(
       `select ${USER_COLUMNS}, password_hash from auth.users
         where lower(username) = lower($1) or lower(email) = lower($1)
         limit 1`,
       [body.login],
     );
     const found = rows[0];
-    const ok = await bcrypt.compare(body.password, found ? found.password_hash : await DUMMY_HASH);
-    if (!found || !ok) throw unauthorized('Invalid username/email or password');
+    // an account made with Google, Apple or GitHub has no password: the same answer, the same timing
+    const ok = await bcrypt.compare(body.password, found?.password_hash ?? (await DUMMY_HASH));
+    if (!found?.password_hash || !ok) throw unauthorized('Invalid username/email or password');
 
     const updated = await pool.query<UserRow>(
       `update auth.users set last_login_at = now() where id = $1 returning ${USER_COLUMNS}`,
@@ -219,15 +220,21 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
     const me = req.user!;
     if (!UUID_RE.test(me.id)) throw unauthorized();
     if (!(await allow(redis, `delete:${me.id}`, 5, 600))) throw rateLimited('Too many attempts, try again in a few minutes');
-    const { password } = parse(deleteMeSchema, req.body ?? {});
+    const { password, confirm } = parse(deleteMeSchema, req.body ?? {});
     await withTx(pool, async (c) => {
-      const { rows } = await c.query<{ username: string; password_hash: string }>(
+      const { rows } = await c.query<{ username: string; password_hash: string | null }>(
         'select username, password_hash from auth.users where id = $1 for update',
         [me.id],
       );
       if (!rows[0]) throw unauthorized('Account no longer exists');
       // 403, not 401: a wrong password must not look like an expired session to the client
-      if (!(await bcrypt.compare(password, rows[0].password_hash))) throw forbidden('Wrong password');
+      const hash = rows[0].password_hash;
+      if (hash) {
+        if (!password || !(await bcrypt.compare(password, hash))) throw forbidden('Wrong password');
+      } else if (confirm?.toLowerCase() !== rows[0].username.toLowerCase()) {
+        // no password (made with a provider): typing the username confirms
+        throw forbidden('Type your username to confirm');
+      }
       await c.query('delete from auth.users where id = $1', [me.id]);
       void withTimeout(redis.srem(PRIVATE_USERS_KEY, me.id.toLowerCase()), 2000, 0); // tidy-up only: the account is gone
 
