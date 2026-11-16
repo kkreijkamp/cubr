@@ -18,8 +18,8 @@ A random-state scramble is not a list of random moves: cubing.js picks a uniform
 *state* and runs a solver search (Kociemba-style two-phase for 3x3x3, big pruning tables for 4x4x4)
 to find a short sequence reaching it. Each request is pure CPU - no I/O to wait on - so CPU
 utilisation tracks request rate almost linearly. The service is stateless (shared state lives in
-Redis/Postgres), so Kubernetes can add pods freely: the HPA demo runs a load generator against
-`?fresh=1` (always generates, bypassing the pool) and watches replicas scale out on CPU.
+Redis/Postgres), so Kubernetes can add pods freely and the HPA scales it on CPU. `?fresh=1` always generates,
+bypassing the pool (for load tests).
 
 Measured per pod (1 search thread, Apple M-series under load, `fresh=1` sequential): 333 ~6-12 ms
 (~100 req/s), pyram/minx/skewb/clock < 5 ms, **444 ~150-220 ms (~5 req/s)**, sq1 ~150-200 ms

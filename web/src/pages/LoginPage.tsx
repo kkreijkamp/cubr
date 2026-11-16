@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
-import { Link, Navigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   CheckIcon,
   CloudArrowUpIcon,
@@ -10,7 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Loading, Spinner } from '../components/Spinner';
 import { safeNext } from '../components/social/util';
-import { ApiError } from '../lib/api';
+import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { localDataSummary } from '../lib/solves';
 import { toast } from '../lib/toast';
@@ -331,7 +331,171 @@ function LoginForm({ active, focusFirst }: FormProps) {
       <button type="submit" className="btn primary block" disabled={busy}>
         {busy && <Spinner size={16} />} sign in
       </button>
+      <Link to="/login?mode=forgot" state={{ email: EMAIL_RE.test(identity.trim()) ? identity.trim() : '' }} className="lg-forgot">
+        forgot password?
+      </Link>
     </form>
+  );
+}
+
+/** Asks for a reset link. The server answers the same way for every address, and so does this form. */
+function ForgotForm() {
+  const location = useLocation();
+  const [email, setEmail] = useState(() => (location.state as { email?: string } | null)?.email ?? '');
+  const [submitted, setSubmitted] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [errorTick, setErrorTick] = useState(0);
+  const emailRef = useRef<HTMLInputElement>(null);
+  useFocusWhenActive(sentTo === null, emailRef);
+  const error = validateEmail(email.trim());
+
+  const onSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setSubmitted(true);
+    setFormError(null);
+    if (error || busy) {
+      setErrorTick((t) => t + 1);
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.auth.forgotPassword(email.trim());
+      setSentTo(email.trim());
+    } catch (err) {
+      setFormError(describeAuthError(err, 'login'));
+      setErrorTick((t) => t + 1);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (sentTo !== null) {
+    return (
+      <div className="lg-form lg-sent" role="status">
+        <p>
+          if an account uses <span className="lg-sent-to">{sentTo}</span>, a reset link is on its way. it works once, for an hour.
+        </p>
+        <p className="lg-sent-sub">
+          nothing after a few minutes? check your spam folder, or{' '}
+          <button type="button" className="btn-text" onClick={() => setSentTo(null)}>
+            send another link
+          </button>
+          .
+        </p>
+      </div>
+    );
+  }
+  return (
+    <form className="lg-form" onSubmit={onSubmit} noValidate>
+      <Field
+        type="email"
+        name="email"
+        placeholder="email"
+        autoComplete="email"
+        inputRef={emailRef}
+        value={email}
+        onChange={setEmail}
+        error={error}
+        show={submitted}
+        maxLength={254}
+      />
+      {formError && <FormError shakeKey={errorTick}>{formError}</FormError>}
+      <button type="submit" className="btn primary block" disabled={busy}>
+        {busy && <Spinner size={16} />} send reset link
+      </button>
+    </form>
+  );
+}
+
+/** /reset#<token>: the page a reset email links to. */
+export function ResetPasswordPage() {
+  const { status, resetPassword } = useAuth();
+  const navigate = useNavigate();
+  // the token travels in the fragment, which browsers never send; it leaves the address bar at once
+  const [token] = useState(() => window.location.hash.replace(/^#/, ''));
+  useEffect(() => {
+    if (window.location.hash) window.history.replaceState(window.history.state, '', window.location.pathname);
+  }, []);
+  const [password, setPassword] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [expired, setExpired] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [errorTick, setErrorTick] = useState(0);
+  const passwordRef = useRef<HTMLInputElement>(null);
+  const wellFormed = /^[A-Za-z0-9_-]{43}$/.test(token);
+  useFocusWhenActive(wellFormed && !expired, passwordRef);
+  useEffect(() => {
+    document.title = 'reset password | cubr';
+    return () => {
+      document.title = 'cubr';
+    };
+  }, []);
+  const error = validatePassword(password);
+
+  const onSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setSubmitted(true);
+    setFormError(null);
+    if (error || busy) {
+      setErrorTick((t) => t + 1);
+      return;
+    }
+    setBusy(true);
+    try {
+      await resetPassword(token, password);
+      toast.success('you are signed in, and signed out everywhere else.', { title: 'password changed' });
+      navigate('/', { replace: true });
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 400) setExpired(true);
+      else setFormError(describeAuthError(err, 'login'));
+      setErrorTick((t) => t + 1);
+      setBusy(false);
+    }
+  };
+
+  if (status === 'loading') return <Loading />;
+  if (!wellFormed || expired) {
+    return (
+      <div className="lg-page">
+        <h1 className="lg-title">reset password</h1>
+        <p className="lg-lede">
+          {wellFormed ? 'this link has expired or was already used. links work once, for an hour.' : 'this link is incomplete. open it straight from the email.'}
+        </p>
+        <Link to="/login?mode=forgot" className="btn primary block">
+          send a new link
+        </Link>
+        <Link to="/login" className="lg-guest">
+          back to sign in
+        </Link>
+      </div>
+    );
+  }
+  return (
+    <div className="lg-page">
+      <h1 className="lg-title">new password</h1>
+      <p className="lg-lede">choose a new password. you&apos;ll be signed in here and signed out everywhere else.</p>
+      <form className="lg-form" onSubmit={onSubmit} noValidate>
+        <Field
+          type="password"
+          name="new-password"
+          placeholder="new password"
+          autoComplete="new-password"
+          inputRef={passwordRef}
+          value={password}
+          onChange={setPassword}
+          error={error}
+          show={submitted}
+          revealable
+        />
+        {formError && <FormError shakeKey={errorTick}>{formError}</FormError>}
+        <button type="submit" className="btn primary block" disabled={busy}>
+          {busy && <Spinner size={16} />} set password
+        </button>
+      </form>
+    </div>
   );
 }
 
@@ -380,6 +544,19 @@ export default function LoginPage() {
 
   if (status === 'loading') return <Loading />;
   if (status === 'authed') return <Navigate to={next} replace />;
+
+  if (params.get('mode') === 'forgot') {
+    return (
+      <div className="lg-page">
+        <h1 className="lg-title">reset password</h1>
+        <p className="lg-lede">enter your account&apos;s email and we&apos;ll send you a link to choose a new password.</p>
+        <ForgotForm />
+        <Link to="/login" className="lg-guest">
+          back to sign in
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="lg-page">

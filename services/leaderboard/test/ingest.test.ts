@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FALLBACK_FLOORS, FloorProvider, floorFor, isBelowFloor, parseRecords } from '../src/floors.js';
-import { planDailyCompleted, planPbUpdated, planSolveCreated, planUserInfo } from '../src/ingest.js';
+import { planDailyResult, planPbUpdated, planSolveCreated, planUserInfo } from '../src/ingest.js';
 import { toBoardWrite } from '../src/rebuild.js';
 import { parseUserInfo, splitWithScores } from '../src/board.js';
 
@@ -135,19 +135,31 @@ describe('planSolveCreated', () => {
   });
 });
 
-describe('planDailyCompleted', () => {
-  it('writes the challenge board, skips DNF', () => {
-    const d = { userId: U, username: 'a', date: '2026-10-14', event: '222', ao5: 3456, occurredAt: '2026-10-14T09:00:00Z' };
-    expect(planDailyCompleted(d, NOW)).toEqual({
+describe('planDailyResult', () => {
+  const d = { userId: U, username: 'a', date: '2026-10-14', event: '222', ao5: 3456, occurredAt: '2026-10-14T09:00:00Z' };
+  it('writes the exact ao5 to the challenge board', () => {
+    expect(planDailyResult(d, NOW)).toEqual({
       board: 'lb:dc:2026-10-14:222',
       event: '222',
       kind: 'ao5',
       valueMs: 3456,
       achievedAt: '2026-10-14T09:00:00.000Z',
-      ttlSec: 0,
+      occurredAtMs: Date.parse('2026-10-14T09:00:00Z'),
     });
-    expect(planDailyCompleted({ ...d, ao5: -1 }, NOW)).toBeNull();
-    expect(planDailyCompleted({ ...d, date: '14/10/2026' }, NOW)).toBeNull();
+  });
+  it('removes the entry for a DNF ao5 (a penalty marked after the solve can cause one)', () => {
+    expect(planDailyResult({ ...d, ao5: -1 }, NOW)).toMatchObject({ board: 'lb:dc:2026-10-14:222', valueMs: null });
+    expect(planDailyResult({ ...d, ao5: null }, NOW)).toMatchObject({ valueMs: null });
+  });
+  it('ignores bad payloads instead of deleting', () => {
+    expect(planDailyResult({ ...d, date: '14/10/2026' }, NOW)).toBeNull();
+    expect(planDailyResult({ ...d, event: '333fm' }, NOW)).toBeNull();
+    expect(planDailyResult({ ...d, ao5: 'fast' }, NOW)).toBeNull();
+    expect(planDailyResult({ ...d, ao5: 0 }, NOW)).toBeNull();
+  });
+  it('falls back to now without occurredAt', () => {
+    const { occurredAt: _o, ...rest } = d;
+    expect(planDailyResult(rest, NOW)).toMatchObject({ occurredAtMs: NOW, achievedAt: new Date(NOW).toISOString() });
   });
 });
 

@@ -1,7 +1,8 @@
 # cubr - system specification
 
 > cubr = csTimer's speedcubing functionality + Monkeytype's polish, delivered as a
-> cloud-native microservice application on Kubernetes (GKE). INFS3208 Type I project.
+> cloud-native microservice application: one VM behind Cloudflare in production, Kubernetes
+> (GKE) manifests for scaling out.
 
 This document describes the design of cubr: the repository layout, the services and what each
 of them owns, the database schemas, the domain events and the HTTP contracts between the services
@@ -32,15 +33,12 @@ cubr/
   web/                        # React 18 + Vite + TypeScript SPA, served by nginx (own package.json, not a workspace)
   deploy/
     gateway/nginx.conf        # compose gateway mimicking the K8s Ingress routes
-    k8s/                      # Kubernetes manifests (kustomize): base/, overlays/gke/, jobs/{seed,loadgen}/
-    cloudbuild/               # Cloud Build for a single image (rollout demo)
+    k8s/                      # Kubernetes manifests (kustomize): base/, overlays/gke/, jobs/seed/
   scripts/
     build-service.mjs         # esbuild bundler: node scripts/build-service.mjs services/auth
     smoke.mjs                 # end-to-end check through any entry point: node scripts/smoke.mjs <baseUrl>
-    build-push.sh             # alternative to Cloud Build: docker buildx --platform linux/amd64 --push
-    commands.sh               # every deploy/demo command, each with a comment (marking requirement)
-    package-submission.sh     # builds the submission archive
-  docs/                       # SPEC.md (this file), proposal/
+    commands.sh               # every GKE command, each with a comment
+  docs/                       # SPEC.md (this file)
 ```
 
 Each service folder: `src/index.ts` (entry), `src/routes/*.ts`, `src/migrations.ts` (if it owns a
@@ -177,6 +175,14 @@ CREATE TABLE auth.avatars (
   bytes        bytea NOT NULL,
   version      text NOT NULL,
   updated_at   timestamptz NOT NULL DEFAULT now()
+);
+-- password-reset links (migration 003): only the SHA-256 of the token; a row is deleted when used,
+-- together with every other row of the user
+CREATE TABLE auth.password_resets (
+  token_hash bytea PRIMARY KEY,
+  user_id    uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  expires_at timestamptz NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
 );
 ```
 
@@ -335,7 +341,8 @@ to `cubr:events:dlq`. Use `publishEvent()` / `consumeEvents()` from common.
 | `session.updated` | solve | `userId, username, sessionId, event, name, practice, tz` - the session became a practice one or stopped being one (stats recomputes the event's PBs; the all-time boards follow via `pb.updated`) |
 | `sessions.merged` | solve | `userId, username, event, targetId, sourceIds, solves, tz` (stats tombstones the sources and recomputes the event) |
 | `solves.imported` | solve | `userId, username, events: string[], count, tz` (bulk import: consumers recompute that user's events) |
-| `daily.completed` | solve | `userId, username, date, event, ao5 (ms or -1), times: number[], tz` (the five attempts as submitted) |
+| `daily.completed` | solve | `userId, username, date, event, ao5 (ms or -1), times: number[], tz` (the five attempts, once the fifth is in) |
+| `daily.updated` | solve | same as `daily.completed` - the day's result again after a penalty change on one of its attempts while the challenge is open |
 | `pb.updated` | stats | `userId, username, event, kind, valueMs (int or null if no longer exists), previousMs, achievedAt` |
 
 ## 9. HTTP API contracts
@@ -357,6 +364,8 @@ type PB = { valueMs: number; solveId: string|null; achievedAt: string };
 | POST `/api/auth/register` | - | `{username, email, password}` | 201 `{token, user: PrivateUser}`; 409 CONFLICT (username/email taken); 429 after 20 registrations/h/IP |
 | POST `/api/auth/login` | - | `{login, password}` (login = username or email) | 200 `{token, user: PrivateUser}`; 401; 429 after 10 attempts/min/IP |
 | POST `/api/auth/logout` | req | - | 204 (revokes jti) |
+| POST `/api/auth/password/forgot` | - | `{email}` | 202 `{ok: true}` for every address, answered before the lookup (no account enumeration by reply or timing); an account with that email gets a link `<PUBLIC_URL>/reset#<token>` (32 random bytes, valid 60 min, single use) through Resend; 429 after 10/h/IP; at most 3 links/h per account |
+| POST `/api/auth/password/reset` | - | `{token, password}` (password: 8-128 chars) | 200 `{token, user: PrivateUser}`: new password set, the user's other reset links deleted, every older token revoked (per-user revocation; the new token is issued after it); 400 invalid/expired/used link; 503 if the revocation can't be stored (nothing changes) |
 | GET `/api/auth/me` | req | - | `{user: PrivateUser, settings: object}` |
 | PATCH `/api/auth/me` | req | `{displayName?, bio?, country?, wcaId?}` (null clears) | `{user: PrivateUser}` (+ `user.updated`) |
 | PUT `/api/auth/me/settings` | req | `{settings: object}` (<= 16 KB JSON) | `{settings}` |
@@ -396,7 +405,7 @@ Pool: keep `scramble:pool:<event>` topped up (333/222/pyram/skewb: 200; 444/sq1/
 | DELETE `/api/solves/:id` | - | 204 (+ `solve.deleted`) |
 | POST `/api/sessions/import` | `{sessions: [{name, event, practice?, solves: [{timeMs, penalty, scramble, comment?, createdAt}]}]}` (<= 1 000 sessions, <= 100 000 solves, body <= 25 MB) | `{imported: {sessions, solves}}` (+ one `solves.imported`) - bulk insert in batches inside a transaction |
 | GET `/api/solves/export` | - | `{exportedAt, sessions: [Session & {solves: Solve[]}]}` |
-| GET `/api/solves/daily?date=` | - | `{date, events: {"333": {solves: Solve[], ao5: number\|-1\|null}, ...}}` (only events with >=1 attempt; ao5 = the official result of the five attempts as submitted) |
+| GET `/api/solves/daily?date=` | - | `{date, events: {"333": {solves: Solve[], ao5: number\|-1\|null}, ...}}` (only events with >=1 attempt; ao5 = the official result of the five attempts: times as submitted, penalties as last set while the day was open) |
 | GET `/api/solves/_info`, `/api/sessions/_info` | - | info (+ outbox backlog and relay state) |
 | GET `/internal/users/:userId/solves?event=` | - | `{solves: [{id, sessionId, timeMs, penalty, createdAt, practice?}]}` ordered by session_id, created_at (for stats recompute; `practice: true` on a practice session's solves) |
 | GET `/internal/users/:userId/sessions` | - | `{sessions: [{id, name, event, practice}]}` (stats backfills session display names) |
@@ -406,8 +415,10 @@ be a daily-challenge event and `date` the UTC date of yesterday, today or tomorr
 on Earth). Each index can be attempted once: the attempt is recorded in `solve.daily_attempts` in the
 same transaction, and a second attempt for that index -> 409, even after the first solve was deleted
 (a retry with the same solve id stays idempotent). Once all five attempts exist, `daily.completed`
-is emitted with the ao5 of the attempts as submitted, so later edits or deletes of the solves change
-neither the result nor the board.
+is emitted with the ao5 of the attempts. A penalty marked after the solve (`PATCH` ok / +2 / DNF on a
+daily solve) also changes its attempt while the day is still open (same window), and a finished
+day's result is re-sent as `daily.updated`. Deletes, and penalty changes after the day has closed,
+change neither the result nor the board.
 
 Outbox relay: every 250 ms each replica claims unpublished rows (`FOR UPDATE SKIP LOCKED`, LIMIT 500),
 XADDs them, sets `published_at`. If Redis is down, solves still succeed and events are delivered later.
@@ -446,8 +457,8 @@ worsens or disappears).
 Sources: all-time boards from `pb.updated` (ZADD exact value; ZREM when valueMs is null or -1).
 Weekly/daily boards from `solve.created` (single = effectiveMs, ao5 = rolling.ao5, `ZADD LT`, skip DNF),
 bucketed by the UTC day / ISO week of `createdAt`; later edits and deletes don't change them.
-Daily-challenge board from `daily.completed`. Display info (username, country, avatar URL) from `user.*` events and usernames in payloads.
-Board writes are small Lua scripts (score and achievedAt change atomically); all-time writes drop `pb.updated` events older than the last one applied for that user.
+Daily-challenge board from `daily.completed` / `daily.updated` (exact value, the latest result wins; ZREM for a DNF ao5). Display info (username, country, avatar URL) from `user.*` events and usernames in payloads.
+Board writes are small Lua scripts (score and achievedAt change atomically); exact writes (all-time and daily-challenge boards) drop events older than the last one applied for that user.
 Rank = position + 1 (equal values don't share a rank). 333fm has no boards (results are move counts).
 Anti-cheat: ignore values below the WCA world record for that event/kind (fetch `GET wca /internal/records`, cache 1 h, fallback hard-coded floors about a quarter below the records, e.g. 333 single 1800 ms) - store rejected entries in `lb:flagged`.
 Rebuild: a background loop checks for `lb:meta:built` every 60 s; when it is missing (Redis lost its

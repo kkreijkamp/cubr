@@ -66,7 +66,7 @@ spec:
                 secretKeyRef:
                   name: cubr-secrets
                   key: INTERNAL_API_TOKEN
-            - name: POD_NAME            # downward API -> X-Served-By header / status page
+            - name: POD_NAME            # downward API -> X-Served-By header
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name

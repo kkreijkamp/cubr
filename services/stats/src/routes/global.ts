@@ -15,7 +15,7 @@ async function soft<T>(op: () => Promise<T>, fallback: T): Promise<T> {
 }
 
 export async function registerGlobalRoutes(app: FastifyInstance, pool: Pool, redis: Redis): Promise<void> {
-  // Site-wide counters for the landing / status page. Cache-aside in Redis for 10 s (fails open).
+  // Site-wide counters. Cache-aside in Redis for 10 s (fails open).
   app.get('/api/stats/global', async (_req, reply) => {
     const cached = await soft(() => redis.get(CACHE_KEY), null);
     if (cached) {

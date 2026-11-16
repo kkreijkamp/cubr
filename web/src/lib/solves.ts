@@ -15,7 +15,7 @@
 //    (1 s ... 60 s, retried immediately on `online`). Server reads are overlaid with queued ops so
 //    optimistic changes survive reloads. The current session is cached (`cubr.cloudcache.v1`)
 //    so a logged-in user can keep timing while solve-service is down.
-import { getEvent, isEventId, type ImportedSession, type Penalty } from '@cubr/cubestats';
+import { defaultSessionName, isEventId, type ImportedSession, type Penalty } from '@cubr/cubestats';
 import { api, ApiError, getToken, type ImportPayload } from './api';
 import { getCurrentUser, onAuthChange } from './auth';
 import { settingsStore, updateSettings } from './settings';
@@ -34,6 +34,8 @@ import {
   LOCAL_KEY,
   overlaySessions,
   overlaySolves,
+  defaultSessionsPlan,
+  freeSessionName,
   planImportChunks,
   QUEUE_KEY,
   sortChrono,
@@ -70,6 +72,8 @@ export interface AddSolveInput {
   daily?: { date: string; index: number };
   /** override target session (defaults to the current session) */
   sessionId?: string;
+  /** client-side id (generated when absent); lets a caller change the solve before it is synced */
+  id?: string;
 }
 
 const EMPTY: Solve[] = [];
@@ -486,25 +490,34 @@ function defaultEvent(): string {
 
 /** Default name for a new session of `event`: "3x3", then "3x3 2", "3x3 3" ... */
 export function suggestSessionName(event: string): string {
-  const base = getEvent(event)?.short ?? event;
-  const taken = new Set(solveStore.get().sessions.map((s) => s.name.toLowerCase()));
-  if (!taken.has(base.toLowerCase())) return base;
-  for (let i = 2; ; i++) if (!taken.has(`${base} ${i}`.toLowerCase())) return `${base} ${i}`;
+  return freeSessionName(defaultSessionName(event), solveStore.get().sessions);
 }
 
 async function loadLocalScope(): Promise<void> {
   localDb = readLocal();
   model = localDb;
-  if (!pickCurrent()) createSessionInternal(suggestSessionNameFor(defaultEvent()), defaultEvent());
+  if (!pickCurrent()) createDefaultSessions(defaultEvent());
   model.current = pickCurrent();
   publish({ ready: true, loading: false });
 }
 
+/** A single new session's name for `event` (its short name, numbered if taken). */
 function suggestSessionNameFor(event: string): string {
-  const base = getEvent(event)?.short ?? event;
-  const taken = new Set(model.sessions.map((s) => s.name.toLowerCase()));
-  if (!taken.has(base.toLowerCase())) return base;
-  for (let i = 2; ; i++) if (!taken.has(`${base} ${i}`.toLowerCase())) return `${base} ${i}`;
+  return freeSessionName(defaultSessionName(event), model.sessions);
+}
+
+/**
+ * Creates the sessions an event starts with: its default session ("3x3") and, if the event has
+ * no practice session yet, "3x3 practice" a millisecond later so the default one stays first.
+ * Used when a new account, a new guest or a newly opened event needs a session; replacing a
+ * deleted session creates only the default one. Returns the default session.
+ */
+function createDefaultSessions(event: string): Session {
+  const t = Date.now();
+  const created = defaultSessionsPlan(event, model.sessions).map((p, i) =>
+    createSessionInternal(p.name, event, p.practice, new Date(t + i).toISOString()),
+  );
+  return created[0];
 }
 
 let loadAttempts = 0;
@@ -543,7 +556,7 @@ async function loadCloudScope(uid: string, g: number, keepCurrent = false): Prom
     model.solves.set(cache.sessionId, overlaySolves(cache.sessionId, cache.solves, overlayOps()));
   }
   let cur = pickCurrent();
-  if (!cur) cur = createSessionInternal(suggestSessionNameFor(defaultEvent()), defaultEvent()).id;
+  if (!cur) cur = createDefaultSessions(defaultEvent()).id;
   model.current = cur;
   publish();
   await loadSessionSolves(cur, g);
@@ -736,8 +749,8 @@ function validName(name: string): string {
   return n;
 }
 
-function createSessionInternal(name: string, event: string, practice = false): Session {
-  const now = new Date().toISOString();
+function createSessionInternal(name: string, event: string, practice = false, createdAt = new Date().toISOString()): Session {
+  const now = createdAt;
   const session: Session = { id: uuid(), name, event, ...(practice ? { practice } : {}), createdAt: now, updatedAt: now, solveCount: 0 };
   model.sessions = [...model.sessions, session];
   model.solves.set(session.id, []);
@@ -764,7 +777,7 @@ export async function addSolve(input: AddSolveInput): Promise<Solve> {
     session = await ensureSession(defaultEvent());
   }
   const solve: Solve = {
-    id: uuid(),
+    id: input.id ?? uuid(),
     sessionId: session.id,
     event: session.event,
     timeMs,
@@ -809,21 +822,54 @@ export async function addSolve(input: AddSolveInput): Promise<Solve> {
   return solve;
 }
 
-function updateSolveLocal(solveId: string, patch: { penalty?: Penalty; comment?: string | null }): boolean {
+/** Changes a loaded solve; returns the id of the queued op (cloud mode), else null. */
+function updateSolveLocal(solveId: string, patch: { penalty?: Penalty; comment?: string | null }): string | null {
   const hit = locate(solveId);
-  if (!hit) return false;
+  if (!hit) return null;
   const next = hit.list.slice();
   next[hit.index] = { ...next[hit.index], ...patch };
   model.solves.set(hit.sid, next);
-  if (scope?.mode === 'cloud') enqueue({ kind: 'updateSolve', id: solveId, sessionId: hit.sid, patch });
+  const opId = scope?.mode === 'cloud' ? enqueue({ kind: 'updateSolve', id: solveId, sessionId: hit.sid, patch }) : null;
   commit();
-  return true;
+  return opId;
+}
+
+/**
+ * Resolves once a queued op has reached the server, was folded into another queued op, or is
+ * waiting to retry after a network error; rejects if the server refused it.
+ */
+function whenSent(opId: string | null): Promise<void> {
+  if (!opId) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    if (!queue.some((q) => q.opId === opId)) return resolve();
+    waiters.set(opId, { resolve, reject });
+  });
 }
 
 export async function setPenalty(solveId: string, penalty: Penalty): Promise<void> {
   const hit = locate(solveId);
   if (!hit || hit.list[hit.index].penalty === penalty) return;
   updateSolveLocal(solveId, { penalty });
+}
+
+/**
+ * Sets the penalty of an account's solve that may not be loaded here (cloud mode only fetches the
+ * sessions you open), e.g. a daily-challenge attempt. Queued like any other change, so it reaches
+ * the server after the solve itself. `sessionId` is needed only when neither the solve nor its
+ * queued creation is known here. See whenSent for when the promise settles.
+ */
+export async function setPenaltyIn(solveId: string, penalty: Penalty, sessionId?: string): Promise<void> {
+  if (!solveStore.get().ready) await whenReady();
+  if (scope?.mode !== 'cloud') throw new Error('not signed in');
+  const hit = locate(solveId);
+  if (hit) {
+    if (hit.list[hit.index].penalty === penalty) return;
+    return whenSent(updateSolveLocal(solveId, { penalty }));
+  }
+  const creating = queue.find((q) => q.op.kind === 'createSolve' && q.op.solve.id === solveId)?.op;
+  const sid = creating?.kind === 'createSolve' ? creating.solve.sessionId : sessionId;
+  if (!sid) throw new Error('unknown solve');
+  return whenSent(enqueue({ kind: 'updateSolve', id: solveId, sessionId: sid, patch: { penalty } }));
 }
 
 export async function setComment(solveId: string, comment: string | null): Promise<void> {
@@ -946,7 +992,7 @@ function findSessionFor(event: string, counts = false): Session | undefined {
 export async function switchEvent(event: string): Promise<void> {
   if (!solveStore.get().ready) await whenReady();
   if (!isEventId(event)) throw new Error(`Unknown event ${event}`);
-  const s = findSessionFor(event) ?? createSessionInternal(suggestSessionNameFor(event), event);
+  const s = findSessionFor(event) ?? createDefaultSessions(event);
   await switchSession(s.id);
 }
 
@@ -960,7 +1006,7 @@ export async function ensureSession(event: string, opts: { counts?: boolean } = 
   if (!isEventId(event)) throw new Error(`Unknown event ${event}`);
   const found = findSessionFor(event, opts.counts === true);
   if (found) return found;
-  const s = createSessionInternal(suggestSessionNameFor(event), event);
+  const s = createDefaultSessions(event);
   commit();
   return s;
 }
@@ -1289,7 +1335,7 @@ export function clearLocalData(): void {
   storageError = null;
   if (scope?.mode === 'local') {
     model = localDb;
-    createSessionInternal(suggestSessionNameFor(defaultEvent()), defaultEvent());
+    createDefaultSessions(defaultEvent());
     model.current = pickCurrent();
     publish();
   }

@@ -13,7 +13,7 @@ metadata:
     app.kubernetes.io/part-of: cubr
 spec:
   # no `replicas:` -- the HorizontalPodAutoscaler (hpa.yaml) owns the count (min 2). Leaving it out
-  # means `kubectl apply` never resets a scaled-out Deployment back to 2 in the middle of a demo.
+  # means `kubectl apply` never resets a scaled-out Deployment back to 2 while the HPA has scaled it out.
   revisionHistoryLimit: 10              # old ReplicaSets kept for `kubectl rollout undo --to-revision`
   minReadySeconds: 5                    # a new pod must stay Ready 5 s before the rollout continues
   strategy:
@@ -53,7 +53,7 @@ spec:
           imagePullPolicy: IfNotPresent
           # APP_VERSION comes from the image (build arg); /_info reports it with the pod name.
           env:
-            - name: NODE_NAME           # downward API -> shown by /_info on the status page
+            - name: NODE_NAME           # downward API -> shown by /_info
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName

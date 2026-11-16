@@ -18,6 +18,35 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: '1.2.0',
+    date: '2026-11-16',
+    title: 'password reset, daily penalties and a white default theme',
+    sections: [
+      {
+        heading: 'new',
+        items: [
+          'forgot your password? reset it by email from the sign-in page',
+          'daily challenge: mark ok, +2 or dnf after the solve (or ctrl+1 / 2 / 3), and click an earlier attempt to change it. your ao5 and the board follow',
+          'every event comes with a practice session next to the main one, e.g. 3x3 and 3x3 practice',
+          'a contact address: hello@cubr.dev, in the footer',
+        ],
+      },
+      {
+        heading: 'changed',
+        items: [
+          'white cross is the default theme: pure white, with a brighter green',
+          "the monkeytype themes are gone and cubr keeps its own 10 cube-inspired ones. if you used one of them, you're on white cross now",
+          'no cloud icon in the timer bar when every solve is saved',
+          'the status page and its buttons are gone',
+        ],
+      },
+      {
+        heading: 'behind the scenes',
+        items: ['cubr is licensed under GPL-3.0'],
+      },
+    ],
+  },
+  {
     version: '1.1.0',
     date: '2026-11-16',
     title: 'cubetype is now cubr, at cubr.dev',

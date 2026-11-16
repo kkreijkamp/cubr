@@ -1,7 +1,7 @@
 // User settings: persisted in localStorage for everyone, synced to the auth service
 // (PUT /api/auth/me/settings) for logged-in users so they follow you across devices.
 import { cleanKeyMaps, type KeyMaps } from '../input/virtual/keymap';
-import { applyTheme, DEFAULT_THEME } from './themes';
+import { applyTheme, DEFAULT_THEME, getTheme } from './themes';
 import { createStore, loadJson, saveJson, useStore } from './store';
 
 export type TimerUpdate = 'realtime' | 'tenths' | 'seconds' | 'hidden';
@@ -118,6 +118,8 @@ function sanitize(raw: Partial<Settings> | null | undefined): Settings {
   const oneOf = <K extends keyof Settings>(key: K, allowed: readonly Settings[K][]) => {
     if (!allowed.includes(s[key])) s[key] = DEFAULT_SETTINGS[key];
   };
+  // a theme that no longer exists (the Monkeytype palettes were removed in 1.1.9) -> the default
+  s.theme = getTheme(s.theme).name;
   oneOf('virtualSpeed', [0, 50, 100, 200, 500, 1000]);
   oneOf('virtualView', ['UF', 'URF']);
   if (typeof s.virtualFloat !== 'number' || !Number.isFinite(s.virtualFloat)) s.virtualFloat = DEFAULT_SETTINGS.virtualFloat;

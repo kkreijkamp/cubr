@@ -7,7 +7,7 @@ import { SOLVE_COLUMNS, toSolve, type Solve, type SolveRow } from '../mapping.js
 import { enqueue } from '../outbox.js';
 import { sessionRolling, solveDeletedPayload, solveEventPayload } from '../repo.js';
 import { dailyOverview, dailyResult, type Rolling } from '../rolling.js';
-import { assertDailyAllowed, createSolveBody, dailyQuery, idParams, patchSolveBody, resolveCreatedAt, utcDay } from '../schemas.js';
+import { assertDailyAllowed, createSolveBody, dailyQuery, idParams, isDailyOpen, patchSolveBody, resolveCreatedAt, utcDay } from '../schemas.js';
 
 /** Translates constraint violations raised inside a solve transaction into API errors. */
 function mapPgError(err: unknown): never {
@@ -19,7 +19,8 @@ function mapPgError(err: unknown): never {
 }
 
 /**
- * Records the official attempt of a daily solve (one per user/date/event/index, kept as submitted).
+ * Records the official attempt of a daily solve (one per user/date/event/index). Its time is kept
+ * as submitted; its penalty follows the solve while the day is open (repenaliseDailyAttempt).
  * An index that was used before stays used even if its solve was deleted since -> 409, so a known
  * scramble can't be redone; only the same solve id (a retry) may hold it again. Returns true for a
  * new attempt.
@@ -41,11 +42,18 @@ async function recordDailyAttempt(client: PoolClient, user: AuthUser, row: Solve
 }
 
 /**
- * After a new daily attempt: if the user now has all 5 attempts for (date, event), queue
- * `daily.completed` with the official ao5 from the attempts as submitted (same transaction, so it
- * is emitted exactly once; later edits or deletes of the solves don't change it).
+ * If the user has all 5 attempts for (date, event), queues the official ao5 from the attempts (same
+ * transaction as the change, under the per-day advisory lock): `daily.completed` after the fifth
+ * attempt, so it is emitted exactly once, and `daily.updated` after a penalty change.
  */
-async function completeDailyIfDone(client: PoolClient, user: AuthUser, date: string, event: string, tz: string): Promise<void> {
+async function queueDailyResult(
+  client: PoolClient,
+  user: AuthUser,
+  date: string,
+  event: string,
+  tz: string,
+  type: 'daily.completed' | 'daily.updated',
+): Promise<void> {
   const { rows } = await client.query<{ time_ms: number; penalty: Penalty }>(
     `SELECT time_ms, penalty FROM solve.daily_attempts
       WHERE user_id = $1 AND daily_date = $2 AND event = $3 ORDER BY daily_index`,
@@ -53,7 +61,24 @@ async function completeDailyIfDone(client: PoolClient, user: AuthUser, date: str
   );
   if (rows.length < 5) return;
   const { ao5, times } = dailyResult(rows.map((r) => ({ timeMs: r.time_ms, penalty: r.penalty })));
-  await enqueue(client, 'daily.completed', { userId: user.id, username: user.username, date, event, ao5, times, tz });
+  await enqueue(client, type, { userId: user.id, username: user.username, date, event, ao5, times, tz });
+}
+
+/**
+ * A new penalty on a daily solve (ok / +2 / DNF marked after the solve) also changes its official
+ * attempt while that day's challenge is open, and a finished day's ao5 follows. After the day has
+ * closed, or if the solve isn't the attempt on record, the official result stays as it was.
+ */
+async function repenaliseDailyAttempt(client: PoolClient, user: AuthUser, row: SolveRow, tz: string): Promise<void> {
+  if (!row.daily_date || row.daily_index === null || !isDailyOpen(row.daily_date)) return;
+  // same lock as POST, so this can't interleave with the fifth attempt's completion check
+  await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`solve:daily:${user.id}:${row.daily_date}:${row.event}`]);
+  const upd = await client.query(
+    `UPDATE solve.daily_attempts SET penalty = $6
+      WHERE user_id = $1 AND daily_date = $2 AND event = $3 AND daily_index = $4 AND solve_id = $5 AND penalty <> $6`,
+    [user.id, row.daily_date, row.event, row.daily_index, row.id, row.penalty],
+  );
+  if (upd.rowCount) await queueDailyResult(client, user, row.daily_date, row.event, tz, 'daily.updated');
 }
 
 export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteContext): void {
@@ -114,7 +139,7 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
       await enqueue(client, 'solve.created', {
         ...solveEventPayload(user, row, tz, rolling), sessionName: session.rows[0].name, practice: session.rows[0].practice,
       });
-      if (daily && newAttempt) await completeDailyIfDone(client, user, daily.date, event, tz);
+      if (daily && newAttempt) await queueDailyResult(client, user, daily.date, event, tz, 'daily.completed');
       return { created: true, row, rolling };
     }).catch(mapPgError);
 
@@ -146,6 +171,7 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
       const row = upd.rows[0];
       const rolling = await sessionRolling(client, row.session_id);
       await enqueue(client, 'solve.updated', solveEventPayload(user, row, tz, rolling));
+      if (penalty !== before.penalty) await repenaliseDailyAttempt(client, user, row, tz);
       return { solve: toSolve(row), rolling };
     });
   });

@@ -73,3 +73,11 @@ export function formatPercent(p: number): string {
   if (p >= 99 || p < 1) return `${p.toFixed(2)}%`;
   return `${p.toFixed(1)}%`;
 }
+
+/**
+ * The "practice" marker to show after a practice session's name: empty when the name already says
+ * so (the default practice sessions are called "3x3 practice"), so it never reads "practice practice".
+ */
+export function practiceMarker(name: string | null | undefined, practice: boolean | undefined, marker: string): string {
+  return practice && !/\bpractice\b/i.test(name ?? '') ? marker : '';
+}

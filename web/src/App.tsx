@@ -15,9 +15,9 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const AccountPage = lazy(() => import('./pages/AccountPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const WcaPage = lazy(() => import('./pages/WcaPage'));
-const StatusPage = lazy(() => import('./pages/StatusPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
+const ResetPasswordPage = lazy(() => import('./pages/LoginPage').then((m) => ({ default: m.ResetPasswordPage })));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 const s = (el: JSX.Element) => <Suspense fallback={<Loading />}>{el}</Suspense>;
@@ -40,9 +40,9 @@ const router = createBrowserRouter([
           { path: '/account', element: s(<AccountPage />) },
           { path: '/settings', element: s(<SettingsPage />) },
           { path: '/wca', element: s(<WcaPage />) },
-          { path: '/status', element: s(<StatusPage />) },
           { path: '/about', element: s(<AboutPage />) },
           { path: '/login', element: s(<LoginPage />) },
+          { path: '/reset', element: s(<ResetPasswordPage />) },
           { path: '*', element: s(<NotFoundPage />) },
         ],
       },

@@ -85,6 +85,7 @@ console.log('\nsolves -> event bus -> stats & leaderboard:');
 const sessions = await req('GET', '/api/sessions');
 const session = sessions.data?.sessions?.[0];
 check('default session created', Boolean(session), session?.name);
+check('default practice session created', (sessions.data?.sessions ?? []).some((s) => s.practice === true && s.event === session?.event), (sessions.data?.sessions ?? []).filter((s) => s.practice).map((s) => s.name).join(', '));
 // Slow on purpose (about a minute each): a smoke run must not top the live leaderboards.
 const times = [61234, 60456, 62001, 59876, 60987, 61500];
 let lastRolling = null;

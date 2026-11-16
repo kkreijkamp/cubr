@@ -37,7 +37,7 @@ const FEATURES = [
   { icon: FlagIcon, t: 'live races', d: 'real-time multiplayer rooms over websockets - share a link and race any event.' },
   { icon: TrophyIcon, t: 'leaderboards', d: 'all-time, weekly and daily boards for every event, single, ao5 and ao12.' },
   { icon: GlobeAltIcon, t: 'wca comparison', d: 'see where your personal bests would rank among every official wca competitor.' },
-  { icon: SwatchIcon, t: 'themes & command line', d: `${THEMES.length} themes - monkeytype classics plus cube-inspired originals - with live preview. press esc and type - everything is a command.` },
+  { icon: SwatchIcon, t: 'themes & command line', d: `${THEMES.length} cube-inspired themes with live preview. press esc and type - everything is a command.` },
   { icon: SignalSlashIcon, t: 'offline first', d: 'guest mode works with no backend at all; sign in to sync solves to the cloud.' },
 ];
 
@@ -265,7 +265,7 @@ export default function AboutPage() {
             <a href="https://monkeytype.com" target="_blank" rel="noreferrer noopener">
               monkeytype
             </a>
-            <span className="d">by miodec - the design language, themes and command line this app borrows.</span>
+            <span className="d">by miodec - the design language and command line this app borrows.</span>
           </div>
           <div className="ab-credit">
             <a href="https://js.cubing.net/cubing/" target="_blank" rel="noreferrer noopener">

@@ -12,7 +12,6 @@ import {
   FlagIcon,
   GlobeAltIcon,
   InformationCircleIcon,
-  SignalIcon,
   SwatchIcon,
   TrophyIcon,
   UserIcon,
@@ -64,7 +63,6 @@ export function GlobalCommands() {
         { id: 'go-lb', label: 'Go to leaderboards', icon: <TrophyIcon />, run: go('/leaderboards') },
         { id: 'go-wca', label: 'Go to WCA rankings', icon: <GlobeAltIcon />, run: go('/wca') },
         { id: 'go-settings', label: 'Go to settings', icon: <Cog6ToothIcon />, run: go('/settings') },
-        { id: 'go-status', label: 'Go to cluster status', icon: <SignalIcon />, keywords: ['kubernetes', 'pods'], run: go('/status') },
         { id: 'go-about', label: 'Go to about', icon: <InformationCircleIcon />, run: go('/about') },
       ];
       const theme: Command = {
@@ -84,8 +82,8 @@ export function GlobalCommands() {
             id: `theme-${t.name}`,
             label: themeLabel(t.name),
             icon: <ThemeBubbles name={t.name} />,
-            // "theme light", "theme original" etc. narrow the list
-            keywords: [isLightTheme(t) ? 'light' : 'dark', ...(t.original ? ['cubr', 'original'] : ['monkeytype'])],
+            // "theme light" / "theme dark" narrow the list
+            keywords: [isLightTheme(t) ? 'light' : 'dark'],
             active: settings.theme === t.name,
             preview: () => applyTheme(t.name, false),
             run: () => updateSettings({ theme: t.name }),

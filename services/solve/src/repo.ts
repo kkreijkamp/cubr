@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { withTx, type AuthUser, type Pool, type PoolClient } from '@cubr/common';
 import { iso, type SessionRow, type SolveRow } from './mapping.js';
 import { effectiveOrNull, rollingFromSolves, ROLLING_WINDOW, type Rolling } from './rolling.js';
-import type { Penalty } from '@cubr/cubestats';
+import { defaultSessionName, practiceSessionName, type Penalty } from '@cubr/cubestats';
 
 // SQL shared by several routes. Every query is scoped by user_id: a user can never see or
 // touch another user's rows (foreign ids simply look like "not found").
@@ -24,20 +24,30 @@ export async function getSession(db: Db, userId: string, id: string): Promise<Se
   return rows[0] ?? null;
 }
 
-export const DEFAULT_SESSION = { name: '3x3', event: '333' } as const;
+const DEFAULT_EVENT = '333';
+/** A new account's sessions: "3x3" and its practice session "3x3 practice", in that order. */
+export const DEFAULT_SESSIONS = [
+  { name: defaultSessionName(DEFAULT_EVENT), event: DEFAULT_EVENT, practice: false },
+  { name: practiceSessionName(DEFAULT_EVENT), event: DEFAULT_EVENT, practice: true },
+] as const;
 
 /**
- * Creates the default "3x3" session for a user who has none. A per-user advisory lock makes
- * two concurrent first requests create exactly one session.
+ * Creates the default sessions (DEFAULT_SESSIONS) for a user who has none. The practice one is
+ * a millisecond younger, so lists ordered by created_at keep "3x3" first (it stays the session the
+ * timer opens). A per-user advisory lock makes concurrent first requests create exactly one pair.
  */
 export async function ensureDefaultSession(pool: Pool, userId: string): Promise<void> {
   await withTx(pool, async (client) => {
     await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`solve:sessions:${userId}`]);
     const { rowCount } = await client.query('SELECT 1 FROM solve.sessions WHERE user_id = $1 LIMIT 1', [userId]);
     if (rowCount) return;
-    await client.query('INSERT INTO solve.sessions (id, user_id, name, event) VALUES ($1, $2, $3, $4)', [
-      randomUUID(), userId, DEFAULT_SESSION.name, DEFAULT_SESSION.event,
-    ]);
+    const [normal, practice] = DEFAULT_SESSIONS;
+    await client.query(
+      `INSERT INTO solve.sessions (id, user_id, name, event, practice, created_at) VALUES
+         ($1, $2, $3, $4, $5, now()),
+         ($6, $2, $7, $8, $9, now() + interval '1 millisecond')`,
+      [randomUUID(), userId, normal.name, normal.event, normal.practice, randomUUID(), practice.name, practice.event, practice.practice],
+    );
   });
 }
 

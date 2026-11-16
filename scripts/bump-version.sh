@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # =============================================================================================
 # The release version of cubr, kept in step across every file that names it: the image tags
-# in the GKE overlays, VERSION in scripts/commands.sh, the defaults in cloudbuild.yaml and
-# scripts/build-push.sh, and the deployment table in deploy/README.md.
+# in the GKE overlays, VERSION in scripts/commands.sh, the default in cloudbuild.yaml, and the
+# deployment table in deploy/README.md.
 #
 #   scripts/bump-version.sh                   # next patch version, e.g. 1.0.2 -> 1.0.3
 #   scripts/bump-version.sh minor             # 1.0.2 -> 1.1.0   (major: 1.0.2 -> 2.0.0)
@@ -24,7 +24,6 @@ FILES=(
   deploy/k8s/overlays/gke/seed/kustomization.yaml
   scripts/commands.sh
   cloudbuild.yaml
-  scripts/build-push.sh
   deploy/README.md
 )
 
@@ -35,7 +34,6 @@ versions() {
     sed -n 's/^ *newTag: "\(.*\)"$/\1/p' deploy/k8s/overlays/gke/kustomization.yaml deploy/k8s/overlays/gke/seed/kustomization.yaml
     sed -n 's/^VERSION="\([^"]*\)".*/\1/p' scripts/commands.sh
     sed -n 's/^  _VERSION: \(.*\)$/\1/p' cloudbuild.yaml
-    sed -n 's/^VERSION="${VERSION:-\(.*\)}"$/\1/p' scripts/build-push.sh
     sed -n 's/.*`VERSION=\([0-9][^`]*\)`.*/\1/p' deploy/README.md
   } | sort -u
 }
@@ -83,8 +81,7 @@ next() {
   esac
 }
 
-# Rewrites version $1 to $2 in every place the files name it (the rollout demo's 1.1.0 and
-# 9.9.9-broken in scripts/commands.sh and deploy/README.md are left alone).
+# Rewrites version $1 to $2 in every place the files name it.
 write() {
   OLD="$1" NEW="$2" perl -pi -e '
     BEGIN { $o = quotemeta $ENV{OLD}; $n = $ENV{NEW} }

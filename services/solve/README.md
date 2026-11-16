@@ -31,7 +31,7 @@ events still waiting in the outbox (`src/purge.ts`).
 
 ## Events produced (stream `cubr:events`, `eventId = solve-<outboxId>`)
 `solve.created` (with `rolling` = session's current ao5/ao12 incl. this solve, `sessionName` and `practice`), `solve.updated`,
-`solve.deleted`, `session.deleted`, `session.renamed`, `session.updated`, `sessions.merged`, `solves.imported`, `daily.completed`. Each is inserted into `solve.outbox` **in the same
+`solve.deleted`, `session.deleted`, `session.renamed`, `session.updated`, `sessions.merged`, `solves.imported`, `daily.completed`, `daily.updated`. Each is inserted into `solve.outbox` **in the same
 transaction** as the data change. A relay loop in every replica claims up to 500 unpublished rows every 250 ms
 (`FOR UPDATE SKIP LOCKED`, so replicas never double-claim), XADDs each batch in id order, and marks the rows published.
 Published rows older than 1 day are deleted every 10 min.
@@ -50,11 +50,13 @@ at-least-once: consumers dedupe on `eventId`.
 ## Daily challenge
 `POST /api/solves` with `daily: {date, index 0..4}` -> `source: 'daily'`. Session event must be a daily event
 (`333 222 444 pyram skewb`); date must be UTC yesterday/today/tomorrow (i.e. "today" somewhere on Earth). Each attempt is
-also recorded in `solve.daily_attempts` exactly as submitted (one row per index, migration `002_daily_attempts`): an index
+also recorded in `solve.daily_attempts` (one row per index, migration `002_daily_attempts`): an index
 that was attempted before -> 409 `daily attempt already recorded`, even if its solve has been deleted since, so a known
 scramble can't be redone. When all 5 attempts exist, `daily.completed` (ao5 + times, computed from the attempts) is queued
-in the same transaction (advisory lock per user/date/event prevents a race). Deleting or re-penalising a daily solve later
-changes neither that result nor the ao5 reported by `GET /api/solves/daily`.
+in the same transaction (advisory lock per user/date/event prevents a race). A penalty marked after the solve (`PATCH`
+ok / +2 / DNF) also changes the attempt while the day is still open, and a finished day's ao5 is re-sent as
+`daily.updated`. Deleting a daily solve, or re-penalising it after the day has closed, changes neither the result nor the
+ao5 reported by `GET /api/solves/daily`.
 
 ## Choices worth knowing
 - `id` and `scramble`/`penalty` on `POST /api/solves` are optional (server generates the id; defaults `''`/`OK`). `source` may be

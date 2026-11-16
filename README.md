@@ -1,19 +1,17 @@
 # cubr
 
-**A cloud-native speedcubing timer, built as microservices on Google Kubernetes Engine.**
-
-INFS3208 Cloud Computing - Individual Project (Type I: scalable & available web application) - Koen Kreijkamp (s4890458)
+**A minimal, fast speedcubing timer, built as microservices. Live at [cubr.dev](https://cubr.dev).**
 
 | | |
 |---|---|
-| Proposal | submitted separately on Blackboard |
 | System spec (APIs, schemas, events) | [`docs/SPEC.md`](docs/SPEC.md) |
-| Deployment guide & demo runbook | [`deploy/README.md`](deploy/README.md) |
-| Every deploy/demo command, commented | [`scripts/commands.sh`](scripts/commands.sh) |
+| Production (one VM behind Cloudflare) | [`deploy/vps/README.md`](deploy/vps/README.md) |
+| Kubernetes (GKE) and local compose | [`deploy/README.md`](deploy/README.md) |
 
 ## What it does
 
-- **Timer** - WCA-compliant: hold-to-start (space or touch), 15 s inspection with 8/12 s alerts and automatic +2/DNF, penalties, sessions per event (create, rename, merge), manual entry, focus mode.
+- **Timer** - WCA-compliant: hold-to-start (space or touch), 15 s inspection with 8/12 s alerts and automatic +2/DNF, penalties, sessions per event (create, rename, merge, practice sessions that count for no PB or leaderboard), manual entry, focus mode, all of csTimer's keyboard shortcuts.
+- **Timer inputs** - keyboard and touch, smart cubes and timers over bluetooth, Stackmat through the audio input, and a virtual puzzle turned from the keyboard.
 - **Scrambles** - official random-state scrambles for all 16 WCA events (cubing.js), with 2D/3D previews.
 - **Statistics** - mo3/ao5/ao12/ao50/ao100/ao1000 (current & best, WCA trimming rules), mean, standard deviation, PB detection.
 - **Accounts & sync** - solves stored in the cloud with offline-tolerant optimistic sync; import and export compatible with csTimer and most others; settings follow you across devices; profile pictures.
@@ -22,11 +20,20 @@ INFS3208 Cloud Computing - Individual Project (Type I: scalable & available web 
 - **Race rooms** - real-time multiplayer rounds over WebSockets.
 - **Profiles & analytics** - PB cards, a solve history chart with rolling averages, activity heatmap, streaks, time-of-day performance.
 - **WCA comparison** - "where would I rank?" against ~2.3 M rows of official WCA data (rank, percentile, distribution).
-- **Cluster status page** - live view of which pod/version served each request: makes scaling, load balancing, self-healing and rolling updates visible during the demo.
-- 178 themes (168 Monkeytype palettes + 10 cube-inspired cubr originals) with search, light/dark
-  filters and random pick, command palette (`esc` / `ctrl+k`), keyboard-first UI.
+- 10 cube-inspired themes (white cross by default) with light/dark filters and random pick, command palette (`esc` / `ctrl+k`), keyboard-first UI.
 
 ## Architecture
+
+Production runs the whole stack with Docker Compose on one small VM, reached only through a
+Cloudflare Tunnel ([`deploy/vps/README.md`](deploy/vps/README.md)):
+
+```
+browser --HTTPS/WSS--> Cloudflare --tunnel--> cloudflared --> nginx gateway --> services
+                                              (one VM: Postgres + Redis + the services below)
+```
+
+The same images also run on Kubernetes when one VM is no longer enough
+([`deploy/k8s`](deploy/k8s), [`deploy/README.md`](deploy/README.md)):
 
 ```
 browser --HTTP/WS--> Google Cloud Load Balancer (GKE Ingress, path routing)
@@ -43,7 +50,6 @@ browser --HTTP/WS--> Google Cloud Load Balancer (GKE Ingress, path routing)
    +------------------------------------------------------------------------------------------+
 ```
 
-The Ingress serves plain HTTP on a reserved static IP. 
 
 | Service | Responsibility | Data |
 |---|---|---|
@@ -92,18 +98,29 @@ on every push, plus the service bundles, the web build and a render of every kus
 To run a single service on the host against the compose databases, see the header of
 [`docker-compose.yml`](docker-compose.yml).
 
-## Deploy to Kubernetes
+## Deploy
 
-- **GKE:** see [`deploy/README.md`](deploy/README.md) and run [`scripts/commands.sh`](scripts/commands.sh)
-  section by section (Artifact Registry + Cloud Build -> GKE cluster -> CloudNativePG -> kustomize
-  overlay -> data jobs -> demos for scaling, load balancing, reliability, rollout & rollback).
+- **Production:** releases are merged from `dev` to `main`, then `deploy/vps/release.sh` builds the
+  images from the release tag on Cloud Build and deploys them to the VM. Only tags on `main` are
+  accepted. See [`deploy/vps/README.md`](deploy/vps/README.md).
+- **Kubernetes (GKE):** see [`deploy/README.md`](deploy/README.md) and run
+  [`scripts/commands.sh`](scripts/commands.sh) section by section (Artifact Registry + Cloud Build ->
+  GKE cluster -> CloudNativePG -> kustomize overlay -> data jobs).
 
 ## Credits
 
-csTimer (inspiration for timer behaviour and statistics), Monkeytype (design language and theme
-palettes), cubing.js (scrambles and previews, MPL-2.0/GPL-3.0). This information is based on
-competition results owned and maintained by the World Cube Association, published at
-https://worldcubeassociation.org/results.
+- [csTimer](https://github.com/cs0x7f/cstimer) (GPL-3.0): timer behaviour and statistics. The smart
+  cube and bluetooth timer drivers, the cube model and the virtual puzzle in `web/src/input/` are
+  derived from csTimer's source.
+- [Monkeytype](https://github.com/monkeytypegame/monkeytype) (GPL-3.0): the design language.
+- [cubing.js](https://github.com/cubing/cubing.js) (MPL-2.0 or GPL-3.0): scrambles and previews.
+- This information is based on competition results owned and maintained by the World Cube
+  Association, published at https://worldcubeassociation.org/results.
 
-## AI USAGE
-Throughout the project, I used assistence from claude opus 4.8 (through claude code) in order to test, and to help generate test files, as well as assisting with deployment issues I faced. I also used claude to help come up with the initial design, and much of the architecture was influenced under claude's advice. That said, I oversaw all of claude's actions, and am confident in my understanding of everything produced.
+## License
+
+Copyright (C) 2026 Koen Kreijkamp
+
+cubr is free software: you can redistribute it and/or modify it under the terms of the GNU General
+Public License, version 3 ([`LICENSE`](LICENSE)). It comes with no warranty. GPL-3.0 matches the
+csTimer code it builds on.

@@ -1,4 +1,9 @@
 import type { Migration } from '@cubr/common';
+import { EVENTS, practiceSessionName } from '@cubr/cubestats';
+
+const sqlText = (s: string) => `'${s.replace(/'/g, "''")}'`;
+/** (event, practice session name) rows for migration 004, e.g. ('333', '3x3 practice') */
+const PRACTICE_NAMES = EVENTS.map((e) => `(${sqlText(e.id)}, ${sqlText(practiceSessionName(e.id))})`).join(',\n         ');
 
 // Schema `solve` exactly as in docs/SPEC.md section 7.2. `migrate()` creates the schema itself and
 // tracks applied ids in solve.schema_migrations (advisory-locked, safe with many replicas).
@@ -77,6 +82,22 @@ ON CONFLICT DO NOTHING;
 -- A practice session's solves count for no personal best and no leaderboard. The flag travels in
 -- solve.created and the internal solve list; changing it emits session.updated.
 ALTER TABLE solve.sessions ADD COLUMN practice boolean NOT NULL DEFAULT false;
+`,
+  },
+  {
+    id: '004_practice_session_per_event',
+    sql: `
+-- Every event a user has sessions for gets a practice session next to its default one
+-- ("3x3 practice"), as new accounts and newly opened events do from now on. Events that already
+-- have a practice session are left alone. Runs once, so a practice session deleted afterwards
+-- stays deleted. Session creation emits no event, so neither does this.
+INSERT INTO solve.sessions (id, user_id, name, event, practice, created_at, updated_at)
+SELECT gen_random_uuid(), u.user_id, coalesce(n.name, u.event || ' practice'), u.event, true, now(), now()
+  FROM (SELECT DISTINCT user_id, event FROM solve.sessions) u
+  LEFT JOIN (VALUES ${PRACTICE_NAMES}) AS n(event, name) ON n.event = u.event
+ WHERE NOT EXISTS (
+   SELECT 1 FROM solve.sessions p WHERE p.user_id = u.user_id AND p.event = u.event AND p.practice
+ );
 `,
   },
 ];

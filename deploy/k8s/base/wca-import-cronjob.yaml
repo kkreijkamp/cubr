@@ -13,7 +13,7 @@ metadata:
     app.kubernetes.io/part-of: cubr
 spec:
   schedule: "0 4 * * 1"                 # every Monday 04:00 (the WCA refreshes its export weekly)
-  timeZone: Australia/Brisbane          # interpret the schedule in local (UQ) time
+  timeZone: Australia/Brisbane          # interpret the schedule in local (Brisbane) time
   concurrencyPolicy: Forbid             # never run two imports at once (they share wca_staging)
   startingDeadlineSeconds: 3600         # if the controller missed the slot by > 1 h, skip it
   successfulJobsHistoryLimit: 3         # keep the last 3 finished Jobs for `kubectl logs`

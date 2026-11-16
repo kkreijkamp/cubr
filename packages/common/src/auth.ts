@@ -33,10 +33,15 @@ function key(secret: string): Uint8Array {
   return k;
 }
 
+/**
+ * `issuedAt` (unix seconds, default now) lets a token outlive a per-user revocation stored in the
+ * same second: a password reset revokes every older token and signs in with iat = revokedAt + 1.
+ */
 export async function signToken(
   secret: string,
   user: { id: string; username: string },
   ttlSec = TOKEN_TTL_SEC,
+  issuedAt?: number,
 ): Promise<{ token: string; jti: string; exp: number }> {
   const jti = randomUUID();
   const exp = Math.floor(Date.now() / 1000) + ttlSec;
@@ -45,7 +50,7 @@ export async function signToken(
     .setSubject(user.id)
     .setIssuer(ISSUER)
     .setJti(jti)
-    .setIssuedAt()
+    .setIssuedAt(issuedAt)
     .setExpirationTime(exp)
     .sign(key(secret));
   return { token, jti, exp };

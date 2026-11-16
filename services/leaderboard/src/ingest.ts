@@ -30,7 +30,7 @@ import {
 // All writes are idempotent (exact set / keep-best), so at-least-once redelivery is harmless.
 // ---------------------------------------------------------------------------------------------
 
-export const CONSUMED_TYPES = ['pb.updated', 'solve.created', 'daily.completed', 'user.registered', 'user.updated', 'user.deleted'];
+export const CONSUMED_TYPES = ['pb.updated', 'solve.created', 'daily.completed', 'daily.updated', 'user.registered', 'user.updated', 'user.deleted'];
 
 /** A keep-best write (ZADD LT) to a period board. */
 export interface BestWrite {
@@ -42,7 +42,7 @@ export interface BestWrite {
   ttlSec: number;
 }
 
-/** An exact write (or removal when valueMs is null) to an all-time board. */
+/** An exact write (or removal when valueMs is null) to an all-time or daily-challenge board. */
 export interface PbWrite {
   board: string;
   event: string;
@@ -112,14 +112,22 @@ export function planSolveCreated(d: Data, nowMs = Date.now()): BestWrite[] {
   return out;
 }
 
-/** daily.completed -> daily-challenge ao5 board (DNF ao5 = -1 is skipped). Kept without TTL (history). */
-export function planDailyCompleted(d: Data, nowMs = Date.now()): BestWrite | null {
+/**
+ * daily.completed / daily.updated -> exact write to the daily-challenge ao5 board: the latest result
+ * wins (a penalty marked after the solve can make it worse), and a DNF ao5 (-1) removes the entry.
+ * Kept without TTL (history).
+ */
+export function planDailyResult(d: Data, nowMs = Date.now()): PbWrite | null {
   const event = String(d.event ?? '');
   const date = String(d.date ?? '');
-  const valueMs = positiveMs(d.ao5);
-  if (!hasBoards(event) || !isValidDay(date) || valueMs === null) return null;
-  const achievedAt = new Date(parseTime(d.occurredAt) ?? nowMs).toISOString();
-  return { board: challengeKey(date, event), event, kind: 'ao5', valueMs, achievedAt, ttlSec: 0 };
+  if (!hasBoards(event) || !isValidDay(date)) return null;
+  let valueMs: number | null = null;
+  if (d.ao5 !== -1 && d.ao5 !== null) {
+    valueMs = positiveMs(d.ao5);
+    if (valueMs === null) return null; // garbage value: ignore rather than delete
+  }
+  const occurredAtMs = parseTime(d.occurredAt) ?? nowMs;
+  return { board: challengeKey(date, event), event, kind: 'ao5', valueMs, achievedAt: new Date(occurredAtMs).toISOString(), occurredAtMs };
 }
 
 /** Only same-origin avatar paths from the auth service are stored (no arbitrary image URLs). */
@@ -225,8 +233,10 @@ export function makeHandler({ redis, floors, log }: IngestDeps) {
     }
 
     switch (evt.type) {
-      case 'pb.updated': {
-        const w = planPbUpdated(d);
+      case 'pb.updated':
+      case 'daily.completed':
+      case 'daily.updated': {
+        const w = evt.type === 'pb.updated' ? planPbUpdated(d) : planDailyResult(d);
         if (!w) return;
         if (w.valueMs !== null && !(await passesFloor(evt, { ...w, valueMs: w.valueMs }, flagged))) return;
         await redis.lbSetPb(w.board, atKey(w.board), tsKey(w.board), userId, w.valueMs ?? '', w.achievedAt, w.occurredAtMs);
@@ -235,11 +245,6 @@ export function makeHandler({ redis, floors, log }: IngestDeps) {
       case 'solve.created':
         for (const w of planSolveCreated(d)) await writeBest(evt, w, flagged);
         return;
-      case 'daily.completed': {
-        const w = planDailyCompleted(d);
-        if (w) await writeBest(evt, w, flagged);
-        return;
-      }
       default:
         return; // user.* - display info handled above
     }

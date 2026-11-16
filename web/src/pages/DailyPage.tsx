@@ -1,22 +1,24 @@
 // Daily challenge: 5 scrambles per event per UTC day, identical for everyone, ranked by ao5.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRightEndOnRectangleIcon, ArrowUturnLeftIcon, CalendarDaysIcon, SignalSlashIcon } from '@heroicons/react/24/outline';
+import { ArrowRightEndOnRectangleIcon, ArrowUturnLeftIcon, CalendarDaysIcon, ClockIcon, SignalSlashIcon } from '@heroicons/react/24/outline';
 import { averageOfN, DAILY_EVENTS, effectiveMs, formatSolve, formatTime, getEvent, type Penalty } from '@cubr/cubestats';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useSettings } from '../lib/settings';
-import { useRegisterCommands } from '../lib/commands';
+import { paletteStore, useRegisterCommands } from '../lib/commands';
 import { toast } from '../lib/toast';
 import { utcDateKey } from '../lib/format';
 import { useAsync } from '../lib/useAsync';
-import { addSolve, ensureSession, solveStore } from '../lib/solves';
+import { addSolve, ensureSession, setPenaltyIn, solveStore } from '../lib/solves';
 import { ErrorState, Loading, Spinner } from '../components/Spinner';
 import { TwistyPreview } from '../components/TwistyPreview';
-import { formatCountdown, useNow, useStoredState } from '../components/live/hooks';
+import { formatCountdown, isTypingTarget, useNow, useStoredState } from '../components/live/hooks';
 import { TimerArea, useLiveTimer } from '../components/live/LiveTimer';
 import { EventPicker, Notice, ScrambleText, Segmented } from '../components/live/ui';
 import { DailyBoard } from '../components/live/daily/DailyBoard';
+import { QuickActions } from '../components/timer/QuickActions';
+import { shortcutFor } from '../timer/shortcuts';
 import { uuid } from '../timer/storeUtils';
 import type { TimerResult } from '../timer/useTimerEngine';
 import '../components/live/live.css';
@@ -32,6 +34,9 @@ interface Attempt {
   /** saved = on the server; saving = in flight; failed = needs retry; practice = guest, local only */
   state: 'saved' | 'saving' | 'failed' | 'practice';
   error?: string;
+  /** the solve behind a signed-in attempt (penalties marked after the solve go to it) */
+  solveId?: string;
+  sessionId?: string;
 }
 
 type PracticeStore = Record<string, Attempt[]>;
@@ -74,20 +79,48 @@ async function directSessionId(event: string): Promise<string> {
   return s.id;
 }
 
-/** Submit through the solve store (optimistic + retry queue); fall back to the API directly. */
-async function submitDaily(event: string, date: string, index: number, r: TimerResult, scramble: string): Promise<void> {
+/**
+ * Submit through the solve store (optimistic + retry queue); fall back to the API directly. `id` is
+ * the solve's id on both paths, so a fallback after a store hiccup can't record it twice. Resolves
+ * with the session the attempt went into.
+ */
+async function submitDaily(event: string, date: string, index: number, r: TimerResult, scramble: string, id: string): Promise<string> {
   const body = { timeMs: r.timeMs, penalty: r.penalty, scramble, source: 'daily' as const, daily: { date, index } };
   if (solveStore.get().mode === 'cloud') {
     try {
       const session = await ensureSession(event, { counts: true });
-      await addSolve({ ...body, sessionId: session.id });
-      return;
+      await addSolve({ ...body, id, sessionId: session.id });
+      return session.id;
     } catch (e) {
       if (e instanceof ApiError) throw e; // a real server answer - don't double-submit
       // store not ready / not implemented -> direct API below
     }
   }
-  await api.solves.create({ id: uuid(), sessionId: await directSessionId(event), ...body });
+  const sessionId = await directSessionId(event);
+  await api.solves.create({ id, sessionId, ...body });
+  return sessionId;
+}
+
+/**
+ * A penalty marked after the solve. Through the solve store, which sends it after the attempt's own
+ * creation; the API directly as a fallback. While the day is open the server also changes the
+ * official attempt, and the board follows a finished day's new ao5.
+ */
+async function saveDailyPenalty(solveId: string, penalty: Penalty, sessionId?: string): Promise<void> {
+  if (solveStore.get().mode === 'cloud') {
+    try {
+      return await setPenaltyIn(solveId, penalty, sessionId);
+    } catch (e) {
+      if (e instanceof ApiError) throw e; // refused by the server (the store has said so)
+      // store not ready -> direct API below
+    }
+  }
+  try {
+    await api.solves.update(solveId, { penalty });
+  } catch (e) {
+    toast.error(`penalty not saved: ${(e as Error).message}`);
+    throw e;
+  }
 }
 
 function ao5Of(attempts: Attempt[]): number | null {
@@ -107,6 +140,11 @@ export default function DailyPage() {
   const [boardKey, setBoardKey] = useState(0);
   const [me, setMe] = useState<{ rank: number; valueMs: number; total: number } | null>(null);
   const [ranking, setRanking] = useState(false);
+  /** penalties marked after the solve on this page (solveId -> penalty), shown before the server confirms */
+  const [penalties, setPenalties] = useState<Record<string, Penalty>>({});
+  const penaltySeq = useRef(new Map<string, number>());
+  /** the attempt picked in the strip for a penalty (null = the latest) */
+  const [picked, setPicked] = useState<number | null>(null);
   const authed = status === 'authed' && !!user;
   const isToday = date === today;
   const key = `${date}|${event}`;
@@ -133,11 +171,15 @@ export default function DailyPage() {
     const server = progress.data?.events?.[event]?.solves ?? [];
     for (const s of server) {
       const idx = typeof s.dailyIndex === 'number' ? s.dailyIndex : null;
-      if (idx !== null && idx >= 0 && idx < ATTEMPTS && (s.dailyDate ?? date) === date) byIndex.set(idx, { index: idx, timeMs: s.timeMs, penalty: s.penalty, state: 'saved' });
+      if (idx !== null && idx >= 0 && idx < ATTEMPTS && (s.dailyDate ?? date) === date) {
+        byIndex.set(idx, { index: idx, timeMs: s.timeMs, penalty: s.penalty, state: 'saved', solveId: s.id, sessionId: s.sessionId });
+      }
     }
     for (const a of local[key] ?? []) if (!byIndex.has(a.index) || a.state !== 'saved') byIndex.set(a.index, byIndex.get(a.index)?.state === 'saved' ? byIndex.get(a.index)! : a);
-    return [...byIndex.values()].sort((a, b) => a.index - b.index);
-  }, [authed, practice, key, progress.data, event, date, local]);
+    return [...byIndex.values()]
+      .map((a) => (a.solveId && penalties[a.solveId] ? { ...a, penalty: penalties[a.solveId] } : a))
+      .sort((a, b) => a.index - b.index);
+  }, [authed, practice, key, progress.data, event, date, local, penalties]);
 
   const nextIndex = useMemo(() => {
     for (let i = 0; i < ATTEMPTS; i++) if (!attempts.some((a) => a.index === i)) return i;
@@ -152,18 +194,21 @@ export default function DailyPage() {
     setLocal((m) => ({ ...m, [k]: [...(m[k] ?? []).filter((x) => x.index !== a.index), a] }));
   }, []);
 
+  /** the board is updated asynchronously from the daily.completed / daily.updated event */
+  const rerank = useCallback(() => {
+    setRanking(true);
+    [1500, 4000, 9000].forEach((ms) => setTimeout(() => setBoardKey((x) => x + 1), ms));
+    setTimeout(() => setRanking(false), 10_000);
+  }, []);
+
   const send = useCallback(
-    (k: string, ev2: string, d: string, a: Attempt, scr2: string) => {
+    (k: string, ev2: string, d: string, attempt: Attempt, scr2: string) => {
+      const a = { ...attempt, solveId: attempt.solveId ?? uuid() };
       setLocalAttempt(k, { ...a, state: 'saving', error: undefined });
-      submitDaily(ev2, d, a.index, { timeMs: a.timeMs, penalty: a.penalty }, scr2)
-        .then(() => {
-          setLocalAttempt(k, { ...a, state: 'saved' });
-          if (a.index === ATTEMPTS - 1) {
-            // the board is updated asynchronously from the daily.completed event
-            setRanking(true);
-            [1500, 4000, 9000].forEach((ms) => setTimeout(() => setBoardKey((x) => x + 1), ms));
-            setTimeout(() => setRanking(false), 10_000);
-          }
+      submitDaily(ev2, d, a.index, { timeMs: a.timeMs, penalty: a.penalty }, scr2, a.solveId)
+        .then((sessionId) => {
+          setLocalAttempt(k, { ...a, state: 'saved', sessionId });
+          if (a.index === ATTEMPTS - 1) rerank();
         })
         .catch((e: Error) => {
           if (e instanceof ApiError && e.status === 409) {
@@ -177,12 +222,13 @@ export default function DailyPage() {
           toast.error(`attempt ${a.index + 1} not saved: ${e.message}`);
         });
     },
-    [setLocalAttempt, progress],
+    [setLocalAttempt, progress, rerank],
   );
 
   const onSolve = (r: TimerResult) => {
     if (nextIndex === null || !scramble) return;
-    const a: Attempt = { index: nextIndex, timeMs: r.timeMs, penalty: r.penalty, state: authed ? 'saving' : 'practice' };
+    setPicked(null);
+    const a: Attempt = { index: nextIndex, timeMs: r.timeMs, penalty: r.penalty, state: authed ? 'saving' : 'practice', ...(authed ? { solveId: uuid() } : {}) };
     if (!authed) {
       setPractice((p) => {
         const next = { ...p, [key]: [...(p[key] ?? []).filter((x) => x.index !== a.index), a] };
@@ -200,9 +246,63 @@ export default function DailyPage() {
     cancel();
     clearResult();
     setMe(null);
+    setPicked(null);
   }, [event, date, cancel, clearResult]);
 
   const retry = (a: Attempt) => scrambles && send(key, event, date, a, scrambles[a.index] ?? '');
+
+  // ---------------------------------------------------------------- penalty after the solve
+  const latest = attempts.length ? attempts[attempts.length - 1] : undefined;
+  /** the attempt the ok / +2 / dnf buttons act on: today's, the one picked in the strip or the latest */
+  const selected = isToday ? ((picked !== null ? attempts.find((a) => a.index === picked) : undefined) ?? latest) : undefined;
+
+  const changePenalty = (p: Penalty) => {
+    const a = selected;
+    if (!a || a.penalty === p) return;
+    if (!authed) {
+      setPractice((prev) => {
+        const next = { ...prev, [key]: (prev[key] ?? []).map((x) => (x.index === a.index ? { ...x, penalty: p } : x)) };
+        savePractice(next);
+        return next;
+      });
+      return;
+    }
+    if (a.state === 'failed' || !a.solveId) {
+      setLocalAttempt(key, { ...a, penalty: p }); // not on the server yet: the retry sends it
+      return;
+    }
+    const id = a.solveId;
+    const seq = (penaltySeq.current.get(id) ?? 0) + 1;
+    penaltySeq.current.set(id, seq);
+    setPenalties((m) => ({ ...m, [id]: p }));
+    const wasDone = done;
+    saveDailyPenalty(id, p, a.sessionId)
+      .then(() => {
+        if (penaltySeq.current.get(id) === seq && wasDone) rerank();
+      })
+      .catch(() => {
+        if (penaltySeq.current.get(id) !== seq) return;
+        setPenalties(({ [id]: _dropped, ...rest }) => rest);
+        progress.reload();
+      });
+  };
+  const changePenaltyRef = useRef(changePenalty);
+  changePenaltyRef.current = changePenalty;
+  const phaseRef = useRef(engine.state.phase);
+  phaseRef.current = engine.state.phase;
+
+  // ctrl+1 / ctrl+2 / ctrl+3 = ok / +2 / dnf, as on the timer page
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.repeat || paletteStore.get().open || document.querySelector('.modal-backdrop') || isTypingTarget(e.target)) return;
+      const action = shortcutFor(e);
+      if (action?.kind !== 'penalty' || (phaseRef.current !== 'idle' && phaseRef.current !== 'stopped')) return;
+      e.preventDefault();
+      changePenaltyRef.current(action.penalty);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const resetPractice = () => {
     setPractice((p) => {
@@ -223,8 +323,25 @@ export default function DailyPage() {
         icon: <CalendarDaysIcon />,
         children: () => DAILY_EVENTS.map((id) => ({ id: `daily-event-${id}`, label: getEvent(id)?.name ?? id, active: id === event, run: () => setEvent(id) })),
       },
+      ...(selected
+        ? [
+            {
+              id: 'daily-penalty',
+              label: `Penalty attempt ${selected.index + 1}...`,
+              icon: <ClockIcon />,
+              keywords: ['dnf', '+2', 'ok'],
+              children: () =>
+                (['OK', '+2', 'DNF'] as Penalty[]).map((p) => ({
+                  id: `daily-penalty-${p}`,
+                  label: p === 'OK' ? 'no penalty' : p,
+                  active: selected.penalty === p,
+                  run: () => changePenaltyRef.current(p),
+                })),
+            },
+          ]
+        : []),
     ],
-    [event],
+    [event, selected?.index, selected?.penalty],
   );
 
   // countdown to the next UTC midnight
@@ -284,13 +401,17 @@ export default function DailyPage() {
             </div>
           )}
 
-          <ol className="daily-strip fade-on-focus" aria-label="attempts">
+          <ol className={`daily-strip fade-on-focus${isToday ? ' pickable' : ''}`} aria-label="attempts">
             {Array.from({ length: ATTEMPTS }, (_, i) => {
               const a = attempts.find((x) => x.index === i);
               const current = isToday && i === nextIndex;
               const paren = done && (i === bestIdx || i === worstIdx);
               return (
-                <li key={i} className={`${current ? 'current' : ''}${a ? ' filled' : ''}${a?.state === 'failed' ? ' failed' : ''}`}>
+                <li
+                  key={i}
+                  className={`${current ? 'current' : ''}${a ? ' filled' : ''}${a?.state === 'failed' ? ' failed' : ''}${a && picked === i && isToday ? ' picked' : ''}`}
+                  onClick={a && isToday ? () => setPicked(i) : undefined}
+                >
                   <span className="n">{i + 1}</span>
                   <span className={`t${a?.penalty === 'DNF' ? ' dnf' : ''}`}>
                     {a ? (
@@ -336,6 +457,7 @@ export default function DailyPage() {
             )
           ) : done ? (
             <div className="daily-result">
+              {isToday && <QuickActions className="daily-quick" last={selected ?? null} onPenalty={changePenalty} label={`attempt ${(selected?.index ?? 0) + 1}`} />}
               <div className="stat lg">
                 <span className="label">ao5</span>
                 <span className="value">{formatTime(ao5, settings.precision)}</span>
@@ -385,7 +507,17 @@ export default function DailyPage() {
               <div className="fade-on-focus">
                 <ScrambleText scramble={scramble} event={event} />
               </div>
-              <TimerArea engine={engine} idleDim={!canStart} />
+              <TimerArea
+                engine={engine}
+                idleDim={!canStart}
+                result={engine.state.result && latest ? { timeMs: latest.timeMs, penalty: latest.penalty } : undefined}
+              />
+              <QuickActions
+                className="daily-quick fade-on-focus"
+                last={selected ?? null}
+                onPenalty={changePenalty}
+                label={`attempt ${(selected?.index ?? 0) + 1}`}
+              />
               <div className="live-keytips fade-on-focus">
                 {settings.inspection && ev.inspection ? (
                   <>

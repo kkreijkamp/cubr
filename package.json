@@ -1,6 +1,7 @@
 {
   "name": "cubr",
   "private": true,
+  "license": "GPL-3.0-only",
   "type": "module",
   "description": "cubr - a cloud-native speedcubing timer on Kubernetes",
   "workspaces": [

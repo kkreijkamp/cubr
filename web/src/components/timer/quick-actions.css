@@ -1,0 +1,20 @@
+/* the ok / +2 / dnf row (timer page, daily challenge) - imported by QuickActions.tsx */
+.tp-quick {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.95rem;
+}
+.tp-quick .btn-text {
+  padding: 0.45rem 0.7rem;
+}
+.tp-quick.hidden {
+  visibility: hidden;
+}
+.tp-quick-sep {
+  width: 0.2em;
+  height: 1.2em;
+  border-radius: 0.2em;
+  background: var(--sub-alt-color);
+  margin: 0 0.4rem;
+}

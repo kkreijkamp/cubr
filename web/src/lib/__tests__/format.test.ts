@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { formatDate, formatDateTime, formatNumber, timeAgo } from '../format';
+import { formatDate, formatDateTime, formatNumber, practiceMarker, timeAgo } from '../format';
 
 describe('timeAgo', () => {
   const now = new Date(2026, 9, 14, 12, 0, 0);
@@ -51,5 +51,16 @@ describe('formatNumber', () => {
     expect(formatNumber(12345)).toBe('12,345');
     expect(formatNumber(0)).toBe('0');
     expect(formatNumber(null)).toBe('-');
+  });
+});
+
+describe('practiceMarker', () => {
+  it('marks a practice session unless its name already says practice', () => {
+    expect(practiceMarker('slow solves', true, ' (practice)')).toBe(' (practice)');
+    expect(practiceMarker('3x3 practice', true, ' (practice)')).toBe('');
+    expect(practiceMarker('Practice runs', true, 'practice')).toBe('');
+    expect(practiceMarker('practiced', true, 'practice')).toBe('practice'); // whole word only
+    expect(practiceMarker('3x3', false, ' (practice)')).toBe('');
+    expect(practiceMarker(undefined, true, 'practice')).toBe('practice');
   });
 });

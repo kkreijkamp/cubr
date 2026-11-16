@@ -123,12 +123,15 @@ export function resolveCreatedAt(createdAt: string | undefined, now = Date.now()
 }
 
 /**
- * Daily-challenge attempts are only accepted for a day that is currently "today" somewhere on
- * Earth (UTC-12 ... UTC+14): UTC yesterday, today or tomorrow. Older/future days are rejected so
+ * A daily challenge is open while its day is "today" somewhere on Earth (UTC-12 ... UTC+14): UTC
+ * yesterday, today or tomorrow. Attempts, and penalty changes to them, are only accepted then, so
  * the challenge board stays honest.
  */
+export function isDailyOpen(date: string, now = Date.now()): boolean {
+  return [utcDay(now, -1), utcDay(now, 0), utcDay(now, 1)].includes(date);
+}
+
 export function assertDailyAllowed(date: string, event: string, now = Date.now()): void {
-  const allowed = [utcDay(now, -1), utcDay(now, 0), utcDay(now, 1)];
-  if (!allowed.includes(date)) throw badRequest('daily.date: daily challenge is only open for the current day');
+  if (!isDailyOpen(date, now)) throw badRequest('daily.date: daily challenge is only open for the current day');
   if (!DAILY_EVENTS.includes(event)) throw badRequest(`daily: event ${event} has no daily challenge`);
 }

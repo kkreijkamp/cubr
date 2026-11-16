@@ -5,7 +5,6 @@ import {
   BeakerIcon,
   CheckIcon,
   ChevronDownIcon,
-  CloudIcon,
   CommandLineIcon,
   ComputerDesktopIcon,
   EyeIcon,
@@ -18,7 +17,7 @@ import {
 import { EVENTS, getEvent, type EventInfo } from '@cubr/cubestats';
 import { INPUT_MODES, modeInfo, type InputMode } from '../../input/inputMode';
 import type { Session } from '../../lib/types';
-import { formatNumber } from '../../lib/format';
+import { formatNumber, practiceMarker } from '../../lib/format';
 
 /** Buttons on the timer page never take focus on click, so Space can't re-trigger them. */
 export const noFocus = { onMouseDown: (e: React.MouseEvent) => e.preventDefault() };
@@ -106,7 +105,6 @@ export function ConfigBar(p: Props) {
         </button>
         <InputMenu open={inputOpen} setOpen={setInputOpen} value={p.input} options={p.inputs} onChange={p.onInput} />
 
-        <div className="divider" />
         <SyncStatus mode={p.mode} pending={p.pending} syncError={p.syncError} />
       </div>
     </div>
@@ -235,7 +233,7 @@ function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, 
         onClick={() => setOpen(!open)}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={`session: ${current?.name ?? 'none'}${current?.practice ? ' (practice)' : ''}`}
+        aria-label={`session: ${current?.name ?? 'none'}${practiceMarker(current?.name, current?.practice, ' (practice)')}`}
         data-tip={current?.practice && !open ? PRACTICE_TIP : undefined}
         data-tip-pos="down"
         {...noFocus}
@@ -260,7 +258,7 @@ function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, 
                 <span className="tp-menu-check">{s.id === current?.id && <CheckIcon width={14} height={14} />}</span>
                 <span className="tp-menu-label">
                   {s.name}
-                  {s.practice && <span className="tp-menu-tag">practice</span>}
+                  {practiceMarker(s.name, s.practice, 'practice') && <span className="tp-menu-tag">practice</span>}
                 </span>
                 <span className="tp-menu-count">{formatNumber(s.solveCount)}</span>
               </button>
@@ -372,10 +370,13 @@ function InputMenu({ open, setOpen, value, options, onChange }: { open: boolean;
   );
 }
 
+/**
+ * Guest mode, unsynced solves or offline, with its own divider. A signed-in user whose solves are
+ * all saved sees nothing here.
+ */
 function SyncStatus({ mode, pending, syncError }: { mode: 'local' | 'cloud'; pending: number; syncError: string | null }) {
   let icon = <ComputerDesktopIcon width={14} height={14} />;
-  /** null = icon only (the calm "synced" state) */
-  let label: string | null = 'local';
+  let label = 'local';
   let tip = 'guest mode: solves are saved in this browser';
   let cls = '';
   if (mode === 'cloud') {
@@ -390,18 +391,19 @@ function SyncStatus({ mode, pending, syncError }: { mode: 'local' | 'cloud'; pen
       tip = `${syncError} - showing cached solves`;
       cls = ' warn';
     } else {
-      icon = <CloudIcon width={14} height={14} />;
-      label = null;
-      tip = 'all solves are saved to your account';
+      return null;
     }
   } else if (syncError) {
     cls = ' warn';
     tip = syncError;
   }
   return (
-    <span className={`tp-sync${cls}`} data-tip={tip} data-tip-pos="down" role="status" aria-label={tip}>
-      {icon}
-      {label && <span className="tp-hide-narrow">{label}</span>}
-    </span>
+    <>
+      <div className="divider" />
+      <span className={`tp-sync${cls}`} data-tip={tip} data-tip-pos="down" role="status" aria-label={tip}>
+        {icon}
+        <span className="tp-hide-narrow">{label}</span>
+      </span>
+    </>
   );
 }

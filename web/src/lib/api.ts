@@ -105,7 +105,7 @@ function transportError(err: unknown): unknown {
   return new ApiError(0, 'NETWORK', 'Network error - is the server reachable?');
 }
 
-/** Low-level request returning body + headers (used by the status page to show X-Served-By).
+/** Low-level request returning body + headers (X-Served-By says which replica answered).
  *  A `Blob` body is sent as raw bytes with the blob's own content type (avatar upload); anything
  *  else is sent as JSON. */
 export async function requestRaw<T>(
@@ -204,6 +204,11 @@ export const api = {
       request<{ token: string; user: PrivateUser }>('POST', '/api/auth/register', body),
     login: (body: { login: string; password: string }) => request<{ token: string; user: PrivateUser }>('POST', '/api/auth/login', body),
     logout: () => request<void>('POST', '/api/auth/logout'),
+    /** Always 202: the answer doesn't say whether an account uses the address. */
+    forgotPassword: (email: string) => request<{ ok: true }>('POST', '/api/auth/password/forgot', { email }),
+    /** Uses a reset link's token once; signs out every other session and returns a fresh one. */
+    resetPassword: (body: { token: string; password: string }) =>
+      request<{ token: string; user: PrivateUser }>('POST', '/api/auth/password/reset', body),
     me: (signal?: AbortSignal) => get<{ user: PrivateUser; settings: Record<string, unknown> }>('/api/auth/me', signal),
     updateMe: (body: Partial<Pick<PublicUser, 'displayName' | 'bio' | 'country' | 'wcaId'>>) =>
       request<{ user: PrivateUser }>('PATCH', '/api/auth/me', body),
@@ -303,18 +308,7 @@ export const api = {
     countries: (signal?: AbortSignal) =>
       get<{ countries: { id: string; iso2: string | null; name: string; continentId: string }[] }>('/api/wca/countries', signal),
   },
-  /** Service _info endpoints used by the status page (one per microservice). */
+  /** A service's _info endpoint (the footer shows the web app's version). */
   info: (path: string, timeoutMs = 2500) => requestRaw<ServiceInfo>('GET', path, undefined, { timeoutMs }),
 };
 
-/** The _info path of every service, in display order. */
-export const SERVICE_INFO_PATHS: { name: string; path: string }[] = [
-  { name: 'web', path: '/_info' },
-  { name: 'auth', path: '/api/auth/_info' },
-  { name: 'scramble', path: '/api/scrambles/_info' },
-  { name: 'solve', path: '/api/solves/_info' },
-  { name: 'stats', path: '/api/stats/_info' },
-  { name: 'leaderboard', path: '/api/leaderboards/_info' },
-  { name: 'race', path: '/api/race/_info' },
-  { name: 'wca', path: '/api/wca/_info' },
-];
