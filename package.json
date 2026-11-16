@@ -13,6 +13,7 @@
     "build:svc": "node scripts/build-service.mjs",
     "build:all": "for d in services/* jobs/seed; do node scripts/build-service.mjs $d || exit 1; done",
     "test": "vitest run",
+    "test:integration": "bash scripts/test-integration.sh",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
