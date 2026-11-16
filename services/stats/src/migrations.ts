@@ -115,4 +115,11 @@ CREATE TABLE stats.deleted_users (
 ALTER TABLE stats.sessions ADD COLUMN practice boolean NOT NULL DEFAULT false;
 `,
   },
+  {
+    // The site-wide "solves today" counts the ledger's solves made since UTC midnight (routes/global.ts).
+    id: '006_ledger_created_at',
+    sql: `
+CREATE INDEX solve_ledger_created_at ON stats.solve_ledger (created_at) WHERE NOT deleted;
+`,
+  },
 ];

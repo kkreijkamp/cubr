@@ -2,6 +2,7 @@ import { fetchJson, internalHeaders, type FetchOptions, type Redis } from '@cubr
 import type { FastifyBaseLogger } from 'fastify';
 import { isBelowFloor, type FloorSource } from './floors.js';
 import {
+  DELETED_USERS_KEY,
   KINDS,
   META_BUILT_KEY,
   REBUILD_LOCK_KEY,
@@ -92,6 +93,10 @@ export async function rebuildOnce(deps: RebuildDeps): Promise<{ entries: number;
     perKind.push([kind, res.pbs]);
   }
 
+  // Deleted accounts stay off the boards even if stats hasn't handled their user.deleted yet:
+  // their later events are ignored (ingest.ts), so a rebuilt entry would stay for good.
+  const deleted = new Set(await redis.smembers(DELETED_USERS_KEY));
+
   let entries = 0;
   let skipped = 0;
   let flagged = 0;
@@ -109,7 +114,7 @@ export async function rebuildOnce(deps: RebuildDeps): Promise<{ entries: number;
   for (const [kind, pbs] of perKind) {
     for (const pb of pbs) {
       const w = toBoardWrite(pb, kind);
-      if (!w) {
+      if (!w || deleted.has(pb.userId)) {
         skipped++;
         continue;
       }
