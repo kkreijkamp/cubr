@@ -79,6 +79,9 @@ and run the WCA import.
 - **Email DNS** (Cloudflare): `cubr.dev` MX to Google Workspace (`hello@cubr.dev`), SPF for Google,
   `_dmarc` (report-only for now), and Resend's records (`resend._domainkey`, `send` MX/TXT,
   `rsend` CNAME).
+- **Logs rotate.** Every container logs through `json-file` with at most 3 x 10 MB (`x-logging` in
+  `compose.prod.yml`), so the gateway's access log, which holds visitors' IPs, is overwritten as it
+  fills up. The privacy policy (`/privacy`) relies on this.
 - **Real client IPs.** Cloudflare sends the visitor's address in `CF-Connecting-IP`; the gateway
   (`deploy/gateway/nginx.conf`) uses it only for requests from Docker networks, so the per-IP rate
   limits (login 10/min, sign-up 20/h, race rooms 20/min) count visitors, not the tunnel.
