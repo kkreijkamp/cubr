@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowDownTrayIcon, ArrowUpRightIcon, ArrowUpTrayIcon, ArrowUturnLeftIcon, ArrowsRightLeftIcon, MagnifyingGlassIcon, PlayIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, ArrowPathIcon, ArrowUpRightIcon, ArrowUpTrayIcon, ArrowUturnLeftIcon, ArrowsRightLeftIcon, MagnifyingGlassIcon, PlayIcon } from '@heroicons/react/24/outline';
 import { CsTimerFormatError, EVENTS, parseTimerFile, toCsTimerExport, type TimerImport } from '@cubr/cubestats';
 import { Modal } from '../components/Modal';
 import { csTimerFileName, skippedNotes } from '../components/social/util';
@@ -12,6 +12,7 @@ import { ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { formatNumber } from '../lib/format';
 import { useKeyboardLayout } from '../lib/keyboardLayout';
+import { applyUpdate, checkForUpdate, installHint, promptInstall, usePwa } from '../lib/pwa';
 import { applyVisualSettings, DEFAULT_SETTINGS, FONTS, updateSettings, useSettings, type Settings } from '../lib/settings';
 import { SCHEMES, stickerColour, type Scheme } from '../lib/scrambleNet';
 import { clearLocalData, exportAll, forgetUser, importSessions, localDataSummary, useSolveState } from '../lib/solves';
@@ -30,6 +31,7 @@ const PANES = [
   { id: 'stats', label: 'stats' },
   { id: 'theme', label: 'theme' },
   { id: 'data', label: 'data' },
+  { id: 'app', label: 'app' },
   { id: 'shortcuts', label: 'shortcuts' },
   { id: 'danger', label: 'danger zone' },
 ] as const;
@@ -485,6 +487,10 @@ export default function SettingsPage() {
 
         <Pane id="data">
           <DataTools loggedIn={status === 'authed'} />
+        </Pane>
+
+        <Pane id="app">
+          <AppGroup />
         </Pane>
 
         <Pane id="shortcuts">
@@ -1070,6 +1076,56 @@ function ThemePicker({ current }: { current: string }) {
           ))}
         </div>
       )}
+    </Group>
+  );
+}
+
+/** The installable app (lib/pwa.ts): install it, whether it works offline here, and updates. */
+function AppGroup() {
+  const pwa = usePwa();
+  const [check, setCheck] = useState<'idle' | 'checking' | 'found' | 'none' | 'failed'>('idle');
+  const runCheck = async () => {
+    setCheck('checking');
+    setCheck(await checkForUpdate());
+  };
+  return (
+    <Group title="app">
+      <SettingRow
+        title="install"
+        description="Install cubr as an app: it gets its own window and an icon on your home screen, dock or start menu, and opens without the browser around it. Chrome, Edge and Safari can install it."
+      >
+        {pwa.standalone ? (
+          <span className="st-status main">installed - you're using the app</span>
+        ) : pwa.canInstall ? (
+          <button className="btn" onClick={() => void promptInstall()}>
+            <ArrowDownTrayIcon width={16} height={16} /> install cubr
+          </button>
+        ) : (
+          <span className="st-status">{installHint()}</span>
+        )}
+      </SettingRow>
+      <SettingRow
+        title="offline"
+        description="Once cubr is saved on this device, it opens and times without a connection: scrambles are made on the device, and solves in your account sync when you're back online. Leaderboards, races and profiles need a connection."
+      >
+        <span className={`st-status${pwa.offline === 'ready' ? ' main' : ''}`}>{{ ready: 'ready', saving: 'saving cubr...', off: 'not available in this browser' }[pwa.offline]}</span>
+      </SettingRow>
+      <SettingRow title="updates" description="New versions download in the background. A notice says when one is ready; it applies when you click the notice, or with the next link you follow.">
+        {pwa.update ? (
+          <button className="btn" onClick={() => applyUpdate()}>
+            <ArrowPathIcon width={16} height={16} /> reload to update
+          </button>
+        ) : (
+          <>
+            {check === 'none' && <span className="st-status">up to date</span>}
+            {check === 'found' && <span className="st-status">downloading...</span>}
+            {check === 'failed' && <span className="st-status error">couldn't check - offline?</span>}
+            <button className="btn" onClick={() => void runCheck()} disabled={pwa.offline === 'off' || check === 'checking'}>
+              <ArrowPathIcon width={16} height={16} /> {check === 'checking' ? 'checking...' : 'check now'}
+            </button>
+          </>
+        )}
+      </SettingRow>
     </Group>
   );
 }

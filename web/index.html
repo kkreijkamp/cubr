@@ -6,6 +6,13 @@
     <meta name="theme-color" content="#ffffff" />
     <meta name="description" content="cubr - a minimal, fast speedcubing timer with stats, leaderboards, daily challenges and live races." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- the installable app (PWA): public/manifest.webmanifest, the service worker is src/sw/ -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="cubr" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>cubr</title>
     <script>
       // Apply the saved theme before first paint to avoid a flash of the default theme.

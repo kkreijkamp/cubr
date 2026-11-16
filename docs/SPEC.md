@@ -532,10 +532,49 @@ UNAVAILABLE with message "WCA data not loaded yet".
 ## 10. Frontend (web) overview
 
 React SPA, routes: `/` timer, `/leaderboards`, `/daily`, `/race`, `/race/:roomId`,
-`/profile/:username`, `/account`, `/settings`, `/wca`, `/status`, `/about`, `/login`.
-Guest mode works fully offline in localStorage; logged-in users sync to solve-service with an
-optimistic local store + retry queue (idempotent ids). Monkeytype-style theme system via CSS
+`/profile/:username`, `/account`, `/settings`, `/wca`, `/about`, `/login`, `/reset`, `/terms`,
+`/privacy`. Guest mode works fully offline in localStorage; logged-in users sync to solve-service
+with an optimistic local store + retry queue (idempotent ids). Monkeytype-style theme system via CSS
 custom properties, command palette (Esc / Ctrl+K), focus mode while timing, toasts.
+
+### 10.1 Installable app and offline (PWA)
+
+- **Manifest** `web/public/manifest.webmanifest`: standalone display, white cross colours, icons
+  (any 192/512, maskable 192/512, monochrome 512), shortcuts (daily challenge, race, leaderboards),
+  wide and narrow screenshots for Chrome's install dialog, `launch_handler: focus-existing` (a
+  shortcut focuses the open window and `lib/pwa.ts` takes it to the shortcut's page). iOS:
+  `apple-touch-icon.png` (180 px, opaque) and the apple meta tags in `index.html`. The images are
+  drawn by `web/scripts/pwa-assets.mjs`.
+- **Service worker** `/sw.js`, from `web/src/sw/sw.ts`, built after the app by
+  `web/plugins/serviceWorker.ts`:
+  - It precaches the whole build (about 2.4 MB) except source maps, the `.woff` font fallbacks,
+    the icons and the screenshots, in the cache `cubr-app-<version>`. The version is a hash of the
+    cached files' names and contents, so a release that doesn't change the web app ships the same
+    `sw.js`, and browsers see no update.
+  - Requests (`web/src/sw/policy.ts`):
+    - navigations: the cached `index.html`;
+    - `/assets/*`: cache first;
+    - other same-origin GETs: network first, falling back to the cache;
+    - never touched: anything but GET, other origins, `/api/*`, `/internal/*`, `/socket.io`,
+      `/_info`, `/healthz`, `/readyz` and `/sw.js`.
+  - Installing copies unchanged hashed files from the previous version's cache. Activating keeps
+    the current and the previous cache (tabs still on the old version can load its chunks),
+    deletes older ones, and takes over open pages.
+  - An update waits. The page shows an "update ready" notice (`lib/pwa.ts`), and the update
+    applies when the notice is clicked or on the next click on a link inside the app (that page
+    then loads fresh); it never reloads by itself. Browsers check `sw.js` on every page load; the
+    app also checks when an installed app comes back to the front, and every 30 minutes.
+  - Kill switch: `VITE_SW=off` builds `src/sw/off.ts` as `sw.js`, which removes the worker and
+    its caches and reloads open pages, and an app that registers no worker.
+- **Offline**: the app opens without a connection. The timer uses scrambles made on the device;
+  signed-in users stay signed in as the cached user, and their writes wait in the retry queue.
+  Pages that need the server (leaderboards, races, profiles, WCA) show their error state. An
+  installed app asks for persistent storage, so the browser keeps guest solves when space runs low.
+- **Serving** (`web/nginx/default.conf.template`): `sw.js` and the manifest go out with
+  `Cache-Control: no-cache` (Cloudflare respects it), the manifest as `application/manifest+json`,
+  and a missing icon is a 404.
+- **Settings > app**: the install button (or how to install on Safari and Firefox), whether the
+  app works offline yet, and "check now" for updates. The command palette has the same actions.
 
 ## 11. Kubernetes overview (deploy/k8s)
 

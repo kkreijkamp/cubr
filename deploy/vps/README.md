@@ -50,6 +50,23 @@ The gateway is also on the VM's `127.0.0.1:8080`, so `curl http://127.0.0.1:8080
 works over SSH. Docker restarts crashed containers and starts the stack on boot
 (`restart: unless-stopped`).
 
+## The offline app (service worker)
+
+cubr installs as an app and works offline: a service worker (`web/src/sw/`, docs/SPEC.md 10.1)
+caches the web app in each visitor's browser. What that means for releases:
+
+- **Browsers check `/sw.js` on every page load.** The web container sends it with
+  `Cache-Control: no-cache`, which Cloudflare respects. Check it with
+  `curl -sI https://cubr.dev/sw.js`.
+- **After a release that changes the web app,** open pages show "update ready". The new version
+  applies when the notice is clicked or on the next link click inside the app, never by itself.
+  A tab that's never reloaded keeps running the previous version, so **keep API changes backward
+  compatible for one release.**
+- **A release that doesn't change the web app** builds the same `sw.js`, so nobody sees a notice.
+- **Kill switch** (if the worker itself misbehaves): in `web/Dockerfile`, change
+  `ARG VITE_SW=on` to `off` and release. Each browser removes the worker and its caches on its
+  next visit and reloads from the network. Switch it back on in a later release.
+
 ## Backups and scheduled jobs
 
 systemd timers on the VM (installed by `deploy.sh`):

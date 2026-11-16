@@ -1,0 +1,12 @@
+// The service worker runs in a worker, not a page: it is type-checked with the WebWorker library
+// instead of the DOM one (npm run typecheck runs this config after the main one).
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "WebWorker"],
+    "types": []
+  },
+  "include": ["./sw.ts", "./off.ts", "./policy.ts"],
+  // the main config leaves the worker files out: don't inherit that
+  "exclude": []
+}

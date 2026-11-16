@@ -15,6 +15,7 @@
 - **Scrambles** - official random-state scrambles for all 16 WCA events (cubing.js), with 2D/3D previews.
 - **Statistics** - mo3/ao5/ao12/ao50/ao100/ao1000 (current & best, WCA trimming rules), mean, standard deviation, PB detection.
 - **Accounts & sync** - solves stored in the cloud with offline-tolerant optimistic sync; import and export compatible with csTimer and most others; settings follow you across devices; profile pictures.
+- **Installable app (PWA)** - install it on phones and computers: its own window, a home screen or dock icon and app shortcuts. The timer opens and works offline, and new versions download in the background with an "update ready" notice.
 - **Leaderboards** - all-time / weekly / daily per event (single, ao5, ao12), WCA-record anti-cheat.
 - **Daily challenge** - everyone gets the same 5 scrambles each UTC day; one attempt per scramble, ranked by ao5.
 - **Race rooms** - real-time multiplayer rounds over WebSockets.

@@ -9,8 +9,14 @@ export function Toasts() {
     <div className="toasts" aria-live="polite">
       {toasts.map((t) => {
         const Icon = ICONS[t.type];
+        const activate = () => {
+          dismissToast(t.id);
+          t.onClick?.();
+        };
+        // a toast with an action (e.g. "update ready - click to reload") also works from the keyboard
+        const action = t.onClick ? { role: 'button', tabIndex: 0, onKeyDown: (e: React.KeyboardEvent) => e.key === 'Enter' && activate() } : {};
         return (
-          <div key={t.id} className={`toast ${t.type}${t.important ? ' important' : ''}`} onClick={() => dismissToast(t.id)}>
+          <div key={t.id} className={`toast ${t.type}${t.important ? ' important' : ''}`} onClick={activate} {...action}>
             <div className="title">
               <Icon width={14} height={14} /> {t.title}
             </div>

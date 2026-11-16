@@ -16,5 +16,7 @@
       "@cubr/cubestats": ["../packages/cubestats/src/index.ts"]
     }
   },
-  "include": ["src", "../packages/cubestats/src"]
+  "include": ["src", "../packages/cubestats/src"],
+  // the service worker has its own config (WebWorker types): src/sw/tsconfig.json
+  "exclude": ["src/sw/sw.ts", "src/sw/off.ts"]
 }

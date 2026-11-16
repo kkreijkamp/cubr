@@ -1,0 +1,50 @@
+{
+  "id": "/",
+  "name": "cubr",
+  "short_name": "cubr",
+  "description": "a minimal, fast speedcubing timer with stats, leaderboards, daily challenges and live races",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "categories": ["sports", "utilities"],
+  "launch_handler": { "client_mode": ["focus-existing", "auto"] },
+  "edge_side_panel": { "preferred_width": 480 },
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/icon-monochrome-512.png", "sizes": "512x512", "type": "image/png", "purpose": "monochrome" }
+  ],
+  "shortcuts": [
+    {
+      "name": "daily challenge",
+      "short_name": "daily",
+      "description": "today's five scrambles, the same for everyone",
+      "url": "/daily",
+      "icons": [{ "src": "/icons/shortcut-daily.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "race",
+      "description": "race other cubers live",
+      "url": "/race",
+      "icons": [{ "src": "/icons/shortcut-race.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "leaderboards",
+      "description": "the fastest times in every event",
+      "url": "/leaderboards",
+      "icons": [{ "src": "/icons/shortcut-leaderboards.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ],
+  "screenshots": [
+    { "src": "/screenshots/timer-wide.png", "sizes": "1280x800", "type": "image/png", "form_factor": "wide", "label": "the timer with its stats, scramble preview and solves" },
+    { "src": "/screenshots/timer-wide-dark.png", "sizes": "1280x800", "type": "image/png", "form_factor": "wide", "label": "the timer in a dark theme with the 3D scramble preview" },
+    { "src": "/screenshots/timer-narrow.png", "sizes": "780x1688", "type": "image/png", "form_factor": "narrow", "label": "the timer on a phone" },
+    { "src": "/screenshots/timer-narrow-dark.png", "sizes": "780x1688", "type": "image/png", "form_factor": "narrow", "label": "the timer on a phone, in a dark theme" }
+  ]
+}
