@@ -245,6 +245,24 @@ describeIntegration('leaderboard Redis scripts and rebuild', () => {
       );
     });
 
+    it("puts a refused PB on the flagged hash and, with stats' all-time bests, the person's real best on the board", async () => {
+      const cy = randomUUID();
+      const fetcher = statsPbs({ single: [row(cy, 'cy', '444', 'single', 1_000, '2026-10-03T00:00:00.000Z')] });
+      const allTime = vi.fn(async () => ({ single: { valueMs: 45_000, achievedAt: '2026-10-04T00:00:00.000Z' }, flagged: { single: { valueMs: 1_000, achievedAt: '2026-10-03T00:00:00.000Z' } } }));
+      expect(await rebuildOnce({ ...deps(fetcher), periods: { bests: vi.fn(), allTime } })).toEqual({ entries: 0, skipped: 0, flagged: 1 });
+      expect(allTime).toHaveBeenCalledWith({ userId: cy, event: '444', minSingle: 11_300, minAverage: 13_900 });
+      const board = allTimeKey('444', 'single');
+      expect([await redis.zscore(board, cy), await redis.hget(atKey(board), cy)]).toEqual(['45000', '2026-10-04T00:00:00.000Z']);
+      expect(JSON.parse((await redis.hget(flaggedKey(board), cy))!)).toEqual({ valueMs: 1_000, floorMs: 11_300, achievedAt: '2026-10-03T00:00:00.000Z' });
+      // without stats' answer (down, say) the flag still goes on, and the next change brings the rest
+      await redis.flushdb();
+      const down = vi.fn(async () => {
+        throw new Error('stats down');
+      });
+      await rebuildOnce({ ...deps(fetcher), periods: { bests: vi.fn(), allTime: down } });
+      expect([await redis.zscore(board, cy), await redis.hexists(flaggedKey(board), cy)]).toEqual([null, 1]);
+    });
+
     it('lets a pb.updated that happened after the snapshot win, and overwrites older entries', async () => {
       const board = allTimeKey('555', 'ao5');
       const [newer, older] = [randomUUID(), randomUUID()];

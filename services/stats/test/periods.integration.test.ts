@@ -159,4 +159,27 @@ describeIntegration('stats day and week bests', () => {
       expect((await read(u, { event: '222', from: '2026-11-16T00:00:00.000Z' })).days['2026-11-16'].single.valueMs).toBe(4_000);
     });
   });
+  describe('GET /internal/users/:id/all-time-bests', () => {
+    it("answers the best real single, ao5 and ao12 of all time and the refused ones apart (Barry), practice left out", async () => {
+      const u = newCuber();
+      const session = s.solve.session(u, '333');
+      const taps = [648, 612, 418, 481, 239].map((t, i) => s.solve.solve(u, session, t, `2026-11-16T11:10:3${i}.000Z`));
+      const real = s.solve.solve(u, session, 17_382, '2026-11-16T11:18:07.253Z');
+      const practice = s.solve.session(u, '333', { practice: true });
+      await s.feed(...taps.map((x) => x.event), real.event, s.solve.solve(u, practice, 9_000, '2026-11-16T12:00:00.000Z').event);
+      const ask = (q: Record<string, string>, token: string | null = s.config.internalToken) =>
+        s.request('GET', `/internal/users/${u.id}/all-time-bests?${new URLSearchParams(q)}`, token === null ? {} : { headers: { 'x-internal-token': token } });
+      expect((await ask({ event: '333' }, null)).statusCode).toBe(403);
+      expect((await ask({ event: 'bogus' })).statusCode).toBe(400);
+      expect((await ask({ event: '333', minSingle: '2510', minAverage: '3510' })).json()).toEqual({
+        single: { valueMs: 17_382, achievedAt: real.solve.createdAt },
+        flagged: { single: { valueMs: 239, achievedAt: taps[4].solve.createdAt }, ao5: { valueMs: 504, achievedAt: taps[4].solve.createdAt } },
+      });
+      // without floors: the plain bests, the practice 9.000 still left out
+      expect((await ask({ event: '333' })).json()).toEqual({
+        single: { valueMs: 239, achievedAt: taps[4].solve.createdAt },
+        ao5: { valueMs: 504, achievedAt: taps[4].solve.createdAt },
+      });
+    });
+  });
 });

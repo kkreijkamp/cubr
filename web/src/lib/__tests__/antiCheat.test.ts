@@ -7,13 +7,13 @@ const at = new Date(2026, 10, 16, 12, 0, 0).toISOString();
 describe('missingNote (why you are not on a board)', () => {
   it('names your refused best, when you did it, the limit, and what to do (all-time)', () => {
     expect(missingNote({ valueMs: 174, floorMs: 2_510, achievedAt: at }, 'all', 'single', 3)).toBe(
-      "your best single, 0.174 on 16 Nov 2026, is faster than the world record, so it's left off as a likely mis-tap (times under 2.510 don't count). delete that solve, or mark its session as practice, and your next best counts.",
+      "your best single, 0.174 on 16 Nov 2026, is faster than the world record, so it's left off as a likely mis-tap (times under 2.510 don't count). time a real solve and it counts.",
     );
   });
 
   it('says average for an ao5, and rounds to the precision you use', () => {
     expect(missingNote({ valueMs: 504, floorMs: 3_510, achievedAt: at }, 'all', 'ao5', 2)).toBe(
-      "your best ao5, 0.50 on 16 Nov 2026, is faster than the world record average, so it's left off as a likely mis-tap (averages under 3.51 don't count). delete that solve, or mark its session as practice, and your next best counts.",
+      "your best ao5, 0.50 on 16 Nov 2026, is faster than the world record average, so it's left off as a likely mis-tap (averages under 3.51 don't count). an ao5 of real solves counts.",
     );
   });
 

@@ -1,6 +1,8 @@
 import { fetchJson, internalHeaders, type FetchOptions, type Redis } from '@cubr/common';
 import type { FastifyBaseLogger } from 'fastify';
 import { flagJson, isBelowFloor, type FloorSource } from './floors.js';
+import { applyAllTimeBests } from './ingest.js';
+import type { PeriodSource } from './periods.js';
 import {
   DELETED_USERS_KEY,
   KINDS,
@@ -57,6 +59,8 @@ export interface RebuildDeps {
   floors: FloorSource;
   log: FastifyBaseLogger;
   fetcher?: Fetcher;
+  /** stats' all-time bests above the floors, for people whose PB is refused (their real solves rank) */
+  periods?: PeriodSource;
 }
 
 /** Validates one PB row from stats and returns the board write, or null to skip it. */
@@ -101,6 +105,7 @@ export async function rebuildOnce(deps: RebuildDeps): Promise<{ entries: number;
   let entries = 0;
   let skipped = 0;
   let flagged = 0;
+  const refused = new Set<string>();
   let pipe = redis.pipeline();
   let queued = 0;
   const flush = async () => {
@@ -123,7 +128,10 @@ export async function rebuildOnce(deps: RebuildDeps): Promise<{ entries: number;
       // a refused PB goes back on the board's flagged hash only (so its owner learns why they
       // aren't listed); lb:flagged, the admin's list, got it when the event first arrived
       const flag = isBelowFloor(w.valueMs, floorMs) ? flagJson(w.valueMs, floorMs!, w.achievedAt) : '';
-      if (flag) flagged++;
+      if (flag) {
+        flagged++;
+        refused.add(`${pb.userId}|${pb.event}`);
+      }
       pipe.lbSetPb(w.board, atKey(w.board), tsKey(w.board), flaggedKey(w.board), pb.userId, w.valueMs, w.achievedAt, snapshotMs, flag);
       queued++;
       if (typeof pb.username === 'string' && pb.username) {
@@ -135,6 +143,19 @@ export async function rebuildOnce(deps: RebuildDeps): Promise<{ entries: number;
     }
   }
   await flush();
+  // people with a refused PB: their real solves rank (best effort; their next change retries it)
+  if (deps.periods) {
+    for (const key of refused) {
+      const [userId, event] = key.split('|');
+      try {
+        const [single, average] = await Promise.all([floors.floor(event, 'single'), floors.floor(event, 'ao5')]);
+        const bests = await deps.periods.allTime({ userId, event, minSingle: single ?? 0, minAverage: average ?? 0 });
+        await applyAllTimeBests(redis, userId, event, bests, { single, average }, snapshotMs);
+      } catch (err) {
+        deps.log.warn({ userId, event, err: (err as Error).message }, 'rebuild: best real values of a refused PB unavailable');
+      }
+    }
+  }
   return { entries, skipped, flagged };
 }
 

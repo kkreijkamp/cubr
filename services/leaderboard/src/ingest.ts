@@ -17,6 +17,7 @@ import {
   hasBoards,
   isKind,
   isValidDay,
+  KINDS,
   livePeriods,
   PERIOD_KINDS,
   purgePlan,
@@ -26,7 +27,7 @@ import {
   weeklyKey,
   type Kind,
 } from './keys.js';
-import type { PeriodBest, PeriodBests, PeriodSource } from './periods.js';
+import type { AllTimeBests, PeriodBest, PeriodBests, PeriodSource } from './periods.js';
 
 // ---------------------------------------------------------------------------------------------
 // Turns domain events (SPEC section 8) into board writes. The plan* functions are pure (unit-tested);
@@ -186,6 +187,29 @@ export function planUserInfo(type: string, d: Data): UserInfo | null {
   return info;
 }
 
+/**
+ * Sets a user's three all-time entries of an event to stats' best values above the floors (their
+ * real solves rank while their PB is an impossible time), and each refused best on the flagged
+ * hash, with the time guard of the exact writes. Shared by the event handler and the rebuild.
+ */
+export async function applyAllTimeBests(
+  redis: Redis,
+  userId: string,
+  event: string,
+  bests: AllTimeBests,
+  floorsMs: { single: number | null; average: number | null },
+  occurredAtMs: number,
+): Promise<void> {
+  for (const kind of KINDS) {
+    const board = allTimeKey(event, kind);
+    const b = bests[kind];
+    const f = bests.flagged?.[kind];
+    const floorMs = (kind === 'single' ? floorsMs.single : floorsMs.average) ?? 0;
+    const flag = f ? flagJson(f.valueMs, floorMs, f.achievedAt) : '';
+    await redis.lbSetPeriod(board, atKey(board), tsKey(board), flaggedKey(board), userId, b?.valueMs ?? '', b?.achievedAt ?? '', occurredAtMs, 0, flag);
+  }
+}
+
 export interface IngestDeps {
   redis: Redis;
   floors: FloorSource;
@@ -237,6 +261,24 @@ export function makeHandler({ redis, floors, log, periods }: IngestDeps) {
       return;
     }
     await redis.lbBest(w.board, atKey(w.board), tsKey(w.board), w.valueMs, userId, w.achievedAt, w.ttlSec, occurredAtMs);
+  }
+
+  /**
+   * A refused PB hides nothing real: the user's all-time entries become stats' best values above the
+   * floors. Asked when a PB is refused, and after every change of their solves while one stands,
+   * since a real solve slower than an impossible PB is no new PB (no pb.updated would come).
+   */
+  async function refreshAllTime(userId: string, event: string, occurredAtMs: number) {
+    if (!periods || !hasBoards(event)) return;
+    const [single, average] = await Promise.all([floors.floor(event, 'single'), floors.floor(event, 'ao5')]);
+    const bests = await periods.allTime({ userId, event, minSingle: single ?? 0, minAverage: average ?? 0 });
+    await applyAllTimeBests(redis, userId, event, bests, { single, average }, occurredAtMs);
+  }
+
+  /** Whether one of the user's all-time PBs of the event is refused (on a flagged hash). */
+  async function hasRefusedPb(userId: string, event: string): Promise<boolean> {
+    const found = await Promise.all(KINDS.map((k) => redis.hexists(flaggedKey(allTimeKey(event, k)), userId)));
+    return found.some((x) => x === 1);
   }
 
   /**
@@ -309,13 +351,19 @@ export function makeHandler({ redis, floors, log, periods }: IngestDeps) {
         const floorMs = w.valueMs === null ? null : await refusedBy(evt, { ...w, valueMs: w.valueMs }, flagged);
         const flag = floorMs === null || w.valueMs === null ? '' : flagJson(w.valueMs, floorMs, w.achievedAt);
         await redis.lbSetPb(w.board, atKey(w.board), tsKey(w.board), flaggedKey(w.board), userId, w.valueMs ?? '', w.achievedAt, w.occurredAtMs, flag);
+        // a refused all-time PB: the user's real solves rank instead (the daily challenge has one ao5 a day)
+        if (flag && evt.type === 'pb.updated') await refreshAllTime(userId, w.event, w.occurredAtMs);
         return;
       }
       case 'solve.created':
         for (const w of planSolveCreated(d)) await writeBest(evt, w, flagged);
         return;
-      case 'periods.changed':
-        return refreshPeriods(userId, d);
+      case 'periods.changed': {
+        await refreshPeriods(userId, d);
+        const event = String(d.event ?? '');
+        if (hasBoards(event) && (await hasRefusedPb(userId, event))) await refreshAllTime(userId, event, parseTime(d.occurredAt) ?? Date.now());
+        return;
+      }
       default:
         return; // user.* - display info handled above
     }

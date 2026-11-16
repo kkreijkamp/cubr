@@ -30,11 +30,46 @@ export interface PeriodQuery {
   minAverage: number;
 }
 
+/** A person's all-time best single / ao5 / ao12 above the floors, and the best ones below them. */
+export type AllTimeValues = { single?: PeriodBest; ao5?: PeriodBest; ao12?: PeriodBest };
+export type AllTimeBests = AllTimeValues & { flagged?: AllTimeValues };
+
 export interface PeriodSource {
   bests(q: PeriodQuery): Promise<PeriodBests>;
+  /** for the all-time boards while someone's PB is refused (GET /internal/users/:id/all-time-bests) */
+  allTime(q: Omit<PeriodQuery, 'from'>): Promise<AllTimeBests>;
 }
 
 type Fetcher = (url: string, opts?: FetchOptions) => Promise<unknown>;
+
+/** One {valueMs, achievedAt} or nothing; anything malformed throws. */
+function best(b: unknown, where: string): PeriodBest | undefined {
+  if (b === undefined || b === null) return undefined;
+  const v = b as { valueMs?: unknown; achievedAt?: unknown };
+  if (typeof v.valueMs !== 'number' || !Number.isInteger(v.valueMs) || v.valueMs <= 0 || typeof v.achievedAt !== 'string' || Number.isNaN(Date.parse(v.achievedAt))) {
+    throw new Error(`malformed best ${where}`);
+  }
+  return { valueMs: v.valueMs, achievedAt: v.achievedAt };
+}
+
+/** Reads stats' all-time answer; anything malformed throws (the event is retried, nothing is wiped). */
+export function parseAllTimeBests(json: unknown): AllTimeBests {
+  if (!json || typeof json !== 'object' || Array.isArray(json)) throw new Error('malformed all-time-bests response');
+  const values = (raw: unknown, where: string): AllTimeValues => {
+    const out: AllTimeValues = {};
+    if (raw === undefined || raw === null) return out;
+    if (typeof raw !== 'object' || Array.isArray(raw)) throw new Error(`malformed all-time-bests ${where}`);
+    for (const kind of ['single', 'ao5', 'ao12'] as const) {
+      const b = best((raw as Record<string, unknown>)[kind], `${where}.${kind}`);
+      if (b) out[kind] = b;
+    }
+    return out;
+  };
+  const out: AllTimeBests = values(json, 'body');
+  const flagged = values((json as Record<string, unknown>).flagged, 'flagged');
+  if (Object.keys(flagged).length) out.flagged = flagged;
+  return out;
+}
 
 /** Reads stats' answer; anything malformed throws (the event is retried, nothing is wiped). */
 export function parsePeriodBests(json: unknown): PeriodBests {
@@ -74,6 +109,11 @@ export function statsPeriodSource(statsUrl: string, internalToken: string, fetch
       const qs = new URLSearchParams({ event: q.event, from: q.from, minSingle: String(q.minSingle), minAverage: String(q.minAverage) });
       const url = `${statsUrl}/internal/users/${encodeURIComponent(q.userId)}/period-bests?${qs}`;
       return parsePeriodBests(await fetcher(url, { timeoutMs: 5000, retries: 1, headers: internalHeaders(internalToken) }));
+    },
+    async allTime(q) {
+      const qs = new URLSearchParams({ event: q.event, minSingle: String(q.minSingle), minAverage: String(q.minAverage) });
+      const url = `${statsUrl}/internal/users/${encodeURIComponent(q.userId)}/all-time-bests?${qs}`;
+      return parseAllTimeBests(await fetcher(url, { timeoutMs: 10_000, retries: 1, headers: internalHeaders(internalToken) }));
     },
   };
 }

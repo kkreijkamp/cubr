@@ -3,7 +3,7 @@ import { isEventId } from '@cubr/cubestats';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { PB_KINDS, type PbKind } from '../domain/pbs.js';
-import { periodBests, type PeriodSolve } from '../domain/periods.js';
+import { allTimeBests, periodBests, type PeriodSolve } from '../domain/periods.js';
 
 const internalPbsQuery = z.object({
   event: z.string().refine(isEventId, 'unknown event').optional(),
@@ -11,6 +11,11 @@ const internalPbsQuery = z.object({
 });
 
 const periodBestsParams = z.object({ userId: z.string().uuid() });
+const allTimeBestsQuery = z.object({
+  event: z.string().refine(isEventId, 'unknown event'),
+  minSingle: z.coerce.number().int().min(0).max(86_400_000).default(0),
+  minAverage: z.coerce.number().int().min(0).max(86_400_000).default(0),
+});
 const periodBestsQuery = z.object({
   event: z.string().refine(isEventId, 'unknown event'),
   /** solves from this moment on count (the leaderboard sends the Monday of its oldest live week) */
@@ -87,5 +92,28 @@ export async function registerInternalRoutes(app: FastifyInstance, pool: Pool, i
       rows.sort(order).map((r) => ({ effectiveMs: r.effective_ms, createdAt: r.created_at })),
     );
     return periodBests(sessions, since, { single: minSingle, average: minAverage });
+  });
+
+  // A person's all-time best single, ao5 and ao12 at or above the floors (non-practice sessions), for
+  // the leaderboard's all-time boards while their PB is an impossible time: it asks only for people
+  // with a refused PB, so this reads all their solves of the event.
+  app.get('/internal/users/:userId/all-time-bests', { preHandler: requireInternal(internalToken, app.log) }, async (req) => {
+    const { userId } = parse(periodBestsParams, req.params);
+    const { event, minSingle, minAverage } = parse(allTimeBestsQuery, req.query);
+    const { rows } = await pool.query<{ session_id: string; effective_ms: number | null; created_at: Date }>(
+      `SELECT l.session_id, l.effective_ms, l.created_at
+         FROM stats.solve_ledger l
+         LEFT JOIN stats.sessions s ON s.session_id = l.session_id
+        WHERE l.user_id = $1 AND l.event = $2 AND NOT l.deleted AND NOT coalesce(s.practice, false)
+        ORDER BY l.session_id, l.created_at, l.seq`,
+      [userId, event],
+    );
+    const sessions = new Map<string, PeriodSolve[]>();
+    for (const r of rows) {
+      const list = sessions.get(r.session_id) ?? [];
+      list.push({ effectiveMs: r.effective_ms, createdAt: r.created_at });
+      sessions.set(r.session_id, list);
+    }
+    return allTimeBests([...sessions.values()], { single: minSingle, average: minAverage });
   });
 }

@@ -9,7 +9,7 @@ import { PRIVATE_USERS_KEY, type EventEnvelope } from '@cubr/common';
 import { describeIntegration, startTestServer, type TestServer } from '@cubr/testkit';
 import { floorFor } from '../src/floors.js';
 import { makeHandler } from '../src/ingest.js';
-import type { PeriodBests, PeriodQuery } from '../src/periods.js';
+import type { AllTimeBests, PeriodBests, PeriodQuery } from '../src/periods.js';
 import { DELETED_USERS_KEY, FLAGGED_KEY, USERS_KEY, allTimeKey, atKey, challengeKey, dailyKey, flaggedKey, tsKey, weeklyKey } from '../src/keys.js';
 import { registerRoutes } from '../src/routes/index.js';
 import { defineScripts } from '../src/scripts.js';
@@ -415,8 +415,10 @@ describeIntegration('leaderboard API', () => {
   });
   describe('daily and weekly boards after an edit or a deletion (periods.changed)', () => {
     let answer: PeriodBests = { days: {}, weeks: {} };
+    let allTimeAnswer: AllTimeBests = {};
     let failing = false;
     const asked: PeriodQuery[] = [];
+    const askedAllTime: Omit<PeriodQuery, 'from'>[] = [];
     let withStats: (evt: EventEnvelope) => Promise<void>;
     beforeAll(() => {
       withStats = makeHandler({
@@ -428,6 +430,10 @@ describeIntegration('leaderboard API', () => {
             asked.push(q);
             if (failing) throw new Error('stats unavailable');
             return answer;
+          },
+          allTime: async (q) => {
+            askedAllTime.push(q);
+            return allTimeAnswer;
           },
         },
       });
@@ -462,6 +468,39 @@ describeIntegration('leaderboard API', () => {
         ]);
         expect((await board(`666/ao5?period=${period}`)).total).toBe(0);
       }
+    });
+
+    it('rank your real solves on the all-time boards while your PB is an impossible tap', async () => {
+      pinNow('2026-11-17T09:00:00Z');
+      const [barry, someone] = [newUser(), newUser()];
+      const token = await s.token(barry);
+      const tapAt = '2026-11-16T11:10:34.000Z';
+      // 16 November: guest taps came in at sign-up, so his PB is 0.174
+      allTimeAnswer = { flagged: { single: best(174, tapAt) } };
+      answer = { days: {}, weeks: {} };
+      await feedStats(pb(barry, 'pyram', 'single', 174, '2026-11-16T11:14:26.352Z'));
+      expect(await board('pyram/single', token)).toMatchObject({ me: null, flagged: { valueMs: 174, floorMs: 520, achievedAt: tapAt } });
+      expect(askedAllTime.at(-1)).toEqual({ userId: barry.id, event: 'pyram', minSingle: 520, minAverage: 750 });
+
+      // a real solve: no new PB (0.174 is still faster), but the change reaches the leaderboard
+      allTimeAnswer = { single: best(7_382, '2026-11-16T11:18:07.253Z'), flagged: { single: best(174, tapAt) } };
+      await feedStats(changed(barry, 'pyram', '2026-11-16T11:18:07.400Z'));
+      const ranked = await board('pyram/single', token);
+      expect(ranked.me).toMatchObject({ valueMs: 7_382 });
+      expect(ranked.flagged).toEqual({ valueMs: 174, floorMs: 520, achievedAt: tapAt }); // and the red line says why 0.174 isn't there
+      expect(rows(ranked).find(([id]) => id === barry.id)).toEqual([barry.id, 7_382, '2026-11-16T11:18:07.253Z']);
+      // ao5 and ao12 the same way: here he has a real ao5 and no ao12
+      allTimeAnswer = { ...allTimeAnswer, ao5: best(8_000, '2026-11-16T11:30:00.000Z') };
+      await feedStats(changed(barry, 'pyram', '2026-11-16T11:30:00.100Z'));
+      expect((await board('pyram/ao5', token)).me).toMatchObject({ valueMs: 8_000 });
+      expect((await board('pyram/ao12', token)).me).toBeNull();
+
+      // he deletes the taps: stats' PB is real again, and the note goes
+      await feedStats(pb(barry, 'pyram', 'single', 7_382, '2026-11-16T11:40:00.000Z'));
+      expect(await board('pyram/single', token)).toMatchObject({ me: { valueMs: 7_382 }, flagged: null });
+      const before = askedAllTime.length;
+      await feedStats(changed(barry, 'pyram', '2026-11-16T11:40:00.100Z'), changed(someone, 'pyram', '2026-11-16T11:41:00.000Z'));
+      expect(askedAllTime.length).toBe(before); // stats is asked only about people with a refused PB
     });
 
     it("keep the day's or week's refused time for its owner, and drop it once stats has none", async () => {

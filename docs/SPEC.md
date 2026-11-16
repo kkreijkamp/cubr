@@ -477,7 +477,8 @@ Published rows older than a day are deleted.
 | GET `/api/stats/global` | `{users, solves, totalMs, solvesToday, activeUsersToday}` ("today" = UTC day; cached 10 s) |
 | GET `/api/stats/_info` | info |
 | GET `/internal/pbs?event=&kind=` | `{pbs: [{userId, username, event, kind, valueMs, achievedAt}]}` |
-| GET `/internal/users/:userId/period-bests?event=&from=&minSingle=&minAverage=` | `{days: {"YYYY-MM-DD": {single?, ao5?}}, weeks: {"YYYY-Www": {single?, ao5?}}}`, each `{valueMs, achievedAt}`: the best single and rolling ao5 (within a session, ending at a solve done that UTC day / ISO week, `from` on) of the user's non-practice sessions, from the ledger; values below the floors (the leaderboard sends its anti-cheat floors) are left out, and the lowest of those come under `flagged: {single?, ao5?}` per day / week. Internal token. |
+| GET `/internal/users/:userId/all-time-bests?event=&minSingle=&minAverage=` | `{single?, ao5?, ao12?, flagged?: {single?, ao5?, ao12?}}`, each `{valueMs, achievedAt}`: the user's all-time best values that may rank (non-practice sessions; a single at or above `minSingle`, an average at or above `minAverage` with no single below `minSingle` in it), and the lowest ones that may not under `flagged`. For the leaderboard while a user's PB is refused. Internal token. |
+| GET `/internal/users/:userId/period-bests?event=&from=&minSingle=&minAverage=` | `{days: {"YYYY-MM-DD": {single?, ao5?}}, weeks: {"YYYY-Www": {single?, ao5?}}}`, each `{valueMs, achievedAt}`: the best single and rolling ao5 (within a session, ending at a solve done that UTC day / ISO week, `from` on) of the user's non-practice sessions, from the ledger; values below the floors (the leaderboard sends its anti-cheat floors), and averages containing a single below the single floor, are left out, and the lowest of those come under `flagged: {single?, ao5?}` per day / week. Internal token. |
 
 Streak = consecutive days (in the user's tz as bucketed) with >= 1 solve, ending today or yesterday.
 PB rules: single = best effective time; mo3/aoN = best rolling value within a single session
@@ -497,7 +498,11 @@ worsens or disappears).
 | GET `/api/leaderboards/users/:userId/ranks` | `{ranks: [{event, kind, period:"all", rank, total, valueMs}]}`; optional token, 403 for a private profile unless it's the owner's (the boards themselves still list them) |
 | GET `/api/leaderboards/_info` | info (+ consumer, rebuild and anti-cheat status) |
 
-Sources: all-time boards from `pb.updated` (ZADD exact value; ZREM when valueMs is null or -1).
+Sources: all-time boards from `pb.updated` (ZADD exact value; ZREM when valueMs is null or -1). A PB the
+anti-cheat refuses (an impossible time, usually a mis-tap) doesn't hide the user's real solves: the leaderboard
+asks stats for their best single / ao5 / ao12 above the floors (`GET stats /internal/users/:id/all-time-bests`)
+and ranks those, and asks again after every `periods.changed` while a refused PB stands (a real solve slower
+than the impossible PB is no new PB). An average containing an impossible single never ranks.
 Weekly/daily boards from `solve.created` (single = effectiveMs, ao5 = rolling.ao5, `ZADD LT`, skip DNF),
 bucketed by the UTC day / ISO week of `createdAt`. After `periods.changed` the user's entries on
 every live daily and weekly board (the UTC days of the last 3 days, the ISO weeks of the last 15) are

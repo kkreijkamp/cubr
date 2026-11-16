@@ -25,7 +25,8 @@ export function missingNote(f: FlaggedTime, period: BoardPeriod, kind: string, p
   const limit = `${average ? 'averages' : 'times'} under ${formatTime(f.floorMs, precision)} don't count`;
   if (period === 'challenge') return `your ao5, ${time}, is faster than ${record}, so it's left off as a likely mis-tap (${limit}).`;
   const which = period === 'daily' ? `your best ${kind} that day, ${time},` : `your best ${kind}${period === 'weekly' ? ' that week' : ''}, ${time}${onDate(f)},`;
-  const fix = period === 'all' ? ' delete that solve, or mark its session as practice, and your next best counts.' : '';
+  // all-time boards rank your best real time, so missing means there is none of this kind yet
+  const fix = period === 'all' ? (average ? ` an ${kind} of real solves counts.` : ' time a real solve and it counts.') : '';
   return `${which} is faster than ${record}, so it's left off as a likely mis-tap (${limit}).${fix}`;
 }
 

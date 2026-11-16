@@ -1,7 +1,7 @@
 // The day and week bests (src/domain/periods.ts), pure: UTC days and ISO weeks, ao5 windows that
 // reach back before `from`, DNFs, floors and ties.
 import { describe, expect, it } from 'vitest';
-import { periodBests, type PeriodSolve } from '../src/domain/periods.js';
+import { allTimeBests, periodBests, type PeriodSolve } from '../src/domain/periods.js';
 
 const solve = (effectiveMs: number | null, at: string): PeriodSolve => ({ effectiveMs, createdAt: new Date(at) });
 const since = new Date('2026-11-16T00:00:00.000Z');
@@ -47,5 +47,35 @@ describe('periodBests', () => {
 
   it('answers nothing for no solves', () => {
     expect(periodBests([], since)).toEqual({ days: {}, weeks: {} });
+  });
+});
+
+describe('allTimeBests (all-time boards while a PB is refused)', () => {
+  const taps = [648, 612, 418, 481, 239].map((t, i) => solve(t, `2026-11-16T11:10:3${i}.000Z`));
+  const floors = { single: 2_510, average: 3_510 };
+
+  it("ranks the real solves and reports the refused ones apart (Barry's 16 November); an ao5 with a tap in it never ranks", () => {
+    const r = allTimeBests([[...taps, solve(17_956, '2026-11-16T11:15:37.617Z'), solve(17_382, '2026-11-16T11:18:07.253Z')]], floors);
+    expect(r).toEqual({
+      single: { valueMs: 17_382, achievedAt: '2026-11-16T11:18:07.253Z' },
+      flagged: { single: { valueMs: 239, achievedAt: '2026-11-16T11:10:34.000Z' }, ao5: { valueMs: 504, achievedAt: '2026-11-16T11:10:34.000Z' } },
+    });
+  });
+
+  it('finds an ao5 and an ao12 of real solves in another session, and ignores DNFs', () => {
+    const real = Array.from({ length: 12 }, (_, i) => solve(i === 3 ? null : 20_000 + i * 100, `2026-11-17T10:${String(i).padStart(2, '0')}:00.000Z`));
+    const r = allTimeBests([taps, real], floors);
+    expect(r.single?.valueMs).toBe(20_000);
+    // one DNF in an average is trimmed as its worst time: 20.0 20.1 20.2 DNF 20.4 -> (20.1 + 20.2 + 20.4) / 3
+    expect(r.ao5).toEqual({ valueMs: 20_233, achievedAt: '2026-11-17T10:04:00.000Z' });
+    expect(r.ao12?.valueMs).toBe(20_630); // 20.1 ... 21.1 without 20.3 (the DNF), best and worst trimmed
+    expect(r.flagged?.single?.valueMs).toBe(239);
+  });
+
+  it('without floors: the plain bests, nothing flagged', () => {
+    expect(allTimeBests([taps], { single: 0, average: 0 })).toEqual({
+      single: { valueMs: 239, achievedAt: '2026-11-16T11:10:34.000Z' },
+      ao5: { valueMs: 504, achievedAt: '2026-11-16T11:10:34.000Z' },
+    });
   });
 });

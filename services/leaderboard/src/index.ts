@@ -34,6 +34,7 @@ const redis = createRedis(config.redisUrl, app.log);
 defineScripts(redis);
 const auth = makeAuth(config.jwtSecret, redis);
 const floors = new FloorProvider(config.urls.wca, config.internalToken, app.log);
+const periods = statsPeriodSource(config.urls.stats, config.internalToken);
 
 await registerRoutes(app, { redis, auth });
 
@@ -51,7 +52,7 @@ consumer = consumeEvents(redis, {
   group: 'leaderboard',
   consumer: config.podName,
   types: CONSUMED_TYPES,
-  handler: makeHandler({ redis, floors, log: app.log, periods: statsPeriodSource(config.urls.stats, config.internalToken) }),
+  handler: makeHandler({ redis, floors, log: app.log, periods }),
   log: app.log,
 });
 rebuild = startRebuildLoop({
@@ -61,4 +62,5 @@ rebuild = startRebuildLoop({
   podName: config.podName,
   floors,
   log: app.log,
+  periods,
 });

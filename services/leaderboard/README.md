@@ -24,6 +24,10 @@ penalty marked after the solve can make it worse, and a DNF ao5 removes the entr
 `username` -> `lb:users`;
 `user.deleted` -> the user leaves every board (SCAN `lb:*`: ZREM / HDEL `:at` `:ts`), `lb:users` and `lb:flagged`, and
 goes into `lb:deleted-users`, so later events for them are ignored.
+A refused all-time PB doesn't hide the user's real solves: on it, and after every `periods.changed` while one
+stands, the leaderboard reads their best single / ao5 / ao12 above the floors from stats
+(`GET /internal/users/:id/all-time-bests`) and sets their three all-time entries to those (`applyAllTimeBests`; the
+rebuild does the same for refused PBs). Only people with a refused PB cost that extra call.
 Score + achievedAt (`<board>:at` hash) are written atomically by small Lua scripts (`src/scripts.ts`).
 A value the anti-cheat refuses also goes on `<board>:flagged` (the user's lowest refused value on that board: JSON
 `{valueMs, floorMs, achievedAt}`), set and cleared with the user's entry by the same scripts and time guard: a valid
