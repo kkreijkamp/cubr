@@ -2,16 +2,17 @@
    Only the 10 theme tokens below are used for colour, so every theme "just works". */
 
 :root {
-  --bg-color: #323437;
-  --main-color: #e2b714;
-  --caret-color: #e2b714;
-  --sub-color: #646669;
-  --sub-alt-color: #2c2e31;
-  --text-color: #d1d0c5;
-  --error-color: #ca4754;
-  --error-extra-color: #7e2a33;
-  --colorful-error-color: #ca4754;
-  --colorful-error-extra-color: #7e2a33;
+  /* white_cross, the default theme (lib/themes.ts) */
+  --bg-color: #ffffff;
+  --main-color: #00a04d;
+  --caret-color: #0046ad;
+  --sub-color: #9a978d;
+  --sub-alt-color: #e3e1da;
+  --text-color: #20201e;
+  --error-color: #d0252f;
+  --error-extra-color: #8f1920;
+  --colorful-error-color: #ff6a13;
+  --colorful-error-extra-color: #b34507;
 
   --roundness: 0.5rem;
   --font: 'Lexend Deca', system-ui, sans-serif;

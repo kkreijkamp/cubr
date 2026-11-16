@@ -94,7 +94,7 @@ function PaletteInner({ initial }: { initial: string | null }) {
     return level.filter((c) => matches(c, query)).map((c) => ({ cmd: c, label: c.label }));
   }, [all, stack, query]);
 
-  // a sub-list opens on its current choice (e.g. the active theme of ~180), like Monkeytype
+  // a sub-list opens on its current choice (e.g. the active theme), like Monkeytype
   useEffect(() => {
     const current = stack.length && !query ? rows.findIndex((r) => r.cmd.active) : -1;
     restIndex.current = Math.max(0, current);

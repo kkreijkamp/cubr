@@ -94,7 +94,7 @@ describe('patchMeSchema', () => {
 
 describe('settingsSchema / jsonBytes', () => {
   it('accepts objects, rejects arrays and primitives', () => {
-    expect(settingsSchema.safeParse({ settings: { theme: 'serika' } }).success).toBe(true);
+    expect(settingsSchema.safeParse({ settings: { theme: 'white_cross' } }).success).toBe(true);
     expect(settingsSchema.safeParse({ settings: [1, 2] }).success).toBe(false);
     expect(settingsSchema.safeParse({ settings: 'x' }).success).toBe(false);
     expect(settingsSchema.safeParse({ settings: null }).success).toBe(false);

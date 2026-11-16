@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowDownTrayIcon, ArrowUpRightIcon, ArrowUpTrayIcon, ArrowUturnLeftIcon, ArrowsRightLeftIcon, CubeIcon, MagnifyingGlassIcon, PlayIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, ArrowUpRightIcon, ArrowUpTrayIcon, ArrowUturnLeftIcon, ArrowsRightLeftIcon, MagnifyingGlassIcon, PlayIcon } from '@heroicons/react/24/outline';
 import { CsTimerFormatError, EVENTS, parseTimerFile, toCsTimerExport, type TimerImport } from '@cubr/cubestats';
 import { Modal } from '../components/Modal';
 import { csTimerFileName, skippedNotes } from '../components/social/util';
@@ -971,13 +971,12 @@ function StickerColours({ custom }: { custom: Settings['customStickers'] }) {
   );
 }
 
-type ThemeFilter = 'all' | 'dark' | 'light' | 'originals';
+type ThemeFilter = 'all' | 'dark' | 'light';
 
 const THEME_FILTERS: { value: ThemeFilter; label: string; test: (t: Theme) => boolean }[] = [
   { value: 'all', label: 'all', test: () => true },
   { value: 'dark', label: 'dark', test: (t) => !isLightTheme(t) },
   { value: 'light', label: 'light', test: (t) => isLightTheme(t) },
-  { value: 'originals', label: 'originals', test: (t) => Boolean(t.original) },
 ];
 
 /** a theme in miniature: its background with its accent, sub and text colours as dots */
@@ -1024,10 +1023,7 @@ function ThemePicker({ current }: { current: string }) {
           <ThemeSwatch theme={now} big />
           <div className="st-theme-now-text">
             <span className="name">{themeLabel(now.name)}</span>
-            <span className="meta">
-              {isLightTheme(now) ? 'light' : 'dark'}
-              {now.original && ' - a cubr original'}
-            </span>
+            <span className="meta">{isLightTheme(now) ? 'light' : 'dark'}</span>
           </div>
           <button className="btn-text st-random" onClick={shuffle} data-tip="a random theme from the list below">
             <ArrowsRightLeftIcon width={16} height={16} /> random
@@ -1070,7 +1066,6 @@ function ThemePicker({ current }: { current: string }) {
             >
               <ThemeSwatch theme={t} />
               <span className="st-theme-name">{themeLabel(t.name)}</span>
-              {t.original && <CubeIcon width={12} height={12} className="st-theme-original" aria-label="cubr original" aria-hidden={false} />}
             </button>
           ))}
         </div>

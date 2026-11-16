@@ -22,7 +22,14 @@ describe('themes', () => {
     expect(new Set(names).size).toBe(names.length);
     for (const n of names) expect(n).toMatch(/^[a-z0-9_]+$/);
     expect(names).toContain(DEFAULT_THEME);
-    expect(THEMES.filter((t) => t.original).length).toBeGreaterThanOrEqual(10);
+    expect(names).toHaveLength(10);
+  });
+
+  it('defaults to white cross: pure white, a vivid green that stays readable on it', () => {
+    const t = getTheme(DEFAULT_THEME);
+    expect(t.name).toBe('white_cross');
+    expect(t.bg).toBe('#ffffff');
+    expect(contrast(t.main, t.bg)).toBeGreaterThanOrEqual(3);
   });
 
   it('uses #rrggbb everywhere (charts append an alpha byte)', () => {
@@ -30,10 +37,8 @@ describe('themes', () => {
   });
 
   it('keeps the timer readable (text vs background contrast)', () => {
-    // vaporwave keeps Monkeytype's pastel text on purpose (low contrast is part of its look)
-    for (const t of THEMES.filter((x) => x.name !== 'vaporwave')) expect(contrast(t.text, t.bg), t.name).toBeGreaterThanOrEqual(2.5);
-    // originals are ours, so hold them to WCAG AA for large text
-    for (const t of THEMES.filter((x) => x.original)) expect(contrast(t.text, t.bg), t.name).toBeGreaterThanOrEqual(4.5);
+    // WCAG AA for large text
+    for (const t of THEMES) expect(contrast(t.text, t.bg), t.name).toBeGreaterThanOrEqual(4.5);
   });
 
   it('falls back to the default theme for unknown names', () => {
@@ -41,14 +46,14 @@ describe('themes', () => {
   });
 
   it('classifies light and dark themes', () => {
-    expect(isLightTheme(getTheme('serika'))).toBe(true);
-    expect(isLightTheme(getTheme('serika_dark'))).toBe(false);
+    expect(isLightTheme(getTheme('white_cross'))).toBe(true);
+    expect(isLightTheme(getTheme('stickerless'))).toBe(false);
     expect(isLightTheme(getTheme('stackmat'))).toBe(true);
   });
 
   it('draws the favicon in the theme colours (the default theme gives public/favicon.svg)', () => {
     expect(faviconSvg(getTheme(DEFAULT_THEME))).toBe(shippedFavicon.trim());
-    const t = getTheme('8008');
+    const t = getTheme('pll_skip');
     const svg = faviconSvg(t);
     expect(svg).toContain(`<rect width="32" height="32" rx="5" fill="${t.bg}"/>`); // the theme's background fills the icon
     expect(svg).toContain(`<g fill="${t.main}">`);
@@ -58,8 +63,8 @@ describe('themes', () => {
 
   it('picks a different random theme of the requested kind', () => {
     for (let i = 0; i < 50; i++) {
-      const t = randomTheme('serika_dark', 'light');
-      expect(t.name).not.toBe('serika_dark');
+      const t = randomTheme('white_cross', 'light');
+      expect(t.name).not.toBe('white_cross');
       expect(isLightTheme(t)).toBe(true);
     }
   });

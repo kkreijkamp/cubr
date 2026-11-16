@@ -20,8 +20,7 @@
 - **Race rooms** - real-time multiplayer rounds over WebSockets.
 - **Profiles & analytics** - PB cards, a solve history chart with rolling averages, activity heatmap, streaks, time-of-day performance.
 - **WCA comparison** - "where would I rank?" against ~2.3 M rows of official WCA data (rank, percentile, distribution).
-- 178 themes (168 Monkeytype palettes + 10 cube-inspired cubr originals) with search, light/dark
-  filters and random pick, command palette (`esc` / `ctrl+k`), keyboard-first UI.
+- 10 cube-inspired themes (white cross by default) with light/dark filters and random pick, command palette (`esc` / `ctrl+k`), keyboard-first UI.
 
 ## Architecture
 
@@ -113,8 +112,7 @@ To run a single service on the host against the compose databases, see the heade
 - [csTimer](https://github.com/cs0x7f/cstimer) (GPL-3.0): timer behaviour and statistics. The smart
   cube and bluetooth timer drivers, the cube model and the virtual puzzle in `web/src/input/` are
   derived from csTimer's source.
-- [Monkeytype](https://github.com/monkeytypegame/monkeytype) (GPL-3.0): the design language and
-  the theme palettes.
+- [Monkeytype](https://github.com/monkeytypegame/monkeytype) (GPL-3.0): the design language.
 - [cubing.js](https://github.com/cubing/cubing.js) (MPL-2.0 or GPL-3.0): scrambles and previews.
 - This information is based on competition results owned and maintained by the World Cube
   Association, published at https://worldcubeassociation.org/results.
@@ -125,4 +123,4 @@ Copyright (C) 2026 Koen Kreijkamp
 
 cubr is free software: you can redistribute it and/or modify it under the terms of the GNU General
 Public License, version 3 ([`LICENSE`](LICENSE)). It comes with no warranty. GPL-3.0 matches the
-csTimer and Monkeytype code it builds on.
+csTimer code it builds on.
