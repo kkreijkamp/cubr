@@ -76,6 +76,10 @@ export function PrivacyPage() {
             <b>Emails</b> you send to <Mail />.
           </li>
           <li>
+            <b>Supporters:</b> if you support cubr on Ko-fi, Ko-fi tells us the kind of support, when, and your name if you made your
+            support public. We keep only that; not your email, message, amount or payment details.
+          </li>
+          <li>
             <b>Guests:</b> without an account, your solves and settings stay in your browser and never reach our servers, unless you
             sign in and choose to upload them.
           </li>
@@ -89,6 +93,7 @@ export function PrivacyPage() {
             With a public profile (the default), anyone can also see your display name, bio, country, WCA ID, statistics, solve history,
             activity and leaderboard ranks.
           </li>
+          <li>If you support cubr on Ko-fi and make your support public, your Ko-fi name appears on the about page.</li>
           <li>
             With a private profile, everyone else sees only your username and picture. Your times still appear on the leaderboards and the
             daily-challenge board under your username.
@@ -130,6 +135,9 @@ export function PrivacyPage() {
           <li>
             <b>Apple iCloud:</b> hosts our contact inbox, <Mail />.
           </li>
+          <li>
+            <b>Ko-fi:</b> takes donations. The payment itself is between you and Ko-fi, under Ko-fi&apos;s own terms and privacy policy.
+          </li>
         </ul>
         <p>Some of them are based in, or process data in, other countries, including the United States, under their own data processing terms.</p>
       </Section>
@@ -162,6 +170,7 @@ export function PrivacyPage() {
           </li>
           <li>Password-reset links work for 1 hour. Race chat is kept for 2 hours, and rate-limit counters for up to an hour.</li>
           <li>Server logs are rotated automatically and overwritten as they fill up.</li>
+          <li>Supporter entries: until you ask us to remove your name.</li>
           <li>
             Emails to <Mail />: as long as needed to deal with them.
           </li>

@@ -39,12 +39,8 @@ const FEATURES = [
   { icon: SignalSlashIcon, t: 'offline first', d: 'guest mode works with no backend at all; sign in to sync solves to the cloud.' },
 ];
 
-/**
- * Supporters. Fill in DONATE_URL once a donation page exists; SUPPORTERS is the hand-kept list of
- * people who chipped in, newest first, until it's fed automatically.
- */
-const DONATE_URL: string = '';
-const SUPPORTERS: { name: string; url?: string }[] = [];
+/** Where to donate. Supporters who make their support public are listed from the Ko-fi webhook. */
+const DONATE_URL = 'https://ko-fi.com/cubrr';
 
 // the everyday ones - csTimer's keys; settings > keyboard shortcuts lists them all
 const KEYS: [string[], string][] = [
@@ -119,6 +115,45 @@ function WcaCitation() {
   );
 }
 
+function Supporters() {
+  const list = useAsync((signal) => api.supporters.list(signal), []);
+  const names = list.data?.supporters ?? [];
+  return (
+    <section aria-labelledby="ab-supporters">
+      <h2 className="ab-h" id="ab-supporters">
+        <GiftIcon /> supporters
+      </h2>
+      <p className="ab-p">
+        cubr is free and has no ads. if you&apos;d like to help keep it running, donate on{' '}
+        <a href={DONATE_URL} target="_blank" rel="noreferrer noopener">
+          {DONATE_URL.replace(/^https?:[/][/]/, '')}
+        </a>
+        . make your support public there and your name shows up here.
+      </p>
+      {names.length > 0 ? (
+        <ul className="ab-supporters">
+          {names.map((s) => (
+            <li key={s.name}>
+              {s.name}
+              {s.member && (
+                <span className="pill" data-tip="a monthly ko-fi member">
+                  member
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        list.data && (
+          <p className="ab-p">
+            <span className="sub">no supporters yet - the first ones get their name here.</span>
+          </p>
+        )
+      )}
+    </section>
+  );
+}
+
 export default function AboutPage() {
   useEffect(() => {
     document.title = 'about | cubr';
@@ -179,41 +214,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section aria-labelledby="ab-supporters">
-        <h2 className="ab-h" id="ab-supporters">
-          <GiftIcon /> supporters
-        </h2>
-        <p className="ab-p">
-          cubr is free and has no ads. if you&apos;d like to help keep it running, donate to{' '}
-          {DONATE_URL ? (
-            <a href={DONATE_URL} target="_blank" rel="noreferrer noopener">
-              {DONATE_URL.replace(/^https?:\/\//, '')}
-            </a>
-          ) : (
-            '---'
-          )}
-          .
-        </p>
-        {SUPPORTERS.length > 0 ? (
-          <ul className="ab-supporters">
-            {SUPPORTERS.map((s) => (
-              <li key={s.name}>
-                {s.url ? (
-                  <a href={s.url} target="_blank" rel="noreferrer noopener">
-                    {s.name}
-                  </a>
-                ) : (
-                  s.name
-                )}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="ab-p">
-            <span className="sub">no supporters yet - the first ones get their name here.</span>
-          </p>
-        )}
-      </section>
+      <Supporters />
 
       <section aria-labelledby="ab-credits">
         <h2 className="ab-h" id="ab-credits">

@@ -74,7 +74,7 @@ logger (JSON to stdout). No pino transports (they break bundling).
 | Service | K8s/compose DNS name | Public route prefixes (Ingress) | Owns schema | Purpose |
 |---|---|---|---|---|
 | web | `web` | `/` | - | nginx serving the SPA |
-| auth | `auth` | `/api/auth`, `/api/users` | `auth` | accounts, JWT, settings, profiles, profile pictures |
+| auth | `auth` | `/api/auth`, `/api/users`, `/api/supporters` | `auth` | accounts, JWT, settings, profiles, profile pictures, Ko-fi supporters |
 | scramble | `scramble` | `/api/scrambles` | `scramble` | WCA random-state scrambles (CPU-bound, pooled in Redis), daily challenge |
 | solve | `solve` | `/api/sessions`, `/api/solves` | `solve` | sessions & solves CRUD, csTimer import/export, transactional outbox -> events |
 | stats | `stats` | `/api/stats` | `stats` | event-driven read model: PBs, activity heatmap, streaks, time-of-day, global stats |
@@ -180,6 +180,12 @@ CREATE TABLE auth.avatars (
 );
 -- password-reset links (migration 003): only the SHA-256 of the token; a row is deleted when used,
 -- together with every other row of the user
+-- Ko-fi supporters (migration 005): one row per Ko-fi message; hidden = removed from the about page by hand
+CREATE TABLE auth.supporters (
+  message_id text PRIMARY KEY, kind text NOT NULL, name text, is_public boolean NOT NULL,
+  is_subscription boolean NOT NULL DEFAULT false, tier text, received_at timestamptz NOT NULL,
+  hidden boolean NOT NULL DEFAULT false
+);
 CREATE TABLE auth.password_resets (
   token_hash bytea PRIMARY KEY,
   user_id    uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -361,7 +367,7 @@ type Solve = { id: string; sessionId: string; event: string; timeMs: number; pen
 type PB = { valueMs: number; solveId: string|null; achievedAt: string };
 ```
 
-### 9.1 auth (`/api/auth`, `/api/users`)
+### 9.1 auth (`/api/auth`, `/api/users`, `/api/supporters`)
 | Method & path | Auth | Body / query | Response |
 |---|---|---|---|
 | POST `/api/auth/register` | - | `{username, email, password}` | 201 `{token, user: PrivateUser}`; 409 CONFLICT (username/email taken); 429 after 20 registrations/h/IP |
@@ -378,6 +384,8 @@ type PB = { valueMs: number; solveId: string|null; achievedAt: string };
 | GET `/api/users/:idOrUsername/avatar` | - | `?v=` version | image bytes (immutable cache when `v` matches, ETag/304); 404 |
 | GET `/api/users/:username` | opt | - | `{user: PublicUser}` (`private: true` and only id, username, avatarUrl for a private profile unless the token is its owner's; displayName, bio, country, wcaId, createdAt null); 404 |
 | GET `/api/users?ids=a,b,c` | opt | <= 100 ids | `{users: PublicUser[]}` (private profiles as above) |
+| POST `/api/supporters/kofi` | Ko-fi verification token in the payload | form-encoded `data` = Ko-fi's payment JSON (body <= 64 KB) | 200 `{ok: true}` (a repeated `message_id` is ignored); 400 not Ko-fi JSON; 403 wrong token (constant-time check against `KOFI_VERIFICATION_TOKEN`); 503 token not configured; 60/min/IP. Stores only message_id, type, the name if `is_public`, subscription flag, tier and time - never email, amount, message or payment ids |
+| GET `/api/supporters` | - | - | `{supporters: [{name, member}]}`: public, not hidden, one per name (case-insensitive), most recent first, <= 200; member = a subscription payment in the last 35 days; cached 60 s |
 | GET `/api/auth/_info`, `/api/users/_info` | - | - | info |
 
 Rate limits are per client IP; callers that present `INTERNAL_API_TOKEN` (section 4) are exempt. Redis is

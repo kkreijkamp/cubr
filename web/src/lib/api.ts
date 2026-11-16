@@ -291,6 +291,10 @@ export const api = {
       get<Leaderboard>(`/api/leaderboards/daily-challenge${qs({ event, date, page: opts.page, size: opts.size })}`, signal),
     userRanks: (userId: string, signal?: AbortSignal) => get<{ ranks: UserRank[] }>(`/api/leaderboards/users/${enc(userId)}/ranks`, signal),
   },
+  supporters: {
+    /** public Ko-fi supporters, most recent first (member = a membership payment in the last 35 days) */
+    list: (signal?: AbortSignal) => get<{ supporters: { name: string; member: boolean }[] }>('/api/supporters', signal),
+  },
   race: {
     rooms: (signal?: AbortSignal) => get<{ rooms: RaceRoomSummary[] }>('/api/race/rooms', signal),
     createRoom: (body: { name: string; event: string; isPrivate?: boolean }) =>

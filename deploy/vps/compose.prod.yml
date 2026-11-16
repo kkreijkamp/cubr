@@ -50,6 +50,7 @@ services:
       <<: *prod-env
       PUBLIC_URL: https://cubr.dev
       RESEND_API_KEY: ${RESEND_API_KEY:-}   # unset -> password-reset emails are only logged
+      KOFI_VERIFICATION_TOKEN: ${KOFI_VERIFICATION_TOKEN:-}   # unset -> the Ko-fi webhook refuses everything
 
   scramble:
     logging: *logging

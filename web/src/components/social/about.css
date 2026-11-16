@@ -223,6 +223,8 @@
   list-style: none;
   font-size: 0.9rem;
 }
-.ab-supporters a {
-  color: var(--main-color);
+.ab-supporters li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }
