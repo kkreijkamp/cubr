@@ -169,6 +169,11 @@ and run the WCA import.
   (301): a proxied `AAAA www 100::` record (no origin) and a Redirect Rule (Rules > Redirect Rules,
   `http.host eq "www.cubr.dev"`). Its requests never reach the VM; the HTTPS certificate covers it as
   `*.cubr.dev`.
+- **Login flood guard** at Cloudflare's edge (Security > WAF > Rate limiting rules, the free plan's
+  one rule): more than 5 requests to `/api/auth/login` in 10 s from one IP (per Cloudflare data
+  centre) are blocked for 10 s with a JSON 429 in the app's error format ("Too many login attempts,
+  try again in a few seconds"). It stops bursts before they reach the VM; the auth service's own
+  limit (10 a minute per IP) still applies behind it.
 - **Logs rotate.** Every container logs through `json-file` with at most 3 x 10 MB (`x-logging` in
   `compose.prod.yml`), so the gateway's access log, which holds visitors' IPs, is overwritten as it
   fills up. The privacy policy (`/privacy`) relies on this.
