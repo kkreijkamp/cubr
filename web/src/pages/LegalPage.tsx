@@ -9,7 +9,7 @@ import { useCanonical } from '../lib/canonical';
 
 // when each page last changed
 const TERMS_EFFECTIVE = '16 November 2026';
-const PRIVACY_EFFECTIVE = '17 November 2026'; // sign-in with Google, Apple and GitHub; Cloudflare Web Analytics; error reports; email-change emails (set to the release's date)
+const PRIVACY_EFFECTIVE = '18 November 2026'; // v1.5.0: sign-in with Google, Apple and GitHub; Cloudflare Web Analytics; error reports; the emails that confirm an address
 const CONTACT = 'hello@cubr.dev';
 
 const Mail = () => <a href={`mailto:${CONTACT}`}>{CONTACT}</a>;
