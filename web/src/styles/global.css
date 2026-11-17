@@ -58,6 +58,9 @@ html {
   scrollbar-width: thin;
   scrollbar-color: var(--sub-color) transparent;
   -webkit-text-size-adjust: 100%;
+  /* no double-tap zoom on touch screens: two quick taps (+2 then dnf, two scrambles skipped) zoomed
+     the page. Pinching still zooms. */
+  touch-action: manipulation;
 }
 
 body {

@@ -628,7 +628,8 @@ export default function TimerPage() {
         )}
       </div>
 
-      <div className="tp-under fade-on-focus">
+      {/* on a touch screen the line under the time starts the timer too: a thumb aimed a little low lands here */}
+      <div className={`tp-under fade-on-focus${input === 'timer' ? ' tp-touch-start' : ''}`} {...(input === 'timer' ? engine.touchHandlers : {})}>
         {solves.length === 0 && input === 'timer' && st.ready ? (
           <div className="tp-hint">
             {touch ? (

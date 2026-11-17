@@ -84,7 +84,23 @@
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
   transition: opacity 0.25s;
+}
+/* touch screens: a long press around the timer (the scramble, the results) selected text when it was
+   meant to start the timer, as on the timer page (timer-page.css). Only what you type in is selectable. */
+@media (hover: none) and (pointer: coarse) {
+  .daily-main,
+  .race-main {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .daily-main :is(input, textarea),
+  .race-main :is(input, textarea) {
+    user-select: text;
+    -webkit-user-select: text;
+  }
 }
 .live-timer.dim .timer-display {
   color: var(--sub-color);

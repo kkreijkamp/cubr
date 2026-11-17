@@ -610,6 +610,14 @@ on a touch screen no longer leaves a button, row or link in its hover colour unt
 Selectors in the same list that don't use `:hover` (`.x:hover, .x.active`) stay for touch screens
 too. The profile's event donut previews an event under a mouse or keyboard focus only, not on a tap.
 
+On touch screens the timer pages (the timer, the daily challenge, a race) have no selectable text, so
+a long press meant to start the timer can't select the scramble or the averages; fields stay
+selectable, and the scramble has its copy button. The touch timer's surface takes in the line under
+the time (the hint, then the averages), where a thumb aimed a little low lands. A press on a button
+there (the last solve's +2 and dnf) is that button's, not a start (`useTimerEngine` skips controls).
+Double-tap zoom is off page-wide (`touch-action: manipulation`), so two quick taps don't zoom;
+pinch zoom still works.
+
 The screen stays on while timing (the Screen Wake Lock API, `web/src/lib/wakeLock.ts`, held by
 `TimerDisplay` for every input, races and the daily challenge included). It holds from the press,
 or the start of inspection, until five minutes after the solve stops: long enough to read the time
