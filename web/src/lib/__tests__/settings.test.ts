@@ -2,25 +2,36 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getTheme } from '../themes';
 import { MemoryStorage } from './memoryStorage';
 
-// settings.ts reads localStorage when it is imported, so each test loads a fresh copy of the module.
+// settings.ts reads localStorage (and the device's light or dark mode) when it is imported, so each test
+// loads a fresh copy of the module.
 
 const KEY = 'cubr.settings';
 let local: MemoryStorage;
 let css: Map<string, string>;
 let attrs: Map<string, string>;
+/** the device's mode, as matchMedia('(prefers-color-scheme: dark)') reports it; `switchTo` changes it */
+let device: EventTarget & { matches: boolean; media: string };
 
 function stubDom(): void {
   css = new Map();
   attrs = new Map();
   const style = { setProperty: (k: string, v: string) => void css.set(k, v), removeProperty: (k: string) => void css.delete(k) };
   const element = (name: string) => ({ setAttribute: (k: string, v: string) => void attrs.set(`${name}.${k}`, v) });
-  const meta = element('meta');
+  // index.html's two theme colours: the light-mode and the dark-mode one
+  const metas = [element('meta-light'), element('meta-dark')];
   const icon = element('icon');
   vi.stubGlobal('document', {
     documentElement: { style },
-    querySelector: (sel: string) => (sel.startsWith('meta') ? meta : sel.startsWith('link') ? icon : null),
+    querySelector: (sel: string) => (sel.startsWith('link') ? icon : null),
+    querySelectorAll: (sel: string) => (sel.startsWith('meta[name="theme-color"]') ? metas : []),
   });
-  vi.stubGlobal('window', new EventTarget());
+  device = Object.assign(new EventTarget(), { matches: false, media: '(prefers-color-scheme: dark)' });
+  vi.stubGlobal('window', Object.assign(new EventTarget(), { matchMedia: (q: string) => (q === device.media ? device : null) }));
+}
+
+function switchTo(mode: 'light' | 'dark'): void {
+  device.matches = mode === 'dark';
+  device.dispatchEvent(new Event('change'));
 }
 
 beforeEach(() => {
@@ -57,7 +68,42 @@ describe('loading saved settings', () => {
 
   it('keeps saved choices and gives settings added since then their default', async () => {
     const s = await load({ precision: 3, inspection: true, theme: 'stackmat', statsShown: ['ao5', 'ao50'], virtualSpeed: 0, smartScrambled: 'never' });
-    expect(s.get()).toEqual({ ...s.DEFAULT_SETTINGS, precision: 3, inspection: true, theme: 'stackmat', statsShown: ['ao5', 'ao50'], virtualSpeed: 0, smartScrambled: 'never' });
+    expect(s.get()).toEqual({
+      ...s.DEFAULT_SETTINGS,
+      precision: 3,
+      inspection: true,
+      theme: 'stackmat',
+      // a theme picked before the theme could follow the device stays put
+      autoSwitchTheme: false,
+      statsShown: ['ao5', 'ao50'],
+      virtualSpeed: 0,
+      smartScrambled: 'never',
+    });
+  });
+
+  it.each([
+    ['nothing saved', undefined, true],
+    ['other settings, the theme never touched', { precision: 3 }, true],
+    ['the default theme', { theme: 'white_cross' }, true],
+    ['a theme that no longer exists (so the default)', { theme: 'serika_dark' }, true],
+    ['a light theme someone picked', { theme: 'comp_day' }, false],
+    ['a dark theme someone picked', { theme: 'dnf' }, false],
+    ['white cross dark, picked', { theme: 'white_cross_dark' }, false],
+    ['following the device switched off', { theme: 'white_cross', autoSwitchTheme: false }, false],
+    ['following the device switched on', { theme: 'dnf', autoSwitchTheme: true }, true],
+  ])('follows the device by default, but not over an earlier pick: %s', async (_label, saved, follows) => {
+    expect((await load(saved)).get().autoSwitchTheme).toBe(follows);
+  });
+
+  it.each([
+    ['themeLight', 'comp_day', 'comp_day'],
+    ['themeLight', 'dnf', 'white_cross'], // a dark theme can't be the light one
+    ['themeLight', 'serika_dark', 'white_cross'],
+    ['themeDark', 'sub_10', 'sub_10'],
+    ['themeDark', 'white_cross', 'white_cross_dark'],
+    ['themeDark', 7, 'white_cross_dark'],
+  ])('keeps %s = %j only if it is a theme of that kind', async (key, value, expected) => {
+    expect((await load({ [key]: value })).get()).toMatchObject({ [key]: expected });
   });
 
   it.each([
@@ -158,15 +204,20 @@ describe('changing settings', () => {
   });
 
   it('applies a new theme or font to the page, and leaves the page alone for other settings', async () => {
-    const s = await load();
+    const s = await load({ autoSwitchTheme: false });
     s.updateSettings({ precision: 3 });
     expect(css.size).toBe(0);
     s.updateSettings({ theme: 'stackmat' });
     const stackmat = getTheme('stackmat');
     expect(css.get('--bg-color')).toBe(stackmat.bg);
     expect(css.get('--main-color')).toBe(stackmat.main);
-    expect(attrs.get('meta.content')).toBe(stackmat.bg);
-    expect(local.json(`cubr.themeColors`)).toMatchObject({ '--bg-color': stackmat.bg });
+    expect(css.get('color-scheme')).toBe('light');
+    // both of the browser's theme colours: the page's own colour, in light mode and in dark
+    expect(attrs.get('meta-light.content')).toBe(stackmat.bg);
+    expect(attrs.get('meta-dark.content')).toBe(stackmat.bg);
+    expect(local.json(`cubr.themeColors`)).toMatchObject({ '--bg-color': stackmat.bg, 'color-scheme': 'light' });
+    s.updateSettings({ theme: 'dnf' });
+    expect(css.get('color-scheme')).toBe('dark'); // dark scrollbars, dropdown lists and pickers
     s.updateSettings({ font: 'Comfortaa' });
     expect(css.get('--font')).toBe("'Comfortaa', system-ui, sans-serif");
     expect(css.get('--digit-width')).toBe('0.65em');
@@ -189,11 +240,30 @@ describe('server settings at sign-in', () => {
     const push = vi.fn(async () => ({}));
     s.setSettingsServerSync(push);
     s.mergeServerSettings({ precision: 2, theme: 'serika_dark', virtualSpeed: 7, timerSize: 9 });
-    expect(s.get()).toMatchObject({ precision: 2, theme: 'white_cross', virtualSpeed: 100, timerSize: 9, inspection: true });
+    expect(s.get()).toMatchObject({ precision: 2, theme: 'white_cross', autoSwitchTheme: true, virtualSpeed: 100, timerSize: 9, inspection: true });
     expect(local.json(KEY)).toMatchObject({ precision: 2, theme: 'white_cross', timerSize: 9 });
     expect(css.get('--bg-color')).toBe(getTheme('white_cross').bg);
     await vi.advanceTimersByTimeAsync(1000);
     expect(push).not.toHaveBeenCalled();
+  });
+
+  it("decide on following the device by the account's theme when they are from before it could", async () => {
+    // an account that picked a theme keeps it, even on a device that follows its mode
+    const s = await load();
+    switchTo('dark');
+    s.mergeServerSettings({ theme: 'comp_day', precision: 3 });
+    expect(s.get()).toMatchObject({ theme: 'comp_day', autoSwitchTheme: false });
+    expect(css.get('--bg-color')).toBe(getTheme('comp_day').bg);
+    // an account on the default theme follows the device, whatever this device had
+    const t = await load({ theme: 'dnf' });
+    t.mergeServerSettings({ theme: 'white_cross' });
+    expect(t.get()).toMatchObject({ theme: 'white_cross', autoSwitchTheme: true });
+    expect(css.get('--bg-color')).toBe(getTheme('white_cross_dark').bg);
+    // newer settings say so themselves
+    const u = await load();
+    u.mergeServerSettings({ theme: 'dnf', autoSwitchTheme: true, themeDark: 'sune' });
+    expect(u.get()).toMatchObject({ theme: 'dnf', autoSwitchTheme: true, themeDark: 'sune' });
+    expect(css.get('--bg-color')).toBe(getTheme('sune').bg);
   });
 
   it('change nothing when the account has no settings yet', async () => {
@@ -204,5 +274,78 @@ describe('server settings at sign-in', () => {
     s.mergeServerSettings(undefined);
     expect(s.get()).toBe(before);
     expect(css.size).toBe(0);
+  });
+});
+
+describe("following the device's light or dark mode", () => {
+  it('shows white cross in light mode and white cross dark in dark mode, switching with the device', async () => {
+    const s = await load();
+    s.applyVisualSettings();
+    expect(css.get('--bg-color')).toBe(getTheme('white_cross').bg);
+    expect(css.get('color-scheme')).toBe('light');
+    switchTo('dark');
+    expect(css.get('--bg-color')).toBe(getTheme('white_cross_dark').bg);
+    expect(css.get('--text-color')).toBe(getTheme('white_cross_dark').text);
+    expect(css.get('color-scheme')).toBe('dark');
+    expect(attrs.get('meta-light.content')).toBe(getTheme('white_cross_dark').bg);
+    switchTo('light');
+    expect(css.get('--bg-color')).toBe(getTheme('white_cross').bg);
+  });
+
+  it('opens in the mode the device is in', async () => {
+    device.matches = true;
+    const s = await load();
+    expect(s.activeTheme()).toBe('white_cross_dark');
+    s.applyVisualSettings();
+    expect(css.get('--bg-color')).toBe(getTheme('white_cross_dark').bg);
+  });
+
+  it('stores a light and a dark set of colours for the first paint while following, one set otherwise', async () => {
+    const s = await load();
+    s.applyVisualSettings();
+    const stored = local.json('cubr.themeColors') as { light: Record<string, string>; dark: Record<string, string> };
+    expect(stored.light).toMatchObject({ '--bg-color': '#ffffff', 'color-scheme': 'light' });
+    expect(stored.dark).toMatchObject({ '--bg-color': getTheme('white_cross_dark').bg, 'color-scheme': 'dark' });
+    s.setAutoSwitchTheme(false);
+    expect(local.json('cubr.themeColors')).toMatchObject({ '--bg-color': '#ffffff', 'color-scheme': 'light' });
+  });
+
+  it('leaves the page alone when the device switches while a theme is set on its own', async () => {
+    const s = await load({ theme: 'dnf' });
+    s.applyVisualSettings();
+    switchTo('dark');
+    switchTo('light');
+    expect(css.get('--bg-color')).toBe(getTheme('dnf').bg);
+  });
+
+  it('makes a picked theme the light or the dark one by its colours, or the theme when not following', async () => {
+    const s = await load();
+    s.applyVisualSettings();
+    // dark, while the device is light: saved for dark mode, the page stays light, and the caller hears so
+    expect(s.chooseTheme('sub_10')).toBe('dark');
+    expect(s.themeWaitsNote('sub_10', 'dark')).toBe('sub 10 is your dark theme now: it shows while your device is in dark mode');
+    expect(s.get()).toMatchObject({ themeLight: 'white_cross', themeDark: 'sub_10', theme: 'white_cross' });
+    expect(css.get('--bg-color')).toBe(getTheme('white_cross').bg);
+    expect(s.chooseTheme('comp_day')).toBeNull(); // light, in light mode: on screen at once
+    expect(s.get()).toMatchObject({ themeLight: 'comp_day', themeDark: 'sub_10' });
+    expect(css.get('--bg-color')).toBe(getTheme('comp_day').bg);
+    switchTo('dark');
+    expect(css.get('--bg-color')).toBe(getTheme('sub_10').bg);
+    s.setAutoSwitchTheme(false);
+    expect(s.chooseTheme('stackmat')).toBeNull();
+    expect(s.get()).toMatchObject({ theme: 'stackmat', themeLight: 'comp_day', themeDark: 'sub_10' });
+    expect(css.get('--bg-color')).toBe(getTheme('stackmat').bg);
+  });
+
+  it('switches following off and on without changing the theme on screen', async () => {
+    const s = await load();
+    switchTo('dark');
+    s.setAutoSwitchTheme(false); // the dark theme on screen becomes the theme
+    expect(s.get()).toMatchObject({ autoSwitchTheme: false, theme: 'white_cross_dark' });
+    expect(css.get('--bg-color')).toBe(getTheme('white_cross_dark').bg);
+    s.updateSettings({ theme: 'dnf' });
+    s.setAutoSwitchTheme(true); // dnf is dark: it becomes the dark theme, and stays on screen
+    expect(s.get()).toMatchObject({ autoSwitchTheme: true, themeDark: 'dnf', themeLight: 'white_cross' });
+    expect(css.get('--bg-color')).toBe(getTheme('dnf').bg);
   });
 });

@@ -35,7 +35,7 @@ const FEATURES = [
   { icon: FlagIcon, t: 'live races', d: 'real-time multiplayer rooms over websockets - share a link and race any event.' },
   { icon: TrophyIcon, t: 'leaderboards', d: 'all-time, weekly and daily boards for every event, single, ao5 and ao12.' },
   { icon: GlobeAltIcon, t: 'wca comparison', d: 'see where your personal bests would rank among every official wca competitor.' },
-  { icon: SwatchIcon, t: 'themes & command line', d: `${THEMES.length} cube-inspired themes with live preview. press esc and type - everything is a command.` },
+  { icon: SwatchIcon, t: 'themes & command line', d: `${THEMES.length} cube-inspired themes with live preview, light or dark with your device. press esc and type - everything is a command.` },
   { icon: SignalSlashIcon, t: 'an app that works offline', d: "install it on your phone or computer. the timer opens and works without a connection, and your solves sync when you're back online." },
 ];
 

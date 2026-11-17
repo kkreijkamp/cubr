@@ -221,13 +221,15 @@ function guestData() {
   };
 }
 
-// the default theme with the 2D preview, and a dark one with the 3D preview
-const DARK = { theme: 'stickerless', scramblePreview: '3D' };
+// the default theme with the 2D preview, and its dark twin with the 3D preview (a theme saved on its own,
+// so the pictures don't depend on the screenshot browser's light or dark mode)
+const LIGHT = { theme: 'white_cross', autoSwitchTheme: false };
+const DARK = { theme: 'white_cross_dark', autoSwitchTheme: false, scramblePreview: '3D' };
 const SHOTS = [
   // [file, css width, css height, device pixel ratio, mobile, settings]
-  ['screenshots/timer-wide.png', 1280, 800, 1, false, {}],
+  ['screenshots/timer-wide.png', 1280, 800, 1, false, LIGHT],
   ['screenshots/timer-wide-dark.png', 1280, 800, 1, false, DARK],
-  ['screenshots/timer-narrow.png', 390, 844, 2, true, {}],
+  ['screenshots/timer-narrow.png', 390, 844, 2, true, LIGHT],
   ['screenshots/timer-narrow-dark.png', 390, 844, 2, true, DARK],
 ];
 

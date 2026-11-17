@@ -353,11 +353,27 @@
   gap: 1.1rem;
   padding: 0.9rem 0 1.6rem;
 }
+.st-theme-now-item {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  min-width: 0;
+}
 .st-theme-now-text {
   display: grid;
   gap: 0.25rem;
   min-width: 0;
-  margin-right: auto;
+}
+/* following the device: the light and the dark theme side by side, the one waiting for its mode quieter */
+.st-theme-now.pair {
+  flex-wrap: wrap;
+  gap: 1rem 2.25rem;
+}
+.st-theme-now.pair .st-theme-now-text .name {
+  font-size: 1.4rem;
+}
+.st-theme-now-item.waiting .st-theme-now-text .name {
+  color: var(--sub-color);
 }
 .st-theme-now-text .name {
   overflow: hidden;
@@ -368,6 +384,7 @@
   white-space: nowrap;
 }
 .st-random {
+  margin-left: auto;
   font-size: 0.9rem;
 }
 .st-theme-now-text .meta {

@@ -3,7 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#ffffff" />
+    <!-- light and dark: the page follows the device's mode until a theme is picked (lib/settings.ts). These
+         are white cross and white cross dark, for the browser's own colours before the app starts; the app
+         then sets both theme colours to the theme in use (lib/themes.ts applyTheme) -->
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1d2024" />
     <meta name="description" content="a minimalist speedcubing timer" />
     <!-- link previews (chat apps, social sites): the same card for every page, as crawlers don't run the app.
          public/og.png is drawn by web/scripts/pwa-assets.mjs og; no og:url, so a shared page links to itself -->
@@ -26,10 +31,16 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>cubr</title>
     <script>
-      // Apply the saved theme before first paint to avoid a flash of the default theme.
+      // Apply the saved theme before first paint to avoid a flash of the default theme: one set of colours,
+      // or a light and a dark set while the theme follows the device's mode (lib/settings.ts showTheme).
       try {
         var t = JSON.parse(localStorage.getItem('cubr.themeColors') || 'null');
-        if (t) for (var k in t) document.documentElement.style.setProperty(k, t[k]);
+        if (t && t.dark) t = matchMedia('(prefers-color-scheme: dark)').matches ? t.dark : t.light;
+        if (t) {
+          for (var k in t) document.documentElement.style.setProperty(k, t[k]);
+          var m = document.querySelectorAll('meta[name="theme-color"]');
+          for (var i = 0; i < m.length; i++) m[i].setAttribute('content', t['--bg-color']);
+        }
       } catch (e) {}
     </script>
   </head>

@@ -23,7 +23,7 @@ import { LocalUploadOffer } from './timer/LocalUploadOffer';
 import { PatchNotesModal } from './PatchNotesModal';
 import { useAuth } from '../lib/auth';
 import { openPalette } from '../lib/commands';
-import { useSettings } from '../lib/settings';
+import { useActiveTheme } from '../lib/settings';
 import { themeLabel } from '../lib/themes';
 import { api } from '../lib/api';
 import { useLaunchQueue } from '../lib/pwa';
@@ -83,7 +83,7 @@ const REPO_URL = 'https://github.com/kkreijkamp/cubr';
 const CONTACT_EMAIL = 'hello@cubr.dev';
 
 function Footer() {
-  const settings = useSettings();
+  const theme = useActiveTheme();
   const [info, setInfo] = useState<{ version: string; pod: string } | null>(null);
   const [notesOpen, setNotesOpen] = useState(false);
   useEffect(() => {
@@ -117,7 +117,7 @@ function Footer() {
           privacy
         </Link>
         <button className="btn-text" onClick={() => openPalette('theme')} data-tip="change theme" aria-label="change theme">
-          <SwatchIcon width={14} height={14} /> {themeLabel(settings.theme)}
+          <SwatchIcon width={14} height={14} /> {themeLabel(theme)}
         </button>
         <button className="btn-text" onClick={() => setNotesOpen(true)} data-tip="patch notes" aria-haspopup="dialog">
           {info ? `v${info.version}` : 'version'}

@@ -692,6 +692,35 @@ The web container's nginx (`web/nginx/default.conf.template`) serves the app and
   app's rules (no Global Privacy Control, no Do Not Track) hold for every page. The CSP allows both
   ways: the script host, and the injected beacon's same-origin `/cdn-cgi/rum`.
 
+### 10.4 Themes, light and dark mode
+
+- **Themes** (`web/src/lib/themes.ts`): 11 cube-inspired palettes of ten CSS custom properties.
+  White cross is the default; white cross dark is its dark twin (the logo's ink background, the same
+  green, white text).
+- **Following the device** (`web/src/lib/settings.ts`):
+  - `autoSwitchTheme` (on by default) shows `themeLight` while the device is in light mode and
+    `themeDark` in dark mode (`prefers-color-scheme`), switching live when the mode changes. With it
+    off, `theme` is shown.
+  - Picking a theme while following sets the light or the dark one, by its own colours. Turning
+    following off keeps the theme on screen; turning it on makes the theme in use the light or the
+    dark one.
+  - Settings saved before 1.4.14 have no `autoSwitchTheme`: the default theme starts following the
+    device, any other theme stays as picked. The same rule applies to an account's settings at
+    sign-in.
+- **The browser's own parts:**
+  - each theme sets `color-scheme` (light or dark), so scrollbars, dropdown lists and pickers match;
+  - `index.html` has `<meta name="color-scheme" content="light dark">` and two `theme-color` tags
+    (light and dark mode). The app sets both to the theme in use.
+  - The favicon is the theme in use (a data URL). `public/favicon.svg`, used before the app starts,
+    switches to white cross dark in dark mode.
+- **No flash at first paint:**
+  - the stylesheet's `:root` defaults are white cross, with white cross dark under
+    `@media (prefers-color-scheme: dark)`;
+  - the app stores the theme's colours in `cubr.themeColors`: one set, or a light and a dark set
+    while following the device;
+  - the inline script in `index.html` (allowed by its CSP hash) applies them before the first paint,
+    picking by the device's mode.
+
 ## 11. Kubernetes overview (deploy/k8s)
 
 Namespace `cubr`. One Deployment + ClusterIP Service per microservice (2+ replicas,

@@ -16,6 +16,7 @@ export interface Theme {
 export const THEMES: Theme[] = [
   {"name":"stickerless","bg":"#161616","main":"#ffd500","caret":"#ffd500","sub":"#6b6b6b","subAlt":"#202020","text":"#f1f1f1","error":"#e8263c","errorExtra":"#9c1426","colorfulError":"#ff6a13","colorfulErrorExtra":"#b34507"},
   {"name":"white_cross","bg":"#ffffff","main":"#00a04d","caret":"#0046ad","sub":"#959aa1","subAlt":"#e5e8eb","text":"#1d2024","error":"#d0252f","errorExtra":"#8f1920","colorfulError":"#ff6a13","colorfulErrorExtra":"#b34507"},
+  {"name":"white_cross_dark","bg":"#1d2024","main":"#00a04d","caret":"#3d7ff5","sub":"#868c94","subAlt":"#2c3036","text":"#f1f3f5","error":"#ff5c63","errorExtra":"#b3323a","colorfulError":"#ff6a13","colorfulErrorExtra":"#b34507"},
   {"name":"stackmat","bg":"#a3ad94","main":"#2b3a1f","caret":"#151a10","sub":"#5f6a52","subAlt":"#949f85","text":"#151a10","error":"#7d1d1d","errorExtra":"#5a1414","colorfulError":"#8a2a00","colorfulErrorExtra":"#5e1d00"},
   {"name":"sub_10","bg":"#10172a","main":"#f2c14e","caret":"#f2c14e","sub":"#4d5a7c","subAlt":"#0c1222","text":"#e6eaf4","error":"#ff5d6c","errorExtra":"#b33f4b","colorfulError":"#ff5d6c","colorfulErrorExtra":"#b33f4b"},
   {"name":"pll_skip","bg":"#1c1235","main":"#ff79d0","caret":"#6ef2ff","sub":"#6e5ca3","subAlt":"#160e2b","text":"#f3eeff","error":"#ffcc66","errorExtra":"#c99a3f","colorfulError":"#ffcc66","colorfulErrorExtra":"#c99a3f"},
@@ -27,6 +28,8 @@ export const THEMES: Theme[] = [
 ];
 
 export const DEFAULT_THEME = 'white_cross';
+/** white cross in the dark: the default theme while the device is in dark mode (settings.autoSwitchTheme) */
+export const DEFAULT_DARK_THEME = 'white_cross_dark';
 
 const BY_NAME = new Map(THEMES.map((t) => [t.name, t]));
 
@@ -74,35 +77,44 @@ const VARS: [Exclude<keyof Theme, 'name'>, string][] = [
 
 /**
  * The favicon (a 3x3 cube face, as in public/favicon.svg) in a theme's colours: main-colour stickers and a
- * text-colour centre on the theme's background, which fills the whole icon.
+ * text-colour centre on the theme's background, which fills the whole icon. With `dark`, the icon switches
+ * to that theme's colours while the browser is in dark mode (public/favicon.svg, before the app has
+ * started; the app then draws the theme in use).
  */
-export function faviconSvg(theme: Theme): string {
+export function faviconSvg(theme: Theme, dark?: Theme): string {
   // the cube spans 24 of the 32 units (gap = 1/6 of a sticker, like the header logo)
   const at = [4, 12.4, 20.8];
+  const cls = (name: string) => (dark ? ` class="${name}"` : '');
   const stickers = at.flatMap((y) =>
-    at.map((x) => `<rect x="${x}" y="${y}" width="7.2" height="7.2" rx="1.8"${x === at[1] && y === at[1] ? ` fill="${theme.text}"` : ''}/>`),
+    at.map((x) => `<rect x="${x}" y="${y}" width="7.2" height="7.2" rx="1.8"${x === at[1] && y === at[1] ? `${cls('c')} fill="${theme.text}"` : ''}/>`),
   );
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="5" fill="${theme.bg}"/><g fill="${theme.main}">${stickers.join('')}</g></svg>`;
+  // a CSS rule beats a fill attribute, so the dark colours win inside the media query
+  const style = dark ? `<style>@media (prefers-color-scheme:dark){.b{fill:${dark.bg}}.m{fill:${dark.main}}.c{fill:${dark.text}}}</style>` : '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">${style}<rect${cls('b')} width="32" height="32" rx="5" fill="${theme.bg}"/><g${cls('m')} fill="${theme.main}">${stickers.join('')}</g></svg>`;
 }
 
-/** Applies a theme's colours to :root and the favicon. `persist` stores them for the pre-paint script in index.html. */
-export function applyTheme(name: string, persist = true): void {
+/**
+ * A theme as the page's CSS: its colour variables, and `color-scheme` so the browser draws its own parts
+ * (scrollbars, dropdown lists, date and colour pickers, autofill) light or dark to match.
+ */
+export function themeColors(theme: Theme): Record<string, string> {
+  const colors: Record<string, string> = {};
+  for (const [k, v] of VARS) colors[v] = theme[k];
+  colors['color-scheme'] = isLightTheme(theme) ? 'light' : 'dark';
+  return colors;
+}
+
+/**
+ * Applies a theme to the page: its colours on :root, the browser's colour for its own bar around the page
+ * (both theme-color tags in index.html, the light-mode and the dark-mode one) and the favicon.
+ * lib/settings.ts picks the theme and stores it for the pre-paint script in index.html.
+ */
+export function applyTheme(name: string): void {
   const theme = getTheme(name);
   const root = document.documentElement;
-  const colors: Record<string, string> = {};
-  for (const [k, v] of VARS) {
-    root.style.setProperty(v, theme[k]);
-    colors[v] = theme[k];
-  }
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme.bg);
+  for (const [k, v] of Object.entries(themeColors(theme))) root.style.setProperty(k, v);
+  document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => meta.setAttribute('content', theme.bg));
   document.querySelector('link[rel="icon"]')?.setAttribute('href', `data:image/svg+xml,${encodeURIComponent(faviconSvg(theme))}`);
-  if (persist) {
-    try {
-      localStorage.setItem('cubr.themeColors', JSON.stringify(colors));
-    } catch {
-      /* ignore */
-    }
-  }
   window.dispatchEvent(new CustomEvent('cubr:theme'));
 }
 

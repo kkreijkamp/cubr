@@ -32,5 +32,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/__tests__/**/*.test.ts'],
+    // CSS is left out of tests (an empty module) unless listed here; lib/__tests__/themes.test.ts reads
+    // the stylesheet's first-paint colours as text (global.css?raw)
+    css: { include: [/\/src\/styles\/global\.css/] },
   },
 });

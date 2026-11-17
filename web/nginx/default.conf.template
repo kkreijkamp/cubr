@@ -51,7 +51,7 @@ server {
   # styles through the CSSOM, which needs nothing. One outside script: Cloudflare Web Analytics' beacon
   # (static.cloudflareinsights.com), which reports to cloudflareinsights.com when the app loads it, or
   # to cubr.dev's own /cdn-cgi/rum when Cloudflare injects it (web/src/lib/analytics.ts).
-  add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-jlcpiT/55Chf4Rt58v/aAqR8xd2yWvs720ejq3PrbRc=' https://static.cloudflareinsights.com; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' wss://$host https://cloudflareinsights.com; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
+  add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-kbWrCQcY5deeZriU+oYxYkCG4RR147XA28tK/0GtqOI=' https://static.cloudflareinsights.com; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' wss://$host https://cloudflareinsights.com; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
   add_header X-Content-Type-Options "nosniff" always;
   add_header X-Frame-Options "DENY" always;
   add_header Referrer-Policy "strict-origin-when-cross-origin" always;

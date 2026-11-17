@@ -21,7 +21,7 @@
 - **Race rooms** - real-time multiplayer rounds over WebSockets.
 - **Profiles & analytics** - PB cards, a solve history chart with rolling averages, activity heatmap, streaks, time-of-day performance.
 - **WCA comparison** - "where would I rank?" against ~2.3 M rows of official WCA data (rank, percentile, distribution).
-- 10 cube-inspired themes (white cross by default) with light/dark filters and random pick, command palette (`esc` / `ctrl+k`), keyboard-first UI.
+- 11 cube-inspired themes (white cross by default, white cross dark in dark mode) that follow your device's light or dark mode, with light/dark filters and random pick, command palette (`esc` / `ctrl+k`), keyboard-first UI.
 
 ## Architecture
 
