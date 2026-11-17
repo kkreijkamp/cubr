@@ -1,0 +1,17 @@
+/* A country flag from the sprite (Flag.tsx). The box keeps a flag's 44:30 shape, so with the sprite
+   scaled to the box's width one slot fills it exactly. Sized in em: it follows the text around it,
+   and each place's own .flag rule (margins, font size) applies as it did to the emoji. */
+.flag {
+  display: inline-block;
+  width: 1.3em;
+  aspect-ratio: 44 / 30;
+  vertical-align: -0.12em;
+  background: url('../assets/country-flags.png') no-repeat 0 0 / 100% auto;
+}
+/* a country the sprite has no flag for: its emoji flag, as text */
+.flag.flag-emoji {
+  width: auto;
+  aspect-ratio: auto;
+  vertical-align: baseline;
+  background: none;
+}

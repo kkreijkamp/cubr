@@ -3,9 +3,10 @@ import { ArrowLeftIcon, ArrowTopRightOnSquareIcon, CircleStackIcon, MagnifyingGl
 import { EVENTS, getEvent } from '@cubr/cubestats';
 import { api } from '../../../lib/api';
 import { useAuth } from '../../../lib/auth';
-import { flagEmoji, formatNumber, formatPercent } from '../../../lib/format';
+import { formatNumber, formatPercent } from '../../../lib/format';
 import { useAsync } from '../../../lib/useAsync';
 import type { WcaDistribution, WcaRank } from '../../../lib/types';
+import { Flag as CountryFlag } from '../../Flag';
 import { ErrorState, Loading, Spinner } from '../../Spinner';
 import { useDebounced } from '../hooks';
 import { EventPicker, Notice, Segmented } from '../ui';
@@ -41,12 +42,7 @@ export function WcaError({ error, onRetry, what = 'WCA data' }: { error: Error; 
 }
 
 function Flag({ iso2 }: { iso2: string | null | undefined }) {
-  const f = flagEmoji(iso2);
-  return f ? (
-    <span className="flag" title={countryName(iso2)} aria-label={countryName(iso2)}>
-      {f}
-    </span>
-  ) : null;
+  return <CountryFlag code={iso2} label={countryName(iso2)} />;
 }
 
 // ---------------------------------------------------------------------------- rank calculator
@@ -144,7 +140,7 @@ export function RankCalculator({ params, onChange, onPerson }: { params: RankPar
             <option value="">worldwide only</option>
             {countries.map((c) => (
               <option key={c.iso2} value={c.iso2}>
-                {flagEmoji(c.iso2)} {c.name}
+                {c.name}
               </option>
             ))}
           </select>

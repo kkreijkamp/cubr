@@ -2,11 +2,13 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ExclamationCircleIcon } from '@heroicons/react/24/outline';
 import { AvatarEditor } from './AvatarEditor';
 import { CountrySelect } from './CountrySelect';
+import { countryName } from './countries';
 import { friendlyError } from './util';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { toast } from '../../lib/toast';
 import type { PrivateUser } from '../../lib/types';
+import { Flag } from '../Flag';
 import { Modal } from '../Modal';
 import { Spinner } from '../Spinner';
 
@@ -124,7 +126,9 @@ export function EditProfileModal({ user, onClose }: { user: PrivateUser; onClose
         </div>
         <div className="ep-two">
           <div className="field">
-            <label htmlFor="ep-country">country</label>
+            <label htmlFor="ep-country">
+              country <Flag code={country} label={countryName(country)} />
+            </label>
             <CountrySelect id="ep-country" value={country} onChange={setCountry} />
           </div>
           <div className="field">

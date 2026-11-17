@@ -20,11 +20,12 @@ import { Avatar } from '../components/Avatar';
 import { Modal } from '../components/Modal';
 import { ErrorState, Loading, Spinner } from '../components/Spinner';
 import { countryName } from '../components/social/countries';
+import { Flag } from '../components/Flag';
 import { addDaysKey, eventLabel, formatDayKey, friendlyError } from '../components/social/util';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useRegisterCommands, type Command } from '../lib/commands';
-import { flagEmoji, formatDate, formatDuration, formatNumber, formatPercent, formatTime, timeAgo, utcDateKey } from '../lib/format';
+import { formatDate, formatDuration, formatNumber, formatPercent, formatTime, timeAgo, utcDateKey } from '../lib/format';
 import { useSettings } from '../lib/settings';
 import type { LbKind, Leaderboard } from '../lib/types';
 import { hiddenNote, missingNote } from '../lib/antiCheat';
@@ -566,11 +567,7 @@ export default function LeaderboardsPage() {
                             <Avatar user={e} size={20} />
                             {e.username}
                           </Link>
-                          {e.country && flagEmoji(e.country) && (
-                            <span className="flag" title={countryName(e.country)} aria-label={countryName(e.country)}>
-                              {flagEmoji(e.country)}
-                            </span>
-                          )}
+                          <Flag code={e.country} label={countryName(e.country)} />
                         </td>
                         <td className="value">{formatTime(e.valueMs, precision)}</td>
                         <td className="date" title={e.achievedAt ? timeAgo(e.achievedAt) : undefined}>

@@ -6,9 +6,10 @@ import { countryName } from './countries';
 import { Section, WidgetEmpty, WidgetError } from './Widget';
 import { eventLabel, isWcaComparable, isWcaNotLoaded, wcaAverageKind } from './util';
 import { api } from '../../lib/api';
-import { flagEmoji, formatDate, formatNumber, formatPercent, formatTime } from '../../lib/format';
+import { formatDate, formatNumber, formatPercent, formatTime } from '../../lib/format';
 import type { StatsSummary, WcaDistribution, WcaRank } from '../../lib/types';
 import { useAsync, type AsyncState } from '../../lib/useAsync';
+import { Flag } from '../Flag';
 import { Loading, Spinner } from '../Spinner';
 
 type WcaKind = 'single' | 'average';
@@ -211,7 +212,8 @@ function Placement({
               </span>
               {rank.data.country && (
                 <span>
-                  #{formatNumber(rank.data.country.rank)} in {flagEmoji(rank.data.country.countryIso2 ?? country)}{' '}
+                  #{formatNumber(rank.data.country.rank)} in{' '}
+                  <Flag code={rank.data.country.countryIso2 ?? country} label={countryName(rank.data.country.countryIso2 ?? country)} />{' '}
                   {(countryName(rank.data.country.countryIso2 ?? country) || rank.data.country.countryId).toLowerCase()}
                 </span>
               )}
@@ -228,7 +230,7 @@ function Placement({
               <span>in the world - faster than 00.0% of 000,000</span>
               {country && (
                 <span>
-                  #0,000 in {flagEmoji(country)} {(countryName(country) || country).toLowerCase()}
+                  #0,000 in <Flag code={country} /> {(countryName(country) || country).toLowerCase()}
                 </span>
               )}
             </span>
@@ -359,7 +361,7 @@ export function WcaComparison({ summary, event, wcaId, country, own, onEdit, pre
         wcaId ? (
           person.data ? (
             <Link to={`/wca?person=${encodeURIComponent(wcaId)}`}>
-              {person.data.person.name} {flagEmoji(person.data.person.countryIso2)}
+              {person.data.person.name} <Flag code={person.data.person.countryIso2} label={countryName(person.data.person.countryIso2)} />
             </Link>
           ) : person.loading ? (
             <Spinner size={12} />
