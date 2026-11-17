@@ -188,6 +188,12 @@ export const api = {
     resetPassword: (body: { token: string; password: string }) =>
       request<{ token: string; user: PrivateUser }>('POST', '/api/auth/password/reset', body),
     me: (signal?: AbortSignal) => get<{ user: PrivateUser; settings: Record<string, unknown> }>('/api/auth/me', signal),
+    /** Asks to change the email: the new address gets a link, nothing changes until it's opened. The
+     *  password is asked again (403 if wrong); an account without one must have signed in in the last
+     *  10 minutes (403 otherwise). 409 if another account uses the address. */
+    changeEmail: (body: { email: string; password?: string }) => request<{ ok: true; email: string }>('POST', '/api/auth/me/email', body),
+    /** Uses the link from the new address once (no sign-in needed); 400 expired or used, 409 taken meanwhile. */
+    confirmEmail: (token: string) => request<{ email: string }>('POST', '/api/auth/email/confirm', { token }),
     updateMe: (body: Partial<Pick<PublicUser, 'displayName' | 'bio' | 'country' | 'wcaId' | 'private'>>) =>
       request<{ user: PrivateUser }>('PATCH', '/api/auth/me', body),
     saveSettings: (settings: Record<string, unknown>) => request<{ settings: Record<string, unknown> }>('PUT', '/api/auth/me/settings', { settings }),

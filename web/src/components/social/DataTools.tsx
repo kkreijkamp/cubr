@@ -5,6 +5,7 @@ import {
   ArrowRightStartOnRectangleIcon,
   ArrowUpTrayIcon,
   DocumentArrowUpIcon,
+  EnvelopeIcon,
   PencilIcon,
   UserCircleIcon,
 } from '@heroicons/react/24/outline';
@@ -19,6 +20,7 @@ import { toast } from '../../lib/toast';
 import type { PrivateUser } from '../../lib/types';
 import { Modal } from '../Modal';
 import { SignInMethods } from './SignInMethods';
+import { ChangeEmailModal } from './ChangeEmailModal';
 import { SessionName } from '../SessionName';
 import { Spinner } from '../Spinner';
 
@@ -146,6 +148,9 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
   const [preview, setPreview] = useState<{ fileName: string; parsed: TimerImport } | null>(null);
   const [reading, setReading] = useState(false);
   const [exporting, setExporting] = useState<'json' | 'cstimer' | null>(null);
+  const [changingEmail, setChangingEmail] = useState(false);
+  // the address a confirmation link went to, until the page reloads
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
 
   const pickFile = () => fileRef.current?.click();
 
@@ -197,6 +202,7 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
       { id: 'account-import', label: 'Import solves...', icon: <DocumentArrowUpIcon />, keywords: ['cstimer', 'twisty', 'cubedesk', 'block keeper', 'upload', 'restore'], run: pickFile },
       { id: 'account-export', label: 'Export data (json)', icon: <ArrowDownTrayIcon />, keywords: ['backup', 'download'], run: () => void doExport('json') },
       { id: 'account-export-cstimer', label: 'Export for csTimer', icon: <ArrowDownTrayIcon />, keywords: ['cstimer', 'backup', 'download'], run: () => void doExport('cstimer') },
+      { id: 'account-email', label: 'Change email...', icon: <EnvelopeIcon />, keywords: ['address', 'account'], run: () => setChangingEmail(true) },
     ],
     [onEdit],
   );
@@ -244,10 +250,31 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
         <div className="ac-row">
           <div>
             <div className="t">
+              <EnvelopeIcon /> email
+            </div>
+            <div className="d">
+              <span className="text">{user.email}</span>. password-reset links and notices about your account go here.
+              {pendingEmail && pendingEmail.toLowerCase() !== user.email.toLowerCase() && (
+                <>
+                  {' '}
+                  <span className="main">waiting for you to confirm {pendingEmail}</span>: open the link we sent there.
+                </>
+              )}
+            </div>
+          </div>
+          <div className="ac-actions">
+            <button className="btn" onClick={() => setChangingEmail(true)}>
+              <EnvelopeIcon /> change email
+            </button>
+          </div>
+        </div>
+        <div className="ac-row">
+          <div>
+            <div className="t">
               <UserCircleIcon /> account
             </div>
             <div className="d">
-              signed in as <span className="text">{user.username}</span> - {user.email}
+              signed in as <span className="text">{user.username}</span>
             </div>
           </div>
           <div className="ac-actions">
@@ -261,6 +288,17 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
         </div>
       </div>
       {preview && <ImportPreview fileName={preview.fileName} parsed={preview.parsed} onClose={() => setPreview(null)} />}
+      {changingEmail && (
+        <ChangeEmailModal
+          user={user}
+          onClose={() => setChangingEmail(false)}
+          onSent={(email) => {
+            setChangingEmail(false);
+            setPendingEmail(email);
+            toast.success(`open the link we sent to ${email}. your email stays ${user.email} until then.`, { title: 'check your inbox' });
+          }}
+        />
+      )}
     </Section>
   );
 }

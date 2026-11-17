@@ -24,7 +24,7 @@ map "$status:$uri" $cubr_cache_control {
 map $request_uri $cubr_robots {
   default                                                 "";
   ~^/(?:api|internal)(?:/|$)                              "noindex";   # data, not pages (the services say the same)
-  ~*^/(?:account|settings|login|reset)(?:[/?]|$)          "noindex";
+  ~*^/(?:account|settings|login|reset|confirm-email)(?:[/?]|$) "noindex";
   ~*^/race/[^/?]                                          "noindex";   # race rooms last two hours
 }
 
@@ -134,7 +134,7 @@ server {
   location = / {
     try_files /index.html =404;
   }
-  location ~* ^/(?:leaderboards|daily|race|account|settings|wca|about|login|login/sso|reset|terms|privacy)/?$ {
+  location ~* ^/(?:leaderboards|daily|race|account|settings|wca|about|login|login/sso|reset|confirm-email|terms|privacy)/?$ {
     try_files /index.html =404;
   }
   location ~* "^/race/[a-z0-9]{4,32}/?$" {

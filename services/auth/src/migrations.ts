@@ -100,4 +100,19 @@ export const migrations: Migration[] = [
       CREATE UNIQUE INDEX IF NOT EXISTS user_identities_user_provider ON auth.user_identities (user_id, provider);
     `,
   },
+  {
+    id: '007_email_changes',
+    sql: `
+      -- a change of email waiting for its confirmation link (emailChange.ts): only the SHA-256 of
+      -- the token is stored; asking again replaces the user's pending change, confirming deletes it
+      CREATE TABLE IF NOT EXISTS auth.email_changes (
+        token_hash bytea PRIMARY KEY,
+        user_id    uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+        new_email  text NOT NULL,
+        expires_at timestamptz NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS email_changes_user ON auth.email_changes (user_id);
+    `,
+  },
 ];

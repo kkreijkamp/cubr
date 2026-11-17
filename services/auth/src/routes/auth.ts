@@ -42,6 +42,7 @@ import {
 import { allow, publishSafely, withTimeout } from '../safe.js';
 import { loadMailConfig, sendMail } from '../mail.js';
 import { RESET_TTL_MIN, forgotSchema, hashResetToken, newResetToken, resetEmail, resetLink, resetSchema } from '../reset.js';
+import { EMAIL_CHANGE_TTL_MIN, changeEmailSchema, confirmEmailLink, confirmEmailMessage, confirmEmailSchema, emailChangedNotice, isFreshSignIn } from '../emailChange.js';
 
 const BCRYPT_COST = 10;
 
@@ -189,6 +190,84 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
     const user = toPrivateUser(row);
     const { token: jwt } = await signToken(config.jwtSecret, user, TOKEN_TTL_SEC, revokedAt + 1);
     return { token: jwt, user };
+  });
+
+  // ---- POST /api/auth/me/email ------------------------------------------------------------------
+  // Asks to change the email. Proof it's you: the password, or for an account without one (made with
+  // Google, Apple or GitHub) a sign-in in the last 10 minutes. The new address gets a link
+  // (emailChange.ts); nothing changes until it's opened. Asking again replaces the pending change.
+  app.post('/api/auth/me/email', { preHandler: auth.requireAuth }, async (req, reply) => {
+    const me = req.user!;
+    if (!UUID_RE.test(me.id)) throw unauthorized();
+    if (!(await allow(redis, `email-change:${me.id}`, 5, 3600))) throw rateLimited('Too many attempts, try again later');
+    const { email, password } = parse(changeEmailSchema, req.body ?? {});
+    const { rows } = await pool.query<{ username: string; email: string; password_hash: string | null }>(
+      'select username, email, password_hash from auth.users where id = $1',
+      [me.id],
+    );
+    const user = rows[0];
+    if (!user) throw unauthorized('Account no longer exists');
+    if (email.toLowerCase() === user.email.toLowerCase()) throw badRequest("That's already your email");
+    // 403, not 401: a wrong password must not look like an expired session to the client
+    if (user.password_hash) {
+      if (!password || !(await bcrypt.compare(password, user.password_hash))) throw forbidden('Wrong password');
+    } else if (!isFreshSignIn(me.iat)) {
+      throw forbidden('Sign in again to change your email');
+    }
+    const taken = await pool.query('select 1 from auth.users where lower(email) = lower($1) and id <> $2', [email, me.id]);
+    if (taken.rowCount) throw conflict('That email is already in use');
+    const { token, hash } = newResetToken();
+    await withTx(pool, async (c) => {
+      await c.query('delete from auth.email_changes where user_id = $1 or expires_at < now()', [me.id]);
+      await c.query(
+        `insert into auth.email_changes (token_hash, user_id, new_email, expires_at) values ($1, $2, $3, now() + make_interval(mins => $4))`,
+        [hash, me.id, email, EMAIL_CHANGE_TTL_MIN],
+      );
+    });
+    try {
+      const message = confirmEmailMessage({ username: user.username, link: confirmEmailLink(mail.publicUrl, token), minutes: EMAIL_CHANGE_TTL_MIN });
+      await sendMail(mail, { to: email, ...message }, req.log);
+    } catch (err) {
+      await pool.query('delete from auth.email_changes where token_hash = $1', [hash]);
+      req.log.error({ err: (err as Error).message }, 'email change: the confirmation email failed');
+      throw unavailable('Could not send the confirmation email right now, please retry');
+    }
+    req.log.info({ userId: me.id }, 'email change: confirmation link sent');
+    return reply.status(202).send({ ok: true, email });
+  });
+
+  // ---- POST /api/auth/email/confirm -------------------------------------------------------------
+  // The link from the new address, used once: the email changes, pending password-reset links end
+  // (they went to the old address), and the old address is told. No sign-in needed: the link is the
+  // proof that the new address is the person's.
+  app.post('/api/auth/email/confirm', async (req) => {
+    if (!(await allow(redis, `confirm-email:${req.ip}`, 20, 3600))) throw rateLimited('Too many attempts, try again later');
+    const { token } = parse(confirmEmailSchema, req.body ?? {});
+    const done = await withTx(pool, async (c) => {
+      const used = await c.query<{ user_id: string; new_email: string }>(
+        'delete from auth.email_changes where token_hash = $1 and expires_at > now() returning user_id, new_email',
+        [hashResetToken(token)],
+      );
+      const change = used.rows[0];
+      if (!change) throw badRequest('This link is invalid or has expired');
+      const before = await c.query<{ username: string; email: string }>('select username, email from auth.users where id = $1 for update', [change.user_id]);
+      if (!before.rows[0]) throw badRequest('This link is invalid or has expired');
+      try {
+        await c.query('update auth.users set email = $2 where id = $1', [change.user_id, change.new_email]);
+      } catch (err) {
+        // someone else took the address since (the unique index): nothing changes, the link stays
+        if (pgCode(err) === '23505') throw conflict('That email is now used by another account');
+        throw err;
+      }
+      await c.query('delete from auth.email_changes where user_id = $1', [change.user_id]);
+      await c.query('delete from auth.password_resets where user_id = $1', [change.user_id]);
+      return { userId: change.user_id, username: before.rows[0].username, oldEmail: before.rows[0].email, newEmail: change.new_email };
+    });
+    req.log.info({ userId: done.userId }, 'email changed');
+    sendMail(mail, { to: done.oldEmail, ...emailChangedNotice({ username: done.username, newEmail: done.newEmail }) }, req.log).catch((err: Error) =>
+      req.log.error({ err: err.message }, 'email change: the notice to the old address failed'),
+    );
+    return { email: done.newEmail };
   });
 
   // ---- POST /api/auth/logout ------------------------------------------------------------------

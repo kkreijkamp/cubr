@@ -503,6 +503,111 @@ export function ResetPasswordPage() {
   );
 }
 
+type Confirming = { kind: 'working' } | { kind: 'done'; email: string } | { kind: 'expired' } | { kind: 'taken' } | { kind: 'failed'; message: string };
+
+/** /confirm-email#<token>: the page the link sent to a new email address opens. Confirms it once. */
+export function ConfirmEmailPage() {
+  const { status, setUser } = useAuth();
+  // the token travels in the fragment, which browsers never send; it leaves the address bar at once
+  const [token] = useState(() => window.location.hash.replace(/^#/, ''));
+  useEffect(() => {
+    if (window.location.hash) window.history.replaceState(window.history.state, '', window.location.pathname);
+  }, []);
+  const wellFormed = /^[A-Za-z0-9_-]{43}$/.test(token);
+  const [state, setState] = useState<Confirming>({ kind: 'working' });
+  const [attempt, setAttempt] = useState(0);
+  // the link works once: send it once per attempt, even when an effect runs twice (React's strict mode)
+  const sentFor = useRef(-1);
+  useEffect(() => {
+    document.title = 'confirm email | cubr';
+    return () => {
+      document.title = 'cubr';
+    };
+  }, []);
+  useEffect(() => {
+    if (!wellFormed || sentFor.current === attempt) return;
+    sentFor.current = attempt;
+    setState({ kind: 'working' });
+    api.auth
+      .confirmEmail(token)
+      .then(async ({ email }) => {
+        setState({ kind: 'done', email });
+        // signed in here: show the new address straight away
+        try {
+          setUser((await api.auth.me()).user);
+        } catch {
+          /* not signed in, or offline: the account page loads it later */
+        }
+      })
+      .catch((err: unknown) => {
+        if (err instanceof ApiError && err.status === 400) setState({ kind: 'expired' });
+        else if (err instanceof ApiError && err.status === 409) setState({ kind: 'taken' });
+        else setState({ kind: 'failed', message: describeAuthError(err, 'login') });
+      });
+  }, [token, wellFormed, attempt, setUser]);
+
+  if (status === 'loading') return <Loading />;
+  const signedIn = status === 'authed';
+  const onward = signedIn ? (
+    <Link to="/account" className="btn primary block">
+      back to your account
+    </Link>
+  ) : (
+    <Link to="/login" className="btn primary block">
+      sign in
+    </Link>
+  );
+  if (!wellFormed) {
+    return (
+      <div className="lg-page">
+        <h1 className="lg-title">confirm email</h1>
+        <p className="lg-lede">this link is incomplete. open it straight from the email.</p>
+        {onward}
+      </div>
+    );
+  }
+  if (state.kind === 'working') {
+    return (
+      <div className="lg-page">
+        <h1 className="lg-title">confirm email</h1>
+        <p className="lg-lede">
+          <Spinner size={16} /> confirming your new email...
+        </p>
+      </div>
+    );
+  }
+  if (state.kind === 'done') {
+    return (
+      <div className="lg-page">
+        <h1 className="lg-title">email changed</h1>
+        <p className="lg-lede">
+          your account&apos;s email is now <span className="text">{state.email}</span>. password-reset links and notices go there from now on.
+        </p>
+        {onward}
+      </div>
+    );
+  }
+  return (
+    <div className="lg-page">
+      <h1 className="lg-title">confirm email</h1>
+      <p className="lg-lede">
+        {state.kind === 'expired'
+          ? 'this link has expired or was already used. links work once, for an hour: ask for a new one on your account page.'
+          : state.kind === 'taken'
+            ? 'another account started using that address in the meantime, so your email stays as it was.'
+            : state.message}
+      </p>
+      {state.kind === 'failed' ? (
+        <button className="btn primary block" onClick={() => setAttempt((a) => a + 1)}>
+          try again
+        </button>
+      ) : (
+        onward
+      )}
+    </div>
+  );
+}
+
 const TABS: { mode: Mode; label: string; lede: string }[] = [
   { mode: 'login', label: 'sign in', lede: 'welcome back. your solves, pbs and settings are waiting.' },
   { mode: 'register', label: 'sign up', lede: 'keep your solves in the cloud, rank on the leaderboards and race under your own name.' },

@@ -192,6 +192,15 @@ CREATE TABLE auth.password_resets (
   expires_at timestamptz NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+-- a change of email waiting for its confirmation link (migration 007): one per user, SHA-256 of the
+-- token only; asking again replaces it, confirming deletes it (and the user's password-reset links)
+CREATE TABLE auth.email_changes (
+  token_hash bytea PRIMARY KEY,
+  user_id    uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  new_email  text NOT NULL,
+  expires_at timestamptz NOT NULL,             -- created_at + 60 min
+  created_at timestamptz NOT NULL DEFAULT now()
+);
 -- sign-in with Google, Apple or GitHub (migration 006): one row per connected provider account;
 -- subject = the provider's stable user id, email = the verified address it gave
 CREATE TABLE auth.user_identities (
@@ -390,6 +399,8 @@ type PB = { valueMs: number; solveId: string|null; achievedAt: string };
 | POST `/api/auth/login` | - | `{login, password}` (login = username or email) | 200 `{token, user: PrivateUser}`; 401 (also for an account without a password, after the same dummy bcrypt compare); 429 after 10 attempts/min/IP. In production Cloudflare also blocks more than 5 in 10 s per IP for 10 s at the edge (429, same error envelope, `RATE_LIMITED`) |
 | POST `/api/auth/logout` | req | - | 204 (revokes jti) |
 | POST `/api/auth/password/forgot` | - | `{email}` | 202 `{ok: true}` for every address, answered before the lookup (no account enumeration by reply or timing); an account with that email gets a link `<PUBLIC_URL>/reset#<token>` (32 random bytes, valid 60 min, single use) through Resend; 429 after 10/h/IP; at most 3 links/h per account |
+| POST `/api/auth/me/email` | req | `{email, password?}` (password required when the account has one) | 202 `{ok: true, email}`: the new address gets a link `<PUBLIC_URL>/confirm-email#<token>` (32 random bytes, valid 60 min, single use; replaces a pending change); nothing changes until it's opened; 400 same as the current email; 403 wrong password, or (no password: made with a provider) no sign-in in the last 10 min (token `iat`); 409 another account uses it; 429 after 5/h per account; 503 the email couldn't be sent (nothing pending) |
+| POST `/api/auth/email/confirm` | - | `{token}` | 200 `{email}`: the email changes, the user's pending changes and password-reset links are deleted, the old address gets a notice with the new one masked (`j***@example.com`); sessions carry on; 400 invalid/expired/used link; 409 another account took the address meanwhile (nothing changes, the link stays); 429 after 20/h/IP |
 | POST `/api/auth/password/reset` | - | `{token, password}` (password: 8-128 chars) | 200 `{token, user: PrivateUser}`: new password set, the user's other reset links deleted, every older token revoked (per-user revocation; the new token is issued after it); 400 invalid/expired/used link; 503 if the revocation can't be stored (nothing changes) |
 | GET `/api/auth/me` | req | - | `{user: PrivateUser, settings: object}` |
 | PATCH `/api/auth/me` | req | `{displayName?, bio?, country?, wcaId?, private?}` (null clears; `private: true` = private profile) | `{user: PrivateUser}` (+ `user.updated`); 503 if the private flag can't be mirrored to Redis (nothing changes) |
@@ -575,7 +586,8 @@ UNAVAILABLE with message "WCA data not loaded yet".
 
 React SPA, routes: `/` timer, `/leaderboards`, `/daily`, `/race`, `/race/:roomId`,
 `/profile/:username`, `/account`, `/settings`, `/wca`, `/about`, `/login`, `/login/sso` (back from
-Google, Apple or GitHub: signs in, or asks a new account for its username), `/reset`, `/terms`, `/privacy`. Guest mode works fully offline in localStorage; logged-in users sync to solve-service
+Google, Apple or GitHub: signs in, or asks a new account for its username), `/reset`, `/confirm-email`
+(the link to a new email address), `/terms`, `/privacy`. Guest mode works fully offline in localStorage; logged-in users sync to solve-service
 with an optimistic local store + retry queue (idempotent ids). Monkeytype-style theme system via CSS
 custom properties, command palette (Esc / Ctrl+K), focus mode while timing, toasts.
 

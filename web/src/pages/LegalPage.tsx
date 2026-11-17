@@ -8,7 +8,7 @@ import './legal.css';
 
 // when each page last changed
 const TERMS_EFFECTIVE = '16 November 2026';
-const PRIVACY_EFFECTIVE = '17 November 2026'; // sign-in with Google, Apple and GitHub; Cloudflare Web Analytics; error reports (set to the release's date)
+const PRIVACY_EFFECTIVE = '17 November 2026'; // sign-in with Google, Apple and GitHub; Cloudflare Web Analytics; error reports; email-change emails (set to the release's date)
 const CONTACT = 'hello@cubr.dev';
 
 const Mail = () => <a href={`mailto:${CONTACT}`}>{CONTACT}</a>;
@@ -128,7 +128,8 @@ export function PrivacyPage() {
         <ul>
           <li>
             To run the service you signed up for: your account, syncing your solves, profiles, leaderboards, the daily challenge, races and
-            password-reset emails. (Legal basis: performing our agreement with you.)
+            password-reset emails, and the emails that confirm a new email address and tell the old one. (Legal basis: performing our agreement
+            with you.)
           </li>
           <li>
             To keep cubr safe, fair and working: rate limits, server logs, error reports, anti-cheat checks that compare times with WCA
@@ -154,7 +155,7 @@ export function PrivacyPage() {
             decrypted to be protected and routed. Cloudflare also counts our page views (Web Analytics, above).
           </li>
           <li>
-            <b>Resend:</b> sends password-reset emails.
+            <b>Resend:</b> sends password-reset and email-change emails.
           </li>
           <li>
             <b>Apple iCloud:</b> hosts our contact inbox, <Mail />.

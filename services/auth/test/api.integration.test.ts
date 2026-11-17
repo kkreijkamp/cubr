@@ -418,6 +418,99 @@ describeIntegration('auth API', () => {
     });
   });
 
+  describe('changing the email', () => {
+    const change = (token: string, body: Record<string, unknown>) => s.request('POST', '/api/auth/me/email', { token, body, ip: freshIp() });
+    const confirm = (token: string) => s.request('POST', '/api/auth/email/confirm', { body: { token }, ip: freshIp() });
+    /** The pending change's link, as if the email had arrived (the route only emails the token). */
+    async function linkFor(userId: string): Promise<string> {
+      const { token, hash } = newResetToken();
+      const res = await s.pool.query('update auth.email_changes set token_hash = $1 where user_id = $2', [hash, userId]);
+      expect(res.rowCount).toBe(1);
+      return token;
+    }
+
+    it('checks the password, emails the new address, and changes nothing until the link is opened', async () => {
+      const { token, user } = await signUp();
+      expect((await change(token, { email: 'new.home@example.com', password: 'wrong password' })).statusCode).toBe(403);
+      expect((await change(token, { email: 'new.home@example.com' })).statusCode).toBe(403);
+      const res = await change(token, { email: 'New.Home@example.com', password: PASSWORD });
+      expect(res.statusCode, res.body).toBe(202);
+      expect(res.json()).toEqual({ ok: true, email: 'New.Home@example.com' });
+      expect((await me(token)).json().user.email).toBe(user.email);
+      // only the hash is stored
+      const { rows } = await s.pool.query('select token_hash from auth.email_changes where user_id = $1', [user.id]);
+      expect(Buffer.isBuffer(rows[0].token_hash)).toBe(true);
+
+      const link = await linkFor(user.id);
+      const ok = await confirm(link);
+      expect(ok.statusCode, ok.body).toBe(200);
+      expect(ok.json()).toEqual({ email: 'New.Home@example.com' });
+      expect((await me(token)).json().user.email).toBe('New.Home@example.com'); // the session carries on
+      expect((await login('new.home@example.com')).statusCode).toBe(200);
+      expect((await login(user.email)).statusCode).toBe(401);
+      expect((await confirm(link)).statusCode).toBe(400); // the link works once
+    });
+
+    it('refuses the current address, one another account uses, nonsense, and no sign-in', async () => {
+      const a = await signUp();
+      const b = await signUp();
+      expect((await change(a.token, { email: a.user.email.toUpperCase(), password: PASSWORD })).statusCode).toBe(400);
+      expect((await change(a.token, { email: b.user.email, password: PASSWORD })).statusCode).toBe(409);
+      expect((await change(a.token, { email: 'not an email', password: PASSWORD })).statusCode).toBe(400);
+      expect((await s.request('POST', '/api/auth/me/email', { body: { email: 'x@example.com', password: PASSWORD } })).statusCode).toBe(401);
+    });
+
+    it('keeps one pending change: asking again replaces it', async () => {
+      const { token, user } = await signUp();
+      await change(token, { email: 'first@example.com', password: PASSWORD });
+      await change(token, { email: 'second@example.com', password: PASSWORD });
+      const { rows } = await s.pool.query('select new_email from auth.email_changes where user_id = $1', [user.id]);
+      expect(rows).toEqual([{ new_email: 'second@example.com' }]);
+    });
+
+    it('refuses an expired or malformed link, and one whose address someone else took meanwhile', async () => {
+      const a = await signUp();
+      await change(a.token, { email: 'contested@example.com', password: PASSWORD });
+      const link = await linkFor(a.user.id);
+      await signUp({ email: 'contested@example.com' });
+      expect((await confirm(link)).statusCode).toBe(409);
+      expect((await me(a.token)).json().user.email).toBe(a.user.email);
+      await change(a.token, { email: 'later@example.com', password: PASSWORD });
+      const late = await linkFor(a.user.id);
+      await s.pool.query(`update auth.email_changes set expires_at = now() - interval '1 minute' where user_id = $1`, [a.user.id]);
+      expect((await confirm(late)).statusCode).toBe(400);
+      expect((await confirm('short')).statusCode).toBe(400);
+    });
+
+    it('ends the pending password-reset links, which went to the old address', async () => {
+      const { token, user } = await signUp();
+      const reset = newResetToken();
+      await s.pool.query(`insert into auth.password_resets (token_hash, user_id, expires_at) values ($1, $2, now() + interval '1 hour')`, [reset.hash, user.id]);
+      await change(token, { email: 'moved@example.com', password: PASSWORD });
+      expect((await confirm(await linkFor(user.id))).statusCode).toBe(200);
+      const viaOld = await s.request('POST', '/api/auth/password/reset', { body: { token: reset.token, password: 'brand new pass' }, ip: freshIp() });
+      expect(viaOld.statusCode).toBe(400);
+    });
+
+    it('lets an account without a password change it only right after signing in', async () => {
+      const { user } = await signUp();
+      await s.pool.query('update auth.users set password_hash = null where id = $1', [user.id]);
+      const now = Math.floor(Date.now() / 1000);
+      const stale = (await signToken(s.config.jwtSecret, user, 3600, now - 20 * 60)).token;
+      const fresh = (await signToken(s.config.jwtSecret, user, 3600, now)).token;
+      const res = await change(stale, { email: 'provider.new@example.com' });
+      expect(res.statusCode).toBe(403);
+      expect(res.json().error.message).toMatch(/sign in again/i);
+      expect((await change(fresh, { email: 'provider.new@example.com' })).statusCode).toBe(202);
+    });
+
+    it('allows 5 attempts an hour per account', async () => {
+      const { token } = await signUp();
+      for (let i = 0; i < 5; i++) expect((await change(token, { email: 'guess@example.com', password: `guess ${i}` })).statusCode).toBe(403);
+      expect((await change(token, { email: 'guess@example.com', password: PASSWORD })).statusCode).toBe(429);
+    });
+  });
+
   // what is logged, and that nothing ties it to an IP address: clientErrors.route.test.ts
   describe('front-end error reports', () => {
     const report = { kind: 'unhandledrejection', message: 'Failed to fetch', route: '/leaderboards', build: 'index-D3oOLUDV.js', browser: 'Chrome 142 on Android', installed: true };
