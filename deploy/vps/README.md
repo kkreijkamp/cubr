@@ -30,7 +30,9 @@ Work happens on `dev`; every commit gets a patch version and tag from the hooks.
 Build from the tag itself (`git archive`, never the working tree), then runs `deploy.sh`.
 `deploy.sh` makes the same main-only check, copies the compose files and gateway config from the
 tag to `/opt/cubr`, pulls the images, sets `CUBR_VERSION`, restarts what changed, waits for the
-health checks, then checks the gateway.
+health checks, then checks the gateway. A changed gateway config means recreating the gateway (a second or two), which deploy.sh
+does by itself: its `nginx.conf` is a single-file mount, and a running container never sees the release's
+new copy of the file (found with 1.5.0, whose gateway kept the 1.4.0 routing until recreated).
 
 Roll back to an earlier release with `deploy/vps/deploy.sh 1.1.0`. Its images are still in
 Artifact Registry; if they aren't, use `release.sh 1.1.0`.

@@ -63,6 +63,13 @@ on_vm "set -e; cd /opt/cubr
   CUBR_VERSION=${VERSION} ${COMPOSE} pull --quiet
   grep -q '^CUBR_VERSION=' .env && sed -i 's/^CUBR_VERSION=.*/CUBR_VERSION=${VERSION}/' .env || echo 'CUBR_VERSION=${VERSION}' >> .env
   ${COMPOSE} up -d --remove-orphans
+  # The gateway's nginx.conf is a single-file mount: the release's copy is a new file (a new inode),
+  # which the running container never sees, and up -d sees nothing to change. So when the config the
+  # gateway runs differs from the one on disk, recreate it (a second or two without the gateway).
+  if [ \"\$(sha256sum deploy/gateway/nginx.conf | cut -d' ' -f1)\" != \"\$(${COMPOSE} exec -T gateway sha256sum /etc/nginx/nginx.conf 2>/dev/null | cut -d' ' -f1)\" ]; then
+    echo 'the gateway config changed: recreating the gateway'
+    ${COMPOSE} up -d --force-recreate --no-deps gateway
+  fi
   for i in \$(seq 1 60); do
     starting=\$(${COMPOSE} ps --format '{{.Status}}' | grep -cE 'starting|unhealthy' || true)
     [ \"\$starting\" = 0 ] && break; sleep 5
