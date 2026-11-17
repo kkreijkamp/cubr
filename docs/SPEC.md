@@ -586,6 +586,20 @@ custom properties, command palette (Esc / Ctrl+K), focus mode while timing, toas
   shortcut focuses the open window and `lib/pwa.ts` takes it to the shortcut's page). iOS:
   `apple-touch-icon.png` (180 px, opaque) and the apple meta tags in `index.html`. The images are
   drawn by `web/scripts/pwa-assets.mjs`.
+- **iOS launch images** (`pwa-assets.mjs launch`): what an iPhone or iPad shows while cubr opens
+  from the home screen, instead of a blank white screen.
+  - The app icon's cube, 96 points across, centred on white.
+  - One per screen size and orientation: 26 sizes, from the iPhone SE to the iPhone 18 Pro Max,
+    the iPhone Air and every current iPad. The iPhone Duo's two sizes assume 3x, since Apple
+    doesn't publish it.
+  - `public/launch/`, linked from `index.html` by `apple-touch-startup-image` tags whose media
+    queries give the screen in points, the pixel ratio and the orientation. The script writes the
+    tags between markers. iOS uses an image only if it is exactly that size; the tests check every
+    tag against its file.
+  - Light only: iOS doesn't honour `prefers-color-scheme` in these queries (WebKit bug 259328), and
+    its web view is white between the launch image and the first paint anyway.
+  - iOS reads the image when the app is added to the home screen: an existing install needs
+    re-adding to get it. The images aren't precached.
 - **Link previews** (chat apps, social sites): `index.html` has Open Graph tags and
   `twitter:card summary_large_image`, the same for every page, since crawlers don't run the app.
   They give the title "cubr", the description "a minimalist speedcubing timer" (also the search
@@ -595,10 +609,10 @@ custom properties, command palette (Esc / Ctrl+K), focus mode while timing, toas
 - **Service worker** `/sw.js`, from `web/src/sw/sw.ts`, built after the app by
   `web/plugins/serviceWorker.ts`:
   - It precaches the whole build (about 2.4 MB) except source maps, the `.woff` font fallbacks,
-    the icons, the screenshots and the files for other sites (the link preview image, `robots.txt`,
-    `sitemap.xml`, `/.well-known/`), in the cache `cubr-app-<version>`. The version is a hash of the
-    cached files' names and contents, so a release that doesn't change the web app ships the same
-    `sw.js`, and browsers see no update.
+    the icons, the screenshots, the iOS launch images and the files for other sites (the link
+    preview image, `robots.txt`, `sitemap.xml`, `/.well-known/`), in the cache `cubr-app-<version>`.
+    The version is a hash of the cached files' names and contents, so a release that doesn't change
+    the web app ships the same `sw.js`, and browsers see no update.
   - Requests (`web/src/sw/policy.ts`):
     - navigations: the cached `index.html`;
     - `/assets/*`: cache first;

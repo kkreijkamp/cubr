@@ -11,7 +11,7 @@ describe('shouldPrecache', () => {
     }
   });
   it('leaves out the worker, source maps, the .woff fallbacks, the icons, the screenshots and the files for other sites', () => {
-    for (const f of ['sw.js', 'assets/index-d3oOLUDV.js.map', 'assets/lexend-deca-latin-400-normal-x.woff', 'icons/icon-512.png', 'screenshots/timer-wide.png', 'apple-touch-icon.png', 'og.png', 'robots.txt', 'sitemap.xml', '.well-known/security.txt', '.DS_Store']) {
+    for (const f of ['sw.js', 'assets/index-d3oOLUDV.js.map', 'assets/lexend-deca-latin-400-normal-x.woff', 'icons/icon-512.png', 'screenshots/timer-wide.png', 'launch/apple-launch-1179x2556.png', 'apple-touch-icon.png', 'og.png', 'robots.txt', 'sitemap.xml', '.well-known/security.txt', '.DS_Store']) {
       expect(shouldPrecache(f), f).toBe(false);
     }
   });

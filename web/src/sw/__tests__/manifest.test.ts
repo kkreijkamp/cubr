@@ -123,3 +123,47 @@ describe('link previews (index.html)', () => {
     expect(meta('og:url')).toBeUndefined();
   });
 });
+
+describe('the iOS launch images', () => {
+  const links = [...indexHtml.matchAll(/<link rel="apple-touch-startup-image" media="([^"]+)" href="([^"]+)" \/>/g)].map((m) => ({ media: m[1], href: m[2] }));
+  /** device-width, device-height, pixel ratio and orientation from a link's media query */
+  const screen = (media: string) => {
+    const m = /^\(device-width: (\d+)px\) and \(device-height: (\d+)px\) and \(-webkit-device-pixel-ratio: (\d)\) and \(orientation: (portrait|landscape)\)$/.exec(media);
+    if (!m) throw new Error(`unexpected media query: ${media}`);
+    return { width: Number(m[1]), height: Number(m[2]), ratio: Number(m[3]), orientation: m[4] };
+  };
+
+  it('only work in a home-screen web app, which index.html declares', () => {
+    expect(indexHtml).toContain('<meta name="apple-mobile-web-app-capable" content="yes" />');
+    expect(links.length).toBeGreaterThan(40);
+  });
+
+  it('match their screens exactly: points x pixel ratio, turned for landscape, opaque', () => {
+    for (const { media, href } of links) {
+      const s = screen(media);
+      const { width, height, alpha } = png(href);
+      const expected = s.orientation === 'portrait' ? [s.width * s.ratio, s.height * s.ratio] : [s.height * s.ratio, s.width * s.ratio];
+      expect([width, height], href).toEqual(expected);
+      expect(alpha, `${href}: iOS shows transparency as black`).toBe(false);
+    }
+  });
+
+  it('cover both orientations of every screen once, and every image in public/launch is used', () => {
+    const media = links.map((l) => l.media);
+    expect(new Set(media).size).toBe(media.length);
+    for (const m of media.filter((x) => x.endsWith('(orientation: portrait)'))) expect(media).toContain(m.replace('portrait', 'landscape'));
+    expect(media.filter((x) => x.endsWith('(orientation: landscape)'))).toHaveLength(media.length / 2);
+    const files = Object.keys(pngs)
+      .filter((f) => f.includes('/public/launch/'))
+      .map((f) => f.slice(f.indexOf('/public/') + '/public'.length));
+    expect(files.sort()).toEqual(links.map((l) => l.href).sort());
+  });
+
+  it("include today's iPhones and iPads", () => {
+    const screens = new Set(links.map((l) => screen(l.media)).map((s) => `${s.width}x${s.height}@${s.ratio}`));
+    // iPhone 15 / 16, 16 Pro / 17 / 18 Pro, 16 Pro Max / 17 Pro Max / 18 Pro Max, Air, 16e / 17e, SE
+    for (const s of ['393x852@3', '402x874@3', '440x956@3', '420x912@3', '390x844@3', '375x667@2']) expect(screens, s).toContain(s);
+    // iPad (A16) / Air 11, Pro 11 and 13 (M4, M5), Air 13, mini
+    for (const s of ['820x1180@2', '834x1210@2', '1032x1376@2', '1024x1366@2', '744x1133@2']) expect(screens, s).toContain(s);
+  });
+});
