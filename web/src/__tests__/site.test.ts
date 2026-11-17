@@ -241,9 +241,17 @@ describe('security headers', () => {
 const noindex = (path: string) => mapLookup('$cubr_robots', path) === 'noindex';
 
 describe('for crawlers', () => {
-  it('robots.txt keeps them out of the API only, and names the sitemap', () => {
+  it('robots.txt lets them fetch everything public, the API included, and names the sitemap', () => {
     const lines = robotsTxt.split('\n').filter((l) => l && !l.startsWith('#'));
-    expect(lines).toEqual(['User-agent: *', 'Disallow: /api/', 'Disallow: /internal/', 'Sitemap: https://cubr.dev/sitemap.xml']);
+    expect(lines).toEqual(['User-agent: *', 'Disallow: /internal/', 'Sitemap: https://cubr.dev/sitemap.xml']);
+    // Google renders pages without whatever robots.txt blocks: the leaderboards, profiles, the daily
+    // board and About load their content from the API
+    for (const l of lines) expect(l).not.toMatch(/^Disallow: \/api/);
+  });
+
+  it('API answers (data, not pages) ask not to be listed, wherever they come from', () => {
+    for (const p of ['/api/leaderboards', '/api/users/koen_k', '/api/nope', '/internal/x']) expect(noindex(p), p).toBe(true);
+    expect(noindex('/apiary')).toBe(false);
   });
 
   it('personal and short-lived pages ask not to be listed, and the public ones don\'t', () => {

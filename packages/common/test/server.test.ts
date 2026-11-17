@@ -1,7 +1,7 @@
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { loadConfig } from '../src/config.js';
 import { PG_PING_TIMEOUT_MS, pingPostgres, type Pool } from '../src/db.js';
-import { createServer, SECURITY_HEADERS, type ServerOptions } from '../src/server.js';
+import { createServer, ROBOTS_HEADERS, SECURITY_HEADERS, type ServerOptions } from '../src/server.js';
 
 const never = () => new Promise<never>(() => {});
 
@@ -72,6 +72,11 @@ describe('security headers', () => {
       const res = await app.inject({ url });
       for (const [name, value] of Object.entries(SECURITY_HEADERS)) expect(res.headers[name.toLowerCase()], `${url}: ${name}`).toBe(value);
     }
+  });
+
+  it('let search engines fetch the API (pages render from it) but never list its answers', async () => {
+    expect(ROBOTS_HEADERS).toEqual({ 'X-Robots-Tag': 'noindex' });
+    for (const url of ['/api/test/thing', '/api/test/nope', '/api/test/_info']) expect((await app.inject({ url })).headers['x-robots-tag'], url).toBe('noindex');
   });
 
   it("leave a route's own stricter value alone (the avatars' sandbox)", async () => {

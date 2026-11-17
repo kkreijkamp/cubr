@@ -63,6 +63,12 @@ export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
 };
 
 /**
+ * Search engines may fetch the API (Google renders pages, e.g. the leaderboards, from it, and skips
+ * whatever robots.txt blocks) but must never list its answers.
+ */
+export const ROBOTS_HEADERS: Readonly<Record<string, string>> = { 'X-Robots-Tag': 'noindex' };
+
+/**
  * Creates a Fastify instance with the cross-cutting behaviour every cubr service shares:
  * JSON error envelope, the security headers, /healthz, /readyz and <prefix>/_info.
  */
@@ -85,7 +91,7 @@ export function createServer(config: BaseConfig, opts: ServerOptions): Server {
 
   // a route's own value wins (the avatars' stricter CSP adds `sandbox`, so an upload can never act as a page)
   app.addHook('onSend', async (_req, reply, payload) => {
-    for (const [name, value] of Object.entries(SECURITY_HEADERS)) if (!reply.hasHeader(name)) reply.header(name, value);
+    for (const [name, value] of Object.entries({ ...SECURITY_HEADERS, ...ROBOTS_HEADERS })) if (!reply.hasHeader(name)) reply.header(name, value);
     return payload;
   });
 

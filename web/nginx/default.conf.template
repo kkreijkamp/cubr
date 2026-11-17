@@ -23,6 +23,7 @@ map "$status:$uri" $cubr_cache_control {
 # still fetch them (robots.txt doesn't block them), or they couldn't see this.
 map $request_uri $cubr_robots {
   default                                                 "";
+  ~^/(?:api|internal)(?:/|$)                              "noindex";   # data, not pages (the services say the same)
   ~*^/(?:account|settings|login|reset)(?:[/?]|$)          "noindex";
   ~*^/race/[^/?]                                          "noindex";   # race rooms last two hours
 }
