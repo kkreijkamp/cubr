@@ -61,7 +61,8 @@ export function GlobalCommands() {
   useRegisterCommands(
     'global',
     () => {
-      const go = (path: string) => () => navigate(path);
+      // React Router 7's navigate() may return a promise; a command returns nothing
+      const go = (path: string) => () => void navigate(path);
       const nav: Command[] = [
         { id: 'go-timer', label: 'Go to timer', icon: <ClockIcon />, run: go('/') },
         { id: 'go-daily', label: 'Go to daily challenge', icon: <CalendarDaysIcon />, run: go('/daily') },
