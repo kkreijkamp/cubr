@@ -604,6 +604,15 @@ Google, Apple or GitHub: signs in, or asks a new account for its username), `/re
 with an optimistic local store + retry queue (idempotent ids). Monkeytype-style theme system via CSS
 custom properties, command palette (Esc / Ctrl+K), focus mode while timing, toasts.
 
+The screen stays on while timing (the Screen Wake Lock API, `web/src/lib/wakeLock.ts`, held by
+`TimerDisplay` for every input, races and the daily challenge included). It holds from the press,
+or the start of inspection, until five minutes after the solve stops: long enough to read the time
+and scramble the next one. That matters most with a Stackmat, smart cube or Bluetooth timer, which
+never touch the screen, so the device counts as idle all along. Leaving the timer lets go at once.
+The browser drops the lock while the page is hidden; it's taken again when the page shows. Where
+the browser lacks the API (iOS before 16.4, or before 18.4 in a home-screen app; Firefox before
+126), the screen sleeps as before.
+
 ### 10.1 Installable app and offline (PWA)
 
 - **Manifest** `web/public/manifest.webmanifest`: standalone display, white cross colours (and

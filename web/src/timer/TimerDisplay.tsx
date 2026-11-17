@@ -3,6 +3,7 @@ import { formatTime, type Precision } from '@cubr/cubestats';
 import type { TimerState } from './useTimerEngine';
 import { INSPECTION_MS } from './useTimerEngine';
 import type { TimerUpdate } from '../lib/settings';
+import { AFTER_SOLVE_MS, useWakeLock } from '../lib/wakeLock';
 import './timer.css';
 
 interface Props {
@@ -61,6 +62,8 @@ export function TimerDisplay({ state, precision, timerUpdate, sizeRem = 7, pb, c
   const textRef = useRef<HTMLSpanElement>(null);
   const { phase, inInspection, startedAt, inspectionStartedAt, result } = state;
   const showInspection = phase === 'inspecting' || (inInspection && (phase === 'holding' || phase === 'ready'));
+  // the screen stays on from the press (or inspection) until the solve stops, and a while after
+  useWakeLock(phase === 'holding' || phase === 'ready' || phase === 'inspecting' || phase === 'running', AFTER_SOLVE_MS);
 
   useEffect(() => {
     if (phase !== 'running' && !showInspection) return;
