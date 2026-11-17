@@ -21,6 +21,34 @@
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="the cubr logo: a green cube face and the word cubr" />
     <meta name="twitter:card" content="summary_large_image" />
+    <!-- for search engines: the site's name ("cubr", not "cubr.dev") and its logo. A data block, not a
+         script: the CSP doesn't apply, and src/__tests__/site.test.ts checks it against the site's files.
+         The logo is the maskable icon: opaque white, with the cube clear of a round crop -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://cubr.dev/#website",
+            "url": "https://cubr.dev/",
+            "name": "cubr",
+            "alternateName": ["cubr.dev"],
+            "description": "a minimalist speedcubing timer",
+            "inLanguage": "en",
+            "publisher": { "@id": "https://cubr.dev/#organization" }
+          },
+          {
+            "@type": "Organization",
+            "@id": "https://cubr.dev/#organization",
+            "name": "cubr",
+            "url": "https://cubr.dev/",
+            "logo": { "@type": "ImageObject", "url": "https://cubr.dev/icons/icon-maskable-512.png", "width": 512, "height": 512 },
+            "sameAs": ["https://github.com/kkreijkamp/cubr", "https://ko-fi.com/cubrr"]
+          }
+        ]
+      }
+    </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <!-- the installable app (PWA): public/manifest.webmanifest, the service worker is src/sw/ -->
     <link rel="manifest" href="/manifest.webmanifest" />

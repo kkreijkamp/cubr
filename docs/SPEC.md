@@ -680,6 +680,13 @@ The web container's nginx (`web/nginx/default.conf.template`) serves the app and
     errors included.
   - The gateway adds nothing to proxied responses (it would duplicate these), only to its own
     errors.
+- **The site's name and logo for search engines:** `index.html` carries one JSON-LD block (a data block,
+  which the CSP doesn't cover):
+  - a `WebSite` (`https://cubr.dev/`, name `cubr`, alternate name `cubr.dev`, the page's description);
+  - its publisher, an `Organization` named `cubr`, with the logo `/icons/icon-maskable-512.png` (512 px,
+    opaque, the cube clear of a round crop) and `sameAs` the GitHub repository and the Ko-fi page.
+  - `structuredData.test.ts` checks it against the files and `lib/links.ts`. The Schema Markup
+    Validator finds no errors or warnings.
 - **One address per page.** Search engines split a page's ranking between its addresses, so:
   - **nginx** (`map $cubr_canonical`) sends a page asked for with capitals or a trailing slash to its
     plain lowercase address: 301, query kept (`/About/?x=1` -> `/about?x=1`). A username and a room id
