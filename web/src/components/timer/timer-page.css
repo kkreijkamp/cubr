@@ -888,10 +888,24 @@
 .tp-guest .btn-text {
   padding: 0.2rem;
 }
+/* touch screens: fingertip-sized targets (global.css's touch block sets the buttons) */
 @media (hover: none) and (pointer: coarse) {
   .tp-guest .btn-text {
     padding: 0.5rem;
     margin: -0.3rem 0;
+  }
+  /* the guest note's links sit in a line of text: they grow around it */
+  .tp-guest a {
+    display: inline-block;
+    padding: 0.8rem 0.25rem;
+    margin: -0.8rem -0.25rem;
+  }
+  /* the stats cells open their averages: a row each, a fingertip tall */
+  .tp-cell-btn {
+    min-height: 44px;
+  }
+  .tp-menu-item {
+    min-height: 44px;
   }
 }
 
@@ -1083,9 +1097,11 @@
   .tp-under {
     min-height: 0;
   }
-  /* the bar's menus scroll inside themselves rather than running past the bottom of the screen */
+  /* the bar's menus scroll inside themselves rather than running past the bottom of the screen
+     (the screen as it is now: a phone's browser bars take some of 100vh) */
   .tp-menu {
     max-height: calc(100vh - 8rem);
+    max-height: calc(100dvh - 8rem);
     overflow-y: auto;
   }
 }

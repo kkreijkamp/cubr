@@ -101,6 +101,11 @@
     user-select: text;
     -webkit-user-select: text;
   }
+  /* a checkbox's whole label is a fingertip tall, around its line */
+  .live-checkbox {
+    padding-block: 0.75rem;
+    margin-block: -0.75rem;
+  }
 }
 .live-timer.dim .timer-display {
   color: var(--sub-color);

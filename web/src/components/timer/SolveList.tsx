@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { ChatBubbleLeftEllipsisIcon, ListBulletIcon } from '@heroicons/react/24/outline';
 import type { Precision } from '@cubr/cubestats';
 import type { Solve } from '../../lib/types';
@@ -6,7 +6,17 @@ import { fmtAvg, fmtSolveShort } from './statsUtil';
 import { Loading } from '../Spinner';
 
 const ROW = 30;
+/** a fingertip's height on a touch screen, as the other touch targets (global.css) */
+const TOUCH_ROW = 44;
 const OVERSCAN = 8;
+
+function touchScreen(): boolean {
+  try {
+    return matchMedia('(hover: none) and (pointer: coarse)').matches;
+  } catch {
+    return false;
+  }
+}
 
 interface Props {
   solves: Solve[];
@@ -28,6 +38,7 @@ export const SolveList = memo(function SolveList({ solves, ao5, ao12, pbs, bestI
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewH, setViewH] = useState(360);
+  const row = useMemo(() => (touchScreen() ? TOUCH_ROW : ROW), []);
   const n = solves.length;
 
   useEffect(() => {
@@ -48,8 +59,8 @@ export const SolveList = memo(function SolveList({ solves, ao5, ao12, pbs, bestI
     prevN.current = n;
   }, [n]);
 
-  const first = Math.max(0, Math.floor(scrollTop / ROW) - OVERSCAN);
-  const last = Math.min(n, Math.ceil((scrollTop + viewH) / ROW) + OVERSCAN);
+  const first = Math.max(0, Math.floor(scrollTop / row) - OVERSCAN);
+  const last = Math.min(n, Math.ceil((scrollTop + viewH) / row) + OVERSCAN);
   const rows = [];
   for (let r = first; r < last; r++) {
     const i = n - 1 - r;
@@ -58,7 +69,7 @@ export const SolveList = memo(function SolveList({ solves, ao5, ao12, pbs, bestI
       <div
         key={s.id}
         className={`tp-solve-row${r % 2 === 0 ? ' odd' : ''}${i === bestIndex ? ' best' : ''}`}
-        style={{ transform: `translateY(${r * ROW}px)` }}
+        style={{ transform: `translateY(${r * row}px)`, height: row }}
         onClick={() => onOpen(i)}
         role="button"
         tabIndex={-1}
@@ -96,7 +107,7 @@ export const SolveList = memo(function SolveList({ solves, ao5, ao12, pbs, bestI
             <span>ao12</span>
           </div>
           <div className="tp-solve-scroll" ref={scrollRef} onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}>
-            <div className="tp-solve-inner" style={{ height: n * ROW }}>
+            <div className="tp-solve-inner" style={{ height: n * row }}>
               {rows}
             </div>
           </div>

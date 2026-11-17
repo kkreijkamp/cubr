@@ -66,6 +66,8 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
+  /* a phone's screen with its browser bars showing: a short page fits it instead of scrolling a little */
+  min-height: 100svh;
   font-family: var(--font);
   font-size: 16px;
   color: var(--text-color);
@@ -133,6 +135,7 @@ h4 {
   grid-template-columns: minmax(0, 1fr); /* never let wide content (e.g. the nav) widen the page */
   row-gap: 2rem;
   min-height: 100vh;
+  min-height: 100svh;
   padding: 2rem var(--pad);
   max-width: calc(var(--page-max) + var(--pad) * 2);
   margin: 0 auto;
@@ -303,14 +306,44 @@ body.focus * {
   font-size: 0.75rem;
   padding: 0.25rem;
 }
-/* touch screens: the footer's small links get a fingertip-sized height */
+/* ---------------------------------------------------------------- touch screens */
+/* Fingertip-sized controls where there's no mouse (phones, tablets): buttons and fields at least
+   44 px tall and buttons as wide, Apple's minimum (WCAG 2.5.8 asks for 24 px; most were 22-35 px).
+   Where a control sits in a line of text, or in the header, which has no room to spare, it grows
+   into the space around it instead (padding, then the same negative margin), so nothing moves.
+   Each component's stylesheet fits its own controls in its touch block. */
 @media (hover: none) and (pointer: coarse) {
+  .btn,
+  .btn-text {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .btn.small {
+    min-height: 40px;
+  }
+  input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file']),
+  select {
+    min-height: 44px;
+  }
+  /* the header: the logo and seven icons across a 320-400 px screen. Full height, as wide as fits */
+  .nav .btn-text {
+    min-width: 0;
+    padding: 0.75rem clamp(0.3rem, 1.8vw, 0.6rem);
+    margin-block: -0.5rem;
+  }
+  .logo {
+    padding-block: 0.75rem;
+    margin-block: -0.75rem;
+  }
   .footer .btn-text {
     padding: 0.45rem 0.3rem;
   }
   .footer .footer-links,
   .footer .footer-right {
     row-gap: 0;
+  }
+  .palette .palette-row {
+    min-height: 44px;
   }
 }
 .keytips {

@@ -618,6 +618,24 @@ there (the last solve's +2 and dnf) is that button's, not a start (`useTimerEngi
 Double-tap zoom is off page-wide (`touch-action: manipulation`), so two quick taps don't zoom;
 pinch zoom still works.
 
+Touch screens get fingertip-sized controls (`@media (hover: none) and (pointer: coarse)`: global.css's
+touch block, then each component's own).
+- **Buttons and fields:** at least 44 px tall (Apple's minimum; WCAG 2.5.8 asks for 24 px), and
+  buttons are as wide. The menus, the command palette, the stats cells and the solve list's rows are
+  44 px too. `SolveList` sets its row height from the same media query, since it positions its rows
+  itself.
+- **The header:** its icons are full height and as wide as fits (30-32 px on 320-390 px phones).
+- **Controls inside a line of text:** links, the leaderboard's names, the profile's ranks and range,
+  and the login links grow into the space around them (padding with the same negative margin), so
+  nothing moves.
+- **Under 44 px on purpose:**
+  - links inside prose (WCAG's inline exception);
+  - the profile's donut legend, 36 px, a list of pickers kept beside the donut;
+  - the keyboard-binding keys, which only matter with a keyboard.
+- **Text and heights:** fields keep 16 px text, so iOS doesn't zoom into them. Short pages fit a
+  phone's screen with its browser bars showing (`100svh`), and the timer's menus scroll within what's
+  visible (`100dvh`).
+
 The screen stays on while timing (the Screen Wake Lock API, `web/src/lib/wakeLock.ts`, held by
 `TimerDisplay` for every input, races and the daily challenge included). It holds from the press,
 or the start of inspection, until five minutes after the solve stops: long enough to read the time

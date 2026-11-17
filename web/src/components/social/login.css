@@ -203,11 +203,20 @@
 .lg-forgot:hover {
   color: var(--text-color);
 }
-/* touch screens: a fingertip-sized hit area, in the same place */
+/* touch screens: fingertip-sized hit areas (44 px), in the same places */
 @media (hover: none) and (pointer: coarse) {
   .lg-forgot {
-    padding: 0.5rem 0 0.5rem 0.75rem;
-    margin: -0.5rem 0;
+    padding: 0.85rem 0 0.85rem 0.75rem;
+    margin: -0.85rem 0;
+  }
+  .lg-tab {
+    padding-block: 0.3rem;
+    margin-block: -0.3rem;
+  }
+  .lg-guest {
+    padding-block: 0.85rem;
+    margin-top: 0.65rem;
+    margin-bottom: -0.85rem;
   }
 }
 .lg-sent p {
