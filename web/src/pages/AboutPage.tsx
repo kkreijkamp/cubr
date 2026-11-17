@@ -20,6 +20,7 @@ import { useCountUp } from '../components/social/useCountUp';
 import { friendlyError } from '../components/social/util';
 import { api } from '../lib/api';
 import { formatDate, formatNumber } from '../lib/format';
+import { DONATE_URL } from '../lib/links';
 import { THEMES } from '../lib/themes';
 import type { GlobalStats } from '../lib/types';
 import { useAsync } from '../lib/useAsync';
@@ -38,9 +39,6 @@ const FEATURES = [
   { icon: SwatchIcon, t: 'themes & command line', d: `${THEMES.length} cube-inspired themes with live preview, light or dark with your device. press esc and type - everything is a command.` },
   { icon: SignalSlashIcon, t: 'an app that works offline', d: "install it on your phone or computer. the timer opens and works without a connection, and your solves sync when you're back online." },
 ];
-
-/** Where to donate. Supporters who make their support public are listed from the Ko-fi webhook. */
-const DONATE_URL = 'https://ko-fi.com/cubrr';
 
 // the everyday ones - csTimer's keys; settings > keyboard shortcuts lists them all
 const KEYS: [string[], string][] = [

@@ -8,6 +8,7 @@ import {
   CommandLineIcon,
   EnvelopeIcon,
   FlagIcon,
+  HeartIcon,
   GlobeAltIcon,
   InformationCircleIcon,
   SwatchIcon,
@@ -23,6 +24,7 @@ import { LocalUploadOffer } from './timer/LocalUploadOffer';
 import { PatchNotesModal } from './PatchNotesModal';
 import { useAuth } from '../lib/auth';
 import { openPalette } from '../lib/commands';
+import { CONTACT_EMAIL, DONATE_URL, REPO_URL } from '../lib/links';
 import { useActiveTheme } from '../lib/settings';
 import { themeLabel } from '../lib/themes';
 import { api } from '../lib/api';
@@ -77,10 +79,6 @@ function Header() {
   );
 }
 
-/** The source code on GitHub. */
-const REPO_URL = 'https://github.com/kkreijkamp/cubr';
-/** Where people reach the maintainer (an iCloud+ custom-domain address). */
-const CONTACT_EMAIL = 'hello@cubr.dev';
 
 function Footer() {
   const theme = useActiveTheme();
@@ -107,6 +105,9 @@ function Footer() {
         </a>
         <a href={`mailto:${CONTACT_EMAIL}`} className="btn-text" data-tip={CONTACT_EMAIL}>
           <EnvelopeIcon width={14} height={14} /> contact
+        </a>
+        <a href={DONATE_URL} className="btn-text" target="_blank" rel="noreferrer noopener" data-tip={DONATE_URL.replace(/^https:[/][/]/, '')}>
+          <HeartIcon width={14} height={14} /> support
         </a>
       </div>
       <div className="footer-right">
