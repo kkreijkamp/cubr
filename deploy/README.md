@@ -97,7 +97,7 @@ docker compose ps                             # all services report (healthy) vi
 docker compose up -d --scale solve=3          # 3 replicas behind the gateway (round-robin)
 for i in $(seq 9); do curl -s localhost:8080/api/solves/_info | grep -o '"pod":"[^"]*"'; done
 docker compose --profile jobs run --rm wca-import       # downloads the WCA export (or see below)
-docker compose --profile jobs run --rm seed             # 150 users + ~100k solves (SEED_USERS=20 for less)
+docker compose --profile jobs run --rm seed             # 150 users + ~100k solves (SEED_USERS=20 for less); demo login: demo / cubr-demo
 node scripts/smoke.mjs http://localhost:8080            # end-to-end check
 docker compose down          # stop; add -v to also delete the Postgres/Redis volumes
 ```
@@ -117,11 +117,11 @@ Run `scripts/commands.sh` section by section (`scripts/commands.sh list` prints 
 
 | section  | Step |
 |---|---|
-| 0 | Variables (`PROJECT_ID=cubr-app`, `ZONE=australia-southeast1-a`, `CLUSTER=cubr`, `REPO=cubr`, `VERSION=1.4.17`) |
+| 0 | Variables (`PROJECT_ID=cubr-app`, `ZONE=australia-southeast1-a`, `CLUSTER=cubr`, `REPO=cubr`, `VERSION=1.4.18`) |
 | 1 | `gcloud auth list`, select your account (`ACCOUNT`, default: gcloud's active one), set project/region/zone |
 | 2 | Enable container, artifactregistry, cloudbuild and compute APIs |
 | 3 | Artifact Registry repo. IAM: nodes get `artifactregistry.reader` and `container.defaultNodeServiceAccount`; the build SA gets `artifactregistry.writer`, `logging.logWriter` and `storage.objectViewer`. |
-| 4 | `gcloud builds submit --config cloudbuild.yaml --substitutions _VERSION=1.4.17,...` (10 images in parallel, native amd64) |
+| 4 | `gcloud builds submit --config cloudbuild.yaml --substitutions _VERSION=1.4.18,...` (10 images in parallel, native amd64) |
 | 5 | `gcloud container clusters create` (3x e2-standard-2, autoscaling 3-5, 30 GB pd-balanced, regular channel, VPC-native) + `get-credentials` |
 | 6 | Reserve the global static IP `cubr-ip` |
 | 7 | Install CloudNativePG 1.30.1 (server-side apply) and wait for the operator |
