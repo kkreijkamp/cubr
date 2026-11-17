@@ -2,7 +2,7 @@ import { lazy, Suspense } from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { RouteError } from './components/RouteError';
-import { Loading } from './components/Spinner';
+import { Loading, PageLoading } from './components/Spinner';
 import { AuthProvider } from './lib/auth';
 import TimerPage from './pages/TimerPage';
 
@@ -25,6 +25,9 @@ const PrivacyPage = lazy(() => import('./pages/LegalPage').then((m) => ({ defaul
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 const s = (el: JSX.Element) => <Suspense fallback={<Loading />}>{el}</Suspense>;
+// a page that ends up taller than the screen: its loading state holds a screen's height, so the footer
+// isn't pushed off the screen when the page arrives (see PageLoading)
+const tall = (el: JSX.Element) => <Suspense fallback={<PageLoading />}>{el}</Suspense>;
 
 const router = createBrowserRouter([
   {
@@ -40,8 +43,8 @@ const router = createBrowserRouter([
           { path: '/daily', element: s(<DailyPage />) },
           { path: '/race', element: s(<RaceLobbyPage />) },
           { path: '/race/:roomId', element: s(<RaceRoomPage />) },
-          { path: '/profile/:username', element: s(<ProfilePage />) },
-          { path: '/account', element: s(<AccountPage />) },
+          { path: '/profile/:username', element: tall(<ProfilePage />) },
+          { path: '/account', element: tall(<AccountPage />) },
           { path: '/settings', element: s(<SettingsPage />) },
           { path: '/wca', element: s(<WcaPage />) },
           { path: '/about', element: s(<AboutPage />) },

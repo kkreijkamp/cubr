@@ -42,6 +42,10 @@
   color: var(--sub-color);
   letter-spacing: 0;
 }
+/* a spinner by the title (data loading) keeps the line as tall as the text that comes in its place */
+.pf-extra .spinner {
+  margin-block: -0.25rem;
+}
 .pf-extra a,
 .pf-link {
   color: var(--sub-color);
@@ -292,10 +296,6 @@
   color: var(--sub-color);
   font-size: 0.8rem;
 }
-.pf-totals .dim dd {
-  color: var(--sub-color);
-}
-
 /* ---------------------------------------------------------------- one event at a time */
 .pf-event {
   display: grid;
@@ -358,7 +358,11 @@
   align-items: end;
   gap: 1.75rem 4.5rem;
   min-width: 0;
-  /* a new event's numbers fade in (remounted per event) */
+}
+/* a new event's numbers fade in (remounted per event). Not on the first load: the big single is
+   usually the page's largest paint, and Chrome dates an element that fades in from 0 late (only at
+   its next repaint, up to seconds after it shows) */
+.pf-bests.fade {
   animation: fadeIn 0.35s ease-out;
 }
 .pf-single {
@@ -1012,6 +1016,10 @@ table.ps-table td.dnf {
 }
 /* narrow phones: ao100 / ao1000 don't fit next to ao5 / ao12 without scrolling sideways */
 @media (max-width: 500px) {
+  /* the line under the progress chart often wraps here: room for two, so it doesn't push the page when it does */
+  .pf-history .pv-insight {
+    min-height: 3em;
+  }
   table.ps-table .ps-long {
     display: none;
   }
@@ -1062,6 +1070,11 @@ table.ps-table td.dnf {
   align-items: flex-end;
   gap: 0.5rem 1.25rem;
   margin: 0;
+}
+.pf .wc-headline-meta {
+  /* always under the number: the block is as tall whatever the rank's width, and its stand-in (#-)
+     takes the same room while it loads */
+  flex-basis: 100%;
 }
 .pf .wc-headline .big {
   color: var(--text-color);

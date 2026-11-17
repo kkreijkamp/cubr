@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Loading } from '../components/Spinner';
+import { PageLoading } from '../components/Spinner';
 import { AccountSection } from '../components/social/DataTools';
 import { EditProfileModal } from '../components/social/EditProfileModal';
 import { ProfileView } from '../components/social/ProfileView';
@@ -18,7 +18,7 @@ export default function AccountPage() {
     };
   }, []);
 
-  if (status === 'loading') return <Loading />;
+  if (status === 'loading') return <PageLoading />;
   if (status !== 'authed' || !user) return <Navigate to={`/login?next=${encodeURIComponent('/account')}`} replace />;
 
   return (

@@ -15,13 +15,68 @@ const CONTEXT = 999;
 /** the stats service's ?limit= cap */
 const MAX_LIMIT = 50_000;
 
+/** The table's head, shared by the table and its stand-in. */
+function SolvesHead() {
+  return (
+    <thead>
+      <tr>
+        <th className="left">#</th>
+        <th>time</th>
+        <th>ao5</th>
+        <th>ao12</th>
+        <th className="ps-long">ao100</th>
+        <th className="ps-long">ao1000</th>
+        <th className="left hide-mobile-cell">session</th>
+        <th>date</th>
+      </tr>
+    </thead>
+  );
+}
+
+/**
+ * While the solves load: the table they'll fill (as many rows as will show, and "load more" when there
+ * are more), invisible, so the footer below doesn't move when they arrive.
+ */
+function SolvesStandIn({ rows, more }: { rows: number; more: boolean }) {
+  return (
+    <>
+      <div className="table-wrap reserve" aria-hidden="true">
+        <table className="table ps-table">
+          <SolvesHead />
+          <tbody>
+            {Array.from({ length: rows }, (_, i) => (
+              <tr key={i}>
+                <td className="left sub">0</td>
+                <td>00.00</td>
+                <td>00.00</td>
+                <td>00.00</td>
+                <td className="ps-long">00.00</td>
+                <td className="ps-long">00.00</td>
+                <td className="left sub hide-mobile-cell">session</td>
+                <td className="sub">
+                  00 Sep 2026<span className="hide-mobile-cell"> 00:00</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {more && (
+        <button type="button" className="btn-text small ps-more reserve" tabIndex={-1} aria-hidden="true">
+          load {PAGE} more
+        </button>
+      )}
+    </>
+  );
+}
+
 /**
  * Monkeytype-style results table at the bottom of the profile: the newest solves of one event,
  * newest first, with the rolling ao5 / ao12 / ao100 / ao1000 at each solve (over the whole history,
  * like the history chart) and "load more". Served from the stats read model, so it works on any
- * public profile.
+ * public profile. `solves` (the event's count, from the summary) sizes the room it keeps while loading.
  */
-export function ProfileSolves({ userId, event, precision }: { userId: string; event: string; precision: 2 | 3 }) {
+export function ProfileSolves({ userId, event, precision, solves }: { userId: string; event: string; precision: 2 | 3; solves: number }) {
   const [listed, setListed] = useState(PAGE);
   const series = useAsync((signal) => api.stats.solves(userId, event, signal, { limit: listed + CONTEXT }), [userId, event, listed]);
   // useAsync keeps the previous event's rows while the next one loads
@@ -62,25 +117,14 @@ export function ProfileSolves({ userId, event, precision }: { userId: string; ev
 
   let body;
   if (series.error && !data) body = <WidgetError error={series.error} what="the solves" onRetry={series.reload} />;
-  else if (!data) body = <Loading />;
+  else if (!data) body = solves > 0 ? <SolvesStandIn rows={Math.min(PAGE, solves)} more={solves > PAGE} /> : <Loading />;
   else if (data.total === 0) body = <WidgetEmpty>no {eventLabel(event)} solves yet</WidgetEmpty>;
   else
     body = (
       <>
         <div className="table-wrap">
           <table className="table ps-table">
-            <thead>
-              <tr>
-                <th className="left">#</th>
-                <th>time</th>
-                <th>ao5</th>
-                <th>ao12</th>
-                <th className="ps-long">ao100</th>
-                <th className="ps-long">ao1000</th>
-                <th className="left hide-mobile-cell">session</th>
-                <th>date</th>
-              </tr>
-            </thead>
+            <SolvesHead />
             <tbody>
               {rows.map((r) => (
                 <tr key={r.n}>
@@ -112,7 +156,13 @@ export function ProfileSolves({ userId, event, precision }: { userId: string; ev
     );
 
   return (
-    <Section label="solves" className="ps" title="solves" extra={data && data.total > 0 && `${formatNumber(rows.length)} of ${formatNumber(data.total)}`}>
+    <Section
+      label="solves"
+      className="ps"
+      title="solves"
+      // while the invisible stand-in holds the table's room, the spinner sits by the title
+      extra={data ? data.total > 0 && `${formatNumber(rows.length)} of ${formatNumber(data.total)}` : !series.error && solves > 0 && <Spinner size={12} />}
+    >
       {body}
     </Section>
   );

@@ -40,7 +40,20 @@ function RankLink({ rank, full, shownMs, precision }: { rank: UserRank; full?: b
  * One event's personal bests: the single big, the averages in a row beside it, each with its
  * all-time leaderboard place (single, ao5 and ao12 have boards).
  */
-export function EventBests({ userId, event, summary, precision }: { userId: string; event: string; summary: AsyncState<StatsSummary>; precision: 2 | 3 }) {
+/** `fade`: the numbers fade in, for a change of event (not the first load, see ProfileView). */
+export function EventBests({
+  userId,
+  event,
+  summary,
+  precision,
+  fade = false,
+}: {
+  userId: string;
+  event: string;
+  summary: AsyncState<StatsSummary>;
+  precision: 2 | 3;
+  fade?: boolean;
+}) {
   const ranks = useAsync((signal) => api.leaderboards.userRanks(userId, signal), [userId]);
   if (summary.error && !summary.data) return <WidgetError error={summary.error} what="the stats service" onRetry={summary.reload} />;
   if (!summary.data) return <Loading />;
@@ -52,13 +65,24 @@ export function EventBests({ userId, event, summary, precision }: { userId: stri
   const averages = PB_KINDS.filter((k) => k !== 'single');
 
   return (
-    <section className="pf-bests" aria-label="personal bests">
+    <section className={fade ? 'pf-bests fade' : 'pf-bests'} aria-label="personal bests">
       <div className="pf-single" aria-label={single ? `single ${pbText(single, precision)}, set ${formatDate(single.achievedAt)}` : 'no single yet'}>
         <span className="pf-single-value">{pbText(single, precision) ?? '-'}</span>
         <span className="pf-single-meta">
           <span>single</span>
           {single && <span data-tip={timeAgo(single.achievedAt)}>{formatDate(single.achievedAt)}</span>}
-          {singleRank && <RankLink rank={singleRank} full shownMs={single?.valueMs} precision={precision} />}
+          {singleRank ? (
+            <RankLink rank={singleRank} full shownMs={single?.valueMs} precision={precision} />
+          ) : (
+            // while the ranks load: a rank's width, so the averages beside it don't slide over when it comes
+            single &&
+            !ranks.data &&
+            !ranks.error && (
+              <span className="pf-rank reserve" aria-hidden="true">
+                #00 on cubr
+              </span>
+            )
+          )}
         </span>
       </div>
       <div className="pf-avgs">

@@ -695,6 +695,17 @@ table.table .secondary {
   padding: 2rem 1rem;
 }
 
+/* a screen's height for a long page while it loads (PageLoading), and for every outcome of a page that
+   can't know it's short until then (a profile): the footer stays below the screen instead of jumping */
+.page-tall {
+  min-height: 100vh;
+}
+
+/* stand-ins that keep the room of text that comes with the data (same lines, same wrapping) */
+.reserve {
+  visibility: hidden;
+}
+
 /* pills / badges */
 .pill {
   display: inline-flex;

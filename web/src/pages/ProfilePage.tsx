@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
-import { ErrorState, Loading } from '../components/Spinner';
+import { ErrorState, PageLoading } from '../components/Spinner';
 import { PrivateProfileView } from '../components/social/PrivateProfile';
 import { ProfileView } from '../components/social/ProfileView';
 import { friendlyError } from '../components/social/util';
@@ -30,10 +30,12 @@ export default function ProfilePage() {
   const stored = profile.data?.user.username;
   useCanonical(stored ? `/profile/${encodeURIComponent(stored)}` : null);
 
+  // Every outcome is at least a screen tall, like the loading state before it (PageLoading): the footer
+  // stays below the screen instead of jumping up for a short one (no cuber, private, no solves yet).
   if (profile.error && !profile.data) {
     if (missing) {
       return (
-        <div className="empty stack" style={{ justifyItems: 'center', paddingTop: '4rem' }}>
+        <div className="empty stack page-tall" style={{ justifyItems: 'center', paddingTop: '4rem' }}>
           <MagnifyingGlassIcon width={40} height={40} className="sub" aria-hidden="true" />
           <div className="text" style={{ fontSize: '1.5rem', overflowWrap: 'anywhere' }}>
             no cuber called "{username}"
@@ -50,24 +52,35 @@ export default function ProfilePage() {
         </div>
       );
     }
-    return <ErrorState error={new Error(friendlyError(profile.error, 'the auth service'))} onRetry={profile.reload} />;
+    return (
+      <div className="page-tall">
+        <ErrorState error={new Error(friendlyError(profile.error, 'the auth service'))} onRetry={profile.reload} />
+      </div>
+    );
   }
-  if (!profile.data) return <Loading />;
+  if (!profile.data) return <PageLoading />;
 
   const user = profile.data.user;
   const own = me?.id === user.id;
-  if (user.private && !own) return <PrivateProfileView user={user} />;
+  if (user.private && !own)
+    return (
+      <div className="page-tall">
+        <PrivateProfileView user={user} />
+      </div>
+    );
   const shown = own && me ? me : user;
   return (
-    <ProfileView user={shown} own={own}>
-      {own && (
-        <div className="center small sub">
-          {shown.private ? 'your profile is private: others only see your picture and username' : 'this is your public profile'} -{' '}
-          <Link to="/account" className="link-main">
-            edit it on your account page
-          </Link>
-        </div>
-      )}
-    </ProfileView>
+    <div className="page-tall">
+      <ProfileView user={shown} own={own}>
+        {own && (
+          <div className="center small sub">
+            {shown.private ? 'your profile is private: others only see your picture and username' : 'this is your public profile'} -{' '}
+            <Link to="/account" className="link-main">
+              edit it on your account page
+            </Link>
+          </div>
+        )}
+      </ProfileView>
+    </div>
   );
 }

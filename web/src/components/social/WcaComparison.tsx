@@ -74,13 +74,16 @@ interface ChartProps {
   precision: 2 | 3;
 }
 
+/** The distribution chart's height (its loading box keeps the same). */
+const DIST_H = 210;
+
 /** Histogram of every official competitor's PB with your PB (and your official PB) marked. */
 function DistributionChart({ dist, value, official, precision }: ChartProps) {
   const ref = useRef<HTMLDivElement>(null);
   const width = useElementWidth(ref) || 640;
   const [hover, setHover] = useState<number | null>(null);
   const buckets = dist.buckets;
-  const H = 210;
+  const H = DIST_H;
   const pad = { l: 4, r: 4, t: official !== null ? 50 : 30, b: 24 };
   const x0 = buckets[0]?.from ?? 0;
   const x1 = buckets[buckets.length - 1]?.to ?? 1;
@@ -219,6 +222,16 @@ function Placement({
         ) : (
           <div className="wc-headline">
             <span className="big dim">#-</span>
+            {/* the lines beside the rank come with it (the country's when the cuber has one): invisible
+                stand-ins keep their room */}
+            <span className="wc-headline-meta reserve" aria-hidden="true">
+              <span>in the world - faster than 00.0% of 000,000</span>
+              {country && (
+                <span>
+                  #0,000 in {flagEmoji(country)} {(countryName(country) || country).toLowerCase()}
+                </span>
+              )}
+            </span>
           </div>
         )}
         {source}
@@ -227,7 +240,20 @@ function Placement({
         {dist.error && !dist.data ? (
           <WidgetError error={dist.error} what="the wca distribution" onRetry={dist.reload} compact />
         ) : !dist.data ? (
-          <Loading />
+          <>
+            <div style={{ height: DIST_H }} className="pv-chart-empty">
+              <Loading />
+            </div>
+            <div className="wc-legend reserve" aria-hidden="true">
+              <span>
+                <i className="beat" /> cubers you beat
+              </span>
+              <span>
+                <i className="faster" /> faster than you
+              </span>
+              <span>median 00.00</span>
+            </div>
+          </>
         ) : dist.data.buckets.length === 0 ? (
           <WidgetEmpty compact>no official results for this event yet</WidgetEmpty>
         ) : (
@@ -285,7 +311,7 @@ export function WcaComparison({ summary, event, wcaId, country, own, onEdit, pre
       </div>
     );
   else if (meta.error) body = <WidgetError error={meta.error} what="the wca service" onRetry={meta.reload} compact />;
-  else if (!meta.data) body = <Loading />;
+  // while the export's date loads, everything else is laid out already: only the date fills in
   else
     body = (
       <Placement
@@ -312,7 +338,13 @@ export function WcaComparison({ summary, event, wcaId, country, own, onEdit, pre
             <a href="https://www.worldcubeassociation.org/results" target="_blank" rel="noreferrer noopener">
               worldcubeassociation.org/results
             </a>{' '}
-            ({formatDate(meta.data.exportDate)})
+            {meta.data ? (
+              `(${formatDate(meta.data.exportDate)})`
+            ) : (
+              <span className="reserve" aria-hidden="true">
+                (00 Sep 2026)
+              </span>
+            )}
           </p>
         }
       />
