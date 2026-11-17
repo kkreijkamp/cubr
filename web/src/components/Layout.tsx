@@ -95,10 +95,8 @@ function Footer() {
       <div className="footer-links">
         <button className="btn-text" onClick={() => openPalette()} aria-label="command line">
           <CommandLineIcon width={14} height={14} />
-          {/* phones have no esc key, and the footer keeps to two rows */}
-          <span className="hide-mobile">
-            <kbd>esc</kbd> command line
-          </span>
+          {/* the icon alone on phones: the footer keeps to two rows */}
+          <span className="hide-mobile">command line</span>
         </button>
         <a href={REPO_URL} className="btn-text" target="_blank" rel="noreferrer noopener" data-tip="source code">
           <CodeBracketIcon width={14} height={14} /> github
