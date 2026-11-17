@@ -604,6 +604,12 @@ Google, Apple or GitHub: signs in, or asks a new account for its username), `/re
 with an optimistic local store + retry queue (idempotent ids). Monkeytype-style theme system via CSS
 custom properties, command palette (Esc / Ctrl+K), focus mode while timing, toasts.
 
+Hover styles apply only where something can hover: the build wraps every `:hover` selector in
+`@media (hover: hover)` (`web/plugins/hoverMedia.ts`, a PostCSS step in `vite.config.ts`), so a tap
+on a touch screen no longer leaves a button, row or link in its hover colour until the next tap.
+Selectors in the same list that don't use `:hover` (`.x:hover, .x.active`) stay for touch screens
+too. The profile's event donut previews an event under a mouse or keyboard focus only, not on a tap.
+
 The screen stays on while timing (the Screen Wake Lock API, `web/src/lib/wakeLock.ts`, held by
 `TimerDisplay` for every input, races and the daily challenge included). It holds from the press,
 or the start of inspection, until five minutes after the solve stops: long enough to read the time

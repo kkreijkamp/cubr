@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type PointerEvent } from 'react';
 import { eventLabel, plural } from './util';
 import { formatNumber } from '../../lib/format';
 
@@ -46,6 +46,11 @@ export function EventDonut({ events, selected, onSelect }: { events: { event: st
   if (list.length < 2 || total === 0) return null;
 
   const focus = list.find((s) => s.key === hover) ?? list.find((s) => s.event === selected) ?? list[0];
+  // a mouse or the keyboard previews an event; a tap only selects it (a tap's preview would stay
+  // on the tapped event until the next tap somewhere else, over the selected one)
+  const preview = (key: string) => (e: PointerEvent) => {
+    if (e.pointerType === 'mouse') setHover(key);
+  };
   // each event keeps its grey (by its place in the list) when the selection moves - only the accent moves
   const colour = new Map(list.map((s, i) => [s.key, s.event === selected ? 'var(--main-color)' : `color-mix(in srgb, var(--sub-color) ${SHADES[i] ?? 24}%, var(--sub-alt-color))`]));
 
@@ -58,7 +63,7 @@ export function EventDonut({ events, selected, onSelect }: { events: { event: st
   });
 
   return (
-    <div className="pf-donut" onMouseLeave={() => setHover(null)}>
+    <div className="pf-donut" onPointerLeave={() => setHover(null)}>
       <div className="pf-donut-ring">
         <svg viewBox="0 0 120 120" role="img" aria-label={`solves by event: ${list.map((s) => `${s.label} ${pct(s.solves, total)}`).join(', ')}`}>
           <g transform="rotate(-90 60 60)">
@@ -74,7 +79,7 @@ export function EventDonut({ events, selected, onSelect }: { events: { event: st
                 strokeDasharray={`${dash} ${C - dash}`}
                 strokeDashoffset={-offset}
                 className={s.event ? 'seg pick' : 'seg'}
-                onMouseEnter={() => setHover(s.key)}
+                onPointerEnter={preview(s.key)}
                 onClick={() => s.event && onSelect(s.event)}
               />
             ))}
@@ -92,8 +97,8 @@ export function EventDonut({ events, selected, onSelect }: { events: { event: st
               type="button"
               className={`${s.event === selected ? 'on' : ''}${s.key === hover ? ' hover' : ''}`}
               disabled={!s.event}
-              onMouseEnter={() => setHover(s.key)}
-              onFocus={() => setHover(s.key)}
+              onPointerEnter={preview(s.key)}
+              onFocus={(e) => e.currentTarget.matches(':focus-visible') && setHover(s.key)}
               onBlur={() => setHover(null)}
               onClick={() => s.event && onSelect(s.event)}
               data-tip={plural(s.solves, 'solve')}
