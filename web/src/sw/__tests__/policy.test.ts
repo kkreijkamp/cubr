@@ -10,8 +10,8 @@ describe('shouldPrecache', () => {
       expect(shouldPrecache(f), f).toBe(true);
     }
   });
-  it('leaves out the worker, source maps, the .woff fallbacks, the icons and the screenshots', () => {
-    for (const f of ['sw.js', 'assets/index-d3oOLUDV.js.map', 'assets/lexend-deca-latin-400-normal-x.woff', 'icons/icon-512.png', 'screenshots/timer-wide.png', 'apple-touch-icon.png', '.DS_Store']) {
+  it('leaves out the worker, source maps, the .woff fallbacks, the icons, the screenshots and the files for other sites', () => {
+    for (const f of ['sw.js', 'assets/index-d3oOLUDV.js.map', 'assets/lexend-deca-latin-400-normal-x.woff', 'icons/icon-512.png', 'screenshots/timer-wide.png', 'launch/apple-launch-1179x2556.png', 'apple-touch-icon.png', 'og.png', 'robots.txt', 'sitemap.xml', '.well-known/security.txt', '.DS_Store']) {
       expect(shouldPrecache(f), f).toBe(false);
     }
   });
@@ -37,6 +37,8 @@ describe('routeFor', () => {
     expect(routeFor(req('/api/solves', 'cors', 'PATCH'), ORIGIN)).toBe('pass');
     expect(routeFor(req('https://www.worldcubeassociation.org/api/v0/x'), ORIGIN)).toBe('pass');
     expect(routeFor(req('/robots.txt', 'navigate'), ORIGIN)).toBe('pass');
+    expect(routeFor(req('/sitemap.xml', 'navigate'), ORIGIN)).toBe('pass');
+    expect(routeFor(req('/.well-known/security.txt', 'navigate'), ORIGIN)).toBe('pass');
   });
   it('serves hashed assets from the cache first and other files from the network first', () => {
     expect(routeFor(req('/assets/index-d3oOLUDV.js', 'cors'), ORIGIN)).toBe('asset');

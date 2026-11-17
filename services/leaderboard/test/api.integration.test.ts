@@ -9,7 +9,8 @@ import { PRIVATE_USERS_KEY, type EventEnvelope } from '@cubr/common';
 import { describeIntegration, startTestServer, type TestServer } from '@cubr/testkit';
 import { floorFor } from '../src/floors.js';
 import { makeHandler } from '../src/ingest.js';
-import { DELETED_USERS_KEY, FLAGGED_KEY, USERS_KEY, allTimeKey, atKey, challengeKey, dailyKey, tsKey, weeklyKey } from '../src/keys.js';
+import type { AllTimeBests, PeriodBests, PeriodQuery } from '../src/periods.js';
+import { DELETED_USERS_KEY, FLAGGED_KEY, USERS_KEY, allTimeKey, atKey, challengeKey, dailyKey, flaggedKey, tsKey, weeklyKey } from '../src/keys.js';
 import { registerRoutes } from '../src/routes/index.js';
 import { defineScripts } from '../src/scripts.js';
 
@@ -87,7 +88,7 @@ describeIntegration('leaderboard API', () => {
         pb(c, '555', 'single', 45_000, '2026-10-03T10:00:00.000Z'),
       );
       expect(await board('555/single')).toEqual({
-        event: '555', kind: 'single', period: 'all', periodKey: 'all', total: 3, page: 1, size: 50, me: null,
+        event: '555', kind: 'single', period: 'all', periodKey: 'all', total: 3, page: 1, size: 50, me: null, flagged: null,
         entries: [
           { rank: 1, userId: b.id, username: b.username, country: null, avatarUrl: null, valueMs: 40_000, achievedAt: '2026-10-02T10:00:00.000Z' },
           { rank: 2, userId: c.id, username: c.username, country: null, avatarUrl: null, valueMs: 45_000, achievedAt: '2026-10-03T10:00:00.000Z' },
@@ -218,7 +219,7 @@ describeIntegration('leaderboard API', () => {
         daily(c, '2026-10-14', '222', 3_000, '2026-10-14T09:15:00.000Z', 'daily.updated'), // older than c's result: ignored
       );
       expect(await board('daily-challenge?date=2026-10-14&event=222')).toEqual({
-        event: '222', kind: 'ao5', period: 'challenge', periodKey: '2026-10-14', total: 2, page: 1, size: 50, me: null,
+        event: '222', kind: 'ao5', period: 'challenge', periodKey: '2026-10-14', total: 2, page: 1, size: 50, me: null, flagged: null,
         entries: [
           { rank: 1, userId: a.id, username: a.username, country: null, avatarUrl: null, valueMs: 4_500, achievedAt: '2026-10-14T10:00:00.000Z' },
           { rank: 2, userId: c.id, username: c.username, country: null, avatarUrl: null, valueMs: 5_000, achievedAt: '2026-10-14T09:30:00.000Z' },
@@ -332,6 +333,42 @@ describeIntegration('leaderboard API', () => {
       await feed(pb(u, 'sq1', 'single', 5_000)); // the world record itself is fine
       expect((await board('sq1/single')).entries).toEqual([expect.objectContaining({ userId: u.id, valueMs: 5_000 })]);
     });
+
+    it("tells a signed-in user why they aren't on a board, their refused time and the floor, and nobody else", async () => {
+      const [u, other] = [newUser(), newUser()];
+      // as for Barry: taps made an impossible PB
+      await feed(pb(u, 'sq1', 'single', 300, '2026-10-14T10:00:00.000Z'));
+      const mine = await board('sq1/single', await s.token(u));
+      expect(mine.me).toBeNull();
+      expect(mine.flagged).toEqual({ valueMs: 300, floorMs: 5_000, achievedAt: '2026-10-14T10:00:00.000Z' });
+      expect((await board('sq1/single')).flagged).toBeNull(); // nobody signed in
+      expect((await board('sq1/single', await s.token(other))).flagged).toBeNull(); // someone else
+      // the taps deleted: stats' next PB is a real one, and the note goes
+      await feed(pb(u, 'sq1', 'single', 12_000, '2026-10-14T10:05:00.000Z'));
+      expect(await board('sq1/single', await s.token(u))).toMatchObject({ me: { valueMs: 12_000 }, flagged: null });
+      // a refused PB after a real one: the real entry stays, and the note says why the new one isn't there
+      await feed(pb(u, 'sq1', 'single', 250, '2026-10-14T10:10:00.000Z'));
+      expect(await board('sq1/single', await s.token(u))).toMatchObject({ me: { valueMs: 12_000 }, flagged: { valueMs: 250 } });
+    });
+
+    it('does the same on daily and weekly boards, keeping the lowest refused time, with or without real solves', async () => {
+      pinNow('2026-10-14T12:00:00Z');
+      const u = newUser();
+      const token = await s.token(u);
+      await feed(solve(u, 'sq1', 400, '2026-10-14T10:00:00.000Z'));
+      expect(await board('sq1/single?period=daily', token)).toMatchObject({ me: null, flagged: { valueMs: 400, floorMs: 5_000, achievedAt: '2026-10-14T10:00:00.000Z' } });
+      await feed(solve(u, 'sq1', 300, '2026-10-14T10:01:00.000Z'), solve(u, 'sq1', 900, '2026-10-14T10:02:00.000Z'));
+      expect((await board('sq1/single?period=weekly', token)).flagged).toMatchObject({ valueMs: 300 });
+      await feed(solve(u, 'sq1', 15_000, '2026-10-14T10:03:00.000Z'));
+      expect(await board('sq1/single?period=daily', token)).toMatchObject({ me: { valueMs: 15_000 }, flagged: { valueMs: 300 } });
+      expect(await s.redis.ttl(flaggedKey(dailyKey('sq1', 'single', '2026-10-14')))).toBeGreaterThan(3 * 86_400 - 60); // gone with the board
+    });
+
+    it('does the same on the daily challenge board', async () => {
+      const u = newUser();
+      await feed(daily(u, '2026-10-22', '333', 1_000, '2026-10-22T10:00:00.000Z'));
+      expect(await board('daily-challenge?date=2026-10-22&event=333', await s.token(u))).toMatchObject({ me: null, flagged: { valueMs: 1_000, floorMs: 2_600 } });
+    });
   });
 
   describe('deleted accounts', () => {
@@ -361,6 +398,7 @@ describeIntegration('leaderboard API', () => {
       expect(await s.redis.hget(tsKey(challengeKey('2026-10-14', '333')), gone.id)).toBeNull();
       expect(await s.redis.hget(USERS_KEY, gone.id)).toBeNull();
       expect((await s.redis.lrange(FLAGGED_KEY, 0, -1)).some((x) => x.includes(gone.id))).toBe(false);
+      expect(await s.redis.hget(flaggedKey(dailyKey('sq1', 'single', '2026-10-14')), gone.id)).toBeNull(); // their refused tap too
       expect(await s.redis.sismember(DELETED_USERS_KEY, gone.id)).toBe(1);
 
       // events still on their way for the account bring nothing back
@@ -373,6 +411,171 @@ describeIntegration('leaderboard API', () => {
       for (const key of boards) expect(await s.redis.zscore(key, gone.id), `${key} after`).toBeNull();
       expect(await s.redis.hget(USERS_KEY, gone.id)).toBeNull();
       expect(ids(await board('555bf/single'))).toEqual([stays.id]);
+    });
+  });
+  describe('daily and weekly boards after an edit or a deletion (periods.changed)', () => {
+    let answer: PeriodBests = { days: {}, weeks: {} };
+    let allTimeAnswer: AllTimeBests = {};
+    let failing = false;
+    const asked: PeriodQuery[] = [];
+    const askedAllTime: Omit<PeriodQuery, 'from'>[] = [];
+    let withStats: (evt: EventEnvelope) => Promise<void>;
+    beforeAll(() => {
+      withStats = makeHandler({
+        redis: s.redis,
+        floors: { floor: async (event, kind) => floorFor(event, kind, RECORDS) },
+        log: s.app.log,
+        periods: {
+          bests: async (q) => {
+            asked.push(q);
+            if (failing) throw new Error('stats unavailable');
+            return answer;
+          },
+          allTime: async (q) => {
+            askedAllTime.push(q);
+            return allTimeAnswer;
+          },
+        },
+      });
+    });
+    const feedStats = async (...evts: EventEnvelope[]) => {
+      for (const e of evts) await withStats(e);
+    };
+    /** periods.changed as stats publishes it */
+    const changed = (u: User, event: string, occurredAt: string) => evt('periods.changed', { userId: u.id, username: u.username, event, occurredAt });
+    const best = (valueMs: number, achievedAt: string) => ({ valueMs, achievedAt });
+    const rows = (b: { entries: { userId: string; valueMs: number; achievedAt: string }[] }) => b.entries.map((e) => [e.userId, e.valueMs, e.achievedAt]);
+
+    it("replace a deleted solve's time with stats' best of the day and week, and drop an ao5 that is gone", async () => {
+      pinNow('2026-11-17T09:00:00Z');
+      const [koen, other] = [newUser(), newUser()];
+      // as on 16 November: a slip (deleted 3 s later), the real best, and someone else
+      await feedStats(
+        solve(koen, '666', 63_567, '2026-11-16T14:01:23.000Z', { occurredAt: '2026-11-16T14:01:23.100Z', rolling: { ao5: 70_000, ao12: null } }),
+        solve(koen, '666', 77_711, '2026-11-16T02:56:18.483Z', { occurredAt: '2026-11-16T02:56:18.600Z' }),
+        solve(other, '666', 75_000, '2026-11-16T09:00:00.000Z', { occurredAt: '2026-11-16T09:00:00.100Z' }),
+      );
+      expect(ids(await board('666/single?period=weekly'))).toEqual([koen.id, other.id]);
+
+      answer = { days: { '2026-11-16': { single: best(77_711, '2026-11-16T02:56:18.483Z') } }, weeks: { '2026-W47': { single: best(77_711, '2026-11-16T02:56:18.483Z') } } };
+      await feedStats(changed(koen, '666', '2026-11-16T14:01:26.500Z'));
+      // stats was asked from the Monday of the oldest live week, with the anti-cheat floors
+      expect(asked.at(-1)).toEqual({ userId: koen.id, event: '666', from: '2026-11-02T00:00:00.000Z', minSingle: 43_200, minAverage: 46_300 });
+      for (const period of ['daily&key=2026-11-16', 'weekly']) {
+        expect(rows(await board(`666/single?period=${period}`))).toEqual([
+          [other.id, 75_000, '2026-11-16T09:00:00.000Z'],
+          [koen.id, 77_711, '2026-11-16T02:56:18.483Z'],
+        ]);
+        expect((await board(`666/ao5?period=${period}`)).total).toBe(0);
+      }
+    });
+
+    it('rank your real solves on the all-time boards while your PB is an impossible tap', async () => {
+      pinNow('2026-11-17T09:00:00Z');
+      const [barry, someone] = [newUser(), newUser()];
+      const token = await s.token(barry);
+      const tapAt = '2026-11-16T11:10:34.000Z';
+      // 16 November: guest taps came in at sign-up, so his PB is 0.174
+      allTimeAnswer = { flagged: { single: best(174, tapAt) } };
+      answer = { days: {}, weeks: {} };
+      await feedStats(pb(barry, 'pyram', 'single', 174, '2026-11-16T11:14:26.352Z'));
+      expect(await board('pyram/single', token)).toMatchObject({ me: null, flagged: { valueMs: 174, floorMs: 520, achievedAt: tapAt } });
+      expect(askedAllTime.at(-1)).toEqual({ userId: barry.id, event: 'pyram', minSingle: 520, minAverage: 750 });
+
+      // a real solve: no new PB (0.174 is still faster), but the change reaches the leaderboard
+      allTimeAnswer = { single: best(7_382, '2026-11-16T11:18:07.253Z'), flagged: { single: best(174, tapAt) } };
+      await feedStats(changed(barry, 'pyram', '2026-11-16T11:18:07.400Z'));
+      const ranked = await board('pyram/single', token);
+      expect(ranked.me).toMatchObject({ valueMs: 7_382 });
+      expect(ranked.flagged).toEqual({ valueMs: 174, floorMs: 520, achievedAt: tapAt }); // and the red line says why 0.174 isn't there
+      expect(rows(ranked).find(([id]) => id === barry.id)).toEqual([barry.id, 7_382, '2026-11-16T11:18:07.253Z']);
+      // ao5 and ao12 the same way: here he has a real ao5 and no ao12
+      allTimeAnswer = { ...allTimeAnswer, ao5: best(8_000, '2026-11-16T11:30:00.000Z') };
+      await feedStats(changed(barry, 'pyram', '2026-11-16T11:30:00.100Z'));
+      expect((await board('pyram/ao5', token)).me).toMatchObject({ valueMs: 8_000 });
+      expect((await board('pyram/ao12', token)).me).toBeNull();
+
+      // he deletes the taps: stats' PB is real again, and the note goes
+      await feedStats(pb(barry, 'pyram', 'single', 7_382, '2026-11-16T11:40:00.000Z'));
+      expect(await board('pyram/single', token)).toMatchObject({ me: { valueMs: 7_382 }, flagged: null });
+      const before = askedAllTime.length;
+      await feedStats(changed(barry, 'pyram', '2026-11-16T11:40:00.100Z'), changed(someone, 'pyram', '2026-11-16T11:41:00.000Z'));
+      expect(askedAllTime.length).toBe(before); // stats is asked only about people with a refused PB
+    });
+
+    it("keep the day's or week's refused time for its owner, and drop it once stats has none", async () => {
+      pinNow('2026-11-17T09:00:00Z');
+      const u = newUser();
+      const token = await s.token(u);
+      const tap = best(211, '2026-11-17T08:00:00.000Z');
+      answer = { days: { '2026-11-17': { flagged: { single: tap } } }, weeks: { '2026-W47': { flagged: { single: tap } } } };
+      await feedStats(changed(u, '666', '2026-11-17T08:30:00.000Z'));
+      expect(await board('666/single?period=daily', token)).toMatchObject({ me: null, flagged: { valueMs: 211, floorMs: 43_200, achievedAt: tap.achievedAt } });
+      answer = { days: {}, weeks: {} }; // the tap deleted
+      await feedStats(changed(u, '666', '2026-11-17T08:31:00.000Z'));
+      expect((await board('666/single?period=weekly', token)).flagged).toBeNull();
+    });
+
+    it('ignore a solve.created from before the change that is handled late, but take newer solves as usual', async () => {
+      pinNow('2026-11-17T09:00:00Z');
+      const u = newUser();
+      answer = { days: { '2026-11-17': { single: best(95_000, '2026-11-17T07:00:00.000Z') } }, weeks: { '2026-W47': { single: best(95_000, '2026-11-17T07:00:00.000Z') } } };
+      await feedStats(changed(u, '777', '2026-11-17T08:30:00.000Z'));
+      // e.g. on another replica: a slip from 08:00 whose deletion the change above already knew of
+      await feedStats(solve(u, '777', 85_000, '2026-11-17T08:00:00.000Z', { occurredAt: '2026-11-17T08:00:00.100Z' }));
+      expect(rows(await board('777/single?period=daily'))).toEqual([[u.id, 95_000, '2026-11-17T07:00:00.000Z']]);
+      await feedStats(solve(u, '777', 92_000, '2026-11-17T08:45:00.000Z', { occurredAt: '2026-11-17T08:45:00.100Z' }));
+      expect(rows(await board('777/single?period=daily'))).toEqual([[u.id, 92_000, '2026-11-17T08:45:00.000Z']]);
+      expect(rows(await board('777/single?period=weekly'))).toEqual([[u.id, 92_000, '2026-11-17T08:45:00.000Z']]);
+      // stats then sends a change with the new solve in; a change older than that one, handled
+      // late with what was true then, can't undo it
+      answer = { days: { '2026-11-17': { single: best(92_000, '2026-11-17T08:45:00.000Z') } }, weeks: { '2026-W47': { single: best(92_000, '2026-11-17T08:45:00.000Z') } } };
+      await feedStats(changed(u, '777', '2026-11-17T08:45:00.200Z'));
+      answer = { days: { '2026-11-17': { single: best(95_000, '2026-11-17T07:00:00.000Z') } }, weeks: { '2026-W47': { single: best(95_000, '2026-11-17T07:00:00.000Z') } } };
+      await feedStats(changed(u, '777', '2026-11-17T08:40:00.000Z'));
+      expect(rows(await board('777/single?period=daily'))).toEqual([[u.id, 92_000, '2026-11-17T08:45:00.000Z']]);
+    });
+
+    it("leave days and weeks that aren't live any more as they were", async () => {
+      pinNow('2026-11-02T12:00:00Z');
+      const u = newUser();
+      await feed(solve(u, '444', 50_000, '2026-11-02T10:00:00.000Z'));
+      pinNow('2026-11-17T09:00:00Z'); // 2 November is now 15 days ago: its day board is history
+      answer = { days: { '2026-11-02': { single: best(49_000, '2026-11-02T09:00:00.000Z') } }, weeks: {} };
+      await feedStats(changed(u, '444', '2026-11-17T08:00:00.000Z'));
+      expect(await s.redis.zscore(dailyKey('444', 'single', '2026-11-02'), u.id)).toBe('50000');
+      // its week (45) is still live: nothing in stats' answer for it, so the entry goes
+      expect(await s.redis.zscore(weeklyKey('444', 'single', '2026-W45'), u.id)).toBeNull();
+    });
+
+    it('leave events without boards and deleted accounts alone, and do nothing without a stats source', async () => {
+      pinNow('2026-11-17T09:00:00Z');
+      const [u, gone] = [newUser(), newUser()];
+      const before = asked.length;
+      await feedStats(changed(u, '333fm', '2026-11-17T08:00:00.000Z'));
+      await s.redis.sadd(DELETED_USERS_KEY, gone.id);
+      await feedStats(changed(gone, '666', '2026-11-17T08:00:00.000Z'));
+      expect(asked.length).toBe(before);
+      expect(await s.redis.keys(`lb:333fm:*`)).toEqual([]);
+
+      await feed(solve(u, 'clock', 9_000, '2026-11-17T08:00:00.000Z'));
+      await feed(changed(u, 'clock', '2026-11-17T08:30:00.000Z')); // the handler without `periods`
+      expect(await s.redis.zscore(dailyKey('clock', 'single', '2026-11-17'), u.id)).toBe('9000');
+      expect(asked.length).toBe(before);
+    });
+
+    it('fail when stats cannot answer, so the event is retried, and change nothing meanwhile', async () => {
+      pinNow('2026-11-17T09:00:00Z');
+      const u = newUser();
+      await feedStats(solve(u, 'skewb', 9_500, '2026-11-17T08:00:00.000Z', { occurredAt: '2026-11-17T08:00:00.100Z' }));
+      failing = true;
+      try {
+        await expect(withStats(changed(u, 'skewb', '2026-11-17T08:30:00.000Z'))).rejects.toThrow('stats unavailable');
+      } finally {
+        failing = false;
+      }
+      expect(await s.redis.zscore(dailyKey('skewb', 'single', '2026-11-17'), u.id)).toBe('9500');
+      expect(await s.redis.hget(tsKey(dailyKey('skewb', 'single', '2026-11-17')), u.id)).toBeNull();
     });
   });
 });

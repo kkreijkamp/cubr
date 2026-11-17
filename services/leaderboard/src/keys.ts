@@ -10,9 +10,11 @@ import { isEventId } from '@cubr/cubestats';
 //   lb:dc:<YYYY-MM-DD>:<event>       zset  daily-challenge ao5 board
 //   <board>:at                       hash  userId -> achievedAt (ISO) for the score on <board>
 //   <board>:ts                       hash  userId -> occurredAt (epoch ms) of the last applied
-//                                          exact write (all-time and daily-challenge boards:
-//                                          pb.updated, daily.completed / daily.updated; drops
-//                                          stale events)
+//                                          exact write (pb.updated, daily.completed / daily.updated,
+//                                          periods.changed; drops stale events)
+//   <board>:flagged                  hash  userId -> JSON {valueMs, floorMs, achievedAt}: the
+//                                          user's best time the anti-cheat refused on this board,
+//                                          so the API can tell them why they aren't on it
 //   lb:users                         hash  userId -> JSON {username, country, avatarUrl}
 //   lb:flagged                       list  rejected (anti-cheat) entries, newest first, capped
 //   lb:meta:built / lb:rebuild-lock  string
@@ -40,13 +42,14 @@ export const REBUILD_LOCK_KEY = 'lb:rebuild-lock';
 export const DELETED_USERS_KEY = 'lb:deleted-users';
 
 /**
- * What removing a deleted account takes for each lb:* key: HDEL from the per-board :at / :ts
- * hashes, ZREM from the boards; the bookkeeping keys are left alone (lb:users and lb:flagged are
- * cleaned separately).
+ * What removing a deleted account takes for each lb:* key: HDEL from the per-board :at / :ts /
+ * :flagged hashes, ZREM from the boards; the bookkeeping keys are left alone (lb:users and lb:flagged
+ * are cleaned separately).
  */
 export function purgePlan(keys: string[]): { op: 'zrem' | 'hdel'; key: string }[] {
   const skip = new Set([USERS_KEY, FLAGGED_KEY, META_BUILT_KEY, REBUILD_LOCK_KEY, DELETED_USERS_KEY]);
-  return keys.filter((k) => !skip.has(k)).map((key) => ({ op: key.endsWith(':at') || key.endsWith(':ts') ? 'hdel' : 'zrem', key }));
+  const hashes = /:(at|ts|flagged)$/;
+  return keys.filter((k) => !skip.has(k)).map((key) => ({ op: hashes.test(key) ? 'hdel' : 'zrem', key }));
 }
 
 /** Whether an lb:flagged entry (JSON) is about this user. */
@@ -71,6 +74,7 @@ export const dailyKey = (event: string, kind: Kind, day: string) => `lb:${event}
 export const weeklyKey = (event: string, kind: Kind, week: string) => `lb:${event}:${kind}:w:${week}`;
 export const challengeKey = (date: string, event: string) => `lb:dc:${date}:${event}`;
 export const atKey = (board: string) => `${board}:at`;
+export const flaggedKey = (board: string) => `${board}:flagged`;
 export const tsKey = (board: string) => `${board}:ts`;
 
 export function boardKey(event: string, kind: Kind, period: Period, periodKey: string): string {
@@ -88,6 +92,24 @@ export function currentPeriodKey(period: Period, now: Date = new Date()): string
   if (period === 'weekly') return utcWeek(now);
   if (period === 'daily') return utcDay(now);
   return 'all';
+}
+
+const DAY_MS = 86_400_000;
+
+/**
+ * The daily and weekly boards a change can still touch: the ones solve.created writes to (solves
+ * up to 3 days / 15 days old), so the UTC days and ISO weeks of the last 3 and 15 days. `from` is
+ * the Monday (00:00 UTC) of the oldest of those weeks: solves from then on decide them all.
+ */
+export function livePeriods(now: Date = new Date()): { days: string[]; weeks: string[]; from: string } {
+  const days = new Set<string>();
+  for (let k = 0; k <= DAILY_TTL_SEC / 86_400; k++) days.add(utcDay(new Date(now.getTime() - k * DAY_MS)));
+  const weeks = new Set<string>();
+  for (let k = 0; k <= WEEKLY_TTL_SEC / 86_400; k++) weeks.add(utcWeek(new Date(now.getTime() - k * DAY_MS)));
+  const oldest = new Date(now.getTime() - (WEEKLY_TTL_SEC / 86_400) * DAY_MS);
+  const sinceMonday = (oldest.getUTCDay() + 6) % 7; // Monday = 0 ... Sunday = 6
+  const from = new Date(Date.UTC(oldest.getUTCFullYear(), oldest.getUTCMonth(), oldest.getUTCDate() - sinceMonday));
+  return { days: [...days], weeks: [...weeks], from: from.toISOString() };
 }
 
 /** True for a real calendar date written as YYYY-MM-DD. */

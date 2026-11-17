@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { PB_KINDS, type PbKind } from '../domain/pbs.js';
 import { activeYears, addDays, computeStreaks, dayNumber, dayString } from '../domain/streaks.js';
 
-const userParams = z.object({ userId: z.string().uuid('userId must be a UUID') });
+const userParams = z.object({ userId: z.guid('userId must be a UUID') });
 
 const dateStr = z
   .string()

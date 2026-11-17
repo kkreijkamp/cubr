@@ -1,0 +1,7 @@
+# Found a security problem in cubr? Thank you: please email it rather than posting it publicly.
+# The policy (scope, what to include, what happens next) is in SECURITY.md.
+Contact: mailto:hello@cubr.dev
+Expires: 2027-11-16T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://cubr.dev/.well-known/security.txt
+Policy: https://github.com/kkreijkamp/cubr/blob/main/SECURITY.md

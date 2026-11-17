@@ -3,7 +3,8 @@ import type { FastifyBaseLogger } from 'fastify';
 // ---------------------------------------------------------------------------------------------
 // Outgoing email through Resend's HTTPS API (no SDK, no SMTP: GCP blocks port 25 anyway).
 // Without RESEND_API_KEY (local stack, CI) nothing is sent: the message is logged instead, so the
-// whole password-reset flow can be tried by reading the link from `docker compose logs auth`.
+// password-reset and email-confirmation flows can be tried by reading the link from
+// `docker compose logs auth`.
 // ---------------------------------------------------------------------------------------------
 
 export interface MailConfig {
@@ -36,10 +37,29 @@ export function maskEmail(email: string): string {
   return at <= 0 ? '***' : `${email[0]}***${email.slice(at)}`;
 }
 
-/** Sends one email, or logs it when no API key is configured. Throws when Resend refuses it. */
+/**
+ * Whether the address is on a domain that can never receive mail (RFC 2606, RFC 6761): example.com,
+ * .net and .org, and the .test, .example, .invalid and .localhost names. The smoke test and the
+ * tests sign up with them; mail to them is never sent, so it can't bounce and hurt cubr.dev's
+ * sending reputation.
+ */
+export function isReservedDomain(email: string): boolean {
+  const domain = email.slice(email.lastIndexOf('@') + 1).toLowerCase().replace(/\.$/, '');
+  return /(^|\.)(example\.(com|net|org)|test|example|invalid|localhost)$/.test(domain);
+}
+
+/**
+ * Sends one email. Without an API key (local stack, CI) it's logged instead, text and all, so a
+ * link can be read from the log; to a reserved domain it's skipped, and the log leaves the text out
+ * (the links in it work). Throws when Resend refuses it.
+ */
 export async function sendMail(cfg: MailConfig, mail: Mail, log: FastifyBaseLogger, fetchImpl: typeof fetch = fetch): Promise<void> {
   if (!cfg.apiKey) {
     log.warn({ to: maskEmail(mail.to), subject: mail.subject, text: mail.text }, 'email not sent (no RESEND_API_KEY): logged instead');
+    return;
+  }
+  if (isReservedDomain(mail.to)) {
+    log.info({ to: maskEmail(mail.to), subject: mail.subject }, 'email not sent: the address is on a reserved domain');
     return;
   }
   const res = await fetchImpl('https://api.resend.com/emails', {

@@ -64,6 +64,7 @@ import {
 } from '../lib/solves';
 import { useStore } from '../lib/store';
 import { toast } from '../lib/toast';
+import { useCanonical } from '../lib/canonical';
 
 type ModalState =
   | { kind: 'solve'; index: number }
@@ -114,6 +115,7 @@ function isTyping(el: EventTarget | null): boolean {
 }
 
 export default function TimerPage() {
+  useCanonical('/'); // the home page, without any query (/?v=1 is the same page)
   const settings = useSettings();
   const st = useSolveState();
   const { status: authStatus, user } = useAuth();

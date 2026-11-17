@@ -100,4 +100,38 @@ export const migrations: Migration[] = [
       CREATE UNIQUE INDEX IF NOT EXISTS user_identities_user_provider ON auth.user_identities (user_id, provider);
     `,
   },
+  {
+    id: '007_email_changes',
+    sql: `
+      -- a change of email waiting for its confirmation link (emailChange.ts): only the SHA-256 of
+      -- the token is stored; asking again replaces the user's pending change, confirming deletes it
+      CREATE TABLE IF NOT EXISTS auth.email_changes (
+        token_hash bytea PRIMARY KEY,
+        user_id    uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+        new_email  text NOT NULL,
+        expires_at timestamptz NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS email_changes_user ON auth.email_changes (user_id);
+    `,
+  },
+  {
+    id: '008_email_confirmation',
+    sql: `
+      -- Confirming the account's own email (routes/auth.ts): at sign-up the address gets a link (a row
+      -- in auth.email_changes whose new_email is the current address). Password-reset links only go to
+      -- a confirmed address, so an account made with a typo or with someone else's address can't be
+      -- taken over by whoever reads that inbox.
+      ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS email_verified_at timestamptz;
+      -- the accounts made before this keep getting reset links until they confirm: nobody is locked out
+      ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS predates_email_confirmation boolean NOT NULL DEFAULT false;
+      UPDATE auth.users SET predates_email_confirmation = true;
+      -- an address Google, Apple or GitHub vouched for (a connected account with the same email) is
+      -- confirmed already, from when it was connected
+      UPDATE auth.users u SET email_verified_at = i.first_seen
+        FROM (SELECT user_id, lower(email) AS email, min(created_at) AS first_seen
+                FROM auth.user_identities WHERE email IS NOT NULL GROUP BY user_id, lower(email)) i
+       WHERE i.user_id = u.id AND i.email = lower(u.email) AND u.email_verified_at IS NULL;
+    `,
+  },
 ];

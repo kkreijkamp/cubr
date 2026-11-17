@@ -5,10 +5,11 @@ import { useEffect, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { DocumentTextIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import './legal.css';
+import { useCanonical } from '../lib/canonical';
 
 // when each page last changed
 const TERMS_EFFECTIVE = '16 November 2026';
-const PRIVACY_EFFECTIVE = '17 November 2026'; // sign-in with Google, Apple and GitHub
+const PRIVACY_EFFECTIVE = '18 November 2026'; // v1.5.0: sign-in with Google, Apple and GitHub; Cloudflare Web Analytics; error reports; the emails that confirm an address
 const CONTACT = 'hello@cubr.dev';
 
 const Mail = () => <a href={`mailto:${CONTACT}`}>{CONTACT}</a>;
@@ -46,18 +47,20 @@ function LegalShell({ title, icon, children, effective }: { title: string; icon:
 }
 
 export function PrivacyPage() {
+  useCanonical('/privacy');
   return (
     <LegalShell title="privacy policy" effective={PRIVACY_EFFECTIVE} icon={<ShieldCheckIcon />}>
       <p className="legal-intro">
         cubr (cubr.dev) is a free speedcubing timer run by Koen Kreijkamp, an individual in Queensland, Australia (&quot;cubr&quot;,
         &quot;we&quot;). This policy explains what we collect, why, who helps us run cubr, and the choices you have. There are no ads,
-        no analytics and no tracking.
+        and nothing follows you around the web: the only measurement is Cloudflare Web Analytics, which counts page views without
+        cookies.
       </p>
 
       <Section title="what we collect">
         <ul>
           <li>
-            <b>Account:</b> your username, email address and password. The password is stored only as a bcrypt hash, so we can&apos;t
+            <b>Account:</b> your username, email address (and whether you&apos;ve confirmed it) and password. The password is stored only as a bcrypt hash, so we can&apos;t
             read it.
           </li>
           <li>
@@ -78,6 +81,18 @@ export function PrivacyPage() {
           <li>
             <b>Technical data:</b> your IP address, used for the rate limits that protect sign-in and the rest of the service, and in our
             server logs. Cloudflare, which sits in front of cubr, also handles your IP address and request details.
+          </li>
+          <li>
+            <b>Page views:</b> Cloudflare Web Analytics records the page you open, the page that linked to it, your browser and device
+            type, your country (worked out from your IP address, which it doesn&apos;t keep) and how fast the page loaded. Cloudflare says
+            it uses no cookies or other storage in your browser for this and doesn&apos;t fingerprint visitors. We only see totals, never
+            a record of one visit. If your browser sends Global Privacy Control or Do Not Track, cubr doesn&apos;t load it.
+          </li>
+          <li>
+            <b>Error reports:</b> if something in cubr breaks while you use it, your browser sends us the error: its message and where in
+            cubr&apos;s code it happened, the kind of page (such as &quot;a profile&quot;, never which one), whether you use the installed
+            app, and your browser&apos;s name and version. Anything in it that looks personal, such as an email address or a username, is
+            taken out first. Reports aren&apos;t linked to your account, and we don&apos;t keep your IP address with them.
           </li>
           <li>
             <b>Emails</b> you send to <Mail />.
@@ -115,11 +130,17 @@ export function PrivacyPage() {
         <ul>
           <li>
             To run the service you signed up for: your account, syncing your solves, profiles, leaderboards, the daily challenge, races and
-            password-reset emails. (Legal basis: performing our agreement with you.)
+            password-reset emails, the emails that confirm your email address (when you sign up or change it), and the notice to your old
+            address after a change. (Legal basis: performing our agreement
+            with you.)
           </li>
           <li>
-            To keep cubr safe, fair and working: rate limits, server logs, anti-cheat checks that compare times with WCA records, and
-            backups. (Legal basis: our legitimate interest in running a secure service.)
+            To keep cubr safe, fair and working: rate limits, server logs, error reports, anti-cheat checks that compare times with WCA
+            records, and backups. (Legal basis: our legitimate interest in running a secure service.)
+          </li>
+          <li>
+            To see which pages are used and how fast they load, so we know what to improve: page-view totals from Cloudflare Web
+            Analytics. (Legal basis: our legitimate interest in improving cubr.)
           </li>
           <li>To answer you when you contact us.</li>
         </ul>
@@ -134,10 +155,10 @@ export function PrivacyPage() {
           </li>
           <li>
             <b>Cloudflare:</b> our domain, security and delivery. Your traffic passes through Cloudflare&apos;s global network, where it is
-            decrypted to be protected and routed.
+            decrypted to be protected and routed. Cloudflare also counts our page views (Web Analytics, above).
           </li>
           <li>
-            <b>Resend:</b> sends password-reset emails.
+            <b>Resend:</b> sends password-reset emails and the emails that confirm an email address.
           </li>
           <li>
             <b>Apple iCloud:</b> hosts our contact inbox, <Mail />.
@@ -170,7 +191,7 @@ export function PrivacyPage() {
           cubr sets one cookie of its own, and only while you sign in with Google, Apple or GitHub: it ties that sign-in to your browser
           and expires within minutes. Your browser&apos;s local storage keeps you signed in and holds your settings and offline solves,
           so the site works. None of it is used for tracking or advertising, which is why there is no cookie banner. Cloudflare may set a
-          strictly necessary security cookie.
+          strictly necessary security cookie. Cloudflare Web Analytics sets none.
         </p>
       </Section>
 
@@ -180,9 +201,13 @@ export function PrivacyPage() {
             Your account and solves: until you delete your account. Deleting removes them from the live database straight away, and from
             backups within 30 days.
           </li>
-          <li>Password-reset links work for 1 hour. Race chat is kept for 2 hours, and rate-limit counters for up to an hour.</li>
-          <li>Server logs are rotated automatically and overwritten as they fill up.</li>
+          <li>
+            Password-reset links work for 1 hour, links that confirm your email for 7 days (1 hour for a change of address). Race chat is
+            kept for 2 hours, and rate-limit counters for up to a day.
+          </li>
+          <li>Server logs, error reports included, are rotated automatically and overwritten as they fill up.</li>
           <li>Supporter entries: until you ask us to remove your name.</li>
+          <li>Page-view statistics: only as totals, in Cloudflare&apos;s dashboard, for as long as Cloudflare keeps them.</li>
           <li>
             Emails to <Mail />: as long as needed to deal with them.
           </li>
@@ -234,6 +259,7 @@ export function PrivacyPage() {
 }
 
 export function TermsPage() {
+  useCanonical('/terms');
   return (
     <LegalShell title="terms of service" effective={TERMS_EFFECTIVE} icon={<DocumentTextIcon />}>
       <p className="legal-intro">

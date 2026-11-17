@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { EVENT_IDS } from '@cubr/cubestats';
 import { HourlyChart } from './Charts';
@@ -8,13 +8,14 @@ import { ActivityHeatmap } from './Heatmap';
 import { ProfileHeader } from './ProfileHeader';
 import { ProfileSolves } from './ProfileSolves';
 import { WcaComparison } from './WcaComparison';
+import { isTouchDevice } from '../timer/feedback';
 import { eventLabel } from './util';
 import { api } from '../../lib/api';
 import { formatNumber } from '../../lib/format';
 import { useSettings } from '../../lib/settings';
 import type { PublicUser } from '../../lib/types';
 import { useAsync } from '../../lib/useAsync';
-import { Loading } from '../Spinner';
+import { PageLoading } from '../Spinner';
 import './social.css';
 
 interface Props {
@@ -74,6 +75,20 @@ export function ProfileView({ user, own, onEdit, children }: Props) {
   // brand-new cubers: no event to show yet, just a word on where the numbers will come from
   const noSolves = summary.data !== undefined && summary.data.totals.solves === 0;
 
+  // The sections below the profile (the account page's) wait for the summary: shown sooner, they'd sit
+  // below the loading room and then move, down past the event or up under "no solves yet". At most 2 s,
+  // so a slow stats service doesn't keep them away.
+  const [waited, setWaited] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setWaited(true), 2000);
+    return () => clearTimeout(t);
+  }, []);
+  const settled = summary.data !== undefined || summary.error !== undefined || waited;
+
+  // the event the bests showed first: they fade in when it changes, not on the first load (.pf-bests.fade)
+  const firstEvent = useRef<string | null>(null);
+  if (summary.data && firstEvent.current === null) firstEvent.current = event;
+
   return (
     <div className="pf">
       <ProfileHeader user={user} summary={summary} own={own} onEdit={onEdit} event={event} onEvent={pick} />
@@ -81,31 +96,32 @@ export function ProfileView({ user, own, onEdit, children }: Props) {
         <p className="pf-empty">
           {own ? (
             <>
-              no solves yet - <Link to="/">open the timer</Link> and press space. personal bests, progress and the wca comparison show up here.
+              no solves yet - <Link to="/">open the timer</Link> and {isTouchDevice() ? 'hold it to start' : 'press space'}. personal bests, progress and the wca comparison show up here.
             </>
           ) : (
             'no solves yet - personal bests and progress show up here after the first solve.'
           )}
         </p>
       ) : !summary.data ? (
-        !summary.error && <Loading />
+        // a screen's height: the ring, the totals and the event below come in its place, all at once
+        !summary.error && <PageLoading />
       ) : (
         (
           <div className="pf-event">
             <EventTabs events={events} counts={counts} value={event} onChange={pick} />
-            <EventBests key={event} userId={user.id} event={event} summary={summary} precision={precision} />
-            <SolveHistoryChart key={`hist-${user.id}-${event}`} userId={user.id} event={event} precision={precision} />
+            <EventBests key={event} userId={user.id} event={event} summary={summary} precision={precision} fade={event !== firstEvent.current} />
+            <SolveHistoryChart key={`hist-${user.id}-${event}`} userId={user.id} event={event} precision={precision} solves={counts.get(event) ?? 0} />
             {/* when they cube: days (the calendar keeps its range across events) and hours */}
             <div className="pf-habits">
               <ActivityHeatmap key={`act-${user.id}`} userId={user.id} event={event} years={summary.data?.totals.activeYears} />
               <HourlyChart key={`hr-${user.id}-${event}`} userId={user.id} event={event} precision={precision} />
             </div>
             <WcaComparison key={`wca-${event}`} summary={summary} event={event} wcaId={user.wcaId} country={user.country} own={own} onEdit={onEdit} precision={precision} />
-            <ProfileSolves key={`solves-${user.id}-${event}`} userId={user.id} event={event} precision={precision} />
+            <ProfileSolves key={`solves-${user.id}-${event}`} userId={user.id} event={event} precision={precision} solves={counts.get(event) ?? 0} />
           </div>
         )
       )}
-      {children}
+      {settled && children}
     </div>
   );
 }

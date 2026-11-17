@@ -50,16 +50,14 @@ export function ProfileHeader({ user, summary, own, onEdit, event, onEvent }: Pr
   const [avatarOpen, setAvatarOpen] = useState(false);
   const closeAvatar = useCallback(() => setAvatarOpen(false), []);
 
-  const stats: { label: string; value: string; tip?: string }[] = [
-    { label: 'solves', value: totals ? formatNumber(totals.solves) : '-' },
-    { label: 'time cubing', value: totals ? formatDuration(totals.totalMs) : '-', tip: totals ? `${formatNumber(Math.round(totals.totalMs / 1000))} seconds` : undefined },
-    { label: 'active days', value: totals ? formatNumber(totals.activeDays) : '-' },
-    {
-      label: 'day streak',
-      value: totals ? formatNumber(totals.currentStreak) : '-',
-      tip: totals ? `longest streak: ${plural(totals.longestStreak, 'day')}` : undefined,
-    },
-  ];
+  const stats: { label: string; value: string; tip?: string }[] = totals
+    ? [
+        { label: 'solves', value: formatNumber(totals.solves) },
+        { label: 'time cubing', value: formatDuration(totals.totalMs), tip: `${formatNumber(Math.round(totals.totalMs / 1000))} seconds` },
+        { label: 'active days', value: formatNumber(totals.activeDays) },
+        { label: 'day streak', value: formatNumber(totals.currentStreak), tip: `longest streak: ${plural(totals.longestStreak, 'day')}` },
+      ]
+    : [];
 
   return (
     <header className="pf-hero" aria-label="profile">
@@ -133,17 +131,21 @@ export function ProfileHeader({ user, summary, own, onEdit, event, onEvent }: Pr
         {summary.data && <EventDonut events={summary.data.events} selected={event} onSelect={onEvent} />}
       </div>
 
+      {/* the totals come with the summary, together with the ring above them (phones) and the event
+          below: shown earlier, they'd jump when the ring appears (ProfileView holds the room meanwhile) */}
       {summary.error && !totals ? (
         <WidgetError error={summary.error} what="the stats service" onRetry={summary.reload} compact />
       ) : (
-        <dl className="pf-totals">
-          {stats.map((s) => (
-            <div key={s.label} className={totals ? undefined : 'dim'} data-tip={s.tip}>
-              <dt>{s.label}</dt>
-              <dd>{s.value}</dd>
-            </div>
-          ))}
-        </dl>
+        totals && (
+          <dl className="pf-totals">
+            {stats.map((s) => (
+              <div key={s.label} data-tip={s.tip}>
+                <dt>{s.label}</dt>
+                <dd>{s.value}</dd>
+              </div>
+            ))}
+          </dl>
+        )
       )}
 
       {avatarOpen && (

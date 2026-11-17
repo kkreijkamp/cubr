@@ -53,7 +53,7 @@ export const deleteMeSchema = z
   .refine((b) => b.password !== undefined || b.confirm !== undefined, { message: 'password: required' });
 
 export const settingsSchema = z.object({
-  settings: z.record(z.unknown()),
+  settings: z.record(z.string(), z.unknown()),
 });
 
 /** Size in bytes of the JSON encoding of `value` (what Postgres will store). */
@@ -79,6 +79,8 @@ export interface UserRow {
   profile_private?: boolean | null;
   /** false for an account made with Google, Apple or GitHub that hasn't set a password */
   has_password?: boolean;
+  /** the email was confirmed by a link sent to it (or vouched for by Google, Apple or GitHub) */
+  email_verified?: boolean;
 }
 
 export interface PublicUser {
@@ -99,6 +101,8 @@ export interface PrivateUser extends PublicUser {
   email: string;
   /** the account can sign in with a password (false: only with Google, Apple or GitHub) */
   hasPassword: boolean;
+  /** the email is confirmed (a link sent to it was opened, or a provider vouched for it) */
+  emailVerified: boolean;
 }
 
 const iso = (v: Date | string): string => (v instanceof Date ? v.toISOString() : new Date(v).toISOString());
@@ -141,14 +145,14 @@ export function avatarUrl(userId: string, version: string | null | undefined): s
   return version ? `/api/users/${userId}/avatar?v=${version}` : null;
 }
 
-/** The owner's own view: everything, plus the email and whether it has a password. */
+/** The owner's own view: everything, plus the email, whether it's confirmed and whether there's a password. */
 export function toPrivateUser(row: UserRow): PrivateUser {
-  return { ...toPublicUser(row, row.id), email: row.email, hasPassword: row.has_password !== false };
+  return { ...toPublicUser(row, row.id), email: row.email, hasPassword: row.has_password !== false, emailVerified: row.email_verified === true };
 }
 
 /** Columns selected everywhere a user is returned (never includes password_hash). */
 export const USER_COLUMNS =
-  'id, username, email, display_name, bio, country, wca_id, created_at, last_login_at, avatar_version, profile_private, password_hash is not null as has_password';
+  'id, username, email, display_name, bio, country, wca_id, created_at, last_login_at, avatar_version, profile_private, password_hash is not null as has_password, email_verified_at is not null as email_verified';
 
 /** Maps validated PATCH /me fields to SQL columns. Only fixed identifiers, values stay parameterised. */
 export function buildUserUpdate(patch: PatchMe): { sets: string[]; values: unknown[] } {

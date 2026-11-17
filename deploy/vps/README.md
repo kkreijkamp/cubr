@@ -42,6 +42,7 @@ gcloud compute ssh cubr-1 --configuration=cubr --tunnel-through-iap      # shell
 cd /opt/cubr && C="docker compose -f docker-compose.yml -f deploy/vps/compose.prod.yml"
 $C ps            # health of every service
 $C logs -f gateway                         # access log with real visitor IPs
+$C logs auth | grep '"client error"'       # errors in visitors' browsers (SPEC 10.5; no IPs)
 $C exec postgres psql -U cubr -d cubr      # database shell
 $C --profile jobs run --rm wca-import      # refresh the WCA data now (~3 min)
 ```
@@ -49,6 +50,25 @@ $C --profile jobs run --rm wca-import      # refresh the WCA data now (~3 min)
 The gateway is also on the VM's `127.0.0.1:8080`, so `curl http://127.0.0.1:8080/healthz`
 works over SSH. Docker restarts crashed containers and starts the stack on boot
 (`restart: unless-stopped`).
+
+## Security headers and crawler files
+
+The web container sends a Content-Security-Policy and the other security headers on every page, and
+every service sends the API's set (docs/SPEC.md 10.2 and section 3). Check them after a release:
+
+```
+curl -sI https://cubr.dev/ | grep -i -E 'content-security|x-frame|nosniff|strict-transport|permissions'
+curl -s -o /dev/null -w '%{http_code}\n' https://cubr.dev/no/such/page     # 404
+curl -s https://cubr.dev/robots.txt; curl -s https://cubr.dev/.well-known/security.txt
+```
+
+- **A page that breaks after a change** (something doesn't load or run): the browser console says
+  which directive refused what. The inline theme script in `web/index.html` is allowed by its hash;
+  `web/src/__tests__/site.test.ts` fails until the hash in `web/nginx/default.conf.template` matches.
+- **security.txt expires** (its `Expires`, now 2027-11-16): the same test fails 30 days before. Move
+  the date up to a year ahead and release.
+- **Outside checks** (paste the site into them): MDN HTTP Observatory, securityheaders.com and
+  Google Search Console (the sitemap, and the 404s it finds).
 
 ## The offline app (service worker)
 
@@ -142,9 +162,18 @@ and run the WCA import.
   Changing `JWT_SECRET` signs everyone out. `RESEND_API_KEY` (only the auth container gets it)
   sends password-reset emails from `no-reply@cubr.dev`; without it they are only logged.
   The sign-in providers' client secrets and Apple's key are there too ("Sign-in providers").
-- **Email DNS** (Cloudflare): `cubr.dev` MX to Google Workspace (`hello@cubr.dev`), SPF for Google,
-  `_dmarc` (report-only for now), and Resend's records (`resend._domainkey`, `send` MX/TXT,
-  `rsend` CNAME).
+- **Email DNS** (Cloudflare): `cubr.dev` MX to iCloud+ (`hello@cubr.dev`, a custom-domain address),
+  SPF for iCloud, Apple's domain TXT and DKIM CNAME (`sig1._domainkey`), `_dmarc` (report-only for
+  now), and Resend's records (`resend._domainkey`, `send` MX/TXT, `rsend` CNAME).
+- **www.cubr.dev** redirects to `https://cubr.dev` at Cloudflare's edge, with the same path and query
+  (301): a proxied `AAAA www 100::` record (no origin) and a Redirect Rule (Rules > Redirect Rules,
+  `http.host eq "www.cubr.dev"`). Its requests never reach the VM; the HTTPS certificate covers it as
+  `*.cubr.dev`.
+- **Login flood guard** at Cloudflare's edge (Security > WAF > Rate limiting rules, the free plan's
+  one rule): more than 5 requests to `/api/auth/login` in 10 s from one IP (per Cloudflare data
+  centre) are blocked for 10 s with a JSON 429 in the app's error format ("Too many login attempts,
+  try again in a few seconds"). It stops bursts before they reach the VM; the auth service's own
+  limit (10 a minute per IP) still applies behind it.
 - **Logs rotate.** Every container logs through `json-file` with at most 3 x 10 MB (`x-logging` in
   `compose.prod.yml`), so the gateway's access log, which holds visitors' IPs, is overwritten as it
   fills up. The privacy policy (`/privacy`) relies on this.

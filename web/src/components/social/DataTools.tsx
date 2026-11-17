@@ -5,12 +5,15 @@ import {
   ArrowRightStartOnRectangleIcon,
   ArrowUpTrayIcon,
   DocumentArrowUpIcon,
+  EnvelopeIcon,
+  PaperAirplaneIcon,
   PencilIcon,
   UserCircleIcon,
 } from '@heroicons/react/24/outline';
 import { parseTimerFile, toCsTimerExport, TimerFormatError, type ImportedSession, type TimerImport } from '@cubr/cubestats';
 import { csTimerFileName, downloadFile, eventLabel, friendlyError, plural, skippedNotes } from './util';
 import { Section } from './Widget';
+import { api, ApiError } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useRegisterCommands } from '../../lib/commands';
 import { formatDate, formatNumber, localDateKey } from '../../lib/format';
@@ -19,6 +22,7 @@ import { toast } from '../../lib/toast';
 import type { PrivateUser } from '../../lib/types';
 import { Modal } from '../Modal';
 import { SignInMethods } from './SignInMethods';
+import { ChangeEmailModal } from './ChangeEmailModal';
 import { SessionName } from '../SessionName';
 import { Spinner } from '../Spinner';
 
@@ -140,12 +144,43 @@ function ImportPreview({ fileName, parsed, onClose }: { fileName: string; parsed
 
 /** Account-only section: import (cubr and every format csTimer imports), JSON and csTimer export, profile + logout. */
 export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: () => void }) {
-  const { logout } = useAuth();
+  const { logout, setUser } = useAuth();
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<{ fileName: string; parsed: TimerImport } | null>(null);
   const [reading, setReading] = useState(false);
   const [exporting, setExporting] = useState<'json' | 'cstimer' | null>(null);
+  const [changingEmail, setChangingEmail] = useState(false);
+  // the address a change's confirmation link went to, until the page reloads
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  const [sendingLink, setSendingLink] = useState(false);
+  const changing = pendingEmail !== null && pendingEmail.toLowerCase() !== user.email.toLowerCase();
+  // false only: a user cached by an older version doesn't say (unknown, not unconfirmed)
+  const unconfirmed = user.emailVerified === false && !changing;
+
+  /** A new link that confirms the current email (the one from sign-up expired, or never came). */
+  const sendConfirmation = async () => {
+    if (sendingLink) return;
+    setSendingLink(true);
+    try {
+      const res = await api.auth.sendEmailConfirmation();
+      toast.success(`open the link we sent to ${res.email}. it works for 7 days.`, { title: 'check your inbox' });
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 400) {
+        // confirmed meanwhile (in another tab, or with the link): show it
+        try {
+          setUser((await api.auth.me()).user);
+        } catch {
+          /* the next load shows it */
+        }
+        toast.notice('your email is already confirmed.');
+      } else {
+        toast.error(friendlyError(err, 'the account service'), { title: "couldn't send the link" });
+      }
+    } finally {
+      setSendingLink(false);
+    }
+  };
 
   const pickFile = () => fileRef.current?.click();
 
@@ -197,8 +232,12 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
       { id: 'account-import', label: 'Import solves...', icon: <DocumentArrowUpIcon />, keywords: ['cstimer', 'twisty', 'cubedesk', 'block keeper', 'upload', 'restore'], run: pickFile },
       { id: 'account-export', label: 'Export data (json)', icon: <ArrowDownTrayIcon />, keywords: ['backup', 'download'], run: () => void doExport('json') },
       { id: 'account-export-cstimer', label: 'Export for csTimer', icon: <ArrowDownTrayIcon />, keywords: ['cstimer', 'backup', 'download'], run: () => void doExport('cstimer') },
+      { id: 'account-email', label: 'Change email...', icon: <EnvelopeIcon />, keywords: ['address', 'account'], run: () => setChangingEmail(true) },
+      ...(unconfirmed
+        ? [{ id: 'account-email-confirm', label: 'Send email confirmation link', icon: <PaperAirplaneIcon />, keywords: ['confirm', 'verify', 'address'], run: () => void sendConfirmation() }]
+        : []),
     ],
-    [onEdit],
+    [onEdit, unconfirmed],
   );
 
   return (
@@ -244,10 +283,44 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
         <div className="ac-row">
           <div>
             <div className="t">
+              <EnvelopeIcon /> email
+            </div>
+            <div className="d">
+              <span className="text">{user.email}</span>
+              {unconfirmed ? (
+                <>
+                  , <span className="main">not confirmed yet</span>. open the link we sent there, or send a new one: password-reset links only go
+                  to a confirmed email.
+                </>
+              ) : (
+                <>. password-reset links and notices about your account go here.</>
+              )}
+              {changing && (
+                <>
+                  {' '}
+                  <span className="main">waiting for you to confirm {pendingEmail}</span>: open the link we sent there.
+                </>
+              )}
+            </div>
+          </div>
+          <div className="ac-actions">
+            {unconfirmed && (
+              <button className="btn" onClick={() => void sendConfirmation()} disabled={sendingLink}>
+                {sendingLink ? <Spinner size={16} /> : <PaperAirplaneIcon />} send link
+              </button>
+            )}
+            <button className="btn" onClick={() => setChangingEmail(true)}>
+              <EnvelopeIcon /> change email
+            </button>
+          </div>
+        </div>
+        <div className="ac-row">
+          <div>
+            <div className="t">
               <UserCircleIcon /> account
             </div>
             <div className="d">
-              signed in as <span className="text">{user.username}</span> - {user.email}
+              signed in as <span className="text">{user.username}</span>
             </div>
           </div>
           <div className="ac-actions">
@@ -261,6 +334,17 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
         </div>
       </div>
       {preview && <ImportPreview fileName={preview.fileName} parsed={preview.parsed} onClose={() => setPreview(null)} />}
+      {changingEmail && (
+        <ChangeEmailModal
+          user={user}
+          onClose={() => setChangingEmail(false)}
+          onSent={(email) => {
+            setChangingEmail(false);
+            setPendingEmail(email);
+            toast.success(`open the link we sent to ${email}. your email stays ${user.email} until then.`, { title: 'check your inbox' });
+          }}
+        />
+      )}
     </Section>
   );
 }

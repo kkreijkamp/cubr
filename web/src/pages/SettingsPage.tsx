@@ -13,10 +13,10 @@ import { useAuth } from '../lib/auth';
 import { formatNumber } from '../lib/format';
 import { useKeyboardLayout } from '../lib/keyboardLayout';
 import { applyUpdate, checkForUpdate, installHint, promptInstall, usePwa } from '../lib/pwa';
-import { applyVisualSettings, DEFAULT_SETTINGS, FONTS, updateSettings, useSettings, type Settings } from '../lib/settings';
+import { activeTheme, applyVisualSettings, chooseRandomTheme, chooseTheme, DEFAULT_SETTINGS, FONTS, setAutoSwitchTheme, themeWaitsNote, updateSettings, useDeviceIsDark, useSettings, type Settings } from '../lib/settings';
 import { SCHEMES, stickerColour, type Scheme } from '../lib/scrambleNet';
 import { clearLocalData, exportAll, forgetUser, importSessions, localDataSummary, useSolveState } from '../lib/solves';
-import { applyTheme, isLightTheme, randomTheme, THEMES, themeLabel, type Theme } from '../lib/themes';
+import { applyTheme, getTheme, isLightTheme, THEMES, themeLabel, type Theme } from '../lib/themes';
 import { toast } from '../lib/toast';
 import { AVAILABLE_INPUTS, INPUT_MODES, updateInput, useInputState } from '../input/inputMode';
 import { actionOf, bind, BINDABLE, controls, KEY_PUZZLES, keyLabel, keyOf, type KeyPuzzle } from '../input/virtual/keymap';
@@ -482,7 +482,7 @@ export default function SettingsPage() {
         </Pane>
 
         <Pane id="theme">
-          <ThemePicker current={s.theme} />
+          <ThemePicker settings={s} />
         </Pane>
 
         <Pane id="data">
@@ -999,46 +999,84 @@ function ThemeSwatch({ theme, big }: { theme: Theme; big?: boolean }) {
   );
 }
 
-/** The theme in use on top, then every theme as a name with its swatch; hovering one previews it on the whole page. */
-function ThemePicker({ current }: { current: string }) {
+/** A chosen theme: its swatch, its name and what it's for. */
+function ThemeNow({ theme, meta, waiting }: { theme: Theme; meta: string; waiting?: boolean }) {
+  return (
+    <div className={`st-theme-now-item${waiting ? ' waiting' : ''}`}>
+      <ThemeSwatch theme={theme} big />
+      <div className="st-theme-now-text">
+        <span className="name">{themeLabel(theme.name)}</span>
+        <span className="meta">{meta}</span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Following the device's light or dark mode (or not), the theme in use on top (while following, the light
+ * and the dark one), then every theme as a name with its swatch; hovering one previews it on the whole page.
+ */
+function ThemePicker({ settings: s }: { settings: Settings }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<ThemeFilter>('all');
+  const deviceDark = useDeviceIsDark();
+  const auto = s.autoSwitchTheme;
+  const current = activeTheme(s, deviceDark);
   const previewing = useRef(false);
   const restore = () => {
-    if (previewing.current) applyTheme(current, false);
+    if (previewing.current) applyTheme(current);
     previewing.current = false;
   };
   const preview = (t: Theme) => {
     previewing.current = true;
-    applyTheme(t.name, false);
+    applyTheme(t.name);
   };
   const shown = useMemo(() => {
     const test = THEME_FILTERS.find((f) => f.value === filter)!.test;
     const q = query.trim().toLowerCase().replace(/[\s-]+/g, '_');
     return THEMES.filter((t) => test(t) && t.name.includes(q));
   }, [query, filter]);
-  const now = THEMES.find((t) => t.name === current);
-  const shuffle = () => {
-    // random within the current filter when it has more than the active theme
-    const pool = shown.filter((t) => t.name !== current);
-    const next = pool.length ? pool[Math.floor(Math.random() * pool.length)] : randomTheme(current);
+  // following the device, both the light and the dark theme are chosen
+  const chosen = (t: Theme) => (auto ? t.name === s.themeLight || t.name === s.themeDark : t.name === s.theme);
+  const pick = (t: Theme) => {
     previewing.current = false;
-    updateSettings({ theme: next.name });
+    // a theme for the other mode waits for it, and the page stays as it is: say where it went
+    const waits = chooseTheme(t.name);
+    if (waits) toast.notice(themeWaitsNote(t.name, waits));
   };
+  const shuffle = () => {
+    previewing.current = false;
+    // from the list below (its filter and search); following the device, a new light and a new dark theme,
+    // both shown on top
+    chooseRandomTheme(shown);
+  };
+  const manual = getTheme(s.theme);
   return (
     <Group title="theme">
-      {now && (
-        <div className="st-theme-now">
-          <ThemeSwatch theme={now} big />
-          <div className="st-theme-now-text">
-            <span className="name">{themeLabel(now.name)}</span>
-            <span className="meta">{isLightTheme(now) ? 'light' : 'dark'}</span>
-          </div>
-          <button className="btn-text st-random" onClick={shuffle} data-tip="a random theme from the list below">
-            <ArrowsRightLeftIcon width={16} height={16} /> random
-          </button>
-        </div>
-      )}
+      <SettingRow
+        title="light and dark mode"
+        description="Follow your device: a light theme while it's in light mode and a dark theme in dark mode. While this is on, a light theme you pick below becomes your light one, and a dark theme your dark one."
+      >
+        <Options value={auto} options={onOff} onChange={setAutoSwitchTheme} />
+      </SettingRow>
+      <div className={`st-theme-now${auto ? ' pair' : ''}`}>
+        {auto ? (
+          <>
+            <ThemeNow theme={getTheme(s.themeLight)} meta={deviceDark ? 'light mode' : 'light mode - in use'} waiting={deviceDark} />
+            <ThemeNow theme={getTheme(s.themeDark)} meta={deviceDark ? 'dark mode - in use' : 'dark mode'} waiting={!deviceDark} />
+          </>
+        ) : (
+          <ThemeNow theme={manual} meta={isLightTheme(manual) ? 'light' : 'dark'} />
+        )}
+        <button
+          className="btn-text st-random"
+          onClick={shuffle}
+          data-tip={auto ? 'a random light and dark theme from the list below' : 'a random theme from the list below'}
+          aria-label={auto ? 'random light and dark themes' : 'random theme'}
+        >
+          <ArrowsRightLeftIcon width={16} height={16} /> <span className="st-random-label">random</span>
+        </button>
+      </div>
       <div className="st-theme-tools">
         <div className="st-options" role="group" aria-label="show">
           {THEME_FILTERS.map((f) => (
@@ -1058,20 +1096,17 @@ function ThemePicker({ current }: { current: string }) {
       {shown.length === 0 ? (
         <div className="st-theme-empty">no themes match "{query}"</div>
       ) : (
-        <div className="st-themes" onMouseLeave={restore} role="radiogroup" aria-label="theme">
+        // one theme is chosen (radios), or a light and a dark one while following the device (toggles)
+        <div className="st-themes" onMouseLeave={restore} role={auto ? 'group' : 'radiogroup'} aria-label="theme">
           {shown.map((t) => (
             <button
               key={t.name}
-              role="radio"
-              aria-checked={t.name === current}
-              className={`st-theme${t.name === current ? ' active' : ''}`}
+              {...(auto ? { 'aria-pressed': chosen(t) } : { role: 'radio', 'aria-checked': chosen(t) })}
+              className={`st-theme${chosen(t) ? ' active' : ''}`}
               onMouseEnter={() => preview(t)}
               onFocus={() => preview(t)}
               onBlur={restore}
-              onClick={() => {
-                previewing.current = false;
-                updateSettings({ theme: t.name });
-              }}
+              onClick={() => pick(t)}
             >
               <ThemeSwatch theme={t} />
               <span className="st-theme-name">{themeLabel(t.name)}</span>

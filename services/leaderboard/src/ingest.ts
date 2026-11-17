@@ -1,6 +1,6 @@
 import type { EventEnvelope, Redis } from '@cubr/common';
 import type { FastifyBaseLogger } from 'fastify';
-import { isBelowFloor, type FloorSource } from './floors.js';
+import { flagJson, isBelowFloor, type FloorSource } from './floors.js';
 import {
   DAILY_TTL_SEC,
   DELETED_USERS_KEY,
@@ -13,9 +13,13 @@ import {
   challengeKey,
   dailyKey,
   flaggedBy,
+  flaggedKey,
   hasBoards,
   isKind,
   isValidDay,
+  KINDS,
+  livePeriods,
+  PERIOD_KINDS,
   purgePlan,
   tsKey,
   utcDay,
@@ -23,6 +27,7 @@ import {
   weeklyKey,
   type Kind,
 } from './keys.js';
+import type { AllTimeBests, PeriodBest, PeriodBests, PeriodSource } from './periods.js';
 
 // ---------------------------------------------------------------------------------------------
 // Turns domain events (SPEC section 8) into board writes. The plan* functions are pure (unit-tested);
@@ -30,7 +35,7 @@ import {
 // All writes are idempotent (exact set / keep-best), so at-least-once redelivery is harmless.
 // ---------------------------------------------------------------------------------------------
 
-export const CONSUMED_TYPES = ['pb.updated', 'solve.created', 'daily.completed', 'daily.updated', 'user.registered', 'user.updated', 'user.deleted'];
+export const CONSUMED_TYPES = ['pb.updated', 'solve.created', 'periods.changed', 'daily.completed', 'daily.updated', 'user.registered', 'user.updated', 'user.deleted'];
 
 /** A keep-best write (ZADD LT) to a period board. */
 export interface BestWrite {
@@ -40,6 +45,17 @@ export interface BestWrite {
   valueMs: number;
   achievedAt: string;
   ttlSec: number;
+}
+
+/** An exact write (or removal when valueMs is null) to a daily or weekly board, after periods.changed. */
+export interface PeriodWrite {
+  board: string;
+  kind: Kind;
+  valueMs: number | null;
+  achievedAt: string;
+  ttlSec: number;
+  /** the best value of that day or week the anti-cheat refused, if any (its owner is told why) */
+  flagged: PeriodBest | null;
 }
 
 /** An exact write (or removal when valueMs is null) to an all-time or daily-challenge board. */
@@ -113,6 +129,28 @@ export function planSolveCreated(d: Data, nowMs = Date.now()): BestWrite[] {
 }
 
 /**
+ * periods.changed -> an exact write for every live daily and weekly board of the event: stats' best
+ * of that day or week (already at or above the anti-cheat floor), or no entry when there is none.
+ * So a deleted or penalised solve, a deleted or practice session and a merge all show up there.
+ */
+export function planPeriodRefresh(event: string, bests: PeriodBests, live: { days: string[]; weeks: string[] }): PeriodWrite[] {
+  if (!hasBoards(event)) return [];
+  const out: PeriodWrite[] = [];
+  const plan = (periods: string[], bucket: PeriodBests['days'], kinds: readonly Kind[], key: (k: Kind, p: string) => string, ttlSec: number) => {
+    for (const p of periods) {
+      for (const kind of kinds) {
+        const b = bucket[p]?.[kind as 'single' | 'ao5'];
+        const f = bucket[p]?.flagged?.[kind as 'single' | 'ao5'];
+        out.push({ board: key(kind, p), kind, valueMs: b?.valueMs ?? null, achievedAt: b?.achievedAt ?? '', ttlSec, flagged: f ?? null });
+      }
+    }
+  };
+  plan(live.days, bests.days, PERIOD_KINDS.daily, (k, p) => dailyKey(event, k, p), DAILY_TTL_SEC);
+  plan(live.weeks, bests.weeks, PERIOD_KINDS.weekly, (k, p) => weeklyKey(event, k, p), WEEKLY_TTL_SEC);
+  return out;
+}
+
+/**
  * daily.completed / daily.updated -> exact write to the daily-challenge ao5 board: the latest result
  * wins (a penalty marked after the solve can make it worse), and a DNF ao5 (-1) removes the entry.
  * Kept without TTL (history).
@@ -149,26 +187,53 @@ export function planUserInfo(type: string, d: Data): UserInfo | null {
   return info;
 }
 
+/**
+ * Sets a user's three all-time entries of an event to stats' best values above the floors (their
+ * real solves rank while their PB is an impossible time), and each refused best on the flagged
+ * hash, with the time guard of the exact writes. Shared by the event handler and the rebuild.
+ */
+export async function applyAllTimeBests(
+  redis: Redis,
+  userId: string,
+  event: string,
+  bests: AllTimeBests,
+  floorsMs: { single: number | null; average: number | null },
+  occurredAtMs: number,
+): Promise<void> {
+  for (const kind of KINDS) {
+    const board = allTimeKey(event, kind);
+    const b = bests[kind];
+    const f = bests.flagged?.[kind];
+    const floorMs = (kind === 'single' ? floorsMs.single : floorsMs.average) ?? 0;
+    const flag = f ? flagJson(f.valueMs, floorMs, f.achievedAt) : '';
+    await redis.lbSetPeriod(board, atKey(board), tsKey(board), flaggedKey(board), userId, b?.valueMs ?? '', b?.achievedAt ?? '', occurredAtMs, 0, flag);
+  }
+}
+
 export interface IngestDeps {
   redis: Redis;
   floors: FloorSource;
   log: FastifyBaseLogger;
+  /** stats' day and week bests, read after periods.changed (without it that event is ignored) */
+  periods?: PeriodSource;
 }
 
-export function makeHandler({ redis, floors, log }: IngestDeps) {
+export function makeHandler({ redis, floors, log, periods }: IngestDeps) {
   /**
-   * Anti-cheat gate: true if the value may be written, otherwise it is recorded in lb:flagged
-   * once per event/kind/value per domain event (one solve feeds both a daily and a weekly board).
+   * Anti-cheat gate: null if the value may be written, otherwise the floor it is below. A refused
+   * value goes on lb:flagged (the admin's list) once per event/kind/value per domain event (one
+   * solve feeds both a daily and a weekly board); the caller records it on the board's flagged
+   * hash for its owner.
    */
-  async function passesFloor(
+  async function refusedBy(
     evt: EventEnvelope,
     w: { board: string; event: string; kind: Kind; valueMs: number },
     flagged: Set<string>,
-  ) {
+  ): Promise<number | null> {
     const floorMs = await floors.floor(w.event, w.kind);
-    if (!isBelowFloor(w.valueMs, floorMs)) return true;
+    if (floorMs === null || !isBelowFloor(w.valueMs, floorMs)) return null;
     const id = `${w.event}:${w.kind}:${w.valueMs}`;
-    if (flagged.has(id)) return false;
+    if (flagged.has(id)) return floorMs;
     flagged.add(id);
     const entry = {
       userId: evt.data.userId,
@@ -184,12 +249,56 @@ export function makeHandler({ redis, floors, log }: IngestDeps) {
     };
     await redis.multi().lpush(FLAGGED_KEY, JSON.stringify(entry)).ltrim(FLAGGED_KEY, 0, FLAGGED_MAX - 1).exec();
     log.warn(entry, 'anti-cheat: value below world-record floor flagged');
-    return false;
+    return floorMs;
   }
 
   async function writeBest(evt: EventEnvelope, w: BestWrite, flagged: Set<string>) {
-    if (!(await passesFloor(evt, w, flagged))) return;
-    await redis.lbBest(w.board, atKey(w.board), w.valueMs, evt.data.userId as string, w.achievedAt, w.ttlSec);
+    const userId = evt.data.userId as string;
+    const occurredAtMs = parseTime((evt.data as Data).occurredAt) ?? Date.now();
+    const floorMs = await refusedBy(evt, w, flagged);
+    if (floorMs !== null) {
+      await redis.lbFlagBest(flaggedKey(w.board), tsKey(w.board), userId, w.valueMs, flagJson(w.valueMs, floorMs, w.achievedAt), occurredAtMs, w.ttlSec);
+      return;
+    }
+    await redis.lbBest(w.board, atKey(w.board), tsKey(w.board), w.valueMs, userId, w.achievedAt, w.ttlSec, occurredAtMs);
+  }
+
+  /**
+   * A refused PB hides nothing real: the user's all-time entries become stats' best values above the
+   * floors. Asked when a PB is refused, and after every change of their solves while one stands,
+   * since a real solve slower than an impossible PB is no new PB (no pb.updated would come).
+   */
+  async function refreshAllTime(userId: string, event: string, occurredAtMs: number) {
+    if (!periods || !hasBoards(event)) return;
+    const [single, average] = await Promise.all([floors.floor(event, 'single'), floors.floor(event, 'ao5')]);
+    const bests = await periods.allTime({ userId, event, minSingle: single ?? 0, minAverage: average ?? 0 });
+    await applyAllTimeBests(redis, userId, event, bests, { single, average }, occurredAtMs);
+  }
+
+  /** Whether one of the user's all-time PBs of the event is refused (on a flagged hash). */
+  async function hasRefusedPb(userId: string, event: string): Promise<boolean> {
+    const found = await Promise.all(KINDS.map((k) => redis.hexists(flaggedKey(allTimeKey(event, k)), userId)));
+    return found.some((x) => x === 1);
+  }
+
+  /**
+   * periods.changed: the user's solves for an event changed, so their entry on every live daily
+   * and weekly board is set to stats' best of that day or week (above the anti-cheat floor), or
+   * removed. Each write carries the event's time: an older one, or a late solve.created from
+   * before it, is ignored (the scripts' ts-hash).
+   */
+  async function refreshPeriods(userId: string, d: Data) {
+    const event = String(d.event ?? '');
+    if (!periods || !hasBoards(event)) return;
+    const live = livePeriods();
+    const [minSingle, minAverage] = await Promise.all([floors.floor(event, 'single'), floors.floor(event, 'ao5')]);
+    const bests = await periods.bests({ userId, event, from: live.from, minSingle: minSingle ?? 0, minAverage: minAverage ?? 0 });
+    const occurredAtMs = parseTime(d.occurredAt) ?? Date.now();
+    for (const w of planPeriodRefresh(event, bests, live)) {
+      const floorMs = (w.kind === 'single' ? minSingle : minAverage) ?? 0;
+      const flag = w.flagged ? flagJson(w.flagged.valueMs, floorMs, w.flagged.achievedAt) : '';
+      await redis.lbSetPeriod(w.board, atKey(w.board), tsKey(w.board), flaggedKey(w.board), userId, w.valueMs ?? '', w.achievedAt, occurredAtMs, w.ttlSec, flag);
+    }
   }
 
   /** A deleted account leaves every board, the display info and the anti-cheat list. */
@@ -238,13 +347,23 @@ export function makeHandler({ redis, floors, log }: IngestDeps) {
       case 'daily.updated': {
         const w = evt.type === 'pb.updated' ? planPbUpdated(d) : planDailyResult(d);
         if (!w) return;
-        if (w.valueMs !== null && !(await passesFloor(evt, { ...w, valueMs: w.valueMs }, flagged))) return;
-        await redis.lbSetPb(w.board, atKey(w.board), tsKey(w.board), userId, w.valueMs ?? '', w.achievedAt, w.occurredAtMs);
+        // a refused value leaves the user's entry as it was and tells them why (the flagged hash)
+        const floorMs = w.valueMs === null ? null : await refusedBy(evt, { ...w, valueMs: w.valueMs }, flagged);
+        const flag = floorMs === null || w.valueMs === null ? '' : flagJson(w.valueMs, floorMs, w.achievedAt);
+        await redis.lbSetPb(w.board, atKey(w.board), tsKey(w.board), flaggedKey(w.board), userId, w.valueMs ?? '', w.achievedAt, w.occurredAtMs, flag);
+        // a refused all-time PB: the user's real solves rank instead (the daily challenge has one ao5 a day)
+        if (flag && evt.type === 'pb.updated') await refreshAllTime(userId, w.event, w.occurredAtMs);
         return;
       }
       case 'solve.created':
         for (const w of planSolveCreated(d)) await writeBest(evt, w, flagged);
         return;
+      case 'periods.changed': {
+        await refreshPeriods(userId, d);
+        const event = String(d.event ?? '');
+        if (hasBoards(event) && (await hasRefusedPb(userId, event))) await refreshAllTime(userId, event, parseTime(d.occurredAt) ?? Date.now());
+        return;
+      }
       default:
         return; // user.* - display info handled above
     }

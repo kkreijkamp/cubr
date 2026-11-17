@@ -1,24 +1,15 @@
 // The microphone input a stackmat (or MoYu timer) is plugged into: raw samples, with every bit of
 // processing the browser would do (echo cancelling, noise suppression, gain) turned off.
 
+// collects 1024 samples at a time and hands them to the page (an AudioWorklet runs off the main
+// thread). A file of its own, never inlined (Vite would make a small file a data: URL), so the CSP
+// can keep scripts to cubr.dev's own files: no blob: or data: scripts.
+import workletUrl from './stackmat.worklet.js?url&no-inline';
+
 export interface Microphone {
   sampleRate: number;
   stop(): void;
 }
-
-// collects 1024 samples at a time and hands them to the page (an AudioWorklet runs off the main thread)
-const WORKLET = `class CubrStackmat extends AudioWorkletProcessor {
-  constructor() { super(); this.buf = new Float32Array(1024); this.n = 0; }
-  process(inputs) {
-    const ch = inputs[0] && inputs[0][0];
-    if (ch) for (let i = 0; i < ch.length; i++) {
-      this.buf[this.n++] = ch[i];
-      if (this.n === this.buf.length) { this.port.postMessage(this.buf); this.buf = new Float32Array(1024); this.n = 0; }
-    }
-    return true;
-  }
-}
-registerProcessor('cubr-stackmat', CubrStackmat);`;
 
 export class MicrophoneError extends Error {
   constructor(
@@ -69,9 +60,7 @@ export async function openMicrophone(deviceId: string, onSamples: (s: Float32Arr
   mute.connect(ctx.destination);
   let node: AudioNode;
   try {
-    const url = URL.createObjectURL(new Blob([WORKLET], { type: 'application/javascript' }));
-    await ctx.audioWorklet.addModule(url);
-    URL.revokeObjectURL(url);
+    await ctx.audioWorklet.addModule(workletUrl);
     const w = new AudioWorkletNode(ctx, 'cubr-stackmat', { numberOfInputs: 1, numberOfOutputs: 1, channelCount: 1 });
     w.port.onmessage = (e: MessageEvent<Float32Array>) => onSamples(e.data);
     node = w;

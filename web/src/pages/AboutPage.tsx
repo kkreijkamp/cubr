@@ -20,6 +20,8 @@ import { useCountUp } from '../components/social/useCountUp';
 import { friendlyError } from '../components/social/util';
 import { api } from '../lib/api';
 import { formatDate, formatNumber } from '../lib/format';
+import { useCanonical } from '../lib/canonical';
+import { DONATE_URL } from '../lib/links';
 import { THEMES } from '../lib/themes';
 import type { GlobalStats } from '../lib/types';
 import { useAsync } from '../lib/useAsync';
@@ -35,12 +37,9 @@ const FEATURES = [
   { icon: FlagIcon, t: 'live races', d: 'real-time multiplayer rooms over websockets - share a link and race any event.' },
   { icon: TrophyIcon, t: 'leaderboards', d: 'all-time, weekly and daily boards for every event, single, ao5 and ao12.' },
   { icon: GlobeAltIcon, t: 'wca comparison', d: 'see where your personal bests would rank among every official wca competitor.' },
-  { icon: SwatchIcon, t: 'themes & command line', d: `${THEMES.length} cube-inspired themes with live preview. press esc and type - everything is a command.` },
+  { icon: SwatchIcon, t: 'themes & command line', d: `${THEMES.length} cube-inspired themes with live preview, light or dark with your device. press esc and type - everything is a command.` },
   { icon: SignalSlashIcon, t: 'an app that works offline', d: "install it on your phone or computer. the timer opens and works without a connection, and your solves sync when you're back online." },
 ];
-
-/** Where to donate. Supporters who make their support public are listed from the Ko-fi webhook. */
-const DONATE_URL = 'https://ko-fi.com/cubrr';
 
 // the everyday ones - csTimer's keys; settings > keyboard shortcuts lists them all
 const KEYS: [string[], string][] = [
@@ -124,11 +123,10 @@ function Supporters() {
         <GiftIcon /> supporters
       </h2>
       <p className="ab-p">
-        cubr is free and has no ads. if you&apos;d like to help keep it running, donate on{' '}
+        if you&apos;d like to support hosting and development of cubr,{' '}
         <a href={DONATE_URL} target="_blank" rel="noreferrer noopener">
-          {DONATE_URL.replace(/^https?:[/][/]/, '')}
+          consider donating
         </a>
-        . make your support public there and your name shows up here.
       </p>
       {names.length > 0 ? (
         <ul className="ab-supporters">
@@ -146,7 +144,7 @@ function Supporters() {
       ) : (
         list.data && (
           <p className="ab-p">
-            <span className="sub">no supporters yet - the first ones get their name here.</span>
+            <span className="sub">no supporters yet</span>
           </p>
         )
       )}
@@ -155,6 +153,7 @@ function Supporters() {
 }
 
 export default function AboutPage() {
+  useCanonical('/about');
   useEffect(() => {
     document.title = 'about | cubr';
     return () => {

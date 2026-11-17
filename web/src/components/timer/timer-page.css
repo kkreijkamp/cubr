@@ -73,7 +73,10 @@
   .tp-session-btn.practice .tp-session-icon {
     display: none;
   }
+  /* centred under the bar (which is centred on the page), so it never runs off a narrow screen */
   .tp-menu.tp-events-menu {
+    left: 50%;
+    transform: translateX(-50%);
     grid-template-columns: repeat(3, minmax(5.5rem, 1fr));
   }
   /* the input button sits near the right end of the bar: hang its menu from there, inside the page */
@@ -106,6 +109,22 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 11rem;
+}
+/* phones: a long session name gives way first, so the bar (which doesn't wrap) stays on the screen.
+   The rest of the bar and the page's side padding take 17.25rem at most ("3x3 oh", a monospace font) */
+@media (max-width: 560px) {
+  .tp-session-name {
+    max-width: max(2.75rem, calc(100vw - 17.25rem));
+  }
+}
+/* the narrowest screens (a folding phone's cover, 280px): the whole bar a size smaller */
+@media (max-width: 300px) {
+  .tp-config {
+    font-size: 0.7rem;
+  }
+  .tp-session-name {
+    max-width: 2.75rem;
+  }
 }
 .tp-session-btn .tp-chevron {
   transition: transform var(--dur);
@@ -205,6 +224,12 @@
 .tp-input-menu .tp-menu-count kbd {
   font-size: 0.62rem;
   padding: 0.1em 0.35em;
+}
+/* touch screens have no ctrl+alt shortcuts to show */
+@media (hover: none) and (pointer: coarse) {
+  .tp-input-menu .tp-menu-count {
+    display: none;
+  }
 }
 
 /* ------------------------------------------------------------ scramble */
@@ -840,8 +865,20 @@
 .tp-guest .btn-text {
   padding: 0.2rem;
 }
+@media (hover: none) and (pointer: coarse) {
+  .tp-guest .btn-text {
+    padding: 0.5rem;
+    margin: -0.3rem 0;
+  }
+}
 
 /* ------------------------------------------------------------ modals */
+/* narrow phones: "no penalty" takes the width it needs, +2 and dnf share the rest */
+@media (max-width: 400px) {
+  .tp-penalties {
+    grid-template-columns: auto 1fr 1fr;
+  }
+}
 .tp-modal-title {
   display: inline-flex;
   align-items: center;
@@ -1006,5 +1043,26 @@
   }
   .tp-avg-row {
     grid-template-columns: 2rem 5.5rem minmax(0, 1fr);
+  }
+}
+
+/* a short window (a phone on its side): less space around the timer, so the scramble, the time and
+   the quick actions fit on the first screen */
+@media (max-height: 500px) {
+  .tp-scramble-wrap {
+    margin-top: 0.75rem;
+    gap: 0;
+  }
+  .tp-timer-area {
+    min-height: 0;
+    padding: 0.25rem 0 0.5rem;
+  }
+  .tp-under {
+    min-height: 0;
+  }
+  /* the bar's menus scroll inside themselves rather than running past the bottom of the screen */
+  .tp-menu {
+    max-height: calc(100vh - 8rem);
+    overflow-y: auto;
   }
 }

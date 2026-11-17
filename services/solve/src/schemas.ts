@@ -11,7 +11,7 @@ export const MAX_IMPORT_SESSIONS = 1_000;
 /** Client clocks drift; timestamps further in the future than this are clamped to the server time. */
 export const MAX_FUTURE_SKEW_MS = 5 * 60 * 1000;
 
-export const uuid = z.string().uuid();
+export const uuid = z.guid(); // any 8-4-4-4-12 hex id, as zod 3's .uuid() took (zod 4's .uuid() wants RFC variants)
 export const penalty = z.enum(['OK', '+2', 'DNF']);
 export const eventId = z.string().refine(isEventId, { message: 'unknown event' });
 const sessionName = z.string().trim().min(1).max(40);

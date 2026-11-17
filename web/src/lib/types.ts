@@ -22,6 +22,9 @@ export interface PrivateUser extends PublicUser {
   email: string;
   /** false: the account was made with Google, Apple or GitHub and has no password (yet) */
   hasPassword?: boolean;
+  /** false: the email isn't confirmed yet, so password-reset links don't go to it. Absent in a user
+   *  cached by an older version: treat it as unknown, not as unconfirmed. */
+  emailVerified?: boolean;
 }
 
 /** Sign-in with a provider (services/auth/src/routes/oauth.ts) */
@@ -127,6 +130,8 @@ export interface Leaderboard {
   size: number;
   entries: LeaderboardEntry[];
   me: { rank: number; valueMs: number } | null;
+  /** your own best time here that the anti-cheat refused (faster than the world record), if any */
+  flagged?: { valueMs: number; floorMs: number; achievedAt: string | null } | null;
 }
 export interface UserRank {
   event: string;

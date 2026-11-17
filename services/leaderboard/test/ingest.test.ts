@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FALLBACK_FLOORS, FloorProvider, floorFor, isBelowFloor, parseRecords } from '../src/floors.js';
-import { planDailyResult, planPbUpdated, planSolveCreated, planUserInfo } from '../src/ingest.js';
+import { planDailyResult, planPbUpdated, planPeriodRefresh, planSolveCreated, planUserInfo } from '../src/ingest.js';
+import { parsePeriodBests } from '../src/periods.js';
 import { toBoardWrite } from '../src/rebuild.js';
 import { parseUserInfo, splitWithScores } from '../src/board.js';
 
@@ -199,5 +200,64 @@ describe('rebuild / read helpers', () => {
   });
   it('splitWithScores pairs members and scores', () => {
     expect(splitWithScores(['a', '100', 'b', '200'])).toEqual({ ids: ['a', 'b'], scores: [100, 200] });
+  });
+});
+
+describe('planPeriodRefresh (periods.changed)', () => {
+  const live = { days: ['2026-11-17', '2026-11-16'], weeks: ['2026-W47'] };
+  const at = '2026-11-16T14:00:00.000Z';
+
+  it("writes stats' best for every live day and week, and an empty entry where stats has none", () => {
+    const tap = { valueMs: 211, achievedAt: '2026-11-17T08:00:00.000Z' };
+    const writes = planPeriodRefresh(
+      '333',
+      {
+        days: { '2026-11-17': { flagged: { single: tap } }, '2026-11-16': { single: { valueMs: 17_711, achievedAt: at } } },
+        weeks: { '2026-W47': { single: { valueMs: 17_711, achievedAt: at }, ao5: { valueMs: 20_122, achievedAt: at }, flagged: { single: tap } } },
+      },
+      live,
+    );
+    expect(writes).toEqual([
+      { board: 'lb:333:single:d:2026-11-17', kind: 'single', valueMs: null, achievedAt: '', ttlSec: 3 * 86_400, flagged: tap }, // only a refused tap
+      { board: 'lb:333:ao5:d:2026-11-17', kind: 'ao5', valueMs: null, achievedAt: '', ttlSec: 3 * 86_400, flagged: null },
+      { board: 'lb:333:single:d:2026-11-16', kind: 'single', valueMs: 17_711, achievedAt: at, ttlSec: 3 * 86_400, flagged: null },
+      { board: 'lb:333:ao5:d:2026-11-16', kind: 'ao5', valueMs: null, achievedAt: '', ttlSec: 3 * 86_400, flagged: null },
+      { board: 'lb:333:single:w:2026-W47', kind: 'single', valueMs: 17_711, achievedAt: at, ttlSec: 15 * 86_400, flagged: tap },
+      { board: 'lb:333:ao5:w:2026-W47', kind: 'ao5', valueMs: 20_122, achievedAt: at, ttlSec: 15 * 86_400, flagged: null },
+    ]);
+  });
+
+  it('ignores days and weeks that are no longer live, and events without boards', () => {
+    const writes = planPeriodRefresh('333', { days: { '2026-11-01': { single: { valueMs: 5_000, achievedAt: at } } }, weeks: {} }, live);
+    expect(writes.every((w) => w.valueMs === null)).toBe(true);
+    expect(planPeriodRefresh('333fm', { days: {}, weeks: {} }, live)).toEqual([]);
+    expect(planPeriodRefresh('bogus', { days: {}, weeks: {} }, live)).toEqual([]);
+  });
+});
+
+describe('parsePeriodBests (stats\' answer)', () => {
+  it('keeps well-formed entries, refused values (flagged) included', () => {
+    const body = {
+      days: { '2026-11-16': { single: { valueMs: 17_711, achievedAt: '2026-11-16T02:56:18.483Z' }, flagged: { single: { valueMs: 211, achievedAt: '2026-11-16T11:14:36.134Z' } } } },
+      weeks: { '2026-W47': {} },
+    };
+    expect(parsePeriodBests(body)).toEqual(body);
+    expect(parsePeriodBests({ days: { '2026-11-16': { flagged: {} } }, weeks: {} })).toEqual({ days: { '2026-11-16': {} }, weeks: {} });
+  });
+
+  it('throws on anything malformed, so the event is retried instead of wiping entries', () => {
+    for (const bad of [
+      null,
+      {},
+      { days: {}, weeks: [] },
+      { days: { yesterday: {} }, weeks: {} },
+      { days: { '2026-11-16': { single: { valueMs: -5, achievedAt: '2026-11-16T00:00:00Z' } } }, weeks: {} },
+      { days: { '2026-11-16': { single: { valueMs: 1.5, achievedAt: '2026-11-16T00:00:00Z' } } }, weeks: {} },
+      { days: {}, weeks: { '2026-W47': { ao5: { valueMs: 20_000, achievedAt: 'soon' } } } },
+      { days: { '2026-11-16': { flagged: [1] } }, weeks: {} },
+      { days: { '2026-11-16': { flagged: { single: { valueMs: 0, achievedAt: '2026-11-16T00:00:00Z' } } } }, weeks: {} },
+    ]) {
+      expect(() => parsePeriodBests(bad), JSON.stringify(bad)).toThrow();
+    }
   });
 });

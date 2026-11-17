@@ -13,6 +13,8 @@
   --error-extra-color: #8f1920;
   --colorful-error-color: #ff6a13;
   --colorful-error-extra-color: #b34507;
+  /* the browser's own parts (scrollbars, dropdown lists, pickers) match the theme (lib/themes.ts themeColors) */
+  color-scheme: light;
 
   --roundness: 0.5rem;
   --font: 'Lexend Deca', system-ui, sans-serif;
@@ -24,6 +26,24 @@
   --timer-ready: #3ec46d;
   --timer-holding: var(--error-color);
   --timer-inspect: var(--main-color);
+}
+
+/* white_cross_dark, the default theme while the device is in dark mode: what a first visit shows before the
+   app starts (the app then applies the theme in use as inline styles, which win over these) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-color: #1d2024;
+    --main-color: #00a04d;
+    --caret-color: #3d7ff5;
+    --sub-color: #868c94;
+    --sub-alt-color: #2c3036;
+    --text-color: #f1f3f5;
+    --error-color: #ff5c63;
+    --error-extra-color: #b3323a;
+    --colorful-error-color: #ff6a13;
+    --colorful-error-extra-color: #b34507;
+    color-scheme: dark;
+  }
 }
 
 *,
@@ -122,6 +142,14 @@ h4 {
   .app {
     row-gap: 1.25rem;
     padding-top: 1rem;
+  }
+}
+
+/* a short window (a phone on its side): less room above and between the header, page and footer */
+@media (max-height: 500px) {
+  .app {
+    padding-top: 0.75rem;
+    row-gap: 1rem;
   }
 }
 
@@ -271,6 +299,16 @@ body.focus * {
 .footer .btn-text {
   font-size: 0.75rem;
   padding: 0.25rem;
+}
+/* touch screens: the footer's small links get a fingertip-sized height */
+@media (hover: none) and (pointer: coarse) {
+  .footer .btn-text {
+    padding: 0.45rem 0.3rem;
+  }
+  .footer .footer-links,
+  .footer .footer-right {
+    row-gap: 0;
+  }
 }
 .keytips {
   text-align: center;
@@ -657,6 +695,17 @@ table.table .secondary {
   padding: 2rem 1rem;
 }
 
+/* a screen's height for a long page while it loads (PageLoading), and for every outcome of a page that
+   can't know it's short until then (a profile): the footer stays below the screen instead of jumping */
+.page-tall {
+  min-height: 100vh;
+}
+
+/* stand-ins that keep the room of text that comes with the data (same lines, same wrapping) */
+.reserve {
+  visibility: hidden;
+}
+
 /* pills / badges */
 .pill {
   display: inline-flex;
@@ -803,7 +852,19 @@ body.focus .toast:not(.important) {
 }
 .modal-backdrop.modal-centered {
   align-items: center;
+  /* a dialog taller than the window starts at the top, where it can still be scrolled to */
+  align-items: safe center;
   padding-top: 2rem;
+}
+/* phones and short windows: the dialog starts near the top, so more of it is on the screen */
+@media (max-width: 720px), (max-height: 600px) {
+  .modal-backdrop,
+  .modal-backdrop.modal-centered {
+    padding: 1rem 0.75rem;
+  }
+  .modal {
+    padding: 1.25rem;
+  }
 }
 .modal-backdrop.previewing {
   background: transparent;

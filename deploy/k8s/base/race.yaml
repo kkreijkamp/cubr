@@ -63,7 +63,7 @@ spec:
                 secretKeyRef:
                   name: cubr-secrets
                   key: JWT_SECRET
-            - name: POD_NAME            # downward API -> X-Served-By header
+            - name: POD_NAME            # downward API -> "pod" in /_info and the logs
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name

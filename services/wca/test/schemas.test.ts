@@ -21,6 +21,7 @@ describe('rankQuery', () => {
   it('rejects missing/invalid values', () => {
     expect(badRequest(() => parse(rankQuery, { event: '333' }))).toMatch(/value/);
     expect(badRequest(() => parse(rankQuery, { event: '333', value: 'fast' }))).toMatch(/value/);
+    expect(badRequest(() => parse(rankQuery, { event: '333', value: 'Infinity' }))).toMatch(/value must be a number/);
     expect(badRequest(() => parse(rankQuery, { event: '333', value: '1', kind: 'mo3' }))).toMatch(/kind/);
     expect(badRequest(() => parse(rankQuery, { value: '1' }))).toMatch(/event/);
   });

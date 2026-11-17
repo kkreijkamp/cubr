@@ -57,14 +57,16 @@ export function closePalette(): void {
   paletteStore.set({ open: false, initial: null });
 }
 
-/** Monkeytype-style matching: every typed word must prefix some word of the label/keywords. */
+/** Words for matching: letters and digits, with + . : kept inside them (+2, 1:30.00); the rest separates. */
+const words = (text: string) => text.toLowerCase().split(/[^a-z0-9+.:]+/).filter(Boolean);
+
+/**
+ * Monkeytype-style matching: every typed word must prefix some word of the label/keywords. The query splits
+ * like the label, so punctuation typed from a label ("light / dark", "theme > white") matches it.
+ */
 export function matches(cmd: Command, query: string): boolean {
-  const words = query.toLowerCase().split(/[\s>]+/).filter(Boolean);
-  if (words.length === 0) return true;
-  const hay = [cmd.label, ...(cmd.keywords ?? [])]
-    .join(' ')
-    .toLowerCase()
-    .split(/[^a-z0-9+.:]+/)
-    .filter(Boolean);
-  return words.every((w) => hay.some((h) => h.startsWith(w)));
+  const typed = words(query);
+  if (typed.length === 0) return true;
+  const hay = words([cmd.label, ...(cmd.keywords ?? [])].join(' '));
+  return typed.every((w) => hay.some((h) => h.startsWith(w)));
 }

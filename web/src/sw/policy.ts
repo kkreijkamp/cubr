@@ -14,12 +14,15 @@ export const SHELL_URL = '/index.html';
 /**
  * Whether a built file (a path inside dist/, e.g. "assets/index-abc.js") is cached when the worker
  * installs, so that every page of the app opens offline. Left out: the worker itself, source maps,
- * the .woff copies of the fonts (every browser with service workers uses the .woff2 ones), and the
- * icons and screenshots, which only the browser's install screens and the home screen use.
+ * the .woff copies of the fonts (every browser with service workers uses the .woff2 ones), the
+ * icons, screenshots and iOS launch images, which only the browser's install screens and the home
+ * screen use (iOS reads its launch image when the app is added), and the files for other sites and
+ * crawlers (the link preview image, robots.txt, the sitemap, security.txt).
  */
 export function shouldPrecache(file: string): boolean {
   if (file === 'sw.js' || file.endsWith('.map') || file.endsWith('.woff')) return false;
-  if (file.startsWith('icons/') || file.startsWith('screenshots/') || file.startsWith('apple-touch-icon')) return false;
+  if (file.startsWith('icons/') || file.startsWith('screenshots/') || file.startsWith('launch/') || file.startsWith('apple-touch-icon')) return false;
+  if (file === 'og.png' || file === 'robots.txt' || file === 'sitemap.xml' || file.startsWith('.well-known/')) return false;
   return /\.(html|js|css|woff2|svg|png|webp|json|webmanifest|txt)$/.test(file);
 }
 

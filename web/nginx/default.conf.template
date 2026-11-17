@@ -1,16 +1,101 @@
 # nginx config for the cubr web container (rendered by envsubst at container start).
-# Serves the React SPA; API traffic never reaches this container - the Ingress (cloud) or the
-# gateway (local) routes /api/* and /socket.io to the backend services.
+# Serves the React SPA and the site's files; API traffic never reaches this container - the Ingress
+# (cloud) or the gateway (local and production) routes /api/* and /socket.io to the services.
+#
+# Headers: every response gets the same security headers, set once at server level. No location may
+# use add_header: nginx would then drop every inherited header for that location. What differs by path
+# (Cache-Control, X-Robots-Tag) comes from the two maps instead. web/src/__tests__/site.test.ts checks
+# this, the CSP hash and the routes below.
+
+# Cache-Control by status and path ($uri is the file nginx ended up serving: index.html for the app's
+# pages). Only a success may be cached for long: a 404 for a chunk missing during a rollout must not
+# stick for a year. (304 answers a revalidation, so it repeats what the 200 said.)
+map "$status:$uri" $cubr_cache_control {
+  default                                   "no-cache";                              # index.html, the site's files and every error: always revalidated
+  ~^(?:200|206|304):/assets/                "public, max-age=31536000, immutable";   # hashed build files never change
+  ~^\d+:/(?:_info|healthz|readyz)$          "no-store";
+  ~^(?:200|304):/(?:robots\.txt|sitemap\.xml)$  "public, max-age=3600";
+  ~^(?:200|304):/\.well-known/              "public, max-age=3600";
+}
+
+# Pages search engines shouldn't list: personal and one-off pages (an empty value sends no header).
+# Matched on the request as sent, since $uri is index.html by the time headers go out. Crawlers may
+# still fetch them (robots.txt doesn't block them), or they couldn't see this.
+map $request_uri $cubr_robots {
+  default                                                 "";
+  ~^/(?:api|internal)(?:/|$)                              "noindex";   # data, not pages (the services say the same)
+  ~*^/(?:account|settings|login|reset|confirm-email)(?:[/?]|$) "noindex";
+  ~*^/race/[^/?]                                          "noindex";   # race rooms last two hours
+}
+
+# One address per page (search engines split a page's ranking between its addresses): a page asked for
+# with capitals or a trailing slash is sent (301, query kept) to its plain lowercase address, which its
+# <link rel="canonical"> names too (src/lib/canonical.ts). nginx can't lowercase, so each page is spelled
+# out. A username keeps its case (the canonical link has it as stored), and so does a room id (lowercase
+# anyway). Order matters: the canonical forms come first and never redirect, and every target is one of
+# them, so nothing loops (src/__tests__/site.test.ts checks both).
+map $uri $cubr_canonical {
+  default                                                                 "";
+  ~^/(?:leaderboards|daily|race|account|settings|wca|about|login|login/sso|reset|confirm-email|terms|privacy)$ "";
+  "~^/profile/[A-Za-z0-9_]{3,20}$"                                        "";
+  "~^/race/[A-Za-z0-9]{4,32}$"                                            "";
+  ~*^/leaderboards/?$                                                     /leaderboards;
+  ~*^/daily/?$                                                            /daily;
+  ~*^/race/?$                                                             /race;
+  ~*^/account/?$                                                          /account;
+  ~*^/settings/?$                                                         /settings;
+  ~*^/wca/?$                                                              /wca;
+  ~*^/about/?$                                                            /about;
+  ~*^/login/?$                                                            /login;
+  ~*^/login/sso/?$                                                        /login/sso;
+  ~*^/reset/?$                                                            /reset;
+  ~*^/confirm-email/?$                                                    /confirm-email;
+  ~*^/terms/?$                                                            /terms;
+  ~*^/privacy/?$                                                          /privacy;
+  "~*^/profile/([A-Za-z0-9_]{3,20})/?$"                                   /profile/$1;
+  "~*^/race/([A-Za-z0-9]{4,32})/?$"                                       /race/$1;
+}
+
 server {
   listen 8080;
   server_name _;
   root /usr/share/nginx/html;
   server_tokens off;
+  absolute_redirect off;  # redirects say "Location: /path": behind the gateway and Cloudflare, nginx's own idea of scheme and port (http, 8080) is wrong
+  charset utf-8;          # text/html, text/plain, text/xml and JavaScript say charset=utf-8
+
+  # one address per page (map $cubr_canonical above): /About and /about/ -> 301 /about, query kept
+  if ($cubr_canonical) {
+    return 301 $cubr_canonical$is_args$args;
+  }
 
   gzip on;
   gzip_comp_level 5;
   gzip_min_length 1024;
-  gzip_types text/css application/javascript application/json application/manifest+json image/svg+xml text/plain;
+  gzip_types text/css application/javascript application/json application/manifest+json image/svg+xml text/plain text/xml;
+
+  # ---- security headers (every response, errors included) ----------------------------------------
+  # Content-Security-Policy: only cubr.dev's own scripts (plus the inline theme script in index.html,
+  # by its hash), styles, fonts, images and workers; the API and the race sockets on the same origin
+  # (wss://$host spelled out for browsers whose 'self' doesn't cover WebSockets); no plugins, no <base>,
+  # forms only to cubr.dev, and no other site may frame it. Stylesheets only from cubr.dev too: injected
+  # <style> elements are refused. Inline style attributes stay allowed (style-src-attr), because the 2D
+  # scramble net reads cubing.js's puzzle drawings, whose stickers carry style="fill:..."; React sets
+  # styles through the CSSOM, which needs nothing. One outside script: Cloudflare Web Analytics' beacon
+  # (static.cloudflareinsights.com), which reports to cloudflareinsights.com when the app loads it, or
+  # to cubr.dev's own /cdn-cgi/rum when Cloudflare injects it (web/src/lib/analytics.ts).
+  add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-kbWrCQcY5deeZriU+oYxYkCG4RR147XA28tK/0GtqOI=' https://static.cloudflareinsights.com; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' wss://$host https://cloudflareinsights.com; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
+  add_header X-Content-Type-Options "nosniff" always;
+  add_header X-Frame-Options "DENY" always;
+  add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+  # the microphone (stackmat timers), Bluetooth (smart cubes and timers), full screen and keeping the
+  # screen awake stay possible for cubr itself; everything else is off, for every page and frame
+  add_header Permissions-Policy "accelerometer=(), autoplay=(self), bluetooth=(self), browsing-topics=(), camera=(), display-capture=(), fullscreen=(self), geolocation=(), gyroscope=(), hid=(), magnetometer=(), microphone=(self), midi=(), payment=(), publickey-credentials-get=(self), screen-wake-lock=(self), serial=(), usb=()" always;
+  add_header Cross-Origin-Opener-Policy "same-origin" always;
+  # .dev is HTTPS-only in browsers already (the whole TLD is preloaded); this tells everything else
+  add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+  add_header Cache-Control $cubr_cache_control always;
+  add_header X-Robots-Tag $cubr_robots always;
 
   # liveness / readiness probes
   location = /healthz {
@@ -24,13 +109,10 @@ server {
     return 200 '{"status":"ready"}';
   }
 
-  # which pod/version served this request - handy when debugging load balancing
+  # this container's version (the footer's version button) and pod
   location = /_info {
     access_log off;
     default_type application/json;
-    add_header Cache-Control "no-store" always;
-    add_header X-Served-By $hostname always;
-    add_header X-Service "web@${APP_VERSION}" always;
     return 200 '{"service":"web","version":"${APP_VERSION}","pod":"$hostname","node":"${NODE_NAME}","startedAt":null,"uptimeSec":null,"deps":{}}';
   }
 
@@ -46,10 +128,8 @@ server {
     return 404 '{"error":{"code":"NOT_FOUND","message":"Not found"}}';
   }
 
-  # hashed build assets can be cached forever
+  # hashed build assets (cached forever, see the map); a missing one is a plain 404
   location /assets/ {
-    add_header Cache-Control "public, max-age=31536000, immutable" always;
-    add_header X-Served-By $hostname always;
     try_files $uri =404;
   }
 
@@ -57,8 +137,6 @@ server {
   # it's always revalidated (here, by Cloudflare and by the browser); a missing file is a 404, never
   # index.html.
   location = /sw.js {
-    add_header Cache-Control "no-cache" always;
-    add_header X-Served-By $hostname always;
     try_files $uri =404;
   }
 
@@ -66,22 +144,43 @@ server {
   location = /manifest.webmanifest {
     types { }
     default_type application/manifest+json;
-    add_header Cache-Control "no-cache" always;
     try_files $uri =404;
   }
 
   # the app's icons and install screenshots: a missing one is a 404, not the SPA
   location ~ ^/(icons|screenshots)/ {
-    add_header Cache-Control "no-cache" always;
     try_files $uri =404;
   }
 
-  # SPA: every other path serves index.html (client-side routing); never cache it so a rollout
-  # is visible on the next page load
+  # security.txt (RFC 9116) and anything else under /.well-known/; the old top-level spot redirects
+  location ^~ /.well-known/ {
+    try_files $uri =404;
+  }
+  location = /security.txt {
+    return 301 /.well-known/security.txt;
+  }
+
+  # ---- the app's pages (src/App.tsx): index.html, and the router picks the page --------------------
+  # Case-insensitive and with an optional trailing slash, like React Router. Usernames and race room ids
+  # follow the services' rules (USERNAME_RE, ROOM_ID_RE): anything else can't exist, so it's a 404.
+  # (Regexes with {n,m} need quotes, or nginx reads the brace as the start of a block.)
+  location = / {
+    try_files /index.html =404;
+  }
+  location ~* ^/(?:leaderboards|daily|race|account|settings|wca|about|login|login/sso|reset|confirm-email|terms|privacy)/?$ {
+    try_files /index.html =404;
+  }
+  location ~* "^/race/[a-z0-9]{4,32}/?$" {
+    try_files /index.html =404;
+  }
+  location ~* "^/profile/[a-z0-9_]{3,20}/?$" {
+    try_files /index.html =404;
+  }
+
+  # Everything else: a file of the site (favicon.svg, robots.txt, og.png...), or a real 404. The 404
+  # still shows the app (its "page got scrambled" page), but crawlers see the status and don't list it.
   location / {
-    add_header Cache-Control "no-cache" always;
-    add_header X-Served-By $hostname always;
-    add_header X-Service "web@${APP_VERSION}" always;
-    try_files $uri $uri/ /index.html;
+    try_files $uri =404;
+    error_page 404 /index.html;
   }
 }

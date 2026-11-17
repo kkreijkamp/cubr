@@ -4,7 +4,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import { bucketSolves } from './domain/buckets.js';
 import { computePbs, PB_KINDS, replayHistory, type ListSolve } from './domain/pbs.js';
 import { solveListSchema } from './eventSchemas.js';
-import { loadPbs, queuePbUpdated, upsertPb } from './store.js';
+import { loadPbs, queuePbUpdated, queuePeriodsChanged, upsertPb } from './store.js';
 
 export interface RecomputeDeps {
   solveUrl: string;
@@ -35,15 +35,16 @@ export interface RecomputeArgs {
 
 /**
  * Full rebuild of one (user, event) from the authoritative solve list: solve ledger,
- * daily_activity, hourly, personal_bests (+ pb.updated for every changed row) and pb_history
- * (chronological replay). Runs inside the caller's transaction, under the per-user lock.
+ * daily_activity, hourly, personal_bests (+ pb.updated for every changed row), pb_history
+ * (chronological replay) and a periods.changed for the leaderboard's day and week boards. Runs
+ * inside the caller's transaction, under the per-user lock.
  * user_totals is refreshed by the caller once all events are done.
  */
 export async function recomputeEvent(
   c: PoolClient,
   deps: RecomputeDeps,
   args: RecomputeArgs,
-): Promise<{ solves: number; pbChanges: number }> {
+): Promise<{ solves: number; pbChanges: number; queued: number }> {
   const { userId, username, event, tz } = args;
   const started = Date.now();
   const fetched = await fetchSolveList(deps, userId, event);
@@ -152,9 +153,13 @@ export async function recomputeEvent(
     );
   }
 
+  // 5. the day and week bests may have changed too (a deleted solve, a penalty, a session gone...)
+  await queuePeriodsChanged(c, { userId, username, event });
+
   deps.log.info(
     { userId, event, solves: solves.length, pbChanges, history: history.length, fetchMs: fetchedAt - started, totalMs: Date.now() - started },
     'recomputed user event',
   );
-  return { solves: solves.length, pbChanges };
+  // queued = outbox rows (the caller flushes the outbox when there are any)
+  return { solves: solves.length, pbChanges, queued: pbChanges + 1 };
 }

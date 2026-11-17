@@ -18,6 +18,54 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: '1.5.0',
+    date: '2026-11-18',
+    title: 'light and dark mode, a better fit on phones, and an email you can confirm and change',
+    sections: [
+      {
+        heading: 'new',
+        items: [
+          'a new theme, white cross dark. cubr can follow your device\'s light or dark mode: white cross by day and white cross dark at night, or any light and dark pair you pick (settings > theme, "light and dark mode"). a theme you picked before stays until you switch this on',
+          'change your email on your account page: a link to the new address confirms it, and the old address is told',
+          'new accounts confirm their email with a link sent at sign-up. password-reset links only go to a confirmed address, so a mistyped email can\'t hand your account to a stranger. made your account before today? reset links still reach you, and you can confirm your email on your account page ("send link")',
+          'links to cubr.dev show a preview in chats and on social sites: the logo, "cubr" and "a minimalist speedcubing timer"',
+          'on an iphone or ipad, cubr opens from the home screen on its cube instead of a white screen. added it before? remove it and add it again: ios saves the picture when the app is added',
+          'a "support" link at the bottom of every page, to cubr\'s ko-fi',
+        ],
+      },
+      {
+        heading: 'changed',
+        items: [
+          'every page fits small phones, phones on their side and tablets. on a phone held sideways, the timer, its time and the +2/dnf buttons fit on one screen',
+          'profiles no longer jump around while they load on a phone, and their big numbers show sooner',
+          'with light and dark mode on, "random" picks a new light and a new dark theme',
+          'scrollbars and dropdowns turn dark with dark themes, and the browser\'s bar takes the theme\'s colour',
+          'the daily and race pages say "hold the timer" on touch screens',
+          'the about page is linked from the (i) in the header instead of the bottom of the page, and has a shorter supporters line',
+          'the privacy policy now covers counting page views, error reports and the emails that confirm an address',
+        ],
+      },
+      {
+        heading: 'fixed',
+        items: [
+          'a mis-tap as your personal best no longer keeps your real solves off the all-time boards, and an average with a mis-tap in it never ranks',
+          'when the anti-cheat leaves a time off a board, the leaderboard says so in red, and what to do',
+          'the daily and weekly boards follow deleted solves, penalties, and merged, imported and practice sessions',
+          'a long session name no longer pushes the timer bar off the screen, and text fields no longer make iphones zoom in',
+        ],
+      },
+      {
+        heading: 'behind the scenes',
+        items: [
+          'cubr counts page views with cloudflare web analytics: no cookies, totals only, and never when your browser sends global privacy control or do not track',
+          'when something breaks in your browser, cubr sends itself a short error report so it can be fixed, with nothing personal in it',
+          'security headers on every page, a robots.txt, a sitemap and a security contact. addresses that don\'t exist answer a real 404, and each page has one address for search engines, which also learn the site\'s name and logo',
+          'security updates to the libraries cubr is built on',
+        ],
+      },
+    ],
+  },
+  {
     version: '1.4.0',
     date: '2026-11-17',
     title: 'sign in with google or github, and an app that works offline',

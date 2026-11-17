@@ -1,0 +1,10 @@
+# https://cubr.dev - every page may be crawled.
+# The API stays crawlable on purpose: pages like the leaderboards and profiles load their content from
+# it, and Google renders a page without whatever robots.txt blocks. Its answers say
+# "X-Robots-Tag: noindex", so they never show up in search themselves. The same header keeps personal
+# and short-lived pages (account, settings, sign-in, race rooms) out of results; a crawler can only see
+# it on pages it may fetch.
+User-agent: *
+Disallow: /internal/
+
+Sitemap: https://cubr.dev/sitemap.xml

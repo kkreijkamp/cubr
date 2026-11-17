@@ -133,7 +133,15 @@ function prepare(rows: [number, number, number | null, number?][], practice: Set
   return { n, t, raw, eff, isPb, pb, counts, avgs };
 }
 
-export function SolveHistoryChart({ userId, event, precision }: { userId: string; event: string; precision: 2 | 3 }) {
+/**
+ * The legend the chart will most likely have for `solves` solves (what `available` gives once the data is
+ * in: a DNF among them is assumed from 50 solves on), for the room it keeps while the data loads.
+ */
+function expectedLegend(solves: number): ToggleKey[] {
+  return ['solves', ...(solves >= 50 ? (['dnf'] as const) : []), ...LINES.filter((l) => l.key === 'pb' || solves >= l.n).map((l) => l.key)];
+}
+
+export function SolveHistoryChart({ userId, event, precision, solves }: { userId: string; event: string; precision: 2 | 3; solves: number }) {
   const [range, setRange] = useState<Range>('all');
   const [xMode, setXMode] = useState<XMode>('solves');
   const [shown, setShown] = useState<Set<ToggleKey>>(() => new Set(DEFAULT_SHOWN));
@@ -420,11 +428,18 @@ export function SolveHistoryChart({ userId, event, precision }: { userId: string
       title="progress"
       extra={
         <>
-          {series.data && (
+          {series.data ? (
             <>
               {session >= 0 && prep ? `${formatNumber(prep.n)} of ` : ''}
               {formatNumber(series.data.total)} solves
             </>
+          ) : (
+            // the count is known already: as wide as it will be, so the header wraps the same way
+            !series.error && (
+              <span className="reserve" aria-hidden="true">
+                {formatNumber(solves)} solves
+              </span>
+            )
           )}
           {series.loading && series.data && <Spinner size={12} />}
         </>
@@ -434,9 +449,22 @@ export function SolveHistoryChart({ userId, event, precision }: { userId: string
       {series.error && !series.data ? (
         <WidgetError error={series.error} what="the solve history" onRetry={series.reload} />
       ) : !prep ? (
-        <div style={{ height: HEIGHT }} className="pv-chart-empty">
-          <Loading />
-        </div>
+        <>
+          <div style={{ height: HEIGHT }} className="pv-chart-empty">
+            <Loading />
+          </div>
+          {/* the legend and the line under the chart come with the data: invisible stand-ins keep their room */}
+          <div className="pv-legend reserve" aria-hidden="true">
+            {expectedLegend(solves).map((k) => (
+              <button key={k} type="button" className="btn-text" tabIndex={-1}>
+                <Swatch k={k} /> {k}
+              </button>
+            ))}
+          </div>
+          <div className="pv-insight reserve" aria-hidden="true">
+            best 0.00 - mean 00.00 - improving 0.00 s per 100 solves
+          </div>
+        </>
       ) : prep.n === 0 ? (
         <div style={{ height: HEIGHT }} className="pv-chart-empty">
           {session >= 0 ? 'no solves in this session' : `no ${eventLabel(event)} solves yet`}

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /** Event payload schemas (SPEC section 8). Lenient: unknown extra fields are ignored. */
-const uuid = z.string().uuid();
+const uuid = z.guid(); // any 8-4-4-4-12 hex id, as zod 3's .uuid() took
 const penalty = z.enum(['OK', '+2', 'DNF']);
 const event = z.string().min(1).max(20);
 const isoDate = z.string().refine((s) => !Number.isNaN(Date.parse(s)), 'invalid timestamp');

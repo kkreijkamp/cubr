@@ -113,15 +113,17 @@ describeIntegration('stats store and recompute', () => {
         await upsertPb(c, u.id, '333', 'ao5', 12_000, randomUUID(), '2026-10-19T11:00:00.000Z');
       });
       const result = await withTx(s.pool, (c) => recomputeEvent(c, deps, { userId: u.id, username: u.username, event: '333', tz: 'UTC' }));
-      expect(result).toEqual({ solves: 3, pbChanges: 2 });
+      expect(result).toEqual({ solves: 3, pbChanges: 2, queued: 3 }); // + periods.changed
       expect(await rows('SELECT kind, value_ms, solve_id, achieved_at FROM stats.personal_bests WHERE user_id = $1 ORDER BY kind', [u.id])).toEqual([
         { kind: 'mo3', value_ms: 11_000, solve_id: made[2].solve.id, achieved_at: new Date(made[2].solve.createdAt) },
         { kind: 'single', value_ms: 10_000, solve_id: made[0].solve.id, achieved_at: new Date(made[0].solve.createdAt) },
       ]);
-      const queued = (await rows(`SELECT payload FROM stats.pb_outbox WHERE payload->>'userId' = $1 ORDER BY id`, [u.id])).map((r) => r.payload);
+      const queued = (await rows(`SELECT type, payload FROM stats.pb_outbox WHERE payload->>'userId' = $1 ORDER BY id`, [u.id])).map((r) => [r.type, r.payload]);
       expect(queued).toEqual([
-        expect.objectContaining({ kind: 'single', valueMs: 10_000, previousMs: 9_000, achievedAt: made[0].solve.createdAt, username: u.username, event: '333' }),
-        expect.objectContaining({ kind: 'ao5', valueMs: null, previousMs: 12_000, achievedAt: null }),
+        ['pb.updated', expect.objectContaining({ kind: 'single', valueMs: 10_000, previousMs: 9_000, achievedAt: made[0].solve.createdAt, username: u.username, event: '333' })],
+        ['pb.updated', expect.objectContaining({ kind: 'ao5', valueMs: null, previousMs: 12_000, achievedAt: null })],
+        // and the leaderboard re-reads the day and week bests
+        ['periods.changed', { eventId: expect.stringMatching(/^stats-/), occurredAt: expect.any(String), userId: u.id, username: u.username, event: '333' }],
       ]);
     });
 

@@ -149,7 +149,8 @@ describeIntegration('sign-in with Google, Apple and GitHub', () => {
       const res = await s.request('POST', '/api/auth/oauth/signup', { body: { id: r.fragment.get('signup'), username: 'zoe_cubes' }, headers: { cookie: r.cookie! }, ip: freshIp() });
       expect(res.statusCode, res.body).toBe(201);
       const { token, user } = res.json();
-      expect(user).toMatchObject({ username: 'zoe_cubes', email: who.email, hasPassword: false });
+      // the provider verified the address, so it starts confirmed
+      expect(user).toMatchObject({ username: 'zoe_cubes', email: who.email, hasPassword: false, emailVerified: true });
       expect((await s.request('GET', '/api/auth/me', { token })).json().user.id).toBe(user.id);
       expect((await s.events('user.registered')).some((e) => e.data.userId === user.id)).toBe(true);
       // the sign-up is used up
@@ -212,7 +213,7 @@ describeIntegration('sign-in with Google, Apple and GitHub', () => {
     });
 
     it("does not hand an existing account to a provider account with the same email", async () => {
-      // cubr doesn't verify sign-up emails: whoever registered this address may not own it
+      // its email may not be confirmed yet: whoever registered this address may not own it
       const existing = await passwordAccount();
       const r = await back('google', await begin('google'), person({ email: existing.user.email.toUpperCase() }));
       expect(r.fragment.get('error')).toBe('email_taken');
@@ -293,6 +294,17 @@ describeIntegration('sign-in with Google, Apple and GitHub', () => {
       expect((await back('github', await begin('github', { mode: 'link', token: owner.token }), person())).fragment.get('error')).toBe('already_linked');
       // connecting the one it already has again is fine
       expect((await back('github', await begin('github', { mode: 'link', token: owner.token }), who)).fragment.get('linked')).toBe('github');
+    });
+
+    it("confirms the account's email when a provider vouches for that same address, not for another one", async () => {
+      const acct = await passwordAccount();
+      const confirmed = async () => (await s.request('GET', '/api/auth/me', { token: acct.token })).json().user.emailVerified;
+      expect(await confirmed()).toBe(false);
+      await back('google', await begin('google', { mode: 'link', token: acct.token }), person({ email: 'someone.else@example.com' }));
+      expect(await confirmed()).toBe(false);
+      const who = person({ email: acct.user.email.toUpperCase() });
+      await back('apple', await begin('apple', { mode: 'link', token: acct.token }), who);
+      expect(await confirmed()).toBe(true);
     });
 
     it('disconnects a provider, but never the last way to sign in', async () => {

@@ -15,12 +15,16 @@ for personal bests (emits `pb.updated`, consumed by leaderboard).
 | `GET /api/stats/users/:userId/solves?event=333&limit=20000` | Chronological solve series from `solve_ledger` for the profile history chart: `{event, total, truncated, sessions: [{id, name, solves, firstAt, lastAt}], solves: [[unixSeconds, timeMs, effectiveMs\|null, sessionIndex]]}` (newest `limit` <= 50 000; compact arrays keep 20k solves at ~450 KB). `sessionIndex` points into `sessions`, so the web client filters by session without another request. |
 | `GET /api/stats/global` | cached 10 s in Redis `cache:stats:global` (fails open, `X-Cache: hit/miss`). "today" = UTC day. |
 | `GET /internal/pbs?event=&kind=` | all PB rows (+ username) for leaderboard rebuilds; requires `X-Internal-Token` when `INTERNAL_API_TOKEN` is set. |
+| `GET /internal/users/:userId/all-time-bests?event=&minSingle=&minAverage=` | the user's all-time best single / ao5 / ao12 that may rank (at or above the floors; no average containing a single below the single floor), and the lowest refused ones under `flagged`: the leaderboard ranks these while the user's PB is an impossible time; internal token. |
+| `GET /internal/users/:userId/period-bests?event=&from=&minSingle=&minAverage=` | the user's best single and rolling ao5 of each UTC day and ISO week from `from` on (non-practice sessions; an ao5 window may start before `from`; values below the floors skipped), for the leaderboard's daily and weekly boards; internal token as above. |
 | `GET /api/stats/_info`, `/healthz`, `/readyz` | readiness = Postgres + migrations; Redis is soft. `_info` adds consumer stats and `pbOutboxPending`. |
 
 ## Events
 Consumes (group `stats`, consumer = `POD_NAME`): `user.registered`, `user.updated`, `solve.created`,
 `solve.updated`, `solve.deleted`, `session.deleted`, `session.renamed`, `session.updated`,
-`sessions.merged`, `solves.imported`, `user.deleted`. Produces: `pb.updated`.
+`sessions.merged`, `solves.imported`, `user.deleted`. Produces: `pb.updated`, and `periods.changed`
+(`userId, username, event`) after every change of a user's solves for an event: the leaderboard then reads
+their best of each day and week from `GET /internal/users/:id/period-bests` (`src/domain/periods.ts`).
 
 `user.deleted` removes every row of the account (all tables with a `user_id`, plus its queued
 `pb.updated`) and leaves a tombstone in `deleted_users`; any later event for that user (a late
@@ -54,8 +58,9 @@ Consumes (group `stats`, consumer = `POD_NAME`): `user.registered`, `user.update
   only counts it if it was new - so a re-emitted event with a new eventId, or a stale pending entry
   reclaimed after a recompute already counted the solve, never double counts. `solve.deleted` writes a
   tombstone and `session.deleted` a `stats.deleted_sessions` row so late creations are ignored.
-* **pb.updated can't be lost - transactional outbox**: PB changes write their `pb.updated` payload
-  (with a fresh `stats-<uuid>` eventId) to `stats.pb_outbox` in the same transaction. After commit the
+* **pb.updated and periods.changed can't be lost - transactional outbox**: PB changes write their
+  `pb.updated` payload (with a fresh `stats-<uuid>` eventId) to `stats.pb_outbox` in the same transaction,
+  and so does every change of a user's solves with a `periods.changed` (`pb_outbox.type`, migration 007). After commit the
   handler flushes the outbox; a 1 s background loop retries anything left (Redis down, crash between
   commit and XADD). Only one replica relays at a time (advisory lock) so order is preserved. Rows are
   deleted after XADD, so delivery is at-least-once with a stable eventId (leaderboard's ZADD is

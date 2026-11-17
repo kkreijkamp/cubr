@@ -128,6 +128,11 @@ describe('row mapping', () => {
     expect(u).not.toHaveProperty('passwordHash');
     expect(u).not.toHaveProperty('password_hash');
   });
+  it('PrivateUser says whether the email is confirmed (only a true from the database counts)', () => {
+    expect(toPrivateUser({ ...row, email_verified: true }).emailVerified).toBe(true);
+    expect(toPrivateUser({ ...row, email_verified: false }).emailVerified).toBe(false);
+    expect(toPrivateUser(row).emailVerified).toBe(false);
+  });
   it('trims padded char(2) country and handles string timestamps', () => {
     const u = toPublicUser({ ...row, country: '  ', created_at: '2026-01-02T03:04:05Z' });
     expect(u.country).toBeNull();

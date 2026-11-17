@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 // End-to-end smoke test through the public entry point (local gateway, kind gateway or GKE Ingress).
-// Walks a real user journey across every microservice and checks the event pipeline, then deletes
-// its throwaway account and checks that the account's data left every service (also after a failed
-// step), so it leaves nothing behind:
+// Walks a real user journey across every microservice and checks the event pipeline, then cleans up
+// after itself, also after a failed step: it deletes its race room and its throwaway account, and
+// checks that the account's data left every service and every leaderboard. Nothing visible is left
+// behind (only internal bookkeeping: the event log, which is trimmed, and the leaderboards' list of
+// deleted accounts), so it can run against production:
 //   node scripts/smoke.mjs http://localhost:8080
 //   node scripts/smoke.mjs http://<INGRESS_IP>
 const BASE = (process.argv[2] ?? process.env.BASE_URL ?? 'http://localhost:8080').replace(/\/$/, '');
@@ -12,8 +14,10 @@ let token = null;
 const PASSWORD = 'smoke-test-pw';
 let username = null;
 let userId = null;
-/** the all-time 3x3 single board's page that listed the test account */
-let boardPage = null;
+/** the page of each 3x3 single board (all-time, daily, weekly) that listed the test account */
+const boardPages = {};
+/** the race room it made, until it's deleted */
+let roomId = null;
 
 async function req(method, path, body) {
   const t = Date.now();
@@ -113,13 +117,16 @@ await eventually('stats read model updated (single PB)', async () => {
 });
 await eventually('leaderboard updated (all-time single)', async () => {
   const lb = await req('GET', '/api/leaderboards/333/single?period=all');
-  if (lb.data?.me?.rank) boardPage = Math.ceil(lb.data.me.rank / 100);
+  if (lb.data?.me?.rank) boardPages.all = Math.ceil(lb.data.me.rank / 100);
   return { ok: lb.data?.me?.valueMs === 59876, detail: `rank=${lb.data?.me?.rank} of ${lb.data?.total}` };
 });
-await eventually('daily leaderboard updated', async () => {
-  const lb = await req('GET', '/api/leaderboards/333/single?period=daily');
-  return { ok: lb.data?.me?.valueMs > 0, detail: `rank=${lb.data?.me?.rank}` };
-});
+for (const period of ['daily', 'weekly']) {
+  await eventually(`${period} leaderboard updated`, async () => {
+    const lb = await req('GET', `/api/leaderboards/333/single?period=${period}`);
+    if (lb.data?.me?.rank) boardPages[period] = Math.ceil(lb.data.me.rank / 100);
+    return { ok: lb.data?.me?.valueMs > 0, detail: `rank=${lb.data?.me?.rank}` };
+  });
+}
 
 console.log('\nwca dataset:');
 const meta = await req('GET', '/api/wca/meta');
@@ -135,8 +142,10 @@ if (meta.status === 503) {
 console.log('\nrace:');
 const room = await req('POST', '/api/race/rooms', { name: 'smoke room', event: '333' });
 check('create race room', room.status === 201, room.data?.room?.id);
+roomId = room.data?.room?.id ?? null;
 const rooms = await req('GET', '/api/race/rooms');
-check('room listed in lobby', rooms.data?.rooms?.some((r) => r.id === room.data?.room?.id));
+check('room listed in lobby', rooms.data?.rooms?.some((r) => r.id === roomId));
+await deleteRoom();
 
 console.log('\nload balancing (20 requests to /api/scrambles/_info):');
 const pods = new Map();
@@ -159,12 +168,29 @@ check('token revoked after logout', after.status === 401);
   await deleteTestAccount();
 }
 
+/** Deletes the race room (its creator, signed in, may) and checks it left the lobby. */
+async function deleteRoom() {
+  if (!roomId) return;
+  const del = await req('DELETE', `/api/race/rooms/${roomId}`);
+  if (del.status === 404 && /^Route DELETE/.test(del.data?.error?.message ?? '')) {
+    // a server from before rooms could be deleted (v1.4.1)
+    console.log('  - this server cannot delete race rooms yet: the room leaves the lobby after 10 empty minutes');
+    roomId = null;
+    return;
+  }
+  check('delete the race room', del.status === 204, `status ${del.status}`);
+  const lobby = await req('GET', '/api/race/rooms');
+  check('the room left the lobby', lobby.status === 200 && !(lobby.data?.rooms ?? []).some((r) => r.id === roomId));
+  if (del.status === 204) roomId = null;
+}
+
 /** Deletes the throwaway account (signing in again if needed) and checks its data left every service. */
 async function deleteTestAccount() {
   if (!username) return;
-  console.log('\ncleanup (the test account and its data):');
+  console.log('\ncleanup (the race room, the test account and its data):');
   try {
     token = (await req('POST', '/api/auth/login', { login: username, password: PASSWORD })).data?.token ?? null;
+    if (roomId) await deleteRoom(); // the journey stopped before it did
     const gone = await req('DELETE', '/api/auth/me', { password: PASSWORD });
     check('delete the test account', gone.status === 204, `status ${gone.status}`);
     check('its token stops working', (await req('GET', '/api/auth/me')).status === 401);
@@ -177,10 +203,10 @@ async function deleteTestAccount() {
         return { ok: s.status === 200 && solves === 0, detail: `${solves} solves left` };
       });
     }
-    if (userId && boardPage) {
-      await eventually('it left the leaderboards', async () => {
-        const lb = await req('GET', `/api/leaderboards/333/single?period=all&size=100&page=${boardPage}`);
-        return { ok: lb.status === 200 && !(lb.data?.entries ?? []).some((e) => e.userId === userId), detail: `page ${boardPage}` };
+    for (const [period, page] of Object.entries(userId ? boardPages : {})) {
+      await eventually(`it left the ${period === 'all' ? 'all-time' : period} leaderboard`, async () => {
+        const lb = await req('GET', `/api/leaderboards/333/single?period=${period}&size=100&page=${page}`);
+        return { ok: lb.status === 200 && !(lb.data?.entries ?? []).some((e) => e.userId === userId), detail: `page ${page}` };
       });
     }
   } catch (err) {

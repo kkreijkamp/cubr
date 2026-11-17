@@ -48,8 +48,29 @@ async function runCheck(fn: DependencyCheck): Promise<'ok' | 'down'> {
 }
 
 /**
+ * Security headers on every API response (errors included). The API only ever answers with data,
+ * so nothing it sends may run as a page or be framed (CSP), sniffed as another type, or read by other
+ * sites' pages (CORP; avatars included, which only cubr's own pages show). A route may set a stricter
+ * value of its own. Which pod and version answered is in <prefix>/_info and the logs, not in headers.
+ */
+export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
+  'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'no-referrer',
+  'Cross-Origin-Resource-Policy': 'same-origin',
+  'Strict-Transport-Security': 'max-age=63072000; includeSubDomains',
+};
+
+/**
+ * Search engines may fetch the API (Google renders pages, e.g. the leaderboards, from it, and skips
+ * whatever robots.txt blocks) but must never list its answers.
+ */
+export const ROBOTS_HEADERS: Readonly<Record<string, string>> = { 'X-Robots-Tag': 'noindex' };
+
+/**
  * Creates a Fastify instance with the cross-cutting behaviour every cubr service shares:
- * JSON error envelope, X-Served-By / X-Service headers, /healthz, /readyz and <prefix>/_info.
+ * JSON error envelope, the security headers, /healthz, /readyz and <prefix>/_info.
  */
 export function createServer(config: BaseConfig, opts: ServerOptions): Server {
   const app = Fastify({
@@ -68,9 +89,9 @@ export function createServer(config: BaseConfig, opts: ServerOptions): Server {
   let shuttingDown = false;
   const checks = opts.checks ?? {};
 
+  // a route's own value wins (the avatars' stricter CSP adds `sandbox`, so an upload can never act as a page)
   app.addHook('onSend', async (_req, reply, payload) => {
-    reply.header('X-Served-By', config.podName);
-    reply.header('X-Service', `${config.serviceName}@${config.version}`);
+    for (const [name, value] of Object.entries({ ...SECURITY_HEADERS, ...ROBOTS_HEADERS })) if (!reply.hasHeader(name)) reply.header(name, value);
     return payload;
   });
 

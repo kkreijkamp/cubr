@@ -6,7 +6,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import type { FetchOptions, Redis } from '@cubr/common';
 import { createTestRedis, describeIntegration } from '@cubr/testkit';
 import { floorFor, type FloorSource } from '../src/floors.js';
-import { DELETED_USERS_KEY, FLAGGED_KEY, META_BUILT_KEY, REBUILD_LOCK_KEY, USERS_KEY, allTimeKey, atKey, tsKey, type Kind } from '../src/keys.js';
+import { DELETED_USERS_KEY, FLAGGED_KEY, META_BUILT_KEY, REBUILD_LOCK_KEY, USERS_KEY, allTimeKey, atKey, flaggedKey, tsKey, type Kind } from '../src/keys.js';
 import { rebuildOnce, startRebuildLoop, type StatsPb } from '../src/rebuild.js';
 import { defineScripts } from '../src/scripts.js';
 
@@ -32,11 +32,11 @@ describeIntegration('leaderboard Redis scripts and rebuild', () => {
     it('adds an entry, lowers it only for a better value, and moves achievedAt only with the value', async () => {
       const board = freshBoard();
       const u = randomUUID();
-      expect(await redis.lbBest(board, atKey(board), 10_000, u, 'first', 0)).toBe(1);
-      expect(await redis.lbBest(board, atKey(board), 11_000, u, 'worse', 0)).toBe(0);
-      expect(await redis.lbBest(board, atKey(board), 10_000, u, 'equal', 0)).toBe(0); // whoever got there first keeps it
+      expect(await redis.lbBest(board, atKey(board), tsKey(board), 10_000, u, 'first', 0, 1)).toBe(1);
+      expect(await redis.lbBest(board, atKey(board), tsKey(board), 11_000, u, 'worse', 0, 1)).toBe(0);
+      expect(await redis.lbBest(board, atKey(board), tsKey(board), 10_000, u, 'equal', 0, 1)).toBe(0); // whoever got there first keeps it
       expect([await redis.zscore(board, u), await redis.hget(atKey(board), u)]).toEqual(['10000', 'first']);
-      expect(await redis.lbBest(board, atKey(board), 9_000, u, 'better', 0)).toBe(1);
+      expect(await redis.lbBest(board, atKey(board), tsKey(board), 9_000, u, 'better', 0, 1)).toBe(1);
       expect([await redis.zscore(board, u), await redis.hget(atKey(board), u)]).toEqual(['9000', 'better']);
       expect(await redis.ttl(board)).toBe(-1); // 0 = no expiry
     });
@@ -44,12 +44,108 @@ describeIntegration('leaderboard Redis scripts and rebuild', () => {
     it('refreshes the expiry of the board and its achievedAt hash on every write, even one that changes nothing', async () => {
       const board = freshBoard();
       const u = randomUUID();
-      await redis.lbBest(board, atKey(board), 10_000, u, 'first', 1_000);
+      await redis.lbBest(board, atKey(board), tsKey(board), 10_000, u, 'first', 1_000, 1);
       await redis.expire(board, 5);
       await redis.expire(atKey(board), 5);
-      expect(await redis.lbBest(board, atKey(board), 12_000, u, 'worse', 1_000)).toBe(0);
+      expect(await redis.lbBest(board, atKey(board), tsKey(board), 12_000, u, 'worse', 1_000, 1)).toBe(0);
       expect(await redis.ttl(board)).toBeGreaterThan(990);
       expect(await redis.ttl(atKey(board))).toBeGreaterThan(990);
+    });
+  });
+
+  describe('lbSetPeriod (daily and weekly boards, after periods.changed)', () => {
+    it('sets the exact value, a worse one too, and removes the entry for an empty score', async () => {
+      const board = freshBoard();
+      const [u, other] = [randomUUID(), randomUUID()];
+      await redis.lbBest(board, atKey(board), tsKey(board), 3_567, u, 'deleted solve', 1_000, 1_000);
+      await redis.lbBest(board, atKey(board), tsKey(board), 15_000, other, 'O', 1_000, 1_000);
+      expect(await redis.lbSetPeriod(board, atKey(board), tsKey(board), flaggedKey(board), u, 17_711, 'real best', 2_000, 1_000, '')).toBe(1);
+      expect([await redis.zscore(board, u), await redis.hget(atKey(board), u), await redis.hget(tsKey(board), u)]).toEqual(['17711', 'real best', '2000']);
+      expect(await redis.lbSetPeriod(board, atKey(board), tsKey(board), flaggedKey(board), u, '', '', 3_000, 1_000, '')).toBe(0);
+      expect([await redis.zscore(board, u), await redis.hget(atKey(board), u), await redis.hget(tsKey(board), u)]).toEqual([null, null, '3000']);
+      expect(await redis.zscore(board, other)).toBe('15000');
+    });
+
+    it('drops a write older than the last one applied, and a keep-best write of a solve from before it', async () => {
+      const board = freshBoard();
+      const u = randomUUID();
+      await redis.lbSetPeriod(board, atKey(board), tsKey(board), flaggedKey(board), u, 17_711, 'A', 2_000, 1_000, '');
+      expect(await redis.lbSetPeriod(board, atKey(board), tsKey(board), flaggedKey(board), u, 9_000, 'stale', 1_999, 1_000, '')).toBe(-1);
+      // a solve.created handled late, from before the exact write: that solve may be gone by now
+      expect(await redis.lbBest(board, atKey(board), tsKey(board), 3_567, u, 'deleted solve', 1_000, 1_500)).toBe(-1);
+      expect(await redis.zscore(board, u)).toBe('17711');
+      // a newer solve still lowers the time
+      expect(await redis.lbBest(board, atKey(board), tsKey(board), 16_000, u, 'new solve', 1_000, 2_500)).toBe(1);
+      expect([await redis.zscore(board, u), await redis.hget(atKey(board), u)]).toEqual(['16000', 'new solve']);
+    });
+
+    it('keeps the time even when the board has no entry left, so a deleted solve cannot come back', async () => {
+      const board = freshBoard();
+      const u = randomUUID();
+      expect(await redis.lbSetPeriod(board, atKey(board), tsKey(board), flaggedKey(board), u, '', '', 2_000, 1_000, '')).toBe(0);
+      expect(await redis.exists(board)).toBe(0);
+      expect(await redis.hget(tsKey(board), u)).toBe('2000');
+      expect(await redis.ttl(tsKey(board))).toBeGreaterThan(990); // and the record expires with the board's TTL
+      expect(await redis.lbBest(board, atKey(board), tsKey(board), 3_845, u, 'deleted solve', 1_000, 1_000)).toBe(-1);
+      expect(await redis.exists(board)).toBe(0);
+    });
+
+    it("gives new keys the board's TTL, but never extends one that has a TTL already", async () => {
+      const fresh = freshBoard();
+      const u = randomUUID();
+      await redis.lbSetPeriod(fresh, atKey(fresh), tsKey(fresh), flaggedKey(fresh), u, 20_000, 'A', 1_000, 1_000, '');
+      for (const key of [fresh, atKey(fresh), tsKey(fresh)]) expect(await redis.ttl(key)).toBeGreaterThan(990);
+
+      const old = freshBoard();
+      await redis.lbBest(old, atKey(old), tsKey(old), 20_000, u, 'A', 1_000, 1_000);
+      for (const key of [old, atKey(old)]) await redis.expire(key, 50); // a day about to expire
+      await redis.lbSetPeriod(old, atKey(old), tsKey(old), flaggedKey(old), u, 21_000, 'B', 2_000, 1_000, '');
+      expect(await redis.ttl(old)).toBeLessThanOrEqual(50);
+      expect(await redis.ttl(atKey(old))).toBeLessThanOrEqual(50);
+    });
+  });
+
+  describe("flagged hashes (why someone isn't on a board)", () => {
+    const flag = (valueMs: number, floorMs = 2_510) => JSON.stringify({ valueMs, floorMs, achievedAt: 'when' });
+
+    it('lbSetPb records a refused value, keeps the entry as it was, and any later write clears it', async () => {
+      const board = freshBoard();
+      const u = randomUUID();
+      await redis.lbSetPb(board, atKey(board), tsKey(board), flaggedKey(board), u, 15_000, 'valid', 1_000, '');
+      expect(await redis.lbSetPb(board, atKey(board), tsKey(board), flaggedKey(board), u, 174, 'tap', 2_000, flag(174))).toBe(2);
+      expect([await redis.zscore(board, u), await redis.hget(flaggedKey(board), u), await redis.hget(tsKey(board), u)]).toEqual(['15000', flag(174), '2000']);
+      // an older refusal is stale like any other write
+      expect(await redis.lbSetPb(board, atKey(board), tsKey(board), flaggedKey(board), u, 150, 'older tap', 1_500, flag(150))).toBe(-1);
+      expect(await redis.lbSetPb(board, atKey(board), tsKey(board), flaggedKey(board), u, 17_382, 'real', 3_000, '')).toBe(1);
+      expect([await redis.zscore(board, u), await redis.hget(flaggedKey(board), u)]).toEqual(['17382', null]);
+      await redis.lbSetPb(board, atKey(board), tsKey(board), flaggedKey(board), u, 174, 'tap', 4_000, flag(174));
+      expect(await redis.lbSetPb(board, atKey(board), tsKey(board), flaggedKey(board), u, '', '', 5_000, '')).toBe(0); // no PB any more
+      expect([await redis.zscore(board, u), await redis.hget(flaggedKey(board), u)]).toEqual([null, null]);
+    });
+
+    it('lbFlagBest keeps the lowest refused value, skips solves from before an exact write, and expires with the board', async () => {
+      const board = freshBoard();
+      const u = randomUUID();
+      expect(await redis.lbFlagBest(flaggedKey(board), tsKey(board), u, 648, flag(648), 1_000, 1_000)).toBe(1);
+      expect(await redis.lbFlagBest(flaggedKey(board), tsKey(board), u, 700, flag(700), 1_100, 1_000)).toBe(0);
+      expect(await redis.lbFlagBest(flaggedKey(board), tsKey(board), u, 211, flag(211), 1_200, 1_000)).toBe(1);
+      expect(await redis.hget(flaggedKey(board), u)).toBe(flag(211));
+      expect(await redis.ttl(flaggedKey(board))).toBeGreaterThan(990);
+      await redis.lbSetPeriod(board, atKey(board), tsKey(board), flaggedKey(board), u, 17_382, 'real', 2_000, 1_000, '');
+      expect(await redis.lbFlagBest(flaggedKey(board), tsKey(board), u, 100, flag(100), 1_500, 1_000)).toBe(-1);
+      expect(await redis.hget(flaggedKey(board), u)).toBeNull();
+    });
+
+    it('lbSetPeriod sets or clears the flag with the entry', async () => {
+      const board = freshBoard();
+      const u = randomUUID();
+      await redis.lbSetPeriod(board, atKey(board), tsKey(board), flaggedKey(board), u, '', '', 1_000, 1_000, flag(211)); // only a tap that day
+      expect([await redis.exists(board), await redis.hget(flaggedKey(board), u)]).toEqual([0, flag(211)]);
+      expect(await redis.ttl(flaggedKey(board))).toBeGreaterThan(990);
+      await redis.lbSetPeriod(board, atKey(board), tsKey(board), flaggedKey(board), u, 17_382, 'real', 2_000, 1_000, flag(211)); // and a real solve
+      expect([await redis.zscore(board, u), await redis.hget(flaggedKey(board), u)]).toEqual(['17382', flag(211)]);
+      await redis.lbSetPeriod(board, atKey(board), tsKey(board), flaggedKey(board), u, 17_382, 'real', 3_000, 1_000, ''); // the tap was deleted
+      expect(await redis.hget(flaggedKey(board), u)).toBeNull();
     });
   });
 
@@ -57,29 +153,29 @@ describeIntegration('leaderboard Redis scripts and rebuild', () => {
     it('sets the exact value, worse ones included, and records when and from which event time', async () => {
       const board = freshBoard();
       const u = randomUUID();
-      expect(await redis.lbSetPb(board, atKey(board), tsKey(board), u, 10_000, 'A', 1_000)).toBe(1);
-      expect(await redis.lbSetPb(board, atKey(board), tsKey(board), u, 12_000, 'B', 2_000)).toBe(1);
+      expect(await redis.lbSetPb(board, atKey(board), tsKey(board), flaggedKey(board), u, 10_000, 'A', 1_000, '')).toBe(1);
+      expect(await redis.lbSetPb(board, atKey(board), tsKey(board), flaggedKey(board), u, 12_000, 'B', 2_000, '')).toBe(1);
       expect([await redis.zscore(board, u), await redis.hget(atKey(board), u), await redis.hget(tsKey(board), u)]).toEqual(['12000', 'B', '2000']);
     });
 
     it('drops a write older than the last one applied, but applies one from the same moment', async () => {
       const board = freshBoard();
       const u = randomUUID();
-      await redis.lbSetPb(board, atKey(board), tsKey(board), u, 12_000, 'B', 2_000);
-      expect(await redis.lbSetPb(board, atKey(board), tsKey(board), u, 9_000, 'stale', 1_999)).toBe(-1);
+      await redis.lbSetPb(board, atKey(board), tsKey(board), flaggedKey(board), u, 12_000, 'B', 2_000, '');
+      expect(await redis.lbSetPb(board, atKey(board), tsKey(board), flaggedKey(board), u, 9_000, 'stale', 1_999, '')).toBe(-1);
       expect([await redis.zscore(board, u), await redis.hget(atKey(board), u)]).toEqual(['12000', 'B']);
-      expect(await redis.lbSetPb(board, atKey(board), tsKey(board), u, 11_000, 'same time', 2_000)).toBe(1);
+      expect(await redis.lbSetPb(board, atKey(board), tsKey(board), flaggedKey(board), u, 11_000, 'same time', 2_000, '')).toBe(1);
       expect(await redis.zscore(board, u)).toBe('11000');
     });
 
     it('removes the entry for an empty score, and an older write cannot bring it back', async () => {
       const board = freshBoard();
       const [u, other] = [randomUUID(), randomUUID()];
-      await redis.lbSetPb(board, atKey(board), tsKey(board), u, 10_000, 'A', 1_000);
-      await redis.lbSetPb(board, atKey(board), tsKey(board), other, 11_000, 'O', 1_000);
-      expect(await redis.lbSetPb(board, atKey(board), tsKey(board), u, '', '', 2_000)).toBe(0);
+      await redis.lbSetPb(board, atKey(board), tsKey(board), flaggedKey(board), u, 10_000, 'A', 1_000, '');
+      await redis.lbSetPb(board, atKey(board), tsKey(board), flaggedKey(board), other, 11_000, 'O', 1_000, '');
+      expect(await redis.lbSetPb(board, atKey(board), tsKey(board), flaggedKey(board), u, '', '', 2_000, '')).toBe(0);
       expect([await redis.zscore(board, u), await redis.hget(atKey(board), u), await redis.hget(tsKey(board), u)]).toEqual([null, null, '2000']);
-      expect(await redis.lbSetPb(board, atKey(board), tsKey(board), u, 9_000, 'replayed', 1_500)).toBe(-1);
+      expect(await redis.lbSetPb(board, atKey(board), tsKey(board), flaggedKey(board), u, 9_000, 'replayed', 1_500, '')).toBe(-1);
       expect(await redis.zrange(board, 0, -1)).toEqual([other]);
     });
   });
@@ -149,11 +245,29 @@ describeIntegration('leaderboard Redis scripts and rebuild', () => {
       );
     });
 
+    it("puts a refused PB on the flagged hash and, with stats' all-time bests, the person's real best on the board", async () => {
+      const cy = randomUUID();
+      const fetcher = statsPbs({ single: [row(cy, 'cy', '444', 'single', 1_000, '2026-10-03T00:00:00.000Z')] });
+      const allTime = vi.fn(async () => ({ single: { valueMs: 45_000, achievedAt: '2026-10-04T00:00:00.000Z' }, flagged: { single: { valueMs: 1_000, achievedAt: '2026-10-03T00:00:00.000Z' } } }));
+      expect(await rebuildOnce({ ...deps(fetcher), periods: { bests: vi.fn(), allTime } })).toEqual({ entries: 0, skipped: 0, flagged: 1 });
+      expect(allTime).toHaveBeenCalledWith({ userId: cy, event: '444', minSingle: 11_300, minAverage: 13_900 });
+      const board = allTimeKey('444', 'single');
+      expect([await redis.zscore(board, cy), await redis.hget(atKey(board), cy)]).toEqual(['45000', '2026-10-04T00:00:00.000Z']);
+      expect(JSON.parse((await redis.hget(flaggedKey(board), cy))!)).toEqual({ valueMs: 1_000, floorMs: 11_300, achievedAt: '2026-10-03T00:00:00.000Z' });
+      // without stats' answer (down, say) the flag still goes on, and the next change brings the rest
+      await redis.flushdb();
+      const down = vi.fn(async () => {
+        throw new Error('stats down');
+      });
+      await rebuildOnce({ ...deps(fetcher), periods: { bests: vi.fn(), allTime: down } });
+      expect([await redis.zscore(board, cy), await redis.hexists(flaggedKey(board), cy)]).toEqual([null, 1]);
+    });
+
     it('lets a pb.updated that happened after the snapshot win, and overwrites older entries', async () => {
       const board = allTimeKey('555', 'ao5');
       const [newer, older] = [randomUUID(), randomUUID()];
-      await redis.lbSetPb(board, atKey(board), tsKey(board), newer, 50_000, 'live', Date.now() + 60_000); // occurred after the snapshot
-      await redis.lbSetPb(board, atKey(board), tsKey(board), older, 70_000, 'old', Date.now() - 60_000);
+      await redis.lbSetPb(board, atKey(board), tsKey(board), flaggedKey(board), newer, 50_000, 'live', Date.now() + 60_000, ''); // occurred after the snapshot
+      await redis.lbSetPb(board, atKey(board), tsKey(board), flaggedKey(board), older, 70_000, 'old', Date.now() - 60_000, '');
       await rebuildOnce(deps(statsPbs({ ao5: [row(newer, 'new', '555', 'ao5', 55_000), row(older, 'old', '555', 'ao5', 60_000)] })));
       expect(await redis.zscore(board, newer)).toBe('50000');
       expect(await redis.zscore(board, older)).toBe('60000');

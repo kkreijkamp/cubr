@@ -42,6 +42,10 @@
   color: var(--sub-color);
   letter-spacing: 0;
 }
+/* a spinner by the title (data loading) keeps the line as tall as the text that comes in its place */
+.pf-extra .spinner {
+  margin-block: -0.25rem;
+}
 .pf-extra a,
 .pf-link {
   color: var(--sub-color);
@@ -77,6 +81,13 @@
   padding: 0.35em 0.6em;
   background: var(--sub-alt-color);
   max-width: 12rem;
+}
+/* iOS zooms the page into a field under 16px when it gets focus */
+@media (hover: none) and (pointer: coarse) {
+  .pf .pv-seg select.pv-select,
+  .pf .pv-select {
+    font-size: 16px;
+  }
 }
 .pf-empty {
   margin: 0;
@@ -285,10 +296,6 @@
   color: var(--sub-color);
   font-size: 0.8rem;
 }
-.pf-totals .dim dd {
-  color: var(--sub-color);
-}
-
 /* ---------------------------------------------------------------- one event at a time */
 .pf-event {
   display: grid;
@@ -351,7 +358,11 @@
   align-items: end;
   gap: 1.75rem 4.5rem;
   min-width: 0;
-  /* a new event's numbers fade in (remounted per event) */
+}
+/* a new event's numbers fade in (remounted per event). Not on the first load: the big single is
+   usually the page's largest paint, and Chrome dates an element that fades in from 0 late (only at
+   its next repaint, up to seconds after it shows) */
+.pf-bests.fade {
   animation: fadeIn 0.35s ease-out;
 }
 .pf-single {
@@ -862,6 +873,8 @@
   font-size: 0.8rem;
   line-height: 1.5;
   margin-top: 0.25rem;
+  /* a long email address wraps on a phone instead of running off the screen */
+  overflow-wrap: anywhere;
 }
 .ac-row .d a {
   color: var(--main-color);
@@ -1003,6 +1016,10 @@ table.ps-table td.dnf {
 }
 /* narrow phones: ao100 / ao1000 don't fit next to ao5 / ao12 without scrolling sideways */
 @media (max-width: 500px) {
+  /* the line under the progress chart often wraps here: room for two, so it doesn't push the page when it does */
+  .pf-history .pv-insight {
+    min-height: 3em;
+  }
   table.ps-table .ps-long {
     display: none;
   }
@@ -1054,6 +1071,11 @@ table.ps-table td.dnf {
   gap: 0.5rem 1.25rem;
   margin: 0;
 }
+.pf .wc-headline-meta {
+  /* always under the number: the block is as tall whatever the rank's width, and its stand-in (#-)
+     takes the same room while it loads */
+  flex-basis: 100%;
+}
 .pf .wc-headline .big {
   color: var(--text-color);
   font-size: clamp(2rem, 1.5rem + 1.4vw, 2.75rem);
@@ -1099,6 +1121,47 @@ table.ps-table td.dnf {
 
 /* ---------------------------------------------------------------- responsive */
 @media (max-width: 1000px) {
+  /* tablets and phones: the picture beside the name and the meta line, then the bio and the donut
+     across the page (.pf-who's children join the grid so the bio can span it) */
+  .pf-id {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0 1.75rem;
+  }
+  .pf-who {
+    display: contents;
+  }
+  .pf-id > .pv-avatar {
+    grid-row: 1 / span 2;
+  }
+  .pf-name {
+    grid-column: 2;
+    align-self: end;
+    /* up to two lines before the ellipsis. The line height holds the descenders, so no padding
+       below: it would show the top of a clipped third line */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.2;
+    padding-block: 0.1em 0;
+    margin-block: -0.1em 0;
+  }
+  .pf-meta {
+    grid-column: 2;
+    align-self: start;
+    margin-top: 0.5rem;
+  }
+  .pf-bio,
+  .pf-bio-add.btn-text {
+    grid-column: 1 / -1;
+    justify-self: start;
+    margin-top: 1.25rem;
+  }
+  .pf-donut {
+    grid-column: 1 / -1;
+    margin-top: 1.75rem;
+  }
   .pf-bests {
     grid-template-columns: minmax(0, 1fr);
     gap: 2.25rem;
@@ -1123,11 +1186,12 @@ table.ps-table td.dnf {
     gap: 2rem;
   }
   .pf-id {
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 1.25rem;
+    gap: 0 1.25rem;
+  }
+  .pf-name {
+    font-size: clamp(1.6rem, 7vw, 2rem);
   }
   .pf-donut {
-    grid-column: 1 / -1;
     gap: 1.25rem;
   }
   .pf-donut-ring {
@@ -1140,9 +1204,6 @@ table.ps-table td.dnf {
   }
   .pf .pv-avatar .avatar {
     font-size: 2rem;
-  }
-  .pf-bio {
-    grid-column: 1 / -1;
   }
   .pf-totals {
     grid-template-columns: repeat(2, minmax(0, 1fr));

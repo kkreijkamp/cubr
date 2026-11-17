@@ -20,7 +20,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useRegisterCommands, type Command } from '../lib/commands';
 import { useAuth } from '../lib/auth';
-import { FONTS, updateSettings, useSettings, type Settings as S } from '../lib/settings';
+import { activeTheme, chooseRandomTheme, chooseTheme, FONTS, setAutoSwitchTheme, themeWaitsNote, updateSettings, useDeviceIsDark, useSettings, type Settings as S } from '../lib/settings';
 import { applyTheme, getTheme, isLightTheme, randomTheme, THEMES, themeLabel } from '../lib/themes';
 import { applyUpdate, checkForUpdate, promptInstall, usePwa } from '../lib/pwa';
 import { toast } from '../lib/toast';
@@ -56,11 +56,13 @@ export function GlobalCommands() {
   const settings = useSettings();
   const { user, logout } = useAuth();
   const pwa = usePwa();
+  const deviceDark = useDeviceIsDark();
 
   useRegisterCommands(
     'global',
     () => {
-      const go = (path: string) => () => navigate(path);
+      // React Router 7's navigate() may return a promise; a command returns nothing
+      const go = (path: string) => () => void navigate(path);
       const nav: Command[] = [
         { id: 'go-timer', label: 'Go to timer', icon: <ClockIcon />, run: go('/') },
         { id: 'go-daily', label: 'Go to daily challenge', icon: <CalendarDaysIcon />, run: go('/daily') },
@@ -70,6 +72,14 @@ export function GlobalCommands() {
         { id: 'go-settings', label: 'Go to settings', icon: <Cog6ToothIcon />, run: go('/settings') },
         { id: 'go-about', label: 'Go to about', icon: <InformationCircleIcon />, run: go('/about') },
       ];
+      const auto = settings.autoSwitchTheme;
+      // the theme on screen: the list opens on it and ticks it (while following the device, the other
+      // mode's theme isn't ticked, or opening the list would preview it)
+      const shown = activeTheme(settings, deviceDark);
+      const pick = (name: string) => {
+        const waits = chooseTheme(name);
+        if (waits) toast.notice(themeWaitsNote(name, waits));
+      };
       const theme: Command = {
         id: 'theme',
         label: 'Theme...',
@@ -81,7 +91,19 @@ export function GlobalCommands() {
             label: `random${kind && ` ${kind}`} theme`,
             icon: <ArrowsRightLeftIcon />,
             keywords: ['shuffle', 'surprise'],
-            run: () => updateSettings({ theme: randomTheme(settings.theme, kind || undefined).name }),
+            run: () => {
+              if (kind) {
+                // a new one of that kind, other than the one it replaces
+                pick(randomTheme(auto ? (kind === 'light' ? settings.themeLight : settings.themeDark) : settings.theme, kind).name);
+                return;
+              }
+              // following the device: a new light and a new dark theme; the page shows the one for the
+              // mode it's in, so say which the other mode got
+              const got = chooseRandomTheme();
+              const other = deviceDark ? 'light' : 'dark';
+              const waiting = got[other];
+              if (waiting) toast.notice(themeWaitsNote(waiting, other));
+            },
           })),
           ...THEMES.map((t) => ({
             id: `theme-${t.name}`,
@@ -89,10 +111,20 @@ export function GlobalCommands() {
             icon: <ThemeBubbles name={t.name} />,
             // "theme light" / "theme dark" narrow the list
             keywords: [isLightTheme(t) ? 'light' : 'dark'],
-            active: settings.theme === t.name,
-            preview: () => applyTheme(t.name, false),
-            run: () => updateSettings({ theme: t.name }),
+            active: t.name === shown,
+            preview: () => applyTheme(t.name),
+            run: () => pick(t.name),
           })),
+        ],
+      };
+      const lightDark: Command = {
+        id: 'setting-autoSwitchTheme',
+        label: 'Light / dark mode...',
+        icon: <SwatchIcon />,
+        keywords: ['theme', 'auto', 'system', 'device', 'follow', 'dark mode', 'light mode'],
+        children: () => [
+          { id: 'setting-autoSwitchTheme-on', label: 'follow the device (a light and a dark theme)', active: auto, run: () => setAutoSwitchTheme(true) },
+          { id: 'setting-autoSwitchTheme-off', label: 'off (one theme)', active: !auto, run: () => setAutoSwitchTheme(false) },
         ],
       };
       const font: Command = {
@@ -148,9 +180,9 @@ export function GlobalCommands() {
               ]
             : []),
       ];
-      return [theme, font, ...timer, ...nav, ...auth, ...app];
+      return [theme, lightDark, font, ...timer, ...nav, ...auth, ...app];
     },
-    [settings, user, navigate, logout, pwa],
+    [settings, deviceDark, user, navigate, logout, pwa],
   );
   return null;
 }

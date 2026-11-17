@@ -2,7 +2,7 @@ import { lazy, Suspense } from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { RouteError } from './components/RouteError';
-import { Loading } from './components/Spinner';
+import { Loading, PageLoading } from './components/Spinner';
 import { AuthProvider } from './lib/auth';
 import TimerPage from './pages/TimerPage';
 
@@ -18,12 +18,16 @@ const WcaPage = lazy(() => import('./pages/WcaPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const ResetPasswordPage = lazy(() => import('./pages/LoginPage').then((m) => ({ default: m.ResetPasswordPage })));
+const ConfirmEmailPage = lazy(() => import('./pages/LoginPage').then((m) => ({ default: m.ConfirmEmailPage })));
 const SsoPage = lazy(() => import('./pages/SsoPage'));
 const TermsPage = lazy(() => import('./pages/LegalPage').then((m) => ({ default: m.TermsPage })));
 const PrivacyPage = lazy(() => import('./pages/LegalPage').then((m) => ({ default: m.PrivacyPage })));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 const s = (el: JSX.Element) => <Suspense fallback={<Loading />}>{el}</Suspense>;
+// a page that ends up taller than the screen: its loading state holds a screen's height, so the footer
+// isn't pushed off the screen when the page arrives (see PageLoading)
+const tall = (el: JSX.Element) => <Suspense fallback={<PageLoading />}>{el}</Suspense>;
 
 const router = createBrowserRouter([
   {
@@ -39,8 +43,8 @@ const router = createBrowserRouter([
           { path: '/daily', element: s(<DailyPage />) },
           { path: '/race', element: s(<RaceLobbyPage />) },
           { path: '/race/:roomId', element: s(<RaceRoomPage />) },
-          { path: '/profile/:username', element: s(<ProfilePage />) },
-          { path: '/account', element: s(<AccountPage />) },
+          { path: '/profile/:username', element: tall(<ProfilePage />) },
+          { path: '/account', element: tall(<AccountPage />) },
           { path: '/settings', element: s(<SettingsPage />) },
           { path: '/wca', element: s(<WcaPage />) },
           { path: '/about', element: s(<AboutPage />) },
@@ -48,6 +52,7 @@ const router = createBrowserRouter([
           // sign-in with Google, Apple or GitHub lands here
           { path: '/login/sso', element: s(<SsoPage />) },
           { path: '/reset', element: s(<ResetPasswordPage />) },
+          { path: '/confirm-email', element: s(<ConfirmEmailPage />) },
           { path: '/terms', element: s(<TermsPage />) },
           { path: '/privacy', element: s(<PrivacyPage />) },
           { path: '*', element: s(<NotFoundPage />) },
@@ -55,15 +60,12 @@ const router = createBrowserRouter([
       },
     ],
   },
-], {
-  // opt in to React Router v7 behaviour now (silences the future-flag console warnings)
-  future: { v7_relativeSplatPath: true, v7_fetcherPersist: true, v7_normalizeFormMethod: true, v7_partialHydration: true, v7_skipActionErrorRevalidation: true },
-});
+]);
 
 export function App() {
   return (
     <AuthProvider>
-      <RouterProvider router={router} future={{ v7_startTransition: true }} />
+      <RouterProvider router={router} />
     </AuthProvider>
   );
 }

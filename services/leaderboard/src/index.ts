@@ -9,6 +9,7 @@ import {
 } from '@cubr/common';
 import { FloorProvider } from './floors.js';
 import { CONSUMED_TYPES, makeHandler } from './ingest.js';
+import { statsPeriodSource } from './periods.js';
 import { startRebuildLoop } from './rebuild.js';
 import { registerRoutes } from './routes/index.js';
 import { defineScripts } from './scripts.js';
@@ -33,6 +34,7 @@ const redis = createRedis(config.redisUrl, app.log);
 defineScripts(redis);
 const auth = makeAuth(config.jwtSecret, redis);
 const floors = new FloorProvider(config.urls.wca, config.internalToken, app.log);
+const periods = statsPeriodSource(config.urls.stats, config.internalToken);
 
 await registerRoutes(app, { redis, auth });
 
@@ -50,7 +52,7 @@ consumer = consumeEvents(redis, {
   group: 'leaderboard',
   consumer: config.podName,
   types: CONSUMED_TYPES,
-  handler: makeHandler({ redis, floors, log: app.log }),
+  handler: makeHandler({ redis, floors, log: app.log, periods }),
   log: app.log,
 });
 rebuild = startRebuildLoop({
@@ -60,4 +62,5 @@ rebuild = startRebuildLoop({
   podName: config.podName,
   floors,
   log: app.log,
+  periods,
 });

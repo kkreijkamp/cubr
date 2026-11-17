@@ -1,8 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { parse, rateLimit, rateLimited, type Redis, type makeAuth } from '@cubr/common';
+import { conflict, forbidden, notFound, parse, rateLimit, rateLimited, type Redis, type makeAuth } from '@cubr/common';
 import { isEventId } from '@cubr/cubestats';
-import { sanitizeText } from './sanitize.js';
+import { ROOM_ID_RE, sanitizeText } from './sanitize.js';
 import type { RoomStore } from './store.js';
 
 const createRoomSchema = z.object({
@@ -35,5 +35,17 @@ export function registerRoutes(app: FastifyInstance, { store, redis, auth }: Rou
     }
     const room = await store.createRoom({ ...body, createdBy: req.user?.id ?? null });
     return reply.status(201).send({ room: { id: room.id, name: room.name, event: room.event, isPrivate: room.isPrivate } });
+  });
+
+  // Delete a room: only the signed-in account that created it, and only while nobody is in it.
+  // (Otherwise a room drops out of the lobby after 10 empty minutes and expires 2 hours after its last change.)
+  app.delete<{ Params: { id: string } }>('/api/race/rooms/:id', { preHandler: auth.requireAuth }, async (req, reply) => {
+    const { id } = req.params;
+    if (!ROOM_ID_RE.test(id)) throw notFound('Room not found');
+    const result = await store.deleteRoom(id, req.user!.id);
+    if (result === 'not_found') throw notFound('Room not found (it may have expired)');
+    if (result === 'not_creator') throw forbidden('Only the account that created a room can delete it');
+    if (result === 'occupied') throw conflict('Somebody is in the room');
+    return reply.status(204).send();
   });
 }

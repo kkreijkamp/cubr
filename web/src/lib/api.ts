@@ -55,7 +55,6 @@ export interface RawResponse<T> {
   data: T;
   status: number;
   headers: Headers;
-  servedBy: string | null;
   ms: number;
 }
 
@@ -84,7 +83,7 @@ function transportError(err: unknown): unknown {
   return new ApiError(0, 'NETWORK', 'Network error - is the server reachable?');
 }
 
-/** Low-level request returning body + headers (X-Served-By says which replica answered).
+/** Low-level request returning body + headers (and how long it took).
  *  A `Blob` body is sent as raw bytes with the blob's own content type (avatar upload); anything
  *  else is sent as JSON. */
 export async function requestRaw<T>(
@@ -140,7 +139,7 @@ export async function requestRaw<T>(
   }
   // a 2xx that isn't JSON, e.g. the SPA's index.html for a path no service handles
   if (notJson) throw new ApiError(res.status, 'BAD_RESPONSE', 'Unexpected response from the server (not JSON)');
-  return { data: json as T, status: res.status, headers: res.headers, servedBy: res.headers.get('x-served-by'), ms };
+  return { data: json as T, status: res.status, headers: res.headers, ms };
 }
 
 export async function request<T>(method: string, path: string, body?: unknown, opts?: { signal?: AbortSignal; timeoutMs?: number }): Promise<T> {
@@ -189,6 +188,17 @@ export const api = {
     resetPassword: (body: { token: string; password: string }) =>
       request<{ token: string; user: PrivateUser }>('POST', '/api/auth/password/reset', body),
     me: (signal?: AbortSignal) => get<{ user: PrivateUser; settings: Record<string, unknown> }>('/api/auth/me', signal),
+    /** Asks to change the email: the new address gets a link, nothing changes until it's opened. The
+     *  password is asked again (403 if wrong); an account without one must have signed in in the last
+     *  10 minutes (403 otherwise). 409 if another account uses the address. */
+    changeEmail: (body: { email: string; password?: string }) => request<{ ok: true; email: string }>('POST', '/api/auth/me/email', body),
+    /** Uses a link from an email once (no sign-in needed): it confirms the account's own address
+     *  (changed: false), or makes a new address its email (changed: true). 400 expired or used, 409
+     *  the new address was taken meanwhile. */
+    confirmEmail: (token: string) => request<{ email: string; changed?: boolean }>('POST', '/api/auth/email/confirm', { token }),
+    /** Sends a new link that confirms the account's current email (it works for 7 days). 400 if it's
+     *  confirmed already, 429 after 3 an hour or 5 a day. */
+    sendEmailConfirmation: () => request<{ ok: true; email: string }>('POST', '/api/auth/me/email/confirmation'),
     updateMe: (body: Partial<Pick<PublicUser, 'displayName' | 'bio' | 'country' | 'wcaId' | 'private'>>) =>
       request<{ user: PrivateUser }>('PATCH', '/api/auth/me', body),
     saveSettings: (settings: Record<string, unknown>) => request<{ settings: Record<string, unknown> }>('PUT', '/api/auth/me/settings', { settings }),

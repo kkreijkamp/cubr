@@ -32,7 +32,7 @@ x-service-env: &service-env
   TRUST_PROXY_HOPS: 1                                # one reverse proxy (the gateway) in front -> req.ip = real client
   NODE_NAME: docker-compose                          # K8s sets this from spec.nodeName
   # POD_NAME is not set: services fall back to os.hostname() = the container id, which differs
-  # per replica, so X-Served-By shows which replica answered.
+  # per replica, so the "pod" in each /_info shows which replica answered.
   AUTH_URL: http://auth:8080
   SCRAMBLE_URL: http://scramble:8080
   SOLVE_URL: http://solve:8080
@@ -55,7 +55,7 @@ x-service: &service
     redis: { condition: service_healthy }
 
 x-build-args: &build-args
-  APP_VERSION: ${APP_VERSION:-dev}   # baked into the image -> X-Service: <svc>@<version>
+  APP_VERSION: ${APP_VERSION:-dev}   # baked into the image -> "version" in /_info
 
 services:
   # ---- data stores -----------------------------------------------------------------------------

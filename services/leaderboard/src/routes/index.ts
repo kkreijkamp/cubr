@@ -50,7 +50,7 @@ export async function registerRoutes(app: FastifyInstance, { redis, auth }: Deps
     const date = q.date ?? utcDay(new Date());
     if (!isValidDay(date)) throw badRequest('date: expected YYYY-MM-DD');
     const board = await readBoard(redis, challengeKey(date, q.event), q.page, q.size, req.user?.id);
-    return { event: q.event, kind: 'ao5', period: 'challenge', periodKey: date, total: board.total, page: q.page, size: q.size, entries: board.entries, me: board.me };
+    return { event: q.event, kind: 'ao5', period: 'challenge', periodKey: date, total: board.total, page: q.page, size: q.size, entries: board.entries, me: board.me, flagged: board.flagged };
   });
 
   // GET /api/leaderboards/users/:userId/ranks -> positions on every all-time board. A private
@@ -83,7 +83,7 @@ export async function registerRoutes(app: FastifyInstance, { redis, auth }: Deps
       }
 
       const board = await readBoard(redis, boardKey(event, kind, q.period, periodKey), q.page, q.size, req.user?.id);
-      return { event, kind, period: q.period, periodKey, total: board.total, page: q.page, size: q.size, entries: board.entries, me: board.me };
+      return { event, kind, period: q.period, periodKey, total: board.total, page: q.page, size: q.size, entries: board.entries, me: board.me, flagged: board.flagged };
     },
   );
 }

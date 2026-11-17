@@ -49,6 +49,7 @@
   min-width: 0;
 }
 .live-scramble .text {
+  font-size: var(--scramble-size, 1.35rem);
   color: var(--text-color);
   line-height: 1.45;
   max-width: 46ch;
@@ -223,6 +224,18 @@
 }
 
 @media (max-width: 720px) {
+  /* phones: tighter spacing and a shorter timer surface, so the timer is on the first screen */
+  .live-page.stack.lg {
+    gap: 1.25rem;
+  }
+  .live-timer {
+    min-height: 7rem;
+    padding: 0.5rem 0;
+  }
+  /* the size the timer page's scramble has on phones */
+  .live-scramble .text {
+    font-size: calc(var(--scramble-size, 1.35rem) * 0.82);
+  }
   .live-seg {
     font-size: 0.78rem;
   }

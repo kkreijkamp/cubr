@@ -133,9 +133,15 @@ export function HourlyChart({ userId, event, precision }: { userId: string; even
       {hourly.error && !hourly.data ? (
         <WidgetError error={hourly.error} what="the time-of-day chart" onRetry={hourly.reload} />
       ) : !hourly.data ? (
-        <div style={{ height: HEIGHT }} className="pv-chart-empty">
-          <Loading />
-        </div>
+        <>
+          <div style={{ height: HEIGHT }} className="pv-chart-empty">
+            <Loading />
+          </div>
+          {/* the line under the chart comes with the data: an invisible stand-in keeps its room */}
+          <div className="pv-insight reserve" aria-hidden="true">
+            busiest <b>00:00</b> - fastest <b>00:00</b> (mean 00.00)
+          </div>
+        </>
       ) : total === 0 ? (
         <div style={{ height: HEIGHT }} className="pv-chart-empty">
           no {eventLabel(event)} solves yet

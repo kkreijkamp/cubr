@@ -9,6 +9,7 @@ import {
   ClockIcon,
   GlobeAltIcon,
   HashtagIcon,
+  ShieldExclamationIcon,
   SunIcon,
   TrophyIcon,
   UserIcon,
@@ -26,7 +27,9 @@ import { useRegisterCommands, type Command } from '../lib/commands';
 import { flagEmoji, formatDate, formatDuration, formatNumber, formatPercent, formatTime, timeAgo, utcDateKey } from '../lib/format';
 import { useSettings } from '../lib/settings';
 import type { LbKind, Leaderboard } from '../lib/types';
+import { hiddenNote, missingNote } from '../lib/antiCheat';
 import { useAsync } from '../lib/useAsync';
+import { leaderboardCanonical, useCanonical } from '../lib/canonical';
 import '../components/social/leaderboards.css';
 
 const PAGE_SIZE = 50;
@@ -212,6 +215,20 @@ function MeCard({ board, sel, precision, onJump }: { board: Leaderboard | undefi
   }
   if (status !== 'authed' || !user || !board) return null;
   const me = board.me;
+  const flagged = board.flagged ?? null;
+  if (!me && flagged) {
+    // the anti-cheat left your best off: say so, loudly, rather than "not on this leaderboard yet"
+    return (
+      <div className="lb-me lb-me-empty lb-me-flagged" role="alert">
+        <ShieldExclamationIcon width={26} height={26} />
+        <span className="lb-flag-body">
+          <span className="pill error">not ranked: faster than the world record</span>
+          <span>{missingNote(flagged, sel.period, sel.kind, precision)}</span>
+        </span>
+        <span />
+      </div>
+    );
+  }
   if (!me) {
     const how =
       sel.period === 'challenge'
@@ -239,9 +256,15 @@ function MeCard({ board, sel, precision, onJump }: { board: Leaderboard | undefi
       <div className="lb-me-who">
         <span className="name">
           <Avatar user={user} size={20} />
-          {user.username}
+          <span className="lb-me-username">{user.username}</span>
         </span>
         <span className="sub">{me.rank === 1 ? 'goat - nobody is faster' : `you - top ${formatPercent(top)} of ${formatNumber(board.total)}`}</span>
+        {flagged && (
+          <span className="lb-me-flag-note" role="note">
+            <ShieldExclamationIcon width={14} height={14} />
+            {hiddenNote(flagged, precision)}
+          </span>
+        )}
       </div>
       <div className="lb-me-value">{formatTime(me.valueMs, precision)}</div>
       <button className="btn small lb-me-jump" onClick={onJump} data-tip="jump to my rank">
@@ -310,6 +333,7 @@ export default function LeaderboardsPage() {
   );
   const [gotoOpen, setGotoOpen] = useState(false);
   const scrollToMe = useRef(false);
+  useCanonical(leaderboardCanonical(sel));
 
   const update = useCallback(
     (patch: Partial<Selection>) => {

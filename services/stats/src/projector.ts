@@ -1,7 +1,7 @@
 import { DLQ_STREAM, withTx, type EventEnvelope, type Pool, type PoolClient, type Redis } from '@cubr/common';
 import { effectiveMs } from '@cubr/cubestats';
 import type { FastifyBaseLogger } from 'fastify';
-import type { ZodType, ZodTypeDef } from 'zod';
+import type { ZodType } from 'zod';
 import { makeBucketer, validTz } from './domain/buckets.js';
 import { isImprovement, rollingFromPayload, tailAverages, type PbKind } from './domain/pbs.js';
 import {
@@ -14,7 +14,7 @@ import {
   type SolveCreated, sessionRenamedSchema, sessionsMergedSchema, sessionUpdatedSchema} from './eventSchemas.js';
 import { recomputeEvent, type RecomputeDeps } from './recompute.js';
 import { CACHE_KEY as GLOBAL_CACHE_KEY } from './routes/global.js';
-import { ensureUser, loadPbs, lockUser, markProcessed, queuePbUpdated, refreshTotals, upsertPb } from './store.js';
+import { ensureUser, loadPbs, lockUser, markProcessed, queuePbUpdated, queuePeriodsChanged, refreshTotals, upsertPb } from './store.js';
 
 /** Every stats table with a user_id column (all of a deleted account's rows go). */
 export const USER_TABLES = ['user_totals', 'personal_bests', 'pb_history', 'daily_activity', 'hourly', 'solve_ledger', 'deleted_sessions', 'sessions'] as const;
@@ -80,7 +80,7 @@ export function createProjector(deps: ProjectorDeps) {
   }
 
   /** Validates a payload; malformed (non-retriable) events go straight to the dead-letter stream. */
-  async function payload<T>(schema: ZodType<T, ZodTypeDef, unknown>, evt: EventEnvelope): Promise<T | null> {
+  async function payload<T>(schema: ZodType<T>, evt: EventEnvelope): Promise<T | null> {
     const res = schema.safeParse(evt.data);
     if (res.success) return res.data;
     const issue = res.error.issues[0];
@@ -134,9 +134,9 @@ export function createProjector(deps: ProjectorDeps) {
     );
     if (later.rowCount) {
       log.info({ userId: d.userId, solveId: d.solveId }, 'back-dated solve, recomputing event');
-      const { pbChanges } = await recomputeEvent(c, rdeps, { userId: d.userId, username: user.username, event: d.event, tz: user.tz });
+      const { queued } = await recomputeEvent(c, rdeps, { userId: d.userId, username: user.username, event: d.event, tz: user.tz });
       await refreshTotals(c, d.userId);
-      return pbChanges;
+      return queued;
     }
 
     // aggregates (raw timeMs = time spent cubing; hourly mean uses effective times of non-DNF solves)
@@ -202,7 +202,10 @@ export function createProjector(deps: ProjectorDeps) {
       });
       queued++;
     }
-    return queued;
+    // The leaderboard's day and week boards took this solve from solve.created already; re-reading
+    // the bests afterwards keeps them exact when this solve raced with an edit or a deletion.
+    await queuePeriodsChanged(c, { userId: d.userId, username: user.username, event: d.event });
+    return queued + 1;
   }
 
   // ---- solve.updated / solve.deleted: full recompute of the event
@@ -229,9 +232,9 @@ export function createProjector(deps: ProjectorDeps) {
           [d.solveId, d.userId, d.event, d.sessionId ?? null, d.timeMs ?? null, d.createdAt ?? null],
         );
       }
-      const { pbChanges } = await recomputeEvent(c, rdeps, { userId: d.userId, username: user.username, event: d.event, tz: user.tz });
+      const { queued } = await recomputeEvent(c, rdeps, { userId: d.userId, username: user.username, event: d.event, tz: user.tz });
       await refreshTotals(c, d.userId);
-      return pbChanges;
+      return queued;
     });
   }
 
@@ -246,9 +249,9 @@ export function createProjector(deps: ProjectorDeps) {
         [d.sessionId, d.userId],
       );
       await c.query('DELETE FROM stats.sessions WHERE session_id = $1', [d.sessionId]);
-      const { pbChanges } = await recomputeEvent(c, rdeps, { userId: d.userId, username: user.username, event: d.event, tz: user.tz });
+      const { queued } = await recomputeEvent(c, rdeps, { userId: d.userId, username: user.username, event: d.event, tz: user.tz });
       await refreshTotals(c, d.userId);
-      return pbChanges;
+      return queued;
     });
   }
 
@@ -269,9 +272,9 @@ export function createProjector(deps: ProjectorDeps) {
     await inUserTx(d.eventId, d.userId, async (c) => {
       const user = await ensureUser(c, d.userId, d.username, validTz(d.tz));
       await upsertSessionName(c, d.sessionId, d.userId, d.event, d.name, d.practice);
-      const { pbChanges } = await recomputeEvent(c, rdeps, { userId: d.userId, username: user.username, event: d.event, tz: user.tz });
+      const { queued } = await recomputeEvent(c, rdeps, { userId: d.userId, username: user.username, event: d.event, tz: user.tz });
       await refreshTotals(c, d.userId);
-      return pbChanges;
+      return queued;
     });
   }
 
@@ -288,9 +291,9 @@ export function createProjector(deps: ProjectorDeps) {
         [d.sourceIds, d.userId],
       );
       await c.query('DELETE FROM stats.sessions WHERE session_id = ANY($1::uuid[])', [d.sourceIds]);
-      const { pbChanges } = await recomputeEvent(c, rdeps, { userId: d.userId, username: user.username, event: d.event, tz: user.tz });
+      const { queued } = await recomputeEvent(c, rdeps, { userId: d.userId, username: user.username, event: d.event, tz: user.tz });
       await refreshTotals(c, d.userId);
-      return pbChanges;
+      return queued;
     });
   }
 
@@ -306,12 +309,12 @@ export function createProjector(deps: ProjectorDeps) {
         const { rows } = await c.query<{ event: string }>('SELECT DISTINCT event FROM stats.solve_ledger WHERE user_id = $1', [d.userId]);
         events = rows.map((r) => r.event);
       }
-      let pbChanges = 0;
+      let queued = 0;
       for (const event of events) {
-        pbChanges += (await recomputeEvent(c, rdeps, { userId: d.userId, username: user.username, event, tz: user.tz })).pbChanges;
+        queued += (await recomputeEvent(c, rdeps, { userId: d.userId, username: user.username, event, tz: user.tz })).queued;
       }
       await refreshTotals(c, d.userId);
-      return pbChanges;
+      return queued;
     });
   }
 

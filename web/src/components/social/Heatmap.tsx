@@ -218,8 +218,13 @@ export function ActivityHeatmap({ userId, event, years = [] }: { userId: string;
                   <b>{formatNumber(summary.active)}</b> active {summary.active === 1 ? 'day' : 'days'} - busiest <b>{formatDayKey(summary.busiest.date, false)}</b> (
                   {plural(summary.busiest.solves, 'solve')})
                 </>
-              ) : (
+              ) : data ? (
                 'days use the cuber\'s local time zone'
+              ) : (
+                // loading: an invisible stand-in for the line above, which may wrap to two lines on a phone
+                <span className="reserve" aria-hidden="true">
+                  <b>000</b> active days - busiest <b>00 sep 2026</b> (00 solves)
+                </span>
               )}
             </span>
             <span className="hm-legend" aria-hidden="true">
