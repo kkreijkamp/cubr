@@ -22,9 +22,14 @@
     "socket.io-client": "^4.8.4",
     "tsx": "^4.20.0",
     "typescript": "~5.9.3",
-    "vitest": "^3.2.7"
+    "vitest": "^4.1.12"
   },
   "engines": {
     "node": ">=22"
+  },
+  "overrides": {
+    "vitest": {
+      "vite": "^7.3.7"
+    }
   }
 }
