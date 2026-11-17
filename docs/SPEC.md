@@ -606,7 +606,9 @@ custom properties, command palette (Esc / Ctrl+K), focus mode while timing, toas
 
 ### 10.1 Installable app and offline (PWA)
 
-- **Manifest** `web/public/manifest.webmanifest`: standalone display, white cross colours, icons
+- **Manifest** `web/public/manifest.webmanifest`: standalone display, white cross colours (and
+  white cross dark's in `color_scheme_dark`, the spec's dark colours since April 2026; no browser
+  reads them yet, November 2026, so Android's splash screen stays white in dark mode), icons
   (any 192/512, maskable 192/512, monochrome 512), shortcuts (daily challenge, race, leaderboards),
   wide and narrow screenshots for Chrome's install dialog, `launch_handler: focus-existing` (a
   shortcut focuses the open window and `lib/pwa.ts` takes it to the shortcut's page). iOS:
@@ -614,16 +616,21 @@ custom properties, command palette (Esc / Ctrl+K), focus mode while timing, toas
   drawn by `web/scripts/pwa-assets.mjs`.
 - **iOS launch images** (`pwa-assets.mjs launch`): what an iPhone or iPad shows while cubr opens
   from the home screen, instead of a blank white screen.
-  - The app icon's cube, 96 points across, centred on white.
-  - One per screen size and orientation: 26 sizes, from the iPhone SE to the iPhone 18 Pro Max,
-    the iPhone Air and every current iPad. The iPhone Duo's two sizes assume 3x, since Apple
-    doesn't publish it.
-  - `public/launch/`, linked from `index.html` by `apple-touch-startup-image` tags whose media
-    queries give the screen in points, the pixel ratio and the orientation. The script writes the
-    tags between markers. iOS uses an image only if it is exactly that size; the tests check every
-    tag against its file.
-  - Light only: iOS doesn't honour `prefers-color-scheme` in these queries (WebKit bug 259328), and
-    its web view is white between the launch image and the first paint anyway.
+  - The app icon's cube, 96 points across, centred, in the favicon's colours for each mode: on
+    white cross's white in light mode, on white cross dark's `#1d2024` with a light centre in dark
+    mode.
+  - One per screen size, orientation and mode: 26 sizes, from the iPhone SE to the iPhone 18 Pro
+    Max, the iPhone Air and every current iPad, so 104 images. The iPhone Duo's two sizes assume 3x,
+    since Apple doesn't publish it.
+  - `public/launch/` (dark ones end in `-dark`), linked from `index.html` by
+    `apple-touch-startup-image` tags whose media queries give the screen in points, the pixel ratio,
+    the orientation and `prefers-color-scheme`. The script writes the tags between markers. iOS uses
+    an image only if it is exactly that size; the tests check every tag against its file, and each
+    image's background against its mode's theme.
+  - iOS picks the light or dark image for the mode the device is in when cubr is added to the home
+    screen, and keeps it when the mode changes later (WebKit bug 259328, open since 2023): removing
+    cubr and adding it again picks again. Untested on a device: whether iOS shows white between a
+    dark launch image and the first paint.
   - iOS reads the image when the app is added to the home screen: an existing install needs
     re-adding to get it. The images aren't precached.
 - **Link previews** (chat apps, social sites): `index.html` has Open Graph tags and

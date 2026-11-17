@@ -9,8 +9,8 @@
 //        node web/scripts/pwa-assets.mjs screenshots http://localhost:8080
 //   4. the link preview image (index.html's og:image, shown next to links to cubr.dev):
 //        node web/scripts/pwa-assets.mjs og
-//   5. iOS launch images (what an iPhone or iPad shows while cubr opens from the home screen), and
-//      their <link> tags in index.html:
+//   5. iOS launch images (what an iPhone or iPad shows while cubr opens from the home screen), a light
+//      and a dark set, and their <link> tags in index.html:
 //        node web/scripts/pwa-assets.mjs launch
 //
 // The icons follow the favicon (public/favicon.svg, lib/themes.ts faviconSvg): a 3x3 cube face in the
@@ -27,6 +27,9 @@ const CDP = process.env.CDP ?? 'http://127.0.0.1:9333';
 const BG = '#ffffff';
 const MAIN = '#00a04d';
 const CENTRE = '#1d2024';
+// white cross dark (lib/themes.ts), the default theme in dark mode: the dark launch images
+const DARK_BG = '#1d2024';
+const DARK_CENTRE = '#f1f3f5';
 
 /** The cube face: 3 x 3 stickers over `span` units from (x, y), as in the favicon (7.2 / 1.2 / 1.8 of 24). */
 function face(x, y, span, { centre = CENTRE, fill = MAIN } = {}) {
@@ -82,9 +85,12 @@ const ICONS = [
 // ratio, and the devices. From Apple's device table (as pwa-asset-generator keeps it) and Apple's spec
 // pages for the newer models, 2026-11-17. Duplicates of a size are listed once.
 //
-// Light only: iOS doesn't honour prefers-color-scheme in these media queries (WebKit bug 259328),
-// and its web view shows white between the launch image and the page's first paint anyway. White
-// cross's white with the app icon's cube in the middle, as on Android's splash screen.
+// A light and a dark set: white cross and white cross dark (the app's default themes in each mode)
+// with the app icon's cube in the middle, coloured as the favicon is in each mode. iOS picks the set
+// for the mode the device is in when cubr is added to the home screen, and keeps it when the mode
+// changes later (WebKit bug 259328, open since 2023); removing cubr and adding it again picks again.
+// Android's and desktops' splash screens come from the manifest instead: background_color, and
+// color_scheme_dark once browsers read it.
 const LAUNCH_SCREENS = [
   [320, 568, 2, 'iPhone SE (1st generation), iPod touch'],
   [375, 667, 2, 'iPhone 6, 6s, 7, 8, SE (2nd and 3rd generation)'],
@@ -118,14 +124,19 @@ const LAUNCH_SCREENS = [
 /** The cube's size on a launch image, in points: the same physical size on every iPhone and iPad. */
 const LAUNCH_CUBE = 96;
 
-/** Every launch image: [file, pixel width, pixel height, media query], portrait then landscape per screen. */
+/**
+ * Every launch image: [file, pixel width, pixel height, media query, pixel ratio, mode]; per screen,
+ * portrait then landscape, each light then dark.
+ */
 function launchImages() {
   return LAUNCH_SCREENS.flatMap(([w, h, ratio]) =>
-    ['portrait', 'landscape'].map((orientation) => {
-      const [pw, ph] = orientation === 'portrait' ? [w * ratio, h * ratio] : [h * ratio, w * ratio];
-      const media = `(device-width: ${w}px) and (device-height: ${h}px) and (-webkit-device-pixel-ratio: ${ratio}) and (orientation: ${orientation})`;
-      return [`launch/apple-launch-${pw}x${ph}.png`, pw, ph, media, ratio];
-    }),
+    ['portrait', 'landscape'].flatMap((orientation) =>
+      ['light', 'dark'].map((mode) => {
+        const [pw, ph] = orientation === 'portrait' ? [w * ratio, h * ratio] : [h * ratio, w * ratio];
+        const media = `(device-width: ${w}px) and (device-height: ${h}px) and (-webkit-device-pixel-ratio: ${ratio}) and (orientation: ${orientation}) and (prefers-color-scheme: ${mode})`;
+        return [`launch/apple-launch-${pw}x${ph}${mode === 'dark' ? '-dark' : ''}.png`, pw, ph, media, ratio, mode];
+      }),
+    ),
   );
 }
 
@@ -135,11 +146,12 @@ const LINKS_END = '<!-- /iOS launch images -->';
 async function launch() {
   const { send, ev, close } = await connect();
   try {
-    for (const [file, pw, ph, , ratio] of launchImages()) {
+    for (const [file, pw, ph, , ratio, mode] of launchImages()) {
       await send('Emulation.setDeviceMetricsOverride', { width: pw, height: ph, deviceScaleFactor: 1, mobile: false });
       const size = LAUNCH_CUBE * ratio;
+      const [bg, centre] = mode === 'dark' ? [DARK_BG, DARK_CENTRE] : [BG, CENTRE];
       // the icon's face (24 units of its 32) at LAUNCH_CUBE points, in the middle
-      const page = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${pw} ${ph}" width="${pw}" height="${ph}"><rect width="${pw}" height="${ph}" fill="${BG}"/>${face((pw - size) / 2, (ph - size) / 2, size)}</svg>`;
+      const page = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${pw} ${ph}" width="${pw}" height="${ph}"><rect width="${pw}" height="${ph}" fill="${bg}"/>${face((pw - size) / 2, (ph - size) / 2, size, { centre })}</svg>`;
       const html = `<!doctype html><html><body style="margin:0;width:${pw}px;height:${ph}px">${page}</body></html>`;
       await send('Page.navigate', { url: `data:text/html;base64,${Buffer.from(html).toString('base64')}` });
       await waitFor(ev, `document.readyState === 'complete'`);
