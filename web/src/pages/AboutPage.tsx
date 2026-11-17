@@ -124,11 +124,10 @@ function Supporters() {
         <GiftIcon /> supporters
       </h2>
       <p className="ab-p">
-        cubr is free and has no ads. if you&apos;d like to help keep it running, donate on{' '}
+        if you&apos;d like to support hosting and development of cubr,{' '}
         <a href={DONATE_URL} target="_blank" rel="noreferrer noopener">
-          {DONATE_URL.replace(/^https?:[/][/]/, '')}
+          consider donating
         </a>
-        . make your support public there and your name shows up here.
       </p>
       {names.length > 0 ? (
         <ul className="ab-supporters">
@@ -146,7 +145,7 @@ function Supporters() {
       ) : (
         list.data && (
           <p className="ab-p">
-            <span className="sub">no supporters yet - the first ones get their name here.</span>
+            <span className="sub">no supporters yet</span>
           </p>
         )
       )}
