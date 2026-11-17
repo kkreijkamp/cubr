@@ -2,7 +2,7 @@
 // (PUT /api/auth/me/settings) for logged-in users so they follow you across devices.
 import { useSyncExternalStore } from 'react';
 import { cleanKeyMaps, type KeyMaps } from '../input/virtual/keymap';
-import { applyTheme, DEFAULT_DARK_THEME, DEFAULT_THEME, getTheme, isLightTheme, themeColors, themeLabel, THEMES } from './themes';
+import { applyTheme, DEFAULT_DARK_THEME, DEFAULT_THEME, getTheme, isLightTheme, randomTheme, themeColors, themeLabel, THEMES, type Theme } from './themes';
 import { createStore, loadJson, saveJson, useStore } from './store';
 
 export type TimerUpdate = 'realtime' | 'tenths' | 'seconds' | 'hidden';
@@ -270,6 +270,30 @@ export function chooseTheme(name: string): 'light' | 'dark' | null {
   const light = isLightTheme(t);
   updateSettings(light ? { themeLight: t.name } : { themeDark: t.name });
   return light === deviceIsDark() ? (light ? 'light' : 'dark') : null;
+}
+
+/**
+ * A random theme (the theme list's "random", the command line's "random theme"). While following the
+ * device it is a new light theme and a new dark theme, so both modes change; otherwise one new theme.
+ * `from` narrows the choice (the theme list's filter and search): a mode it has nothing new for keeps its
+ * theme, and when it has nothing new at all, every theme counts. Returns the names it chose.
+ */
+export function chooseRandomTheme(from: readonly Theme[] = THEMES): { theme?: string; light?: string; dark?: string } {
+  const s = settingsStore.get();
+  const any = (pool: readonly Theme[]) => (pool.length ? pool[Math.floor(Math.random() * pool.length)].name : undefined);
+  if (!s.autoSwitchTheme) {
+    const theme = any(from.filter((t) => t.name !== s.theme)) ?? randomTheme(s.theme).name;
+    updateSettings({ theme });
+    return { theme };
+  }
+  const fresh = (pool: readonly Theme[]) => ({
+    light: any(pool.filter((t) => isLightTheme(t) && t.name !== s.themeLight)),
+    dark: any(pool.filter((t) => !isLightTheme(t) && t.name !== s.themeDark)),
+  });
+  const picked = fresh(from);
+  const { light, dark } = picked.light || picked.dark ? picked : fresh(THEMES);
+  updateSettings({ ...(light ? { themeLight: light } : {}), ...(dark ? { themeDark: dark } : {}) });
+  return { light, dark };
 }
 
 /** The note for a theme chosen for the other mode (chooseTheme's answer), as the page doesn't change. */

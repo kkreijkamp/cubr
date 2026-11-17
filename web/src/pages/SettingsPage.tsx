@@ -13,10 +13,10 @@ import { useAuth } from '../lib/auth';
 import { formatNumber } from '../lib/format';
 import { useKeyboardLayout } from '../lib/keyboardLayout';
 import { applyUpdate, checkForUpdate, installHint, promptInstall, usePwa } from '../lib/pwa';
-import { activeTheme, applyVisualSettings, chooseTheme, DEFAULT_SETTINGS, FONTS, setAutoSwitchTheme, themeWaitsNote, updateSettings, useDeviceIsDark, useSettings, type Settings } from '../lib/settings';
+import { activeTheme, applyVisualSettings, chooseRandomTheme, chooseTheme, DEFAULT_SETTINGS, FONTS, setAutoSwitchTheme, themeWaitsNote, updateSettings, useDeviceIsDark, useSettings, type Settings } from '../lib/settings';
 import { SCHEMES, stickerColour, type Scheme } from '../lib/scrambleNet';
 import { clearLocalData, exportAll, forgetUser, importSessions, localDataSummary, useSolveState } from '../lib/solves';
-import { applyTheme, getTheme, isLightTheme, randomTheme, THEMES, themeLabel, type Theme } from '../lib/themes';
+import { applyTheme, getTheme, isLightTheme, THEMES, themeLabel, type Theme } from '../lib/themes';
 import { toast } from '../lib/toast';
 import { AVAILABLE_INPUTS, INPUT_MODES, updateInput, useInputState } from '../input/inputMode';
 import { actionOf, bind, BINDABLE, controls, KEY_PUZZLES, keyLabel, keyOf, type KeyPuzzle } from '../input/virtual/keymap';
@@ -1045,12 +1045,10 @@ function ThemePicker({ settings: s }: { settings: Settings }) {
     if (waits) toast.notice(themeWaitsNote(t.name, waits));
   };
   const shuffle = () => {
-    // random within the current filter when it has more than the active theme; following the device, one
-    // for the mode it's in, if the list has any, so the page changes
-    const pool = shown.filter((t) => t.name !== current);
-    const forNow = auto ? pool.filter((t) => isLightTheme(t) !== deviceDark) : pool;
-    const from = forNow.length ? forNow : pool;
-    pick(from.length ? from[Math.floor(Math.random() * from.length)] : randomTheme(current, auto ? (deviceDark ? 'dark' : 'light') : undefined));
+    previewing.current = false;
+    // from the list below (its filter and search); following the device, a new light and a new dark theme,
+    // both shown on top
+    chooseRandomTheme(shown);
   };
   const manual = getTheme(s.theme);
   return (
@@ -1070,7 +1068,12 @@ function ThemePicker({ settings: s }: { settings: Settings }) {
         ) : (
           <ThemeNow theme={manual} meta={isLightTheme(manual) ? 'light' : 'dark'} />
         )}
-        <button className="btn-text st-random" onClick={shuffle} data-tip="a random theme from the list below" aria-label="random theme">
+        <button
+          className="btn-text st-random"
+          onClick={shuffle}
+          data-tip={auto ? 'a random light and dark theme from the list below' : 'a random theme from the list below'}
+          aria-label={auto ? 'random light and dark themes' : 'random theme'}
+        >
           <ArrowsRightLeftIcon width={16} height={16} /> <span className="st-random-label">random</span>
         </button>
       </div>

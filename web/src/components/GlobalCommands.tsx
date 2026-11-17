@@ -20,7 +20,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useRegisterCommands, type Command } from '../lib/commands';
 import { useAuth } from '../lib/auth';
-import { activeTheme, chooseTheme, FONTS, setAutoSwitchTheme, themeWaitsNote, updateSettings, useDeviceIsDark, useSettings, type Settings as S } from '../lib/settings';
+import { activeTheme, chooseRandomTheme, chooseTheme, FONTS, setAutoSwitchTheme, themeWaitsNote, updateSettings, useDeviceIsDark, useSettings, type Settings as S } from '../lib/settings';
 import { applyTheme, getTheme, isLightTheme, randomTheme, THEMES, themeLabel } from '../lib/themes';
 import { applyUpdate, checkForUpdate, promptInstall, usePwa } from '../lib/pwa';
 import { toast } from '../lib/toast';
@@ -91,8 +91,19 @@ export function GlobalCommands() {
             label: `random${kind && ` ${kind}`} theme`,
             icon: <ArrowsRightLeftIcon />,
             keywords: ['shuffle', 'surprise'],
-            // following the device, a plain random theme is one for the mode it's in, so the page changes
-            run: () => pick(randomTheme(shown, kind || (auto ? (deviceDark ? 'dark' : 'light') : undefined)).name),
+            run: () => {
+              if (kind) {
+                // a new one of that kind, other than the one it replaces
+                pick(randomTheme(auto ? (kind === 'light' ? settings.themeLight : settings.themeDark) : settings.theme, kind).name);
+                return;
+              }
+              // following the device: a new light and a new dark theme; the page shows the one for the
+              // mode it's in, so say which the other mode got
+              const got = chooseRandomTheme();
+              const other = deviceDark ? 'light' : 'dark';
+              const waiting = got[other];
+              if (waiting) toast.notice(themeWaitsNote(waiting, other));
+            },
           })),
           ...THEMES.map((t) => ({
             id: `theme-${t.name}`,

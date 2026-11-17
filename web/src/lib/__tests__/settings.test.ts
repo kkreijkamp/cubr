@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getTheme } from '../themes';
+import { getTheme, isLightTheme, THEMES } from '../themes';
 import { MemoryStorage } from './memoryStorage';
 
 // settings.ts reads localStorage (and the device's light or dark mode) when it is imported, so each test
@@ -335,6 +335,48 @@ describe("following the device's light or dark mode", () => {
     expect(s.chooseTheme('stackmat')).toBeNull();
     expect(s.get()).toMatchObject({ theme: 'stackmat', themeLight: 'comp_day', themeDark: 'sub_10' });
     expect(css.get('--bg-color')).toBe(getTheme('stackmat').bg);
+  });
+
+  it('makes "random" a new light and a new dark theme while following the device, and one new theme otherwise', async () => {
+    const s = await load();
+    s.applyVisualSettings();
+    for (let i = 0; i < 25; i++) {
+      const before = s.get();
+      const got = s.chooseRandomTheme();
+      const after = s.get();
+      expect(got).toEqual({ light: after.themeLight, dark: after.themeDark });
+      expect(after.themeLight).not.toBe(before.themeLight);
+      expect(after.themeDark).not.toBe(before.themeDark);
+      expect(isLightTheme(getTheme(after.themeLight))).toBe(true);
+      expect(isLightTheme(getTheme(after.themeDark))).toBe(false);
+      expect(after.theme).toBe(before.theme);
+    }
+    // the page shows the new theme for the mode the device is in, and switches to the other new one
+    expect(css.get('--bg-color')).toBe(getTheme(s.get().themeLight).bg);
+    switchTo('dark');
+    expect(css.get('--bg-color')).toBe(getTheme(s.get().themeDark).bg);
+
+    s.setAutoSwitchTheme(false);
+    const pair = { themeLight: s.get().themeLight, themeDark: s.get().themeDark };
+    const before = s.get().theme;
+    const got = s.chooseRandomTheme();
+    expect(got).toEqual({ theme: s.get().theme });
+    expect(s.get().theme).not.toBe(before);
+    expect(s.get()).toMatchObject(pair); // not following: the pair stays as it was
+  });
+
+  it('picks "random" from the list it is given; a mode with nothing new there keeps its theme', async () => {
+    const s = await load();
+    const got = s.chooseRandomTheme(THEMES.filter((t) => isLightTheme(t))); // the list filtered to light themes
+    expect(got.dark).toBeUndefined();
+    expect(s.get().themeDark).toBe('white_cross_dark');
+    expect(s.get().themeLight).not.toBe('white_cross');
+    // a list with nothing new for either mode (only the themes in use): every theme counts
+    const again = s.chooseRandomTheme([getTheme(s.get().themeLight), getTheme(s.get().themeDark)]);
+    expect(again.light && again.dark).toBeTruthy();
+    s.setAutoSwitchTheme(false);
+    const theme = s.get().theme;
+    expect(s.chooseRandomTheme([getTheme(theme)]).theme).not.toBe(theme);
   });
 
   it('switches following off and on without changing the theme on screen', async () => {
