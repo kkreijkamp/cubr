@@ -11,6 +11,7 @@ import './styles/global.css';
 import { App } from './App';
 import { reloadForNewRelease } from './lib/chunkReload';
 import { startPwa } from './lib/pwa';
+import { startAnalytics } from './lib/analytics';
 import { applyVisualSettings } from './lib/settings';
 
 applyVisualSettings();
@@ -26,3 +27,6 @@ createRoot(document.getElementById('root')!).render(
 
 // the offline, installable app: the service worker (production builds only) and the install prompt
 startPwa();
+
+// page views and loading speed on cubr.dev, without cookies (Cloudflare Web Analytics, lib/analytics.ts)
+startAnalytics();

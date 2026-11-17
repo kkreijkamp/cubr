@@ -632,11 +632,13 @@ The web container's nginx (`web/nginx/default.conf.template`) serves the app and
 - **Security headers** on every response, set once at server level (no location may use
   `add_header`, or nginx drops the inherited ones there):
   - `Content-Security-Policy`:
-    - `script-src 'self'` plus the hash of the inline theme script in `index.html`;
+    - `script-src 'self'` plus the hash of the inline theme script in `index.html`, and Cloudflare
+      Web Analytics' beacon (10.3);
     - `style-src 'self'` with `style-src-attr 'unsafe-inline'` (inline style attributes only, for
       cubing.js's puzzle drawings; injected `<style>` elements are refused);
     - images from self, `data:` and `blob:`;
-    - `connect-src 'self' wss://<host>`, `worker-src 'self'`;
+    - `connect-src 'self' wss://<host> https://cloudflareinsights.com` (the beacon's reports),
+      `worker-src 'self'`;
     - `object-src 'none'`, `base-uri 'none'`, `form-action 'self'`, `frame-ancestors 'none'`.
     - No `blob:` or `data:` scripts: the stackmat input's AudioWorklet is a file of its own
       (`stackmat.worklet.js?url&no-inline`).
@@ -671,6 +673,24 @@ The web container's nginx (`web/nginx/default.conf.template`) serves the app and
   test fails 30 days before it passes.
 - Redirects are relative (`absolute_redirect off`): behind the gateway and Cloudflare, nginx would
   build them with the wrong scheme and port.
+
+### 10.3 Analytics (Cloudflare Web Analytics)
+
+- **What:** page views, referrers, browsers, countries and loading speed (Core Web Vitals), as totals
+  in Cloudflare's dashboard (Analytics & Logs > Web Analytics > cubr.dev). There are no cookies or
+  browser storage for it, per Cloudflare. The privacy policy describes it.
+- **How:**
+  - `web/src/lib/analytics.ts` adds Cloudflare's beacon (`static.cloudflareinsights.com/beacon.min.js`
+    with cubr.dev's site token) when the app starts.
+  - **Only on cubr.dev:** the local stack and previews are never measured.
+  - **Never when the browser sends Global Privacy Control or Do Not Track.**
+  - **Never twice:** not if the page already has the beacon.
+  - The beacon follows the router's page changes itself and reports to `cloudflareinsights.com`.
+- **Why the app adds it:** Cloudflare can inject the beacon into the pages it serves ("automatic setup",
+  which Cloudflare switched on by default when the zone was created). But the offline app opens from
+  its cached `index.html`, which never passes through Cloudflare. Automatic setup should be off, so the
+  app's rules (no Global Privacy Control, no Do Not Track) hold for every page. The CSP allows both
+  ways: the script host, and the injected beacon's same-origin `/cdn-cgi/rum`.
 
 ## 11. Kubernetes overview (deploy/k8s)
 

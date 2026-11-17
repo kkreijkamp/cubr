@@ -8,7 +8,7 @@ import './legal.css';
 
 // when each page last changed
 const TERMS_EFFECTIVE = '16 November 2026';
-const PRIVACY_EFFECTIVE = '17 November 2026'; // sign-in with Google, Apple and GitHub
+const PRIVACY_EFFECTIVE = '17 November 2026'; // sign-in with Google, Apple and GitHub; Cloudflare Web Analytics (set to the release's date)
 const CONTACT = 'hello@cubr.dev';
 
 const Mail = () => <a href={`mailto:${CONTACT}`}>{CONTACT}</a>;
@@ -51,7 +51,8 @@ export function PrivacyPage() {
       <p className="legal-intro">
         cubr (cubr.dev) is a free speedcubing timer run by Koen Kreijkamp, an individual in Queensland, Australia (&quot;cubr&quot;,
         &quot;we&quot;). This policy explains what we collect, why, who helps us run cubr, and the choices you have. There are no ads,
-        no analytics and no tracking.
+        and nothing follows you around the web: the only measurement is Cloudflare Web Analytics, which counts page views without
+        cookies.
       </p>
 
       <Section title="what we collect">
@@ -78,6 +79,12 @@ export function PrivacyPage() {
           <li>
             <b>Technical data:</b> your IP address, used for the rate limits that protect sign-in and the rest of the service, and in our
             server logs. Cloudflare, which sits in front of cubr, also handles your IP address and request details.
+          </li>
+          <li>
+            <b>Page views:</b> Cloudflare Web Analytics records the page you open, the page that linked to it, your browser and device
+            type, your country (worked out from your IP address, which it doesn&apos;t keep) and how fast the page loaded. Cloudflare says
+            it uses no cookies or other storage in your browser for this and doesn&apos;t fingerprint visitors. We only see totals, never
+            a record of one visit. If your browser sends Global Privacy Control or Do Not Track, cubr doesn&apos;t load it.
           </li>
           <li>
             <b>Emails</b> you send to <Mail />.
@@ -121,6 +128,10 @@ export function PrivacyPage() {
             To keep cubr safe, fair and working: rate limits, server logs, anti-cheat checks that compare times with WCA records, and
             backups. (Legal basis: our legitimate interest in running a secure service.)
           </li>
+          <li>
+            To see which pages are used and how fast they load, so we know what to improve: page-view totals from Cloudflare Web
+            Analytics. (Legal basis: our legitimate interest in improving cubr.)
+          </li>
           <li>To answer you when you contact us.</li>
         </ul>
         <p>We don&apos;t sell your data, use it for advertising, or build profiles of you.</p>
@@ -134,7 +145,7 @@ export function PrivacyPage() {
           </li>
           <li>
             <b>Cloudflare:</b> our domain, security and delivery. Your traffic passes through Cloudflare&apos;s global network, where it is
-            decrypted to be protected and routed.
+            decrypted to be protected and routed. Cloudflare also counts our page views (Web Analytics, above).
           </li>
           <li>
             <b>Resend:</b> sends password-reset emails.
@@ -170,7 +181,7 @@ export function PrivacyPage() {
           cubr sets one cookie of its own, and only while you sign in with Google, Apple or GitHub: it ties that sign-in to your browser
           and expires within minutes. Your browser&apos;s local storage keeps you signed in and holds your settings and offline solves,
           so the site works. None of it is used for tracking or advertising, which is why there is no cookie banner. Cloudflare may set a
-          strictly necessary security cookie.
+          strictly necessary security cookie. Cloudflare Web Analytics sets none.
         </p>
       </Section>
 
@@ -183,6 +194,7 @@ export function PrivacyPage() {
           <li>Password-reset links work for 1 hour. Race chat is kept for 2 hours, and rate-limit counters for up to an hour.</li>
           <li>Server logs are rotated automatically and overwritten as they fill up.</li>
           <li>Supporter entries: until you ask us to remove your name.</li>
+          <li>Page-view statistics: only as totals, in Cloudflare&apos;s dashboard, for as long as Cloudflare keeps them.</li>
           <li>
             Emails to <Mail />: as long as needed to deal with them.
           </li>

@@ -6,6 +6,7 @@ import appSource from '../App.tsx?raw';
 import robotsTxt from '../../public/robots.txt?raw';
 import sitemapXml from '../../public/sitemap.xml?raw';
 import securityTxt from '../../public/.well-known/security.txt?raw';
+import { BEACON_SRC } from '../lib/analytics';
 
 // The web container's nginx config (web/nginx/default.conf.template) against the app it serves: which
 // URLs are pages (200) and which are real 404s, the security headers, the crawler files. nginx's
@@ -180,14 +181,14 @@ describe('security headers', () => {
     });
   });
 
-  it('allow only cubr.dev\'s own scripts, plus the inline theme script by its hash', async () => {
+  it('allow only cubr.dev\'s own scripts, the inline theme script by its hash, and Cloudflare\'s analytics beacon', async () => {
     const inline = [...indexHtml.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
     expect(inline.length).toBeGreaterThan(0);
     const hashes = await Promise.all(
       inline.map(async (s) => `'sha256-${btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))))}'`),
     );
     // a changed inline script needs its new hash here, or browsers block it (and the theme flashes)
-    expect(csp['script-src']).toEqual(["'self'", ...hashes]);
+    expect(csp['script-src']).toEqual(["'self'", ...hashes, 'https://static.cloudflareinsights.com']);
   });
 
   it('shut out plugins, <base>, framing and other sites\' forms', () => {
@@ -197,8 +198,13 @@ describe('security headers', () => {
     expect(csp['frame-ancestors']).toEqual(["'none'"]);
     expect(csp['form-action']).toEqual(["'self'"]);
     expect(csp['worker-src']).toEqual(["'self'"]);
-    expect(csp['connect-src']).toEqual(["'self'", 'wss://$host']);
+    // the race sockets, and Cloudflare Web Analytics' reports (lib/analytics.ts)
+    expect(csp['connect-src']).toEqual(["'self'", 'wss://$host', 'https://cloudflareinsights.com']);
     for (const values of Object.values(csp)) expect(values).not.toContain("'unsafe-eval'");
+  });
+
+  it('allow exactly the analytics beacon the app loads (lib/analytics.ts)', () => {
+    expect(csp['script-src']).toContain(new URL(BEACON_SRC).origin);
   });
 
   it('take stylesheets only from cubr.dev (no injected <style>), allowing inline style attributes alone', () => {
