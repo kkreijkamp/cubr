@@ -10,7 +10,7 @@ const internalPbsQuery = z.object({
   kind: z.enum(PB_KINDS).optional(),
 });
 
-const periodBestsParams = z.object({ userId: z.string().uuid() });
+const periodBestsParams = z.object({ userId: z.guid() });
 const allTimeBestsQuery = z.object({
   event: z.string().refine(isEventId, 'unknown event'),
   minSingle: z.coerce.number().int().min(0).max(86_400_000).default(0),

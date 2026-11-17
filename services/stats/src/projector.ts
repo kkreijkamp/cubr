@@ -1,7 +1,7 @@
 import { DLQ_STREAM, withTx, type EventEnvelope, type Pool, type PoolClient, type Redis } from '@cubr/common';
 import { effectiveMs } from '@cubr/cubestats';
 import type { FastifyBaseLogger } from 'fastify';
-import type { ZodType, ZodTypeDef } from 'zod';
+import type { ZodType } from 'zod';
 import { makeBucketer, validTz } from './domain/buckets.js';
 import { isImprovement, rollingFromPayload, tailAverages, type PbKind } from './domain/pbs.js';
 import {
@@ -80,7 +80,7 @@ export function createProjector(deps: ProjectorDeps) {
   }
 
   /** Validates a payload; malformed (non-retriable) events go straight to the dead-letter stream. */
-  async function payload<T>(schema: ZodType<T, ZodTypeDef, unknown>, evt: EventEnvelope): Promise<T | null> {
+  async function payload<T>(schema: ZodType<T>, evt: EventEnvelope): Promise<T | null> {
     const res = schema.safeParse(evt.data);
     if (res.success) return res.data;
     const issue = res.error.issues[0];

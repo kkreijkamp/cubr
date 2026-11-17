@@ -53,7 +53,7 @@ export const deleteMeSchema = z
   .refine((b) => b.password !== undefined || b.confirm !== undefined, { message: 'password: required' });
 
 export const settingsSchema = z.object({
-  settings: z.record(z.unknown()),
+  settings: z.record(z.string(), z.unknown()),
 });
 
 /** Size in bytes of the JSON encoding of `value` (what Postgres will store). */
