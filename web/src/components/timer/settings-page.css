@@ -401,6 +401,12 @@
   padding-left: 0;
   background: transparent;
 }
+/* iOS zooms the page into a text field under 16px when it gets focus */
+@media (hover: none) and (pointer: coarse) {
+  .st-theme-search input {
+    font-size: 16px;
+  }
+}
 .st-theme-search:focus-within {
   box-shadow: 0 0 0 2px var(--main-color);
 }
@@ -691,5 +697,11 @@
   }
   .st-theme-now-text .name {
     font-size: 1.4rem;
+  }
+}
+/* narrow phones: the random button is just its icon, so the theme's name has the room */
+@media (max-width: 400px) {
+  .st-random-label {
+    display: none;
   }
 }

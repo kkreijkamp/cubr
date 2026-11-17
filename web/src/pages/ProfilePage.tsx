@@ -26,11 +26,11 @@ export default function ProfilePage() {
       return (
         <div className="empty stack" style={{ justifyItems: 'center', paddingTop: '4rem' }}>
           <MagnifyingGlassIcon width={40} height={40} className="sub" aria-hidden="true" />
-          <div className="text" style={{ fontSize: '1.5rem' }}>
+          <div className="text" style={{ fontSize: '1.5rem', overflowWrap: 'anywhere' }}>
             no cuber called "{username}"
           </div>
           <div className="sub">maybe they changed their name, or it was never solved {'\u00af\\_(\u30c4)_/\u00af'}</div>
-          <div className="row" style={{ justifyContent: 'center' }}>
+          <div className="row wrap" style={{ justifyContent: 'center' }}>
             <Link to="/leaderboards" className="btn">
               browse leaderboards
             </Link>

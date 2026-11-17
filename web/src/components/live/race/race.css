@@ -17,6 +17,7 @@
 }
 .race-card {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.75rem;
 }
 .race-card .live-section-title {
@@ -56,6 +57,27 @@
   }
   .race-rooms .room-name {
     max-width: 9rem;
+  }
+}
+.race-rooms .show-xs {
+  display: none;
+}
+/* narrow phones: the name wraps instead of being cut to a few letters, and the status pill moves
+   under it, so the table fits without scrolling sideways */
+@media (max-width: 440px) {
+  .race-rooms .hide-xs {
+    display: none;
+  }
+  .race-rooms .room-name {
+    max-width: none;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.35;
+  }
+  .race-rooms .show-xs {
+    display: table;
+    margin-top: 0.3rem;
+    font-size: 0.7rem;
   }
 }
 
@@ -100,6 +122,18 @@
   padding: 0 0.25rem;
   vertical-align: -0.1em;
 }
+.race-refresh.btn-text {
+  padding: 0;
+}
+/* touch screens: a fingertip-sized hit area around the small icon buttons (the negative margins keep
+   them where they were), and a 16px chat field, which iOS doesn't zoom into */
+@media (hover: none) and (pointer: coarse) {
+  .btn-text.inline,
+  .race-refresh.btn-text {
+    padding: 0.45rem;
+    margin: -0.45rem;
+  }
+}
 
 .race-layout {
   display: grid;
@@ -112,14 +146,17 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+/* one column no wider than the page: the results grid (a column per player) scrolls inside it */
 .race-main {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
   align-content: start;
   min-width: 0;
 }
 .race-side {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
   align-content: start;
   min-width: 0;
@@ -196,6 +233,20 @@
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
 }
+/* the numbers keep their width and the name column takes what is left (its name and status line
+   end in an ellipsis), so the table never outgrows the card on phones */
+.race-standings td:first-child {
+  width: 100%;
+  max-width: 0;
+  overflow: hidden;
+}
+/* the narrowest phones: the mean gives way to the name (ao5 stays) */
+@media (max-width: 360px) {
+  .race-standings th:nth-child(3),
+  .race-standings td:nth-child(3) {
+    display: none;
+  }
+}
 .race-standings th {
   color: var(--sub-color);
   font-weight: 400;
@@ -253,6 +304,8 @@
   color: var(--sub-color);
   font-size: 0.68rem;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .race-standings tr.me .text-name {
   color: var(--main-color);
@@ -354,6 +407,12 @@ table.table.race-grid {
   min-width: 0;
   background: transparent;
   font-size: 0.85rem;
+}
+/* iOS zooms the page into a field under 16px when it gets focus */
+@media (hover: none) and (pointer: coarse) {
+  .chat-form input {
+    font-size: 16px;
+  }
 }
 .chat-form .count {
   color: var(--sub-color);

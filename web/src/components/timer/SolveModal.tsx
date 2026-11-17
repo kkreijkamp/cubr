@@ -101,7 +101,7 @@ export function SolveModal({ solve, index, total, precision, preview, confirmDel
         </div>
       </div>
 
-      <div className="option-group" role="group" aria-label="penalty">
+      <div className="option-group tp-penalties" role="group" aria-label="penalty">
         {PENALTIES.map((p, i) => (
           <button key={p} className={`btn${solve.penalty === p ? ' active' : ''}`} onClick={() => void setPenalty(solve.id, p)} data-tip={`ctrl+${i + 1}`}>
             {p === 'OK' ? 'no penalty' : p.toLowerCase()}

@@ -255,7 +255,7 @@ function MeCard({ board, sel, precision, onJump }: { board: Leaderboard | undefi
       <div className="lb-me-who">
         <span className="name">
           <Avatar user={user} size={20} />
-          {user.username}
+          <span className="lb-me-username">{user.username}</span>
         </span>
         <span className="sub">{me.rank === 1 ? 'goat - nobody is faster' : `you - top ${formatPercent(top)} of ${formatNumber(board.total)}`}</span>
         {flagged && (

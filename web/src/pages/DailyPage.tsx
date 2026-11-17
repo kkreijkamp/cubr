@@ -18,6 +18,7 @@ import { TimerArea, useLiveTimer } from '../components/live/LiveTimer';
 import { EventPicker, Notice, ScrambleText, Segmented } from '../components/live/ui';
 import { DailyBoard } from '../components/live/daily/DailyBoard';
 import { QuickActions } from '../components/timer/QuickActions';
+import { isTouchDevice } from '../components/timer/feedback';
 import { shortcutFor } from '../timer/shortcuts';
 import { uuid } from '../timer/storeUtils';
 import type { TimerResult } from '../timer/useTimerEngine';
@@ -131,6 +132,8 @@ function ao5Of(attempts: Attempt[]): number | null {
 export default function DailyPage() {
   const { user, status } = useAuth();
   const settings = useSettings();
+  // phones and tablets have no space or esc key: the tips say what to do with the screen instead
+  const touch = useMemo(isTouchDevice, []);
   const now = useNow(1000);
   const today = utcDateKey(new Date(now));
   const [date, setDate] = useState(today);
@@ -519,16 +522,22 @@ export default function DailyPage() {
                 label={`attempt ${(selected?.index ?? 0) + 1}`}
               />
               <div className="live-keytips fade-on-focus">
-                {settings.inspection && ev.inspection ? (
-                  <>
-                    <kbd>space</kbd> inspect, then hold <kbd>space</kbd> to start
-                  </>
+                {touch ? (
+                  `${settings.inspection && ev.inspection ? 'tap the timer to inspect, then hold it and release to start' : 'hold the timer, release to start'} - tap to stop - one try per scramble`
                 ) : (
                   <>
-                    hold <kbd>space</kbd>, release to start
+                    {settings.inspection && ev.inspection ? (
+                      <>
+                        <kbd>space</kbd> inspect, then hold <kbd>space</kbd> to start
+                      </>
+                    ) : (
+                      <>
+                        hold <kbd>space</kbd>, release to start
+                      </>
+                    )}{' '}
+                    - <kbd>esc</kbd> while solving = DNF - one try per scramble
                   </>
-                )}{' '}
-                - <kbd>esc</kbd> while solving = DNF - one try per scramble
+                )}
               </div>
               {settings.scramblePreview !== 'off' && scramble && (
                 <div className="daily-preview fade-on-focus">

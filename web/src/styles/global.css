@@ -125,6 +125,14 @@ h4 {
   }
 }
 
+/* a short window (a phone on its side): less room above and between the header, page and footer */
+@media (max-height: 500px) {
+  .app {
+    padding-top: 0.75rem;
+    row-gap: 1rem;
+  }
+}
+
 .page {
   animation: fadeIn 0.2s ease-out;
   min-width: 0;
@@ -271,6 +279,16 @@ body.focus * {
 .footer .btn-text {
   font-size: 0.75rem;
   padding: 0.25rem;
+}
+/* touch screens: the footer's small links get a fingertip-sized height */
+@media (hover: none) and (pointer: coarse) {
+  .footer .btn-text {
+    padding: 0.45rem 0.3rem;
+  }
+  .footer .footer-links,
+  .footer .footer-right {
+    row-gap: 0;
+  }
 }
 .keytips {
   text-align: center;
@@ -803,7 +821,19 @@ body.focus .toast:not(.important) {
 }
 .modal-backdrop.modal-centered {
   align-items: center;
+  /* a dialog taller than the window starts at the top, where it can still be scrolled to */
+  align-items: safe center;
   padding-top: 2rem;
+}
+/* phones and short windows: the dialog starts near the top, so more of it is on the screen */
+@media (max-width: 720px), (max-height: 600px) {
+  .modal-backdrop,
+  .modal-backdrop.modal-centered {
+    padding: 1rem 0.75rem;
+  }
+  .modal {
+    padding: 1.25rem;
+  }
 }
 .modal-backdrop.previewing {
   background: transparent;

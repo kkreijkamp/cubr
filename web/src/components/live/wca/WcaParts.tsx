@@ -138,7 +138,7 @@ export function RankCalculator({ params, onChange, onPerson }: { params: RankPar
               className={invalid ? 'invalid' : ''}
               autoFocus
             />
-            <span className="unit">{fmc ? 'moves' : ev?.name ?? event}</span>
+            <span className={`unit${fmc ? '' : ' unit-event'}`}>{fmc ? 'moves' : ev?.name ?? event}</span>
           </div>
           <select value={country} onChange={(e) => onChange({ country: e.target.value })} aria-label="country" className="wca-country">
             <option value="">worldwide only</option>
@@ -432,7 +432,10 @@ export function PersonCard({ wcaId, onBack }: { wcaId: string; onBack: () => voi
             <tbody>
               {pbs.map((pb) => (
                 <tr key={pb.event}>
-                  <td className="left">{getEvent(pb.event)?.name ?? pb.event}</td>
+                  <td className="left">
+                    <span className="ev-long">{getEvent(pb.event)?.name ?? pb.event}</span>
+                    <span className="ev-short">{getEvent(pb.event)?.short ?? pb.event}</span>
+                  </td>
                   {rankCells(pb.single)}
                   <td className="main-val">{formatWcaValue(pb.single?.value, pb.event, 'single')}</td>
                   <td className="main-val">{formatWcaValue(pb.average?.value, pb.event, 'average')}</td>

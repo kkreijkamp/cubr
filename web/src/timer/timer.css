@@ -48,3 +48,9 @@
     font-size: min(var(--timer-size, 7rem), 22vw);
   }
 }
+/* a short window (a phone on its side): the height sets the size */
+@media (max-height: 500px) {
+  .timer-display {
+    font-size: min(var(--timer-size, 7rem), 22vw, 25vh);
+  }
+}

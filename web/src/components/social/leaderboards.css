@@ -114,6 +114,13 @@
   min-width: 0;
   color: var(--text-color);
 }
+/* a long username gives way (an ellipsis) before it can run into the time beside it */
+.lb-me .lb-me-username {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .lb-me .lb-me-who .sub {
   font-size: 0.75rem;
 }
@@ -312,6 +319,10 @@ table.lb-table tr.me.flash td {
     grid-column: 1 / -1;
     grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr));
   }
+  /* "yesterday" with its icon needs a wider button than an event name */
+  .lb-group.lb-dates {
+    grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+  }
   .lb-group-label {
     grid-column: 1 / -1;
   }
@@ -331,6 +342,9 @@ table.lb-table tr.me.flash td {
   .lb-group.lb-events,
   .lb-group.lb-dates {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .lb-group.lb-dates {
+    grid-template-columns: repeat(auto-fill, minmax(5.25rem, 1fr));
   }
   .lb-group .btn {
     justify-content: center;

@@ -51,7 +51,7 @@ function RoomsTable({ onJoin }: { onJoin: (id: string) => void }) {
         <h3 className="h3" id="rooms-title">
           <FlagIcon /> public rooms
         </h3>
-        <button className="btn-text small" onClick={load} aria-label="refresh" style={{ padding: 0 }}>
+        <button className="btn-text small race-refresh" onClick={load} aria-label="refresh">
           {loading ? <Spinner size={14} /> : <ArrowPathIcon width={14} height={14} />} {rooms ? `${rooms.length} open` : ''}
         </button>
       </div>
@@ -69,7 +69,7 @@ function RoomsTable({ onJoin }: { onJoin: (id: string) => void }) {
                 <th className="left">room</th>
                 <th className="left">event</th>
                 <th>players</th>
-                <th className="center">status</th>
+                <th className="center hide-xs">status</th>
                 <th className="hide-sm">created</th>
                 <th className="hide-sm" aria-label="join" />
               </tr>
@@ -77,10 +77,14 @@ function RoomsTable({ onJoin }: { onJoin: (id: string) => void }) {
             <tbody>
               {rooms.map((r) => (
                 <tr key={r.id} className="clickable" onClick={() => onJoin(r.id)}>
-                  <td className="left room-name">{r.name}</td>
+                  <td className="left room-name">
+                    {r.name}
+                    {/* phones have no status column: the pill follows the name */}
+                    <span className={`pill show-xs${r.status === 'running' ? ' main' : ''}`}>{r.status === 'lobby' ? 'waiting' : r.status}</span>
+                  </td>
                   <td className="left">{getEvent(r.event)?.short ?? r.event}</td>
                   <td>{r.players}</td>
-                  <td className="center">
+                  <td className="center hide-xs">
                     <span className={`pill${r.status === 'running' ? ' main' : ''}`}>{r.status === 'lobby' ? 'waiting' : r.status}</span>
                   </td>
                   <td className="secondary hide-sm">{timeAgo(r.createdAt)}</td>

@@ -8,6 +8,7 @@ import { ActivityHeatmap } from './Heatmap';
 import { ProfileHeader } from './ProfileHeader';
 import { ProfileSolves } from './ProfileSolves';
 import { WcaComparison } from './WcaComparison';
+import { isTouchDevice } from '../timer/feedback';
 import { eventLabel } from './util';
 import { api } from '../../lib/api';
 import { formatNumber } from '../../lib/format';
@@ -81,7 +82,7 @@ export function ProfileView({ user, own, onEdit, children }: Props) {
         <p className="pf-empty">
           {own ? (
             <>
-              no solves yet - <Link to="/">open the timer</Link> and press space. personal bests, progress and the wca comparison show up here.
+              no solves yet - <Link to="/">open the timer</Link> and {isTouchDevice() ? 'hold it to start' : 'press space'}. personal bests, progress and the wca comparison show up here.
             </>
           ) : (
             'no solves yet - personal bests and progress show up here after the first solve.'

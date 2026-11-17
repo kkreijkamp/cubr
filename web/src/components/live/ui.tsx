@@ -61,7 +61,7 @@ export function ScrambleText({ scramble, event, muted, actions }: { scramble: st
   const size = len <= 40 ? 1.6 : len <= 70 ? 1.35 : len <= 130 ? 1.1 : len <= 260 ? 0.95 : 0.8;
   return (
     <div className={`live-scramble${muted ? ' muted' : ''}${event === 'minx' ? ' minx' : ''}`}>
-      <div className="text" style={{ fontSize: `${size}rem` }}>
+      <div className="text" style={{ ['--scramble-size' as string]: `${size}rem` }}>
         {scramble ?? '\u00a0'}
       </div>
       {scramble && (

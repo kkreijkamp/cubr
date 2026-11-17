@@ -1034,8 +1034,8 @@ function ThemePicker({ current }: { current: string }) {
             <span className="name">{themeLabel(now.name)}</span>
             <span className="meta">{isLightTheme(now) ? 'light' : 'dark'}</span>
           </div>
-          <button className="btn-text st-random" onClick={shuffle} data-tip="a random theme from the list below">
-            <ArrowsRightLeftIcon width={16} height={16} /> random
+          <button className="btn-text st-random" onClick={shuffle} data-tip="a random theme from the list below" aria-label="random theme">
+            <ArrowsRightLeftIcon width={16} height={16} /> <span className="st-random-label">random</span>
           </button>
         </div>
       )}

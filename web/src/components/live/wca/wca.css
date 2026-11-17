@@ -7,6 +7,8 @@
 /* calculator */
 .wca-calc {
   display: grid;
+  /* one column no wider than the card: the time field and the pickers shrink or wrap on phones */
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.85rem;
   padding: 1rem 1.25rem;
 }
@@ -57,6 +59,12 @@
   max-width: 16rem;
   font-size: 0.85rem;
   padding: 0.6rem 0.75rem;
+}
+/* iOS zooms the page into a field under 16px when it gets focus */
+@media (hover: none) and (pointer: coarse) {
+  .wca-country {
+    font-size: 16px;
+  }
 }
 .wca-hint {
   text-align: center;
@@ -114,6 +122,7 @@
 /* distribution */
 .wca-dist {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.5rem;
 }
 .wca-dist .live-section-title {
@@ -207,8 +216,10 @@
   font-size: 1.5rem;
   flex-shrink: 0;
 }
+/* the name keeps at least 9rem: on a phone the "WCA profile" button wraps under it rather than
+   squeezing the name into broken words */
 .wca-person .who {
-  flex: 1;
+  flex: 1 1 9rem;
   min-width: 0;
   display: grid;
   gap: 0.2rem;
@@ -216,7 +227,10 @@
 .wca-person .name {
   font-size: 1.5rem;
   color: var(--text-color);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+}
+.wca-pbs .ev-short {
+  display: none;
 }
 .wca-pbs .rank {
   color: var(--sub-color);
@@ -242,10 +256,33 @@
   color: var(--main-color);
 }
 
+/* narrow phones: the time gets the room (the event is picked right above it; "moves" stays) */
+@media (max-width: 400px) {
+  .wca-time .unit-event {
+    display: none;
+  }
+}
+/* phones: rank and time keep their width, the name takes the rest and ends in an ellipsis */
+@media (max-width: 720px) {
+  .wca-neighbours .table {
+    table-layout: fixed;
+  }
+  .wca-neighbours .table td:first-child,
+  .wca-neighbours .table td:last-child {
+    width: 4.75rem;
+  }
+  .wca-neighbours .name {
+    max-width: none;
+  }
+}
 @media (max-width: 720px) {
   .wca-pbs .hide-sm,
+  .wca-pbs .ev-long,
   .wca-records .secondary {
     display: none;
+  }
+  .wca-pbs .ev-short {
+    display: inline;
   }
   .wca-records .holder {
     max-width: 9rem;

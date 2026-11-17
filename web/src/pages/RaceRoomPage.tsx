@@ -1,6 +1,6 @@
 // Race room: real-time multiplayer over Socket.IO (lib/race.ts). Any race pod can serve any
 // player - room state lives in Redis and the Redis adapter relays broadcasts between pods.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeftIcon, ArrowRightStartOnRectangleIcon, FlagIcon, ForwardIcon, LinkIcon, PencilIcon, SignalSlashIcon } from '@heroicons/react/24/outline';
 import { getEvent, formatTime, type Penalty } from '@cubr/cubestats';
@@ -17,6 +17,7 @@ import { copyText, isTypingTarget, useStoredState } from '../components/live/hoo
 import { useLiveTimer, TimerArea } from '../components/live/LiveTimer';
 import { Dot, Notice, ScrambleText } from '../components/live/ui';
 import { PlayersCard, RaceChat, ResultsGrid } from '../components/live/race/RaceParts';
+import { isTouchDevice } from '../components/timer/feedback';
 import type { TimerResult } from '../timer/useTimerEngine';
 import '../components/live/live.css';
 import '../components/live/race/race.css';
@@ -67,6 +68,8 @@ export default function RaceRoomPage() {
   const { state, conn } = useRace(id);
   const { user, status: authStatus } = useAuth();
   const settings = useSettings();
+  // phones and tablets have no keys: the tips say what to do with the screen instead
+  const touch = useMemo(isTouchDevice, []);
   const [pending, setPending] = useState<Pending | null>(null);
   const [busy, setBusy] = useState(false);
   const [nickOpen, setNickOpen] = useState(false);
@@ -266,6 +269,7 @@ export default function RaceRoomPage() {
   else if (room.status === 'finished') roundLine = isHost ? 'round finished - start the next one' : `round finished - waiting for ${host?.name ?? 'the host'}`;
   else if (myResult) roundLine = `you're done - waiting for ${waitingNames}`;
   else if (phase === 'running') roundLine = 'solving...';
+  else if (touch) roundLine = settings.inspection && event?.inspection ? 'tap the timer to inspect' : 'hold the timer, release to start';
   else roundLine = settings.inspection && event?.inspection ? 'press space to inspect' : 'hold space, release to start';
 
   return (
@@ -365,7 +369,7 @@ export default function RaceRoomPage() {
               >
                 {busy ? <Spinner size={16} /> : <ForwardIcon />}
                 {!round ? 'start round 1' : room.status === 'running' && waitingFor > 0 ? 'skip to next round' : 'next round'}
-                <kbd>n</kbd>
+                {!touch && <kbd>n</kbd>}
               </button>
             ) : (
               <span className="sub small">only the host ({host?.name ?? '...'}) can start rounds</span>
@@ -373,10 +377,16 @@ export default function RaceRoomPage() {
           </div>
 
           <div className="live-keytips fade-on-focus">
-            <kbd>space</kbd> start / stop - <kbd>esc</kbd> while solving = DNF{isHost ? ' - ' : ''}
-            {isHost && (
+            {touch ? (
+              `${settings.inspection && event?.inspection ? 'tap the timer to inspect, then hold it and release to start' : 'hold the timer, release to start'} - tap to stop`
+            ) : (
               <>
-                <kbd>n</kbd> next round
+                <kbd>space</kbd> start / stop - <kbd>esc</kbd> while solving = DNF{isHost ? ' - ' : ''}
+                {isHost && (
+                  <>
+                    <kbd>n</kbd> next round
+                  </>
+                )}
               </>
             )}
           </div>

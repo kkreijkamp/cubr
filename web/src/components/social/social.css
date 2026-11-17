@@ -78,6 +78,13 @@
   background: var(--sub-alt-color);
   max-width: 12rem;
 }
+/* iOS zooms the page into a field under 16px when it gets focus */
+@media (hover: none) and (pointer: coarse) {
+  .pf .pv-seg select.pv-select,
+  .pf .pv-select {
+    font-size: 16px;
+  }
+}
 .pf-empty {
   margin: 0;
   color: var(--sub-color);
@@ -862,6 +869,8 @@
   font-size: 0.8rem;
   line-height: 1.5;
   margin-top: 0.25rem;
+  /* a long email address wraps on a phone instead of running off the screen */
+  overflow-wrap: anywhere;
 }
 .ac-row .d a {
   color: var(--main-color);
@@ -1099,6 +1108,47 @@ table.ps-table td.dnf {
 
 /* ---------------------------------------------------------------- responsive */
 @media (max-width: 1000px) {
+  /* tablets and phones: the picture beside the name and the meta line, then the bio and the donut
+     across the page (.pf-who's children join the grid so the bio can span it) */
+  .pf-id {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0 1.75rem;
+  }
+  .pf-who {
+    display: contents;
+  }
+  .pf-id > .pv-avatar {
+    grid-row: 1 / span 2;
+  }
+  .pf-name {
+    grid-column: 2;
+    align-self: end;
+    /* up to two lines before the ellipsis. The line height holds the descenders, so no padding
+       below: it would show the top of a clipped third line */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.2;
+    padding-block: 0.1em 0;
+    margin-block: -0.1em 0;
+  }
+  .pf-meta {
+    grid-column: 2;
+    align-self: start;
+    margin-top: 0.5rem;
+  }
+  .pf-bio,
+  .pf-bio-add.btn-text {
+    grid-column: 1 / -1;
+    justify-self: start;
+    margin-top: 1.25rem;
+  }
+  .pf-donut {
+    grid-column: 1 / -1;
+    margin-top: 1.75rem;
+  }
   .pf-bests {
     grid-template-columns: minmax(0, 1fr);
     gap: 2.25rem;
@@ -1123,11 +1173,12 @@ table.ps-table td.dnf {
     gap: 2rem;
   }
   .pf-id {
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 1.25rem;
+    gap: 0 1.25rem;
+  }
+  .pf-name {
+    font-size: clamp(1.6rem, 7vw, 2rem);
   }
   .pf-donut {
-    grid-column: 1 / -1;
     gap: 1.25rem;
   }
   .pf-donut-ring {
@@ -1140,9 +1191,6 @@ table.ps-table td.dnf {
   }
   .pf .pv-avatar .avatar {
     font-size: 2rem;
-  }
-  .pf-bio {
-    grid-column: 1 / -1;
   }
   .pf-totals {
     grid-template-columns: repeat(2, minmax(0, 1fr));

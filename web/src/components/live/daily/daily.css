@@ -35,9 +35,15 @@
 }
 .daily-main {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.1rem;
   align-content: start;
   min-width: 0;
+}
+@media (max-width: 400px) {
+  .daily-main {
+    gap: 0.75rem;
+  }
 }
 .daily-side {
   min-width: 0;
@@ -230,8 +236,14 @@
   justify-self: center;
 }
 @media (max-width: 720px) {
+  /* one line under the title: "next challenge in 23:41:25" */
   .daily-countdown {
-    justify-items: start;
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+  .daily-countdown .value {
+    font-size: 1.15rem;
   }
   .daily-result .stat.lg .value {
     font-size: 3.75rem;
