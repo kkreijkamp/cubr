@@ -608,10 +608,12 @@
   font-variant-numeric: tabular-nums;
   font-size: 0.9rem;
 }
+/* the rows are as tall as the solve list's beside it (SolveList's ROW, in px as there), so the two
+   tables' rows and stripes line up across the panels */
 .tp-stats th,
 .tp-stats td {
   padding: 0;
-  height: 1.75rem;
+  height: 30px;
   font-weight: 400;
   white-space: nowrap;
 }
@@ -714,6 +716,8 @@
   font-size: 0.7rem;
   padding: 0 0.75rem;
   height: 1.4rem;
+  /* the rows start right under the header, as the stats table's do (not a panel gap below it) */
+  margin-bottom: -0.6rem;
 }
 .tp-solve-head > span,
 .tp-solve-row > span {
@@ -900,9 +904,14 @@
     padding: 0.8rem 0.25rem;
     margin: -0.8rem -0.25rem;
   }
-  /* the stats cells open their averages: a row each, a fingertip tall */
+  /* the stats cells open their averages: a row each, a fingertip tall. Every row is as tall as the
+     solve list's (SolveList's TOUCH_ROW), with or without a button in it */
   .tp-cell-btn {
     min-height: 44px;
+  }
+  .tp-stats tbody th,
+  .tp-stats tbody td {
+    height: 44px;
   }
   .tp-menu-item {
     min-height: 44px;
