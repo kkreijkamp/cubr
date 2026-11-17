@@ -161,9 +161,13 @@ and run the WCA import.
   Changing `JWT_SECRET` signs everyone out. `RESEND_API_KEY` (only the auth container gets it)
   sends password-reset emails from `no-reply@cubr.dev`; without it they are only logged.
   The sign-in providers' client secrets and Apple's key are there too ("Sign-in providers").
-- **Email DNS** (Cloudflare): `cubr.dev` MX to Google Workspace (`hello@cubr.dev`), SPF for Google,
-  `_dmarc` (report-only for now), and Resend's records (`resend._domainkey`, `send` MX/TXT,
-  `rsend` CNAME).
+- **Email DNS** (Cloudflare): `cubr.dev` MX to iCloud+ (`hello@cubr.dev`, a custom-domain address),
+  SPF for iCloud, Apple's domain TXT and DKIM CNAME (`sig1._domainkey`), `_dmarc` (report-only for
+  now), and Resend's records (`resend._domainkey`, `send` MX/TXT, `rsend` CNAME).
+- **www.cubr.dev** redirects to `https://cubr.dev` at Cloudflare's edge, with the same path and query
+  (301): a proxied `AAAA www 100::` record (no origin) and a Redirect Rule (Rules > Redirect Rules,
+  `http.host eq "www.cubr.dev"`). Its requests never reach the VM; the HTTPS certificate covers it as
+  `*.cubr.dev`.
 - **Logs rotate.** Every container logs through `json-file` with at most 3 x 10 MB (`x-logging` in
   `compose.prod.yml`), so the gateway's access log, which holds visitors' IPs, is overwritten as it
   fills up. The privacy policy (`/privacy`) relies on this.
