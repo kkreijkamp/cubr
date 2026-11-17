@@ -7,12 +7,11 @@ import { EventDonut } from './EventDonut';
 import { countryName } from './countries';
 import { WidgetError } from './Widget';
 import { plural } from './util';
-import { formatDate, formatNumber, timeAgo } from '../../lib/format';
+import { flagEmoji, formatDate, formatNumber, timeAgo } from '../../lib/format';
 import { toast } from '../../lib/toast';
 import type { PublicUser, StatsSummary } from '../../lib/types';
 import type { AsyncState } from '../../lib/useAsync';
 import { Avatar } from '../Avatar';
-import { Flag } from '../Flag';
 import { Modal } from '../Modal';
 
 interface Props {
@@ -45,6 +44,7 @@ function monthYear(iso: string): string {
 export function ProfileHeader({ user, summary, own, onEdit, event, onEvent }: Props) {
   const name = user.displayName?.trim() || user.username;
   const totals = summary.data?.totals;
+  const flag = flagEmoji(user.country);
   // the picture is editable where the rest of the profile is (account page)
   const editableAvatar = own && Boolean(onEdit);
   const [avatarOpen, setAvatarOpen] = useState(false);
@@ -91,7 +91,11 @@ export function ProfileHeader({ user, summary, own, onEdit, event, onEvent }: Pr
           </h1>
           <div className="pf-meta">
             {user.displayName && <span>@{user.username}</span>}
-            <Flag code={user.country} label={countryName(user.country)} tip />
+            {flag && (
+              <span className="flag" data-tip={countryName(user.country)} aria-label={countryName(user.country)}>
+                {flag}
+              </span>
+            )}
             {user.createdAt && <span data-tip={`${formatDate(user.createdAt)} - ${timeAgo(user.createdAt)}`}>joined {monthYear(user.createdAt)}</span>}
             {user.wcaId && (
               <Link to={`/wca?person=${encodeURIComponent(user.wcaId)}`} data-tip="official wca results">

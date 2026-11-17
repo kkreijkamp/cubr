@@ -604,15 +604,6 @@ Google, Apple or GitHub: signs in, or asks a new account for its username), `/re
 with an optimistic local store + retry queue (idempotent ids). Monkeytype-style theme system via CSS
 custom properties, command palette (Esc / Ctrl+K), focus mode while timing, toasts.
 
-Country flags come from one sprite, not emoji, which Windows shows as two letters.
-- **Where:** `web/src/assets/country-flags.png`, flat 44 x 30 px flags in one column, drawn by
-  `components/Flag.tsx` and sized in em to the text around them.
-- **Coverage:** the sprite calls GB "uk". It has no flag for 12 of the 250 countries in the list
-  (Kosovo, Palestine, Curaçao, Åland, Guernsey, Isle of Man, Jersey, Saint Barthélemy, Saint Martin,
-  Sint Maarten, Caribbean Netherlands, Mayotte); those keep their emoji.
-- **Pickers:** the country pickers list names alone, since an option holds only text. That also lets
-  typing a name find it. The edit-profile form shows the chosen flag by its label.
-
 Hover styles apply only where something can hover: the build wraps every `:hover` selector in
 `@media (hover: hover)` (`web/plugins/hoverMedia.ts`, a PostCSS step in `vite.config.ts`), so a tap
 on a touch screen no longer leaves a button, row or link in its hover colour until the next tap.

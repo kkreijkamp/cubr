@@ -3,9 +3,7 @@ import { Link } from 'react-router-dom';
 import { TrophyIcon } from '@heroicons/react/24/outline';
 import { formatTime, fromApiValue, type Precision } from '@cubr/cubestats';
 import { api, ApiError } from '../../../lib/api';
-import { formatNumber } from '../../../lib/format';
-import { Flag } from '../../Flag';
-import { countryName } from '../../social/countries';
+import { flagEmoji, formatNumber } from '../../../lib/format';
 import { useAsync } from '../../../lib/useAsync';
 import { ErrorState, Loading, Spinner } from '../../Spinner';
 
@@ -78,7 +76,7 @@ export function DailyBoard({
                 <tr key={e.userId} className={e.userId === userId ? 'me' : ''}>
                   <td className="center">{e.rank === 1 ? <TrophyIcon width={14} height={14} aria-label="1st" aria-hidden={false} className="crown" /> : e.rank}</td>
                   <td className="left name">
-                    <Flag code={e.country} label={countryName(e.country)} />
+                    {e.country && <span className="flag">{flagEmoji(e.country)}</span>}
                     <Link to={`/profile/${encodeURIComponent(e.username)}`}>{e.username}</Link>
                   </td>
                   <td>{formatTime(fromApiValue(e.valueMs), precision)}</td>
