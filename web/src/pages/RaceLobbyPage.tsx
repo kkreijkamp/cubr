@@ -9,6 +9,7 @@ import { useRegisterCommands } from '../lib/commands';
 import { timeAgo } from '../lib/format';
 import { defaultGuestName, getGuestName, parseRoomCode, setGuestName } from '../lib/race';
 import type { RaceRoomSummary } from '../lib/types';
+import { useCanonical } from '../lib/canonical';
 import { ErrorState, Loading, Spinner } from '../components/Spinner';
 import { useInterval, usePageVisible, useStoredState } from '../components/live/hooks';
 import '../components/live/live.css';
@@ -103,6 +104,7 @@ function RoomsTable({ onJoin }: { onJoin: (id: string) => void }) {
 }
 
 export default function RaceLobbyPage() {
+  useCanonical('/race');
   const navigate = useNavigate();
   const { user, status } = useAuth();
   const [nick, setNick] = useState(getGuestName());

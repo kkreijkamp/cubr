@@ -11,6 +11,7 @@ import { toast } from '../lib/toast';
 import { utcDateKey } from '../lib/format';
 import { useAsync } from '../lib/useAsync';
 import { addSolve, ensureSession, setPenaltyIn, solveStore } from '../lib/solves';
+import { useCanonical } from '../lib/canonical';
 import { ErrorState, Loading, Spinner } from '../components/Spinner';
 import { TwistyPreview } from '../components/TwistyPreview';
 import { formatCountdown, isTypingTarget, useNow, useStoredState } from '../components/live/hooks';
@@ -130,6 +131,7 @@ function ao5Of(attempts: Attempt[]): number | null {
 }
 
 export default function DailyPage() {
+  useCanonical('/daily');
   const { user, status } = useAuth();
   const settings = useSettings();
   // phones and tablets have no space or esc key: the tips say what to do with the screen instead

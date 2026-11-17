@@ -8,6 +8,7 @@ import { friendlyError } from '../components/social/util';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useAsync } from '../lib/useAsync';
+import { useCanonical } from '../lib/canonical';
 import { useNoIndex } from '../lib/useNoIndex';
 
 export default function ProfilePage() {
@@ -25,6 +26,9 @@ export default function ProfilePage() {
   // nobody by this name: the server answered 200 (the name is well-formed), so tell search engines here
   const missing = !profile.data && profile.error instanceof ApiError && profile.error.status === 404;
   useNoIndex(missing);
+  // the name as stored: /profile/koen_k and /profile/KOEN_K are one page (names ignore case)
+  const stored = profile.data?.user.username;
+  useCanonical(stored ? `/profile/${encodeURIComponent(stored)}` : null);
 
   if (profile.error && !profile.data) {
     if (missing) {

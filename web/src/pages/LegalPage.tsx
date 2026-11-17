@@ -5,6 +5,7 @@ import { useEffect, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { DocumentTextIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import './legal.css';
+import { useCanonical } from '../lib/canonical';
 
 // when each page last changed
 const TERMS_EFFECTIVE = '16 November 2026';
@@ -46,6 +47,7 @@ function LegalShell({ title, icon, children, effective }: { title: string; icon:
 }
 
 export function PrivacyPage() {
+  useCanonical('/privacy');
   return (
     <LegalShell title="privacy policy" effective={PRIVACY_EFFECTIVE} icon={<ShieldCheckIcon />}>
       <p className="legal-intro">
@@ -253,6 +255,7 @@ export function PrivacyPage() {
 }
 
 export function TermsPage() {
+  useCanonical('/terms');
   return (
     <LegalShell title="terms of service" effective={TERMS_EFFECTIVE} icon={<DocumentTextIcon />}>
       <p className="legal-intro">

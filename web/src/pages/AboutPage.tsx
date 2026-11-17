@@ -20,6 +20,7 @@ import { useCountUp } from '../components/social/useCountUp';
 import { friendlyError } from '../components/social/util';
 import { api } from '../lib/api';
 import { formatDate, formatNumber } from '../lib/format';
+import { useCanonical } from '../lib/canonical';
 import { DONATE_URL } from '../lib/links';
 import { THEMES } from '../lib/themes';
 import type { GlobalStats } from '../lib/types';
@@ -152,6 +153,7 @@ function Supporters() {
 }
 
 export default function AboutPage() {
+  useCanonical('/about');
   useEffect(() => {
     document.title = 'about | cubr';
     return () => {

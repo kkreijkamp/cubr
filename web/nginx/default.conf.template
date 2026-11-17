@@ -28,6 +28,34 @@ map $request_uri $cubr_robots {
   ~*^/race/[^/?]                                          "noindex";   # race rooms last two hours
 }
 
+# One address per page (search engines split a page's ranking between its addresses): a page asked for
+# with capitals or a trailing slash is sent (301, query kept) to its plain lowercase address, which its
+# <link rel="canonical"> names too (src/lib/canonical.ts). nginx can't lowercase, so each page is spelled
+# out. A username keeps its case (the canonical link has it as stored), and so does a room id (lowercase
+# anyway). Order matters: the canonical forms come first and never redirect, and every target is one of
+# them, so nothing loops (src/__tests__/site.test.ts checks both).
+map $uri $cubr_canonical {
+  default                                                                 "";
+  ~^/(?:leaderboards|daily|race|account|settings|wca|about|login|login/sso|reset|confirm-email|terms|privacy)$ "";
+  "~^/profile/[A-Za-z0-9_]{3,20}$"                                        "";
+  "~^/race/[A-Za-z0-9]{4,32}$"                                            "";
+  ~*^/leaderboards/?$                                                     /leaderboards;
+  ~*^/daily/?$                                                            /daily;
+  ~*^/race/?$                                                             /race;
+  ~*^/account/?$                                                          /account;
+  ~*^/settings/?$                                                         /settings;
+  ~*^/wca/?$                                                              /wca;
+  ~*^/about/?$                                                            /about;
+  ~*^/login/?$                                                            /login;
+  ~*^/login/sso/?$                                                        /login/sso;
+  ~*^/reset/?$                                                            /reset;
+  ~*^/confirm-email/?$                                                    /confirm-email;
+  ~*^/terms/?$                                                            /terms;
+  ~*^/privacy/?$                                                          /privacy;
+  "~*^/profile/([A-Za-z0-9_]{3,20})/?$"                                   /profile/$1;
+  "~*^/race/([A-Za-z0-9]{4,32})/?$"                                       /race/$1;
+}
+
 server {
   listen 8080;
   server_name _;
@@ -35,6 +63,11 @@ server {
   server_tokens off;
   absolute_redirect off;  # redirects say "Location: /path": behind the gateway and Cloudflare, nginx's own idea of scheme and port (http, 8080) is wrong
   charset utf-8;          # text/html, text/plain, text/xml and JavaScript say charset=utf-8
+
+  # one address per page (map $cubr_canonical above): /About and /about/ -> 301 /about, query kept
+  if ($cubr_canonical) {
+    return 301 $cubr_canonical$is_args$args;
+  }
 
   gzip on;
   gzip_comp_level 5;

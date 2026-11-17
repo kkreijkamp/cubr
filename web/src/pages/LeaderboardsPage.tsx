@@ -29,6 +29,7 @@ import { useSettings } from '../lib/settings';
 import type { LbKind, Leaderboard } from '../lib/types';
 import { hiddenNote, missingNote } from '../lib/antiCheat';
 import { useAsync } from '../lib/useAsync';
+import { leaderboardCanonical, useCanonical } from '../lib/canonical';
 import '../components/social/leaderboards.css';
 
 const PAGE_SIZE = 50;
@@ -332,6 +333,7 @@ export default function LeaderboardsPage() {
   );
   const [gotoOpen, setGotoOpen] = useState(false);
   const scrollToMe = useRef(false);
+  useCanonical(leaderboardCanonical(sel));
 
   const update = useCallback(
     (patch: Partial<Selection>) => {

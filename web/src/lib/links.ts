@@ -1,4 +1,7 @@
-// The places outside cubr that the app links to.
+// The places outside cubr that the app links to, and cubr's own address.
+
+/** cubr's own address: canonical links (lib/canonical.ts) point here. */
+export const SITE_URL = 'https://cubr.dev';
 
 /** The source code on GitHub. */
 export const REPO_URL = 'https://github.com/kkreijkamp/cubr';

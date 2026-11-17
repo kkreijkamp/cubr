@@ -9,6 +9,7 @@ import { api } from '../lib/api';
 import { formatDate } from '../lib/format';
 import { useRegisterCommands } from '../lib/commands';
 import { useAsync } from '../lib/useAsync';
+import { useCanonical } from '../lib/canonical';
 import { Segmented } from '../components/live/ui';
 import { PeopleSearch, PersonCard, RankCalculator, RecordsTable, type RankParams } from '../components/live/wca/WcaParts';
 import '../components/live/live.css';
@@ -37,6 +38,7 @@ function Citation() {
 }
 
 export default function WcaPage() {
+  useCanonical('/wca');
   const [sp, setSp] = useSearchParams();
   const person = sp.get('person');
   const rawTab = sp.get('tab');

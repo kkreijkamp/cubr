@@ -680,6 +680,15 @@ The web container's nginx (`web/nginx/default.conf.template`) serves the app and
     errors included.
   - The gateway adds nothing to proxied responses (it would duplicate these), only to its own
     errors.
+- **One address per page.** Search engines split a page's ranking between its addresses, so:
+  - **nginx** (`map $cubr_canonical`) sends a page asked for with capitals or a trailing slash to its
+    plain lowercase address: 301, query kept (`/About/?x=1` -> `/about?x=1`). A username and a room id
+    keep their case. The canonical forms are listed first and never redirect, and every target is
+    one of them, so nothing loops (`site.test.ts`).
+  - **the app** adds `<link rel="canonical" href="https://cubr.dev/...">` to each page search engines
+    may list (`lib/canonical.ts`): the path itself; the home page without a query; a profile with
+    its name as stored; a board with only its event, kind and period (the default board is plain
+    `/leaderboards`, as in the sitemap). Pages with `noindex` get none.
 - **Real 404s.** The app's routes (section 10, case-insensitive, optional trailing slash) get
   `index.html` with 200. Usernames and room ids must look like `USERNAME_RE` and `ROOM_ID_RE`.
   Everything else is a file of the build or a 404 whose body is still `index.html`, so people see

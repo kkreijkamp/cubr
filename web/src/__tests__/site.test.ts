@@ -87,6 +87,8 @@ function locationFor(path: string): Location {
   return locations.find((l) => (l.mod === '~' || l.mod === '~*') && new RegExp(l.pattern, l.mod === '~*' ? 'i' : '').test(path)) ?? longest;
 }
 const isAppPage = (l: Location) => /try_files \/index\.html =404;/.test(l.body);
+/** Where nginx redirects a path to (301), or '' when it serves it as it is (map $cubr_canonical). */
+const redirectFor = (path: string) => mapLookup('$cubr_canonical', path);
 const isFileOr404 = (l: Location) => /try_files \$uri =404;/.test(l.body) && /error_page 404 \/index\.html;/.test(l.body);
 
 /** An nginx map: exact strings first, then regexes in order, then the default. */
@@ -103,7 +105,8 @@ function mapLookup(name: string, key: string): string {
   for (const [k, v] of entries) {
     if (!k.startsWith('~')) continue;
     const ci = k.startsWith('~*');
-    if (new RegExp(k.slice(ci ? 2 : 1), ci ? 'i' : '').test(key)) return v;
+    const m = new RegExp(k.slice(ci ? 2 : 1), ci ? 'i' : '').exec(key);
+    if (m) return v.replace(/\$(\d)/g, (_, n: string) => m[Number(n)] ?? ''); // $1... are the regex's captures
   }
   return entries.find(([k]) => k === 'default')?.[1] ?? '';
 }
@@ -131,9 +134,33 @@ describe('the app\'s pages and real 404s', () => {
     expect(appPaths.length).toBeGreaterThanOrEqual(15);
   });
 
-  it('serves the app (200) for every route, with or without a trailing slash, in any case, with a query', () => {
+  it('serves every route at its own address (200), without a redirect', () => {
     for (const p of appPaths) {
-      for (const variant of [p, p === '/' ? p : `${p}/`, p.toUpperCase()]) expect(isAppPage(locationFor(variant)), variant).toBe(true);
+      expect(redirectFor(p), p).toBe('');
+      expect(isAppPage(locationFor(p)), p).toBe(true);
+    }
+  });
+
+  it('sends capitals and a trailing slash to the plain address (301), keeping a username\'s case', () => {
+    expect(inServer.blocks.find((b) => b.head[0] === 'if' && b.head[1] === '($cubr_canonical)')?.body.trim()).toBe('return 301 $cubr_canonical$is_args$args;');
+    for (const p of appPaths.filter((x) => x !== '/')) {
+      // what the address is once fixed: the route's own spelling, with the name or room id as typed
+      const plain = (v: string) => p.replace(/^(\/profile\/|\/race\/)(.+)$/i, (_, prefix: string) => `${prefix.toLowerCase()}${v.slice(prefix.length).replace(/\/$/, '')}`);
+      for (const variant of [`${p}/`, p.toUpperCase(), `${p.toUpperCase()}/`, p.replace(/^\/./, (c) => c.toUpperCase())]) {
+        const target = redirectFor(variant);
+        expect(target, variant).toBe(/^\/(?:profile|race)\/./i.test(p) ? plain(variant) : p);
+        // never a loop: the target is served as it is
+        expect(redirectFor(target), `${variant} -> ${target}`).toBe('');
+        expect(isAppPage(locationFor(target)), target).toBe(true);
+      }
+    }
+    expect(redirectFor('/PROFILE/Koen_K/')).toBe('/profile/Koen_K');
+    expect(redirectFor('/Race/abcd1234/')).toBe('/race/abcd1234');
+  });
+
+  it('never redirects the home page, the site\'s files or unknown paths', () => {
+    for (const p of ['/', '/assets/index-D3oOLUDV.js', '/favicon.svg', '/robots.txt', '/sitemap.xml', '/.well-known/security.txt', '/launch/apple-launch-1179x2556.png', '/nope', '/ABOUTS', '/profile/a.b', '/race/ab']) {
+      expect(redirectFor(p), p).toBe('');
     }
   });
 
