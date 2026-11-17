@@ -68,7 +68,7 @@ All three use the same container images and the same routing table.
   - Pods run as non-root (`runAsNonRoot`, numeric UID), with no privilege escalation, all capabilities dropped and a read-only root filesystem (writable `/tmp` via emptyDir).
   - No ServiceAccount token is mounted.
   - Secrets are never committed. `cubr-secrets` holds `JWT_SECRET` and `INTERNAL_API_TOKEN` (required on `/internal/*` calls between services) and is created by `commands.sh` section 8.
-- **Images.** One image per service, tagged `<version>` and built with `--build-arg APP_VERSION`. The version shows in `X-Service` and on the `/status` page.
+- **Images.** One image per service, tagged `<version>` and built with `--build-arg APP_VERSION`. The version shows in each service's `/_info` and in the footer (the web image's `/_info`).
 
 ### Resource sizing (requests -> limits)
 
@@ -95,7 +95,7 @@ docker compose up -d --build                  # build all images and start every
 open http://localhost:8080                    # gateway: same routes as the Ingress
 docker compose ps                             # all services report (healthy) via /readyz
 docker compose up -d --scale solve=3          # 3 replicas behind the gateway (round-robin)
-for i in $(seq 9); do curl -sI localhost:8080/api/solves/_info | grep -i x-served-by; done
+for i in $(seq 9); do curl -s localhost:8080/api/solves/_info | grep -o '"pod":"[^"]*"'; done
 docker compose --profile jobs run --rm wca-import       # downloads the WCA export (or see below)
 docker compose --profile jobs run --rm seed             # 150 users + ~100k solves (SEED_USERS=20 for less)
 node scripts/smoke.mjs http://localhost:8080            # end-to-end check
@@ -105,7 +105,7 @@ docker compose down          # stop; add -v to also delete the Postgres/Redis vo
 - The gateway resolves backends **per request** through Docker's DNS (`resolver 127.0.0.11 valid=10s`):
   - it starts even if a service is down; that route answers `502 {"error":{"code":"UNAVAILABLE"...}}`;
   - after `--scale` it round-robins over all containers within about 10 s;
-  - the `X-Upstream` response header shows the container it picked.
+  - the access log (`docker compose logs gateway`) shows the container it picked (`upstream=`); no response header names a container or an internal address.
 - `/internal/*` returns 404, including `../` and `%2e%2e` tricks. WebSocket upgrades on `/socket.io` work, with a 1 h timeout. `client_max_body_size` is 25m.
 - Host ports: `8080` (gateway), plus Postgres on `127.0.0.1:55433` and Redis on `127.0.0.1:56380` (psql / redis-cli, or running one service on the host with `npm run dev`).
 - Offline WCA import from an unzipped export:
@@ -117,11 +117,11 @@ Run `scripts/commands.sh` section by section (`scripts/commands.sh list` prints 
 
 | section  | Step |
 |---|---|
-| 0 | Variables (`PROJECT_ID=cubr-app`, `ZONE=australia-southeast1-a`, `CLUSTER=cubr`, `REPO=cubr`, `VERSION=1.4.10`) |
+| 0 | Variables (`PROJECT_ID=cubr-app`, `ZONE=australia-southeast1-a`, `CLUSTER=cubr`, `REPO=cubr`, `VERSION=1.4.11`) |
 | 1 | `gcloud auth list`, select your account (`ACCOUNT`, default: gcloud's active one), set project/region/zone |
 | 2 | Enable container, artifactregistry, cloudbuild and compute APIs |
 | 3 | Artifact Registry repo. IAM: nodes get `artifactregistry.reader` and `container.defaultNodeServiceAccount`; the build SA gets `artifactregistry.writer`, `logging.logWriter` and `storage.objectViewer`. |
-| 4 | `gcloud builds submit --config cloudbuild.yaml --substitutions _VERSION=1.4.10,...` (10 images in parallel, native amd64) |
+| 4 | `gcloud builds submit --config cloudbuild.yaml --substitutions _VERSION=1.4.11,...` (10 images in parallel, native amd64) |
 | 5 | `gcloud container clusters create` (3x e2-standard-2, autoscaling 3-5, 30 GB pd-balanced, regular channel, VPC-native) + `get-credentials` |
 | 6 | Reserve the global static IP `cubr-ip` |
 | 7 | Install CloudNativePG 1.30.1 (server-side apply) and wait for the operator |

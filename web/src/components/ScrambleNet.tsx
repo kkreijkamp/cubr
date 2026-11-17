@@ -106,7 +106,10 @@ async function buildNet(puzzle: string): Promise<Net> {
   const loader = puzzles[puzzle];
   if (!loader) throw new Error(`no 2D net for ${puzzle}`);
   const [svg, kpuzzle] = await Promise.all([loader.svg(), loader.kpuzzle()]);
-  const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
+  // Only the drawing's geometry and each sticker's fill are read. Its <style> (black sticker outlines,
+  // in the puzzle-geometry drawings) is dropped first: parsing it in the page would break the CSP,
+  // which refuses inline <style> elements.
+  const doc = new DOMParser().parseFromString(svg.replace(/<style[\s\S]*?<\/style>/gi, ''), 'image/svg+xml');
   const root = doc.documentElement;
   const cells: { id: string; points: Point[] }[] = [];
   const solved = new Map<string, string>();

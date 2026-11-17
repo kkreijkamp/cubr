@@ -50,6 +50,25 @@ The gateway is also on the VM's `127.0.0.1:8080`, so `curl http://127.0.0.1:8080
 works over SSH. Docker restarts crashed containers and starts the stack on boot
 (`restart: unless-stopped`).
 
+## Security headers and crawler files
+
+The web container sends a Content-Security-Policy and the other security headers on every page, and
+every service sends the API's set (docs/SPEC.md 10.2 and section 3). Check them after a release:
+
+```
+curl -sI https://cubr.dev/ | grep -i -E 'content-security|x-frame|nosniff|strict-transport|permissions'
+curl -s -o /dev/null -w '%{http_code}\n' https://cubr.dev/no/such/page     # 404
+curl -s https://cubr.dev/robots.txt; curl -s https://cubr.dev/.well-known/security.txt
+```
+
+- **A page that breaks after a change** (something doesn't load or run): the browser console says
+  which directive refused what. The inline theme script in `web/index.html` is allowed by its hash;
+  `web/src/__tests__/site.test.ts` fails until the hash in `web/nginx/default.conf.template` matches.
+- **security.txt expires** (its `Expires`, now 2027-11-16): the same test fails 30 days before. Move
+  the date up to a year ahead and release.
+- **Outside checks** (paste the site into them): MDN HTTP Observatory, securityheaders.com and
+  Google Search Console (the sitemap, and the 404s it finds).
+
 ## The offline app (service worker)
 
 cubr installs as an app and works offline: a service worker (`web/src/sw/`, docs/SPEC.md 10.1)

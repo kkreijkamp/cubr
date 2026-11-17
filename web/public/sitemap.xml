@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- cubr's public pages. web/src/__tests__/site.test.ts checks each one is an indexable page of the app. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://cubr.dev/</loc></url>
+  <url><loc>https://cubr.dev/daily</loc></url>
+  <url><loc>https://cubr.dev/leaderboards</loc></url>
+  <url><loc>https://cubr.dev/race</loc></url>
+  <url><loc>https://cubr.dev/wca</loc></url>
+  <url><loc>https://cubr.dev/about</loc></url>
+  <url><loc>https://cubr.dev/terms</loc></url>
+  <url><loc>https://cubr.dev/privacy</loc></url>
+</urlset>

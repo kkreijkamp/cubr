@@ -1,0 +1,8 @@
+# https://cubr.dev - every page may be crawled. The API isn't for crawlers. Personal and short-lived
+# pages (account, settings, sign-in, race rooms) stay crawlable on purpose: they answer with
+# "X-Robots-Tag: noindex", which a crawler can only see if it may fetch them.
+User-agent: *
+Disallow: /api/
+Disallow: /internal/
+
+Sitemap: https://cubr.dev/sitemap.xml

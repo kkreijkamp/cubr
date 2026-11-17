@@ -8,6 +8,7 @@ import { friendlyError } from '../components/social/util';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useAsync } from '../lib/useAsync';
+import { useNoIndex } from '../lib/useNoIndex';
 
 export default function ProfilePage() {
   const { username = '' } = useParams();
@@ -21,8 +22,12 @@ export default function ProfilePage() {
     };
   }, [username]);
 
+  // nobody by this name: the server answered 200 (the name is well-formed), so tell search engines here
+  const missing = !profile.data && profile.error instanceof ApiError && profile.error.status === 404;
+  useNoIndex(missing);
+
   if (profile.error && !profile.data) {
-    if (profile.error instanceof ApiError && profile.error.status === 404) {
+    if (missing) {
       return (
         <div className="empty stack" style={{ justifyItems: 'center', paddingTop: '4rem' }}>
           <MagnifyingGlassIcon width={40} height={40} className="sub" aria-hidden="true" />

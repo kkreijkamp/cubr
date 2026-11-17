@@ -55,7 +55,6 @@ export interface RawResponse<T> {
   data: T;
   status: number;
   headers: Headers;
-  servedBy: string | null;
   ms: number;
 }
 
@@ -84,7 +83,7 @@ function transportError(err: unknown): unknown {
   return new ApiError(0, 'NETWORK', 'Network error - is the server reachable?');
 }
 
-/** Low-level request returning body + headers (X-Served-By says which replica answered).
+/** Low-level request returning body + headers (and how long it took).
  *  A `Blob` body is sent as raw bytes with the blob's own content type (avatar upload); anything
  *  else is sent as JSON. */
 export async function requestRaw<T>(
@@ -140,7 +139,7 @@ export async function requestRaw<T>(
   }
   // a 2xx that isn't JSON, e.g. the SPA's index.html for a path no service handles
   if (notJson) throw new ApiError(res.status, 'BAD_RESPONSE', 'Unexpected response from the server (not JSON)');
-  return { data: json as T, status: res.status, headers: res.headers, servedBy: res.headers.get('x-served-by'), ms };
+  return { data: json as T, status: res.status, headers: res.headers, ms };
 }
 
 export async function request<T>(method: string, path: string, body?: unknown, opts?: { signal?: AbortSignal; timeoutMs?: number }): Promise<T> {
