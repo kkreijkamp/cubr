@@ -12,7 +12,11 @@ import { App } from './App';
 import { reloadForNewRelease } from './lib/chunkReload';
 import { startPwa } from './lib/pwa';
 import { startAnalytics } from './lib/analytics';
+import { startErrorReports } from './lib/errorReports';
 import { applyVisualSettings } from './lib/settings';
+
+// first, so errors while the app starts are reported too (production builds; lib/errorReports.ts)
+startErrorReports();
 
 applyVisualSettings();
 

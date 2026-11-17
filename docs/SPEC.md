@@ -74,7 +74,7 @@ logger (JSON to stdout). No pino transports (they break bundling).
 | Service | K8s/compose DNS name | Public route prefixes (Ingress) | Owns schema | Purpose |
 |---|---|---|---|---|
 | web | `web` | `/` | - | nginx serving the SPA |
-| auth | `auth` | `/api/auth`, `/api/users`, `/api/supporters` | `auth` | accounts, JWT, settings, profiles, profile pictures, Ko-fi supporters |
+| auth | `auth` | `/api/auth`, `/api/users`, `/api/supporters`, `/api/errors` | `auth` | accounts, JWT, settings, profiles, profile pictures, Ko-fi supporters, front-end error reports |
 | scramble | `scramble` | `/api/scrambles` | `scramble` | WCA random-state scrambles (CPU-bound, pooled in Redis), daily challenge |
 | solve | `solve` | `/api/sessions`, `/api/solves` | `solve` | sessions & solves CRUD, csTimer import/export, transactional outbox -> events |
 | stats | `stats` | `/api/stats` | `stats` | event-driven read model: PBs, activity heatmap, streaks, time-of-day, global stats |
@@ -383,7 +383,7 @@ type Solve = { id: string; sessionId: string; event: string; timeMs: number; pen
 type PB = { valueMs: number; solveId: string|null; achievedAt: string };
 ```
 
-### 9.1 auth (`/api/auth`, `/api/users`, `/api/supporters`)
+### 9.1 auth (`/api/auth`, `/api/users`, `/api/supporters`, `/api/errors`)
 | Method & path | Auth | Body / query | Response |
 |---|---|---|---|
 | POST `/api/auth/register` | - | `{username, email, password}` | 201 `{token, user: PrivateUser}`; 409 CONFLICT (username/email taken); 429 after 20 registrations/h/IP |
@@ -410,6 +410,7 @@ type PB = { valueMs: number; solveId: string|null; achievedAt: string };
 | GET `/api/users?ids=a,b,c` | opt | <= 100 ids | `{users: PublicUser[]}` (private profiles as above) |
 | POST `/api/supporters/kofi` | Ko-fi verification token in the payload | form-encoded `data` = Ko-fi's payment JSON (body <= 64 KB) | 200 `{ok: true}` (a repeated `message_id` is ignored); 400 not Ko-fi JSON; 403 wrong token (constant-time check against `KOFI_VERIFICATION_TOKEN`); 503 token not configured; 60/min/IP. Stores only message_id, type, the name if `is_public`, subscription flag, tier and time - never email, amount, message or payment ids |
 | GET `/api/supporters` | - | - | `{supporters: [{name, member}]}`: public, not hidden, one per name (case-insensitive), most recent first, <= 200; member = a subscription payment in the last 35 days; cached 60 s |
+| POST `/api/errors` | - | JSON `{kind: 'error' or 'unhandledrejection', message, stack?, source?, route, build?, browser?, installed?}`, no other fields, body <= 16 KB (10.5) | 204, logged once as `client error` (warn), scrubbed again (emails, tokens, query strings, usernames in paths, long ids), nothing stored; 400 anything else; 413 over 16 KB; 429 after 30 per 10 min per IP; past 600 an hour in total, accepted and dropped unlogged. Never logged with an IP: the route logs no request lines and the gateway doesn't log it |
 | GET `/api/auth/_info`, `/api/users/_info` | - | - | info |
 
 An account made with a provider has no password: it signs in with the provider, and "forgot password?"
@@ -734,6 +735,36 @@ The web container's nginx (`web/nginx/default.conf.template`) serves the app and
     while following the device;
   - the inline script in `index.html` (allowed by its CSP hash) applies them before the first paint,
     picking by the device's mode.
+
+### 10.5 Front-end error reports
+
+- **What:** an uncaught error or unhandled promise rejection in the app (`web/src/lib/errorReports.ts`,
+  production builds only) goes to POST `/api/errors` (auth, 9.1), which logs it as `client error`
+  at warn level. Nothing is stored. To read them on the VM: `$C logs auth | grep '"client error"'`.
+- **What a report holds:**
+  - the kind, the message, the stack and the throw's file:line:column;
+  - the route's pattern (`/profile/:username`; any other path is `(other)`), never the address;
+  - the running code's entry file (`index-<hash>.js`), which names the exact build even in a tab
+    that's older than the server;
+  - a coarse browser (`Safari 18 on iOS`), never the user agent string;
+  - whether it's the installed app.
+- **Nothing personal:**
+  - emails, tokens, query strings and fragments, usernames and room ids in paths, and long ids are
+    taken out in the browser, and again by the server;
+  - an odd rejection (not an Error or a string) is sent as its type only;
+  - no account, and no IP address: the auth route logs no request lines, and the gateway's
+    `location = /api/errors` has its access log off. The address is used only for the rate limit,
+    whose Redis counter expires within 10 minutes.
+- **Limits:**
+  - in the browser: each distinct error once, at most 5 per page load;
+  - on the server: 30 per 10 minutes per IP (429), then a total of 600 an hour, past which reports
+    are accepted and dropped.
+- **Skipped as noise:**
+  - cross-origin "Script error.", errors from other sites' scripts and browser extensions;
+  - a new release's missing chunks (`lib/chunkReload.ts` reloads instead);
+  - aborted requests and ResizeObserver's loop warning.
+- **Sending:** `navigator.sendBeacon` (it survives the page closing), else `fetch` with `keepalive`.
+  The CSP's `connect-src 'self'` covers it. The privacy policy describes it.
 
 ## 11. Kubernetes overview (deploy/k8s)
 

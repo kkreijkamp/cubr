@@ -8,7 +8,7 @@ import './legal.css';
 
 // when each page last changed
 const TERMS_EFFECTIVE = '16 November 2026';
-const PRIVACY_EFFECTIVE = '17 November 2026'; // sign-in with Google, Apple and GitHub; Cloudflare Web Analytics (set to the release's date)
+const PRIVACY_EFFECTIVE = '17 November 2026'; // sign-in with Google, Apple and GitHub; Cloudflare Web Analytics; error reports (set to the release's date)
 const CONTACT = 'hello@cubr.dev';
 
 const Mail = () => <a href={`mailto:${CONTACT}`}>{CONTACT}</a>;
@@ -87,6 +87,12 @@ export function PrivacyPage() {
             a record of one visit. If your browser sends Global Privacy Control or Do Not Track, cubr doesn&apos;t load it.
           </li>
           <li>
+            <b>Error reports:</b> if something in cubr breaks while you use it, your browser sends us the error: its message and where in
+            cubr&apos;s code it happened, the kind of page (such as &quot;a profile&quot;, never which one), whether you use the installed
+            app, and your browser&apos;s name and version. Anything in it that looks personal, such as an email address or a username, is
+            taken out first. Reports aren&apos;t linked to your account, and we don&apos;t keep your IP address with them.
+          </li>
+          <li>
             <b>Emails</b> you send to <Mail />.
           </li>
           <li>
@@ -125,8 +131,8 @@ export function PrivacyPage() {
             password-reset emails. (Legal basis: performing our agreement with you.)
           </li>
           <li>
-            To keep cubr safe, fair and working: rate limits, server logs, anti-cheat checks that compare times with WCA records, and
-            backups. (Legal basis: our legitimate interest in running a secure service.)
+            To keep cubr safe, fair and working: rate limits, server logs, error reports, anti-cheat checks that compare times with WCA
+            records, and backups. (Legal basis: our legitimate interest in running a secure service.)
           </li>
           <li>
             To see which pages are used and how fast they load, so we know what to improve: page-view totals from Cloudflare Web
@@ -192,7 +198,7 @@ export function PrivacyPage() {
             backups within 30 days.
           </li>
           <li>Password-reset links work for 1 hour. Race chat is kept for 2 hours, and rate-limit counters for up to an hour.</li>
-          <li>Server logs are rotated automatically and overwritten as they fill up.</li>
+          <li>Server logs, error reports included, are rotated automatically and overwritten as they fill up.</li>
           <li>Supporter entries: until you ask us to remove your name.</li>
           <li>Page-view statistics: only as totals, in Cloudflare&apos;s dashboard, for as long as Cloudflare keeps them.</li>
           <li>

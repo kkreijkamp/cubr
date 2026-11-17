@@ -35,6 +35,9 @@ spec:
           - path: /api/supporters
             pathType: Prefix
             backend: { service: { name: auth, port: { number: 8080 } } }
+          - path: /api/errors
+            pathType: Prefix
+            backend: { service: { name: auth, port: { number: 8080 } } }
           - path: /api/scrambles
             pathType: Prefix
             backend: { service: { name: scramble, port: { number: 8080 } } }

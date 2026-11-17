@@ -42,6 +42,7 @@ gcloud compute ssh cubr-1 --configuration=cubr --tunnel-through-iap      # shell
 cd /opt/cubr && C="docker compose -f docker-compose.yml -f deploy/vps/compose.prod.yml"
 $C ps            # health of every service
 $C logs -f gateway                         # access log with real visitor IPs
+$C logs auth | grep '"client error"'       # errors in visitors' browsers (SPEC 10.5; no IPs)
 $C exec postgres psql -U cubr -d cubr      # database shell
 $C --profile jobs run --rm wca-import      # refresh the WCA data now (~3 min)
 ```

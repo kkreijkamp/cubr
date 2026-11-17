@@ -417,4 +417,28 @@ describeIntegration('auth API', () => {
       expect((await post('')).statusCode).toBe(400);
     });
   });
+
+  // what is logged, and that nothing ties it to an IP address: clientErrors.route.test.ts
+  describe('front-end error reports', () => {
+    const report = { kind: 'unhandledrejection', message: 'Failed to fetch', route: '/leaderboards', build: 'index-D3oOLUDV.js', browser: 'Chrome 142 on Android', installed: true };
+    const post = (body: unknown, ip = freshIp()) => s.request('POST', '/api/errors', { body, ip });
+
+    it('takes a report, without signing in, and answers with no content', async () => {
+      const res = await post(report);
+      expect(res.statusCode, res.body).toBe(204);
+      expect(res.body).toBe('');
+    });
+
+    it('refuses anything else: other fields, a missing route, a body over 16 KB', async () => {
+      expect((await post({ ...report, email: 'jo@example.com' })).statusCode).toBe(400);
+      expect((await post({ ...report, route: undefined })).statusCode).toBe(400);
+      expect((await post({ ...report, message: 'x'.repeat(17 * 1024) })).statusCode).toBe(413);
+    });
+
+    it('limits one address to 30 reports per 10 minutes', async () => {
+      const ip = freshIp();
+      for (let i = 0; i < 30; i++) expect((await post(report, ip)).statusCode).toBe(204);
+      expect((await post(report, ip)).statusCode).toBe(429);
+    });
+  });
 });
