@@ -13,6 +13,7 @@ import { SsoButtons } from '../components/social/Sso';
 import { safeNext } from '../components/social/util';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { CONTACT_EMAIL } from '../lib/links';
 import { localDataSummary } from '../lib/solves';
 import { toast } from '../lib/toast';
 import '../components/social/login.css';
@@ -185,7 +186,7 @@ function RegisterForm({ active, focusFirst }: FormProps) {
     setBusy(true);
     try {
       await register(username.trim(), email.trim(), password);
-      toast.success(`welcome to cubr, ${username.trim()}!`);
+      toast.success(`open the link we sent to ${email.trim()} to confirm your email.`, { title: `welcome to cubr, ${username.trim()}!`, durationMs: 8000 });
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         const field = /mail/i.test(err.message) ? 'email' : 'username';
@@ -379,14 +380,15 @@ function ForgotForm() {
     return (
       <div className="lg-form lg-sent" role="status">
         <p>
-          if an account uses <span className="lg-sent-to">{sentTo}</span>, a reset link is on its way. it works once, for an hour.
+          if an account uses <span className="lg-sent-to">{sentTo}</span> and has confirmed it, a reset link is on its way. it works once, for an
+          hour.
         </p>
         <p className="lg-sent-sub">
           nothing after a few minutes? check your spam folder, or{' '}
           <button type="button" className="btn-text" onClick={() => setSentTo(null)}>
             send another link
           </button>
-          .
+          . links only go to a confirmed email: if you never confirmed yours, write to <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
         </p>
       </div>
     );
@@ -503,9 +505,17 @@ export function ResetPasswordPage() {
   );
 }
 
-type Confirming = { kind: 'working' } | { kind: 'done'; email: string } | { kind: 'expired' } | { kind: 'taken' } | { kind: 'failed'; message: string };
+type Confirming =
+  | { kind: 'working' }
+  | { kind: 'done'; email: string; changed: boolean }
+  | { kind: 'expired' }
+  | { kind: 'taken' }
+  | { kind: 'failed'; message: string };
 
-/** /confirm-email#<token>: the page the link sent to a new email address opens. Confirms it once. */
+/**
+ * /confirm-email#<token>: the page a confirmation link opens, once. The link either confirms the
+ * account's own email (sent at sign-up) or makes a new address its email (a change).
+ */
 export function ConfirmEmailPage() {
   const { status, setUser } = useAuth();
   // the token travels in the fragment, which browsers never send; it leaves the address bar at once
@@ -530,9 +540,9 @@ export function ConfirmEmailPage() {
     setState({ kind: 'working' });
     api.auth
       .confirmEmail(token)
-      .then(async ({ email }) => {
-        setState({ kind: 'done', email });
-        // signed in here: show the new address straight away
+      .then(async ({ email, changed }) => {
+        setState({ kind: 'done', email, changed: changed !== false });
+        // signed in here: show the address (and that it's confirmed) straight away
         try {
           setUser((await api.auth.me()).user);
         } catch {
@@ -571,7 +581,7 @@ export function ConfirmEmailPage() {
       <div className="lg-page">
         <h1 className="lg-title">confirm email</h1>
         <p className="lg-lede">
-          <Spinner size={16} /> confirming your new email...
+          <Spinner size={16} /> confirming your email...
         </p>
       </div>
     );
@@ -579,9 +589,17 @@ export function ConfirmEmailPage() {
   if (state.kind === 'done') {
     return (
       <div className="lg-page">
-        <h1 className="lg-title">email changed</h1>
+        <h1 className="lg-title">{state.changed ? 'email changed' : 'email confirmed'}</h1>
         <p className="lg-lede">
-          your account&apos;s email is now <span className="text">{state.email}</span>. password-reset links and notices go there from now on.
+          {state.changed ? (
+            <>
+              your account&apos;s email is now <span className="text">{state.email}</span>. password-reset links and notices go there from now on.
+            </>
+          ) : (
+            <>
+              <span className="text">{state.email}</span> is confirmed. if you ever forget your password, a reset link can reach you there.
+            </>
+          )}
         </p>
         {onward}
       </div>
@@ -592,7 +610,7 @@ export function ConfirmEmailPage() {
       <h1 className="lg-title">confirm email</h1>
       <p className="lg-lede">
         {state.kind === 'expired'
-          ? 'this link has expired or was already used. links work once, for an hour: ask for a new one on your account page.'
+          ? 'this link has expired or was already used. you can send a new one from your account page.'
           : state.kind === 'taken'
             ? 'another account started using that address in the meantime, so your email stays as it was.'
             : state.message}

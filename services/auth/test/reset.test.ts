@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import { RESET_TOKEN_RE, forgotSchema, hashResetToken, newResetToken, resetEmail, resetLink, resetSchema } from '../src/reset.js';
-import { loadMailConfig, maskEmail, sendMail } from '../src/mail.js';
+import { isReservedDomain, loadMailConfig, maskEmail, sendMail } from '../src/mail.js';
 
 const log = () => ({ warn: vi.fn(), info: vi.fn(), error: vi.fn() }) as never;
 
@@ -66,6 +66,24 @@ describe('mail', () => {
     await sendMail(loadMailConfig({}), { to: 'a@b.co', subject: 's', text: 't', html: 'h' }, l, fetchImpl as never);
     expect(fetchImpl).not.toHaveBeenCalled();
     expect((l as { warn: ReturnType<typeof vi.fn> }).warn).toHaveBeenCalledOnce();
+  });
+  it('knows the domains that can never receive mail (RFC 2606, RFC 6761)', () => {
+    for (const reserved of ['a@example.com', 'a@EXAMPLE.org', 'a@mail.example.net', 'a@x.test', 'a@foo.example', 'a@bar.invalid', 'a@localhost', 'a@me.localhost', 'a@example.com.']) {
+      expect(isReservedDomain(reserved), reserved).toBe(true);
+    }
+    for (const real of ['a@gmail.com', 'a@cubr.dev', 'a@myexample.com', 'a@example.co', 'a@testing.dev', 'a@contest.org', 'a@example.com.au']) {
+      expect(isReservedDomain(real), real).toBe(false);
+    }
+  });
+  it('never sends to a reserved domain, and logs it without the text (its links work)', async () => {
+    const cfg = loadMailConfig({ RESEND_API_KEY: 're_test' });
+    const l = log();
+    const fetchImpl = vi.fn();
+    await sendMail(cfg, { to: 'smoke_1@example.com', subject: 's', text: 'the link', html: 'h' }, l, fetchImpl as never);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    const info = (l as { info: ReturnType<typeof vi.fn> }).info;
+    expect(info).toHaveBeenCalledOnce();
+    expect(JSON.stringify(info.mock.calls[0])).not.toContain('the link');
   });
   it('posts to Resend with the reply-to, and throws on a refusal', async () => {
     const cfg = loadMailConfig({ RESEND_API_KEY: 're_test' });

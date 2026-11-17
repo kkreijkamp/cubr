@@ -60,7 +60,7 @@ export function PrivacyPage() {
       <Section title="what we collect">
         <ul>
           <li>
-            <b>Account:</b> your username, email address and password. The password is stored only as a bcrypt hash, so we can&apos;t
+            <b>Account:</b> your username, email address (and whether you&apos;ve confirmed it) and password. The password is stored only as a bcrypt hash, so we can&apos;t
             read it.
           </li>
           <li>
@@ -130,7 +130,8 @@ export function PrivacyPage() {
         <ul>
           <li>
             To run the service you signed up for: your account, syncing your solves, profiles, leaderboards, the daily challenge, races and
-            password-reset emails, and the emails that confirm a new email address and tell the old one. (Legal basis: performing our agreement
+            password-reset emails, the emails that confirm your email address (when you sign up or change it), and the notice to your old
+            address after a change. (Legal basis: performing our agreement
             with you.)
           </li>
           <li>
@@ -157,7 +158,7 @@ export function PrivacyPage() {
             decrypted to be protected and routed. Cloudflare also counts our page views (Web Analytics, above).
           </li>
           <li>
-            <b>Resend:</b> sends password-reset and email-change emails.
+            <b>Resend:</b> sends password-reset emails and the emails that confirm an email address.
           </li>
           <li>
             <b>Apple iCloud:</b> hosts our contact inbox, <Mail />.
@@ -200,7 +201,10 @@ export function PrivacyPage() {
             Your account and solves: until you delete your account. Deleting removes them from the live database straight away, and from
             backups within 30 days.
           </li>
-          <li>Password-reset links work for 1 hour. Race chat is kept for 2 hours, and rate-limit counters for up to an hour.</li>
+          <li>
+            Password-reset links work for 1 hour, links that confirm your email for 7 days (1 hour for a change of address). Race chat is
+            kept for 2 hours, and rate-limit counters for up to a day.
+          </li>
           <li>Server logs, error reports included, are rotated automatically and overwritten as they fill up.</li>
           <li>Supporter entries: until you ask us to remove your name.</li>
           <li>Page-view statistics: only as totals, in Cloudflare&apos;s dashboard, for as long as Cloudflare keeps them.</li>

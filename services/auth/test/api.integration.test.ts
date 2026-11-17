@@ -7,6 +7,19 @@ import { migrations } from '../src/migrations.js';
 import { registerRoutes } from '../src/routes/index.js';
 import { newResetToken } from '../src/reset.js';
 
+/** Every email the service sends (without an API key it only logs them), oldest first. */
+const outbox = vi.hoisted(() => [] as { to: string; subject: string; text: string }[]);
+vi.mock('../src/mail.js', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../src/mail.js')>();
+  return {
+    ...real,
+    sendMail: (...args: Parameters<typeof real.sendMail>) => {
+      outbox.push(args[1]);
+      return real.sendMail(...args);
+    },
+  };
+});
+
 const KOFI_TOKEN = 'kofi-test-token-0123456789';
 const PASSWORD = 'correct horse 1';
 
@@ -47,6 +60,20 @@ describeIntegration('auth API', () => {
   }
   const login = (loginName: string, password = PASSWORD, ip = freshIp()) => s.request('POST', '/api/auth/login', { body: { login: loginName, password }, ip });
   const me = (token: string) => s.request('GET', '/api/auth/me', { token });
+  /** Confirms the account's email, as opening the link from sign-up would. */
+  const confirmEmailOf = (userId: string) => s.pool.query('update auth.users set email_verified_at = now() where id = $1', [userId]);
+  const mailsTo = (to: string, subject: string) => outbox.filter((m) => m.to.toLowerCase() === to.toLowerCase() && m.subject === subject);
+  /** The token in the newest "confirm your email" link sent to `to` (other than `except`), once it's sent. */
+  async function emailedLink(to: string, except?: string): Promise<string> {
+    let token = '';
+    await vi.waitFor(() => {
+      const mails = mailsTo(to, 'Confirm your cubr email');
+      token = /\/confirm-email#([A-Za-z0-9_-]{43})/.exec(mails[mails.length - 1]?.text ?? '')?.[1] ?? '';
+      expect(token).not.toBe('');
+      expect(token).not.toBe(except);
+    });
+    return token;
+  }
 
   describe('register', () => {
     it('creates the account, returns a working token and keeps only a bcrypt hash of the password', async () => {
@@ -242,6 +269,7 @@ describeIntegration('auth API', () => {
 
     it('answers 202 whether or not the address has an account, and stores a link only for real ones', async () => {
       const { user } = await signUp({ email: 'Forgetful@example.com' });
+      await confirmEmailOf(user.id);
       const known = await s.request('POST', '/api/auth/password/forgot', { body: { email: 'forgetful@EXAMPLE.com' }, ip: freshIp() });
       const unknown = await s.request('POST', '/api/auth/password/forgot', { body: { email: 'nobody@example.com' }, ip: freshIp() });
       expect([known.statusCode, unknown.statusCode]).toEqual([202, 202]);
@@ -254,10 +282,35 @@ describeIntegration('auth API', () => {
 
     it('sends at most 3 links an hour for one account', async () => {
       const { user } = await signUp();
+      await confirmEmailOf(user.id);
       for (let i = 0; i < 5; i++) await s.request('POST', '/api/auth/password/forgot', { body: { email: user.email }, ip: freshIp() });
       await vi.waitFor(async () => expect(await linkCount(user.id)).toBe(3));
       await new Promise((r) => setTimeout(r, 200));
       expect(await linkCount(user.id)).toBe(3);
+    });
+
+    it('sends no link to an address that was never confirmed: it may be a typo, or someone else', async () => {
+      const { user } = await signUp();
+      const res = await s.request('POST', '/api/auth/password/forgot', { body: { email: user.email }, ip: freshIp() });
+      expect(res.statusCode).toBe(202); // the same answer as for any address
+      await new Promise((r) => setTimeout(r, 300));
+      expect(await linkCount(user.id)).toBe(0);
+      expect(mailsTo(user.email, 'Reset your cubr password')).toHaveLength(0);
+    });
+
+    it('still sends one to an account from before confirming existed, and using it confirms the address', async () => {
+      const { user, token } = await signUp();
+      await s.pool.query('update auth.users set predates_email_confirmation = true where id = $1', [user.id]);
+      await s.request('POST', '/api/auth/password/forgot', { body: { email: user.email }, ip: freshIp() });
+      let link = '';
+      await vi.waitFor(() => {
+        link = /\/reset#([A-Za-z0-9_-]{43})/.exec(mailsTo(user.email, 'Reset your cubr password')[0]?.text ?? '')?.[1] ?? '';
+        expect(link).not.toBe('');
+      });
+      expect((await me(token)).json().user.emailVerified).toBe(false);
+      const res = await s.request('POST', '/api/auth/password/reset', { body: { token: link, password: 'brand new pass' }, ip: freshIp() });
+      expect(res.statusCode, res.body).toBe(200);
+      expect(res.json().user.emailVerified).toBe(true);
     });
 
     it('sets the new password once, signs out every other session and signs in', async () => {
@@ -444,7 +497,7 @@ describeIntegration('auth API', () => {
       const link = await linkFor(user.id);
       const ok = await confirm(link);
       expect(ok.statusCode, ok.body).toBe(200);
-      expect(ok.json()).toEqual({ email: 'New.Home@example.com' });
+      expect(ok.json()).toEqual({ email: 'New.Home@example.com', changed: true });
       expect((await me(token)).json().user.email).toBe('New.Home@example.com'); // the session carries on
       expect((await login('new.home@example.com')).statusCode).toBe(200);
       expect((await login(user.email)).statusCode).toBe(401);
@@ -508,6 +561,92 @@ describeIntegration('auth API', () => {
       const { token } = await signUp();
       for (let i = 0; i < 5; i++) expect((await change(token, { email: 'guess@example.com', password: `guess ${i}` })).statusCode).toBe(403);
       expect((await change(token, { email: 'guess@example.com', password: PASSWORD })).statusCode).toBe(429);
+    });
+
+    it("confirms the new address, and tells the old one only if it was confirmed (an unconfirmed one may be a stranger's)", async () => {
+      const notice = 'Your cubr email was changed';
+      const confirmed = await signUp();
+      await confirmEmailOf(confirmed.user.id);
+      await change(confirmed.token, { email: 'confirmed.moved@example.com', password: PASSWORD });
+      expect((await confirm(await linkFor(confirmed.user.id))).statusCode).toBe(200);
+      const never = await signUp();
+      await change(never.token, { email: 'never.moved@example.com', password: PASSWORD });
+      expect((await confirm(await linkFor(never.user.id))).statusCode).toBe(200);
+
+      await vi.waitFor(() => expect(mailsTo(confirmed.user.email, notice)).toHaveLength(1));
+      await new Promise((r) => setTimeout(r, 200));
+      expect(mailsTo(never.user.email, notice)).toHaveLength(0);
+      for (const { token } of [confirmed, never]) expect((await me(token)).json().user.emailVerified).toBe(true);
+    });
+  });
+
+  describe('confirming the email', () => {
+    const confirm = (token: string) => s.request('POST', '/api/auth/email/confirm', { body: { token }, ip: freshIp() });
+    const sendAgain = (token: string) => s.request('POST', '/api/auth/me/email/confirmation', { token, ip: freshIp() });
+
+    it('emails a link at sign-up; the account works at once, unconfirmed until the link is opened', async () => {
+      const { token, user } = await signUp({ username: 'Fresh_Start', email: 'Fresh.Start@example.com' });
+      expect(user).toMatchObject({ emailVerified: false });
+      expect((await me(token)).json().user.emailVerified).toBe(false);
+      const link = await emailedLink('Fresh.Start@example.com');
+      const [mail] = mailsTo('Fresh.Start@example.com', 'Confirm your cubr email');
+      expect(mail.text).toContain('Hi Fresh_Start,');
+      expect(mail.text).toContain('for 7 days');
+      // only the hash is stored, with the address it went to, for a week
+      const { rows } = await s.pool.query(`select token_hash, new_email, expires_at > now() + interval '6 days' as week from auth.email_changes where user_id = $1`, [user.id]);
+      expect(rows).toHaveLength(1);
+      expect(Buffer.isBuffer(rows[0].token_hash)).toBe(true);
+      expect(rows[0]).toMatchObject({ new_email: 'Fresh.Start@example.com', week: true });
+
+      const ok = await confirm(link);
+      expect(ok.statusCode, ok.body).toBe(200);
+      expect(ok.json()).toEqual({ email: 'Fresh.Start@example.com', changed: false });
+      expect((await me(token)).json().user).toMatchObject({ email: 'Fresh.Start@example.com', emailVerified: true });
+      expect((await confirm(link)).statusCode).toBe(400); // the link works once
+      // confirming isn't a change: no "your email was changed"
+      await new Promise((r) => setTimeout(r, 200));
+      expect(mailsTo('Fresh.Start@example.com', 'Your cubr email was changed')).toHaveLength(0);
+    });
+
+    it("sends none for the seed job's accounts (internal token)", async () => {
+      const res = await s.request('POST', '/api/auth/register', {
+        body: { username: 'seeded_one', email: 'seeded.one@example.com', password: PASSWORD },
+        ip: freshIp(),
+        headers: { 'x-internal-token': s.config.internalToken },
+      });
+      expect(res.statusCode).toBe(201);
+      expect((await s.pool.query('select 1 from auth.email_changes where user_id = $1', [res.json().user.id])).rowCount).toBe(0);
+      await new Promise((r) => setTimeout(r, 200));
+      expect(outbox.filter((m) => m.to === 'seeded.one@example.com')).toHaveLength(0);
+    });
+
+    it('sends a new link on request, which replaces the old one; none once confirmed, none without a sign-in', async () => {
+      const { token, user } = await signUp();
+      const first = await emailedLink(user.email);
+      const res = await sendAgain(token);
+      expect(res.statusCode, res.body).toBe(202);
+      expect(res.json()).toEqual({ ok: true, email: user.email });
+      const second = await emailedLink(user.email, first);
+      expect((await confirm(first)).statusCode).toBe(400);
+      expect((await confirm(second)).statusCode).toBe(200);
+      const again = await sendAgain(token);
+      expect(again.statusCode).toBe(400);
+      expect(again.json().error.message).toBe('Your email is already confirmed');
+      expect((await s.request('POST', '/api/auth/me/email/confirmation', { ip: freshIp() })).statusCode).toBe(401);
+    });
+
+    it('sends at most 3 new links an hour per account, so an account made with your address cannot flood you', async () => {
+      const { token } = await signUp();
+      for (let i = 0; i < 3; i++) expect((await sendAgain(token)).statusCode).toBe(202);
+      expect((await sendAgain(token)).statusCode).toBe(429);
+    });
+
+    it('ends the sign-up link when the account asks to move to another address', async () => {
+      const { token, user } = await signUp();
+      const fromSignUp = await emailedLink(user.email);
+      expect((await s.request('POST', '/api/auth/me/email', { token, body: { email: 'elsewhere@example.com', password: PASSWORD }, ip: freshIp() })).statusCode).toBe(202);
+      expect((await confirm(fromSignUp)).statusCode).toBe(400);
+      expect((await me(token)).json().user).toMatchObject({ email: user.email, emailVerified: false });
     });
   });
 

@@ -228,6 +228,10 @@
   font-size: inherit;
   text-decoration: underline;
 }
+.lg-sent .lg-sent-sub a {
+  color: inherit;
+  text-decoration: underline;
+}
 .lg-guest {
   justify-self: start;
   margin-top: 1.5rem;

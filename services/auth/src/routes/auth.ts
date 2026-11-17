@@ -42,7 +42,18 @@ import {
 import { allow, publishSafely, withTimeout } from '../safe.js';
 import { loadMailConfig, sendMail } from '../mail.js';
 import { RESET_TTL_MIN, forgotSchema, hashResetToken, newResetToken, resetEmail, resetLink, resetSchema } from '../reset.js';
-import { EMAIL_CHANGE_TTL_MIN, changeEmailSchema, confirmEmailLink, confirmEmailMessage, confirmEmailSchema, emailChangedNotice, isFreshSignIn } from '../emailChange.js';
+import {
+  EMAIL_CHANGE_TTL_MIN,
+  EMAIL_CONFIRM_TTL_DAYS,
+  EMAIL_CONFIRM_TTL_MIN,
+  changeEmailSchema,
+  confirmAccountEmailMessage,
+  confirmEmailLink,
+  confirmEmailMessage,
+  confirmEmailSchema,
+  emailChangedNotice,
+  isFreshSignIn,
+} from '../emailChange.js';
 
 const BCRYPT_COST = 10;
 
@@ -68,13 +79,37 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
     return rows[0];
   }
 
+  const mail = loadMailConfig();
+  if (!mail.apiKey) app.log.warn('RESEND_API_KEY is not set: emails (password resets, email confirmations) are logged, not sent');
+
+  /**
+   * Emails the link that confirms the account's own address; its row in auth.email_changes is in
+   * place already. If the email can't be sent, the row goes too (nothing waits for a link that never
+   * came) and the error is rethrown.
+   */
+  async function emailConfirmation(user: { id: string; username: string; email: string }, link: { token: string; hash: Buffer }, log: FastifyBaseLogger): Promise<void> {
+    try {
+      const message = confirmAccountEmailMessage({ username: user.username, link: confirmEmailLink(mail.publicUrl, link.token), days: EMAIL_CONFIRM_TTL_DAYS });
+      await sendMail(mail, { to: user.email, ...message }, log);
+    } catch (err) {
+      await pool.query('delete from auth.email_changes where token_hash = $1', [link.hash]).catch(() => undefined);
+      log.error({ userId: user.id, err: (err as Error).message }, 'email confirmation: the email failed');
+      throw err;
+    }
+    log.info({ userId: user.id }, 'email confirmation link sent');
+  }
+
   // ---- POST /api/auth/register ----------------------------------------------------------------
+  // The account works at once; its email gets a link that confirms it (password-reset links only go
+  // to a confirmed address). The seed job's accounts (internal token) get none.
   app.post('/api/auth/register', async (req, reply) => {
-    if (!isInternalCaller(config.internalToken, req.headers[INTERNAL_TOKEN_HEADER]) && !(await allow(redis, `register:${req.ip}`, 20, 3600))) {
+    const internal = isInternalCaller(config.internalToken, req.headers[INTERNAL_TOKEN_HEADER]);
+    if (!internal && !(await allow(redis, `register:${req.ip}`, 20, 3600))) {
       throw rateLimited('Too many registrations from this address, try again later');
     }
     const body = parse(registerSchema, req.body);
     const passwordHash = await bcrypt.hash(body.password, BCRYPT_COST);
+    const confirmation = internal ? null : newResetToken();
 
     let row: UserRow;
     try {
@@ -84,6 +119,12 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
           [body.username, body.email, passwordHash],
         );
         await client.query(`insert into auth.user_settings (user_id) values ($1)`, [rows[0].id]);
+        if (confirmation) {
+          await client.query(
+            `insert into auth.email_changes (token_hash, user_id, new_email, expires_at) values ($1, $2, $3, now() + make_interval(mins => $4))`,
+            [confirmation.hash, rows[0].id, rows[0].email, EMAIL_CONFIRM_TTL_MIN],
+          );
+        }
         return rows[0];
       });
     } catch (err) {
@@ -94,6 +135,9 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
     const user = toPrivateUser(row);
     const { token } = await signToken(config.jwtSecret, user);
     await publishSafely(redis, req.log, 'user.registered', userEventData(toPublicUser(row)));
+    // not awaited: sign-up doesn't wait for the mail provider. A failure is logged, and the account
+    // page offers a new link.
+    if (confirmation) emailConfirmation(row, confirmation, req.log).catch(() => undefined);
     return reply.status(201).send({ token, user });
   });
 
@@ -125,17 +169,23 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
   });
 
   // ---- password reset ---------------------------------------------------------------------------
-  const mail = loadMailConfig();
-  if (!mail.apiKey) app.log.warn('RESEND_API_KEY is not set: password-reset emails are logged, not sent');
-
-  /** Creates a reset link for the account of `email` (if there is one) and emails it. */
+  /**
+   * Creates a reset link for the account of `email` and emails it, if there's an account and its
+   * address is confirmed, or the account is older than confirming (predates_email_confirmation). An
+   * unconfirmed address may be a typo or someone else's, and whoever reads it could take the account.
+   */
   async function sendResetLink(email: string, log: FastifyBaseLogger): Promise<void> {
-    const { rows } = await pool.query<{ id: string; username: string; email: string }>(
-      'select id, username, email from auth.users where lower(email) = lower($1)',
+    const { rows } = await pool.query<{ id: string; username: string; email: string; trusted: boolean }>(
+      `select id, username, email, (email_verified_at is not null or predates_email_confirmation) as trusted
+         from auth.users where lower(email) = lower($1)`,
       [email],
     );
     const user = rows[0];
     if (!user) return;
+    if (!user.trusted) {
+      log.info({ userId: user.id }, 'password reset: no link, the email is not confirmed');
+      return;
+    }
     if (!(await allow(redis, `forgot-user:${user.id}`, 3, 3600))) {
       log.warn({ userId: user.id }, 'password reset: too many links for this account this hour');
       return;
@@ -176,8 +226,10 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
       if (!used.rows[0]) throw badRequest('This reset link is invalid or has expired');
       const userId = used.rows[0].user_id;
       await c.query('delete from auth.password_resets where user_id = $1', [userId]);
+      // the link reached the address (and links end when the address changes): that confirms it
       const { rows } = await c.query<UserRow>(
-        `update auth.users set password_hash = $2, last_login_at = now() where id = $1 returning ${USER_COLUMNS}`,
+        `update auth.users set password_hash = $2, last_login_at = now(), email_verified_at = coalesce(email_verified_at, now())
+          where id = $1 returning ${USER_COLUMNS}`,
         [userId, passwordHash],
       );
       if (!rows[0]) throw badRequest('This reset link is invalid or has expired');
@@ -236,10 +288,46 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
     return reply.status(202).send({ ok: true, email });
   });
 
+  // ---- POST /api/auth/me/email/confirmation -----------------------------------------------------
+  // A new link that confirms the account's current email (the one from sign-up expired, got lost or
+  // went to spam). No password needed: it only goes to the account's own address. It replaces any
+  // pending link or change. Capped per account per hour and per day, so an account made with someone
+  // else's address can't flood them.
+  app.post('/api/auth/me/email/confirmation', { preHandler: auth.requireAuth }, async (req, reply) => {
+    const me = req.user!;
+    if (!UUID_RE.test(me.id)) throw unauthorized();
+    const { rows } = await pool.query<{ id: string; username: string; email: string; verified: boolean }>(
+      'select id, username, email, email_verified_at is not null as verified from auth.users where id = $1',
+      [me.id],
+    );
+    const user = rows[0];
+    if (!user) throw unauthorized('Account no longer exists');
+    if (user.verified) throw badRequest('Your email is already confirmed');
+    if (!(await allow(redis, `email-confirm:${me.id}`, 3, 3600)) || !(await allow(redis, `email-confirm-day:${me.id}`, 5, 86_400))) {
+      throw rateLimited('Too many links, try again later');
+    }
+    const link = newResetToken();
+    await withTx(pool, async (c) => {
+      await c.query('delete from auth.email_changes where user_id = $1 or expires_at < now()', [me.id]);
+      await c.query(
+        `insert into auth.email_changes (token_hash, user_id, new_email, expires_at) values ($1, $2, $3, now() + make_interval(mins => $4))`,
+        [link.hash, me.id, user.email, EMAIL_CONFIRM_TTL_MIN],
+      );
+    });
+    try {
+      await emailConfirmation(user, link, req.log);
+    } catch {
+      throw unavailable('Could not send the email right now, please retry');
+    }
+    return reply.status(202).send({ ok: true, email: user.email });
+  });
+
   // ---- POST /api/auth/email/confirm -------------------------------------------------------------
-  // The link from the new address, used once: the email changes, pending password-reset links end
-  // (they went to the old address), and the old address is told. No sign-in needed: the link is the
-  // proof that the new address is the person's.
+  // A link from an email, used once; no sign-in needed, the link is the proof the address is the
+  // person's. Either it confirms the account's own address (changed: false), or a new address
+  // becomes the email (changed: true): pending password-reset links end (they went to the old
+  // address), and the old address is told, if it was a confirmed one (an unconfirmed address may be
+  // a stranger's).
   app.post('/api/auth/email/confirm', async (req) => {
     if (!(await allow(redis, `confirm-email:${req.ip}`, 20, 3600))) throw rateLimited('Too many attempts, try again later');
     const { token } = parse(confirmEmailSchema, req.body ?? {});
@@ -250,24 +338,35 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
       );
       const change = used.rows[0];
       if (!change) throw badRequest('This link is invalid or has expired');
-      const before = await c.query<{ username: string; email: string }>('select username, email from auth.users where id = $1 for update', [change.user_id]);
+      const before = await c.query<{ username: string; email: string; trusted: boolean }>(
+        `select username, email, (email_verified_at is not null or predates_email_confirmation) as trusted
+           from auth.users where id = $1 for update`,
+        [change.user_id],
+      );
       if (!before.rows[0]) throw badRequest('This link is invalid or has expired');
+      const changed = before.rows[0].email.toLowerCase() !== change.new_email.toLowerCase();
       try {
-        await c.query('update auth.users set email = $2 where id = $1', [change.user_id, change.new_email]);
+        await c.query('update auth.users set email = $2, email_verified_at = now() where id = $1', [change.user_id, changed ? change.new_email : before.rows[0].email]);
       } catch (err) {
         // someone else took the address since (the unique index): nothing changes, the link stays
         if (pgCode(err) === '23505') throw conflict('That email is now used by another account');
         throw err;
       }
       await c.query('delete from auth.email_changes where user_id = $1', [change.user_id]);
-      await c.query('delete from auth.password_resets where user_id = $1', [change.user_id]);
-      return { userId: change.user_id, username: before.rows[0].username, oldEmail: before.rows[0].email, newEmail: change.new_email };
+      if (changed) await c.query('delete from auth.password_resets where user_id = $1', [change.user_id]);
+      return { userId: change.user_id, username: before.rows[0].username, oldEmail: before.rows[0].email, oldTrusted: before.rows[0].trusted, newEmail: change.new_email, changed };
     });
+    if (!done.changed) {
+      req.log.info({ userId: done.userId }, 'email confirmed');
+      return { email: done.oldEmail, changed: false };
+    }
     req.log.info({ userId: done.userId }, 'email changed');
-    sendMail(mail, { to: done.oldEmail, ...emailChangedNotice({ username: done.username, newEmail: done.newEmail }) }, req.log).catch((err: Error) =>
-      req.log.error({ err: err.message }, 'email change: the notice to the old address failed'),
-    );
-    return { email: done.newEmail };
+    if (done.oldTrusted) {
+      sendMail(mail, { to: done.oldEmail, ...emailChangedNotice({ username: done.username, newEmail: done.newEmail }) }, req.log).catch((err: Error) =>
+        req.log.error({ err: err.message }, 'email change: the notice to the old address failed'),
+      );
+    }
+    return { email: done.newEmail, changed: true };
   });
 
   // ---- POST /api/auth/logout ------------------------------------------------------------------

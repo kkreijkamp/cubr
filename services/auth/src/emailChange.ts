@@ -3,14 +3,22 @@ import { maskEmail } from './mail.js';
 import { RESET_TOKEN_RE } from './reset.js';
 
 // ---------------------------------------------------------------------------------------------
-// Changing the email address: schemas, the link and the two emails (pure, unit-tested). The new
-// address gets a link and only takes over once it's opened (proof it's yours, and no typos); the
-// old one is told afterwards. The routes are in routes/auth.ts; tokens are the reset links' kind
-// (reset.ts: 32 random bytes, only the SHA-256 stored).
+// Confirming an email address by a link sent to it: schemas, the link and the emails (pure,
+// unit-tested). Two cases share the link and the table (auth.email_changes):
+//  - the account's own address, at sign-up or sent again: confirmed, password-reset links can go
+//    there (until then they don't, so a typo or someone else's address can't take the account);
+//  - a change of address: the new one takes over once its link is opened (proof it's yours, and no
+//    typos), and the old one is told afterwards.
+// The routes are in routes/auth.ts; tokens are the reset links' kind (reset.ts: 32 random bytes,
+// only the SHA-256 stored).
 // ---------------------------------------------------------------------------------------------
 
-/** How long a confirmation link works. */
+/** How long a change-of-address link works. */
 export const EMAIL_CHANGE_TTL_MIN = 60;
+
+/** How long the link that confirms the account's own address works: days, as it's sent at sign-up. */
+export const EMAIL_CONFIRM_TTL_DAYS = 7;
+export const EMAIL_CONFIRM_TTL_MIN = EMAIL_CONFIRM_TTL_DAYS * 24 * 60;
 
 /** An account without a password (made with Google, Apple or GitHub) proves it's you by a sign-in this recent. */
 export const FRESH_SIGN_IN_SEC = 10 * 60;
@@ -58,6 +66,22 @@ ${foot}
 ${raw}
 </div>
 </body></html>`;
+}
+
+/** To the account's own address, at sign-up or when asked for again: the link that confirms it. */
+export function confirmAccountEmailMessage(o: { username: string; link: string; days: number }): Email {
+  const subject = 'Confirm your cubr email';
+  const why = 'Then, if you ever forget your password, a reset link can reach you here.';
+  const terms = `The link works once, for ${o.days} days. If you didn't make a cubr account, ignore this email.`;
+  const text = [`Hi ${o.username},`, '', 'Confirm that this is the email for your cubr account:', '', o.link, '', why, '', terms, '', '- cubr'].join('\n');
+  const link = escapeHtml(o.link);
+  const html = page(
+    [`Hi ${escapeHtml(o.username)},`, 'Confirm that this is the email for your cubr account.'],
+    { label: 'confirm my email', href: link },
+    `${why} ${terms}`,
+    link,
+  );
+  return { subject, text, html };
 }
 
 /** To the new address: the link that makes it the account's email. */

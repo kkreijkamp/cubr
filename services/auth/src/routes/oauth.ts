@@ -38,8 +38,12 @@ import { USERNAME_RE, USER_COLUMNS, UUID_RE, conflictMessage, toPrivateUser, toP
  * fragment, never a token, and binds that to the browser the same way: a code someone sends you
  * doesn't work in your browser.
  * A new provider account whose email already belongs to a cubr account is not linked automatically
- * (cubr doesn't verify sign-up emails, so that could hand over someone's account): its owner signs in
- * with the password and connects the provider on the account page.
+ * (that account's email may be unconfirmed, a typo or someone else's, so that could hand over
+ * someone's account): its owner signs in with the password and connects the provider on the account
+ * page.
+ * The provider's email is a verified one (fetchIdentity), so it counts as confirmed: an account made
+ * this way starts confirmed, and connecting or signing in with a provider whose email is the
+ * account's confirms the account's.
  */
 
 const FLOW_TTL_SEC = 600;
@@ -119,6 +123,12 @@ export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, 
 
   const userById = async (id: string) => (await pool.query<UserRow>(`select ${USER_COLUMNS} from auth.users where id = $1`, [id])).rows[0] ?? null;
 
+  /** The provider vouches for `email`: if it's the account's email, it's confirmed. */
+  const confirmByProvider = async (userId: string, email: string | null) => {
+    if (!email) return;
+    await pool.query('update auth.users set email_verified_at = now() where id = $1 and email_verified_at is null and lower(email) = lower($2)', [userId, email]);
+  };
+
   /** A free username close to the provider's (null if 50 tries are all taken). */
   async function freeUsername(identity: Pick<ProviderIdentity, 'login' | 'name' | 'email'>): Promise<string | null> {
     const candidates = usernameCandidates(suggestUsername(identity));
@@ -183,11 +193,13 @@ export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, 
         }
         req.log.info({ provider, userId: flow.userId }, 'provider connected');
       }
+      await confirmByProvider(flow.userId!, identity.email);
       return toSpa(reply, '/account', { linked: provider });
     }
 
     if (linked) {
       await pool.query('update auth.user_identities set last_used_at = now() where provider = $1 and subject = $2', [provider, identity.subject]);
+      await confirmByProvider(linked.user_id, identity.email);
       const code = randomToken();
       const ok = await withTimeout(redis.set(loginKey(code), JSON.stringify({ userId: linked.user_id }), 'EX', LOGIN_CODE_TTL_SEC).then(() => true), 2000, false);
       if (!ok) return fail(reply, flow, provider, 'busy');
@@ -258,7 +270,11 @@ export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, 
     let row: UserRow;
     try {
       row = await withTx(pool, async (c) => {
-        const { rows } = await c.query<UserRow>(`insert into auth.users (username, email, password_hash) values ($1, $2, null) returning ${USER_COLUMNS}`, [username, pending.email]);
+        // the provider verified the address, so it starts confirmed
+        const { rows } = await c.query<UserRow>(`insert into auth.users (username, email, password_hash, email_verified_at) values ($1, $2, null, now()) returning ${USER_COLUMNS}`, [
+          username,
+          pending.email,
+        ]);
         await c.query('insert into auth.user_settings (user_id) values ($1)', [rows[0].id]);
         await c.query('insert into auth.user_identities (provider, subject, user_id, email, last_used_at) values ($1, $2, $3, $4, now())', [
           pending.provider,

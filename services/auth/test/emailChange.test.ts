@@ -1,13 +1,38 @@
 import { describe, expect, it } from 'vitest';
 import {
   changeEmailSchema,
+  confirmAccountEmailMessage,
   confirmEmailLink,
   confirmEmailMessage,
   confirmEmailSchema,
+  EMAIL_CONFIRM_TTL_DAYS,
+  EMAIL_CONFIRM_TTL_MIN,
   emailChangedNotice,
   FRESH_SIGN_IN_SEC,
   isFreshSignIn,
 } from '../src/emailChange.js';
+
+describe('confirming the account email', () => {
+  it('gives the sign-up link a week, as people open it later', () => {
+    expect(EMAIL_CONFIRM_TTL_DAYS).toBe(7);
+    expect(EMAIL_CONFIRM_TTL_MIN).toBe(7 * 24 * 60);
+  });
+
+  it('asks the address to confirm, says why and for how long, and escapes the username in the HTML', () => {
+    const link = 'https://cubr.dev/confirm-email#abc_DEF-123';
+    const m = confirmAccountEmailMessage({ username: 'felix<b>', link, days: 7 });
+    expect(m.subject).toBe('Confirm your cubr email');
+    expect(m.text).toContain('Hi felix<b>,');
+    expect(m.text).toContain(link);
+    expect(m.text).toMatch(/reset link can reach you here/);
+    expect(m.text).toMatch(/works once, for 7 days/);
+    expect(m.text).toMatch(/didn't make a cubr account, ignore this email/);
+    expect(m.html).toContain('Hi felix&lt;b&gt;,');
+    expect(m.html).not.toContain('felix<b>');
+    expect(m.html).toContain(`href="${link}"`);
+    expect(m.html).toContain('confirm my email');
+  });
+});
 
 describe('changing the email', () => {
   it('takes a new address (trimmed) and the password, which an account without one leaves out', () => {

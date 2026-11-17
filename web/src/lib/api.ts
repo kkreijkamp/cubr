@@ -192,8 +192,13 @@ export const api = {
      *  password is asked again (403 if wrong); an account without one must have signed in in the last
      *  10 minutes (403 otherwise). 409 if another account uses the address. */
     changeEmail: (body: { email: string; password?: string }) => request<{ ok: true; email: string }>('POST', '/api/auth/me/email', body),
-    /** Uses the link from the new address once (no sign-in needed); 400 expired or used, 409 taken meanwhile. */
-    confirmEmail: (token: string) => request<{ email: string }>('POST', '/api/auth/email/confirm', { token }),
+    /** Uses a link from an email once (no sign-in needed): it confirms the account's own address
+     *  (changed: false), or makes a new address its email (changed: true). 400 expired or used, 409
+     *  the new address was taken meanwhile. */
+    confirmEmail: (token: string) => request<{ email: string; changed?: boolean }>('POST', '/api/auth/email/confirm', { token }),
+    /** Sends a new link that confirms the account's current email (it works for 7 days). 400 if it's
+     *  confirmed already, 429 after 3 an hour or 5 a day. */
+    sendEmailConfirmation: () => request<{ ok: true; email: string }>('POST', '/api/auth/me/email/confirmation'),
     updateMe: (body: Partial<Pick<PublicUser, 'displayName' | 'bio' | 'country' | 'wcaId' | 'private'>>) =>
       request<{ user: PrivateUser }>('PATCH', '/api/auth/me', body),
     saveSettings: (settings: Record<string, unknown>) => request<{ settings: Record<string, unknown> }>('PUT', '/api/auth/me/settings', { settings }),

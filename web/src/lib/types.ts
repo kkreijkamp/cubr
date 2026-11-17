@@ -22,6 +22,9 @@ export interface PrivateUser extends PublicUser {
   email: string;
   /** false: the account was made with Google, Apple or GitHub and has no password (yet) */
   hasPassword?: boolean;
+  /** false: the email isn't confirmed yet, so password-reset links don't go to it. Absent in a user
+   *  cached by an older version: treat it as unknown, not as unconfirmed. */
+  emailVerified?: boolean;
 }
 
 /** Sign-in with a provider (services/auth/src/routes/oauth.ts) */

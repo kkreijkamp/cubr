@@ -171,6 +171,12 @@ CREATE TABLE auth.user_settings (
 ALTER TABLE auth.users ADD COLUMN avatar_version text;
 -- private profile (migration 004): strangers see only username + picture; mirrored to auth:private-users
 ALTER TABLE auth.users ADD COLUMN profile_private boolean NOT NULL DEFAULT false;
+-- email confirmation (migration 008): set when a link sent to the address is opened (sign-up, a change,
+-- a used reset link) or a provider vouches for it (made with Google/Apple/GitHub, or one connected with
+-- the same email). Password-reset links only go to a confirmed address, or to an account made before
+-- 008 (predates_email_confirmation, set for every account that existed then), so nobody was locked out.
+ALTER TABLE auth.users ADD COLUMN email_verified_at timestamptz;
+ALTER TABLE auth.users ADD COLUMN predates_email_confirmation boolean NOT NULL DEFAULT false;
 CREATE TABLE auth.avatars (
   user_id      uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   content_type text NOT NULL CHECK (content_type IN ('image/webp','image/jpeg','image/png')),
@@ -192,13 +198,15 @@ CREATE TABLE auth.password_resets (
   expires_at timestamptz NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
--- a change of email waiting for its confirmation link (migration 007): one per user, SHA-256 of the
--- token only; asking again replaces it, confirming deletes it (and the user's password-reset links)
+-- an address waiting for its confirmation link (migration 007): one per user, SHA-256 of the token only.
+-- new_email = the current email: confirming the account's own address (sign-up, or sent again);
+-- otherwise a change of address. A new request replaces it; confirming deletes it (and, for a change,
+-- the user's password-reset links)
 CREATE TABLE auth.email_changes (
   token_hash bytea PRIMARY KEY,
   user_id    uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   new_email  text NOT NULL,
-  expires_at timestamptz NOT NULL,             -- created_at + 60 min
+  expires_at timestamptz NOT NULL,             -- created_at + 7 days (own address) or 60 min (a change)
   created_at timestamptz NOT NULL DEFAULT now()
 );
 -- sign-in with Google, Apple or GitHub (migration 006): one row per connected provider account;
@@ -386,7 +394,11 @@ always present. Responses may carry additional fields; clients ignore fields the
 
 ```ts
 type PublicUser = { id: string; username: string; displayName: string|null; bio: string|null; country: string|null; wcaId: string|null; createdAt: string; avatarUrl: string|null /* '/api/users/<id>/avatar?v=<version>' */ };
-type PrivateUser = PublicUser & { email: string; hasPassword: boolean /* false: made with a provider, no password yet */ };
+type PrivateUser = PublicUser & {
+  email: string;
+  hasPassword: boolean;   // false: made with a provider, no password yet
+  emailVerified: boolean; // the email is confirmed (users.email_verified_at): reset links can go to it
+};
 type Session = { id: string; name: string; event: string; createdAt: string; updatedAt: string; solveCount: number };
 type Solve = { id: string; sessionId: string; event: string; timeMs: number; penalty: 'OK'|'+2'|'DNF'; scramble: string; comment: string|null; source: string; createdAt: string; dailyDate?: string|null; dailyIndex?: number|null };
 type PB = { valueMs: number; solveId: string|null; achievedAt: string };
@@ -395,13 +407,14 @@ type PB = { valueMs: number; solveId: string|null; achievedAt: string };
 ### 9.1 auth (`/api/auth`, `/api/users`, `/api/supporters`, `/api/errors`)
 | Method & path | Auth | Body / query | Response |
 |---|---|---|---|
-| POST `/api/auth/register` | - | `{username, email, password}` | 201 `{token, user: PrivateUser}`; 409 CONFLICT (username/email taken); 429 after 20 registrations/h/IP |
+| POST `/api/auth/register` | - | `{username, email, password}` | 201 `{token, user: PrivateUser}` (`emailVerified: false`); the address gets a link `<PUBLIC_URL>/confirm-email#<token>` that confirms it (valid 7 days, single use; emailed after the reply, and dropped if the email fails; none for internal-token callers, the seed job); 409 CONFLICT (username/email taken); 429 after 20 registrations/h/IP |
 | POST `/api/auth/login` | - | `{login, password}` (login = username or email) | 200 `{token, user: PrivateUser}`; 401 (also for an account without a password, after the same dummy bcrypt compare); 429 after 10 attempts/min/IP. In production Cloudflare also blocks more than 5 in 10 s per IP for 10 s at the edge (429, same error envelope, `RATE_LIMITED`) |
 | POST `/api/auth/logout` | req | - | 204 (revokes jti) |
-| POST `/api/auth/password/forgot` | - | `{email}` | 202 `{ok: true}` for every address, answered before the lookup (no account enumeration by reply or timing); an account with that email gets a link `<PUBLIC_URL>/reset#<token>` (32 random bytes, valid 60 min, single use) through Resend; 429 after 10/h/IP; at most 3 links/h per account |
+| POST `/api/auth/password/forgot` | - | `{email}` | 202 `{ok: true}` for every address, answered before the lookup (no account enumeration by reply or timing); an account with that email gets a link `<PUBLIC_URL>/reset#<token>` (32 random bytes, valid 60 min, single use) through Resend, only if the address is confirmed or the account predates confirmation (an unconfirmed address may be a typo or someone else's); 429 after 10/h/IP; at most 3 links/h per account |
+| POST `/api/auth/me/email/confirmation` | req | - | 202 `{ok: true, email}`: a new link to the account's current email that confirms it (valid 7 days; replaces a pending link or change); 400 already confirmed; 429 after 3/h or 5/day per account; 503 the email couldn't be sent (nothing pending) |
 | POST `/api/auth/me/email` | req | `{email, password?}` (password required when the account has one) | 202 `{ok: true, email}`: the new address gets a link `<PUBLIC_URL>/confirm-email#<token>` (32 random bytes, valid 60 min, single use; replaces a pending change); nothing changes until it's opened; 400 same as the current email; 403 wrong password, or (no password: made with a provider) no sign-in in the last 10 min (token `iat`); 409 another account uses it; 429 after 5/h per account; 503 the email couldn't be sent (nothing pending) |
-| POST `/api/auth/email/confirm` | - | `{token}` | 200 `{email}`: the email changes, the user's pending changes and password-reset links are deleted, the old address gets a notice with the new one masked (`j***@example.com`); sessions carry on; 400 invalid/expired/used link; 409 another account took the address meanwhile (nothing changes, the link stays); 429 after 20/h/IP |
-| POST `/api/auth/password/reset` | - | `{token, password}` (password: 8-128 chars) | 200 `{token, user: PrivateUser}`: new password set, the user's other reset links deleted, every older token revoked (per-user revocation; the new token is issued after it); 400 invalid/expired/used link; 503 if the revocation can't be stored (nothing changes) |
+| POST `/api/auth/email/confirm` | - | `{token}` | 200 `{email, changed}`: the address is confirmed (`email_verified_at`) and the user's pending links are deleted. `changed: false`: it was the account's own address. `changed: true`: the email changes too, the user's password-reset links are deleted, and the old address gets a notice with the new one masked (`j***@example.com`) if it was confirmed (an unconfirmed one may be a stranger's); sessions carry on; 400 invalid/expired/used link; 409 another account took the address meanwhile (nothing changes, the link stays); 429 after 20/h/IP |
+| POST `/api/auth/password/reset` | - | `{token, password}` (password: 8-128 chars) | 200 `{token, user: PrivateUser}`: new password set, the address confirmed (the link reached it), the user's other reset links deleted, every older token revoked (per-user revocation; the new token is issued after it); 400 invalid/expired/used link; 503 if the revocation can't be stored (nothing changes) |
 | GET `/api/auth/me` | req | - | `{user: PrivateUser, settings: object}` |
 | PATCH `/api/auth/me` | req | `{displayName?, bio?, country?, wcaId?, private?}` (null clears; `private: true` = private profile) | `{user: PrivateUser}` (+ `user.updated`); 503 if the private flag can't be mirrored to Redis (nothing changes) |
 | PUT `/api/auth/me/settings` | req | `{settings: object}` (<= 16 KB JSON) | `{settings}` |
@@ -410,10 +423,10 @@ type PB = { valueMs: number; solveId: string|null; achievedAt: string };
 | DELETE `/api/auth/me` | req | `{password}`, or `{confirm: username}` (case-insensitive) for an account without a password | 204: the account is deleted and every token of it revoked (+ `user.deleted`, which makes the other services delete its data; its provider identities cascade); 403 wrong password or username; 429 after 5 tries/10 min; 503 when Redis can't take the revocation or the event (then nothing is deleted) |
 | GET `/api/auth/oauth/providers` | - | - | `{providers: ('google'\|'apple'\|'github')[]}`: the providers whose keys are set (none = no buttons); cached 5 min |
 | POST `/api/auth/oauth/:provider/start` | opt (req for `link`) | `{mode?: 'signin'\|'link', next?}` | `{url}`: the provider's sign-in page (authorization code + PKCE S256, `state`, OIDC `nonce`); sets the `cubr_oauth` cookie = state (HttpOnly, Secure, SameSite=None, Path=/api/auth/oauth, 10 min); 404 provider not set up; 401 `link` without a token; 429 after 30/10 min/IP; 503 Redis down |
-| GET or POST `/api/auth/oauth/:provider/callback` | `cubr_oauth` cookie | the provider's `code` + `state` (Apple: form POST, with `user` = the name the first time) | 303 to the web app, the result in the URL fragment: `/login/sso#code=<one-time code>&next=` (a connected account; the cookie becomes the code, 2 min), `#signup=<id>&next=` (a new account; the cookie becomes the id, 15 min), `/account#linked=<provider>` (mode `link`), or `#error=<cancelled\|expired\|failed\|no_email\|email_taken\|linked_elsewhere\|already_linked\|busy>&provider=`. The state must exist (single use), be for this provider and match the cookie; ID tokens (Google RS256, Apple ES256) are checked against the provider's JWKS (issuer, audience, nonce, expiry); only a verified email counts (GitHub: the primary verified one, from its API) and a new account needs one (`no_email`). A provider email that an account already has is never linked automatically (`email_taken`); 60/10 min/IP |
+| GET or POST `/api/auth/oauth/:provider/callback` | `cubr_oauth` cookie | the provider's `code` + `state` (Apple: form POST, with `user` = the name the first time) | 303 to the web app, the result in the URL fragment: `/login/sso#code=<one-time code>&next=` (a connected account; the cookie becomes the code, 2 min), `#signup=<id>&next=` (a new account; the cookie becomes the id, 15 min), `/account#linked=<provider>` (mode `link`), or `#error=<cancelled\|expired\|failed\|no_email\|email_taken\|linked_elsewhere\|already_linked\|busy>&provider=`. The state must exist (single use), be for this provider and match the cookie; ID tokens (Google RS256, Apple ES256) are checked against the provider's JWKS (issuer, audience, nonce, expiry); only a verified email counts (GitHub: the primary verified one, from its API) and a new account needs one (`no_email`). A provider email that an account already has is never linked automatically (`email_taken`). Connecting or signing in with a provider whose email is the account's confirms the account's email; 60/10 min/IP |
 | POST `/api/auth/oauth/exchange` | `cubr_oauth` cookie | `{code}` | `{token, user: PrivateUser}` (`last_login_at` set); 404 code not this browser's, expired or used (not 401: the web app signs out on a 401, and a link mustn't sign anyone out); 429 after 30/10 min/IP |
 | GET `/api/auth/oauth/signup/:id` | `cubr_oauth` cookie | - | `{provider, email, username}`: the new account, with a free username suggested from the provider's (null if none); 404 expired or not this browser's |
-| POST `/api/auth/oauth/signup` | `cubr_oauth` cookie | `{id, username}` | 201 `{token, user: PrivateUser}`: the account (no password) and its identity in one transaction (+ `user.registered`); 409 username taken (the sign-up is kept for another try), email taken, or already created; 404 expired; counts toward register's 20/h/IP |
+| POST `/api/auth/oauth/signup` | `cubr_oauth` cookie | `{id, username}` | 201 `{token, user: PrivateUser}`: the account (no password, its email confirmed: the provider verified it) and its identity in one transaction (+ `user.registered`); 409 username taken (the sign-up is kept for another try), email taken, or already created; 404 expired; counts toward register's 20/h/IP |
 | GET `/api/auth/me/sign-in` | req | - | `{password: boolean, providers: [...] /* set up on the server */, identities: [{provider, email, createdAt}]}` |
 | DELETE `/api/auth/me/identities/:provider` | req | - | 204 disconnected; 409 it's the only way in (no password, no other provider); 404 not connected |
 | GET `/api/users/:idOrUsername/avatar` | - | `?v=` version | image bytes (immutable cache when `v` matches, ETag/304); 404 |
