@@ -60,10 +60,11 @@ set_route() { # PATTERN [SCRIPT]: creates or updates the route; without a script
   echo "route $pattern -> ${script:-(no Worker)}"
 }
 
+tmp=''
+trap 'if [ -n "$tmp" ]; then rm -rf "$tmp"; fi' EXIT # at exit, when up() has returned: so not a local
+
 up() {
-  local tmp
   tmp=$(mktemp -d)
-  trap 'rm -rf "$tmp"' EXIT
   (cd ../../.. && npx esbuild deploy/cloudflare/down-page/worker.ts --bundle --format=esm --platform=neutral \
     --target=es2022 --log-level=warning --outfile="$tmp/worker.js")
   jq -nc --arg d "$COMPAT_DATE" '{main_module: "worker.js", compatibility_date: $d}' >"$tmp/metadata.json"
