@@ -40,6 +40,13 @@ describe('routeFor', () => {
     expect(routeFor(req('/sitemap.xml', 'navigate'), ORIGIN)).toBe('pass');
     expect(routeFor(req('/.well-known/security.txt', 'navigate'), ORIGIN)).toBe('pass');
   });
+  it("leaves /.well-known/ to the server: a password manager's change-password link is a redirect there, not a page of the app", () => {
+    for (const p of ['/.well-known/change-password', '/.well-known/resource-that-should-not-exist-whose-status-code-should-not-be-200', '/.well-known/security.txt']) {
+      expect(routeFor(req(p, 'navigate'), ORIGIN), p).toBe('pass');
+      expect(routeFor(req(p), ORIGIN), `${p} (fetch)`).toBe('pass');
+    }
+    expect(routeFor(req('/well-known', 'navigate'), ORIGIN)).toBe('shell'); // an app path that merely looks alike
+  });
   it('serves hashed assets from the cache first and other files from the network first', () => {
     expect(routeFor(req('/assets/index-d3oOLUDV.js', 'cors'), ORIGIN)).toBe('asset');
     expect(routeFor(req('/assets/lexend-deca-latin-400-normal-Cs_IAxDy.woff2', 'cors'), ORIGIN)).toBe('asset');

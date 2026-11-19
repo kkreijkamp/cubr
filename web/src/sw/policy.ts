@@ -45,13 +45,14 @@ export function isHashedAsset(path: string): boolean {
  * - asset: a hashed build file: the cache first (it never changes), else the network
  * - file: another file of the site (favicon, manifest): the network first, else the cache
  * - pass: not answered at all, as if there were no worker: anything but GET, other sites, the API,
- *   live races (Socket.IO), the health and version checks, the worker script, and navigations to
- *   files (e.g. /robots.txt)
+ *   live races (Socket.IO), the health and version checks, the worker script, /.well-known/ (the
+ *   server's answers for other programs, like the redirect password managers follow from
+ *   /.well-known/change-password), and navigations to files (e.g. /robots.txt)
  */
 export type Route = 'shell' | 'asset' | 'file' | 'pass';
 
 /** Paths the worker never answers (always the network). */
-const NETWORK_ONLY = /^\/(?:api|internal|socket\.io)(?:\/|$)|^\/(?:_info|healthz|readyz|sw\.js)$/;
+const NETWORK_ONLY = /^\/(?:api|internal|socket\.io|\.well-known)(?:\/|$)|^\/(?:_info|healthz|readyz|sw\.js)$/;
 
 export function routeFor(request: { url: string; method: string; mode: string }, origin: string): Route {
   if (request.method !== 'GET') return 'pass';

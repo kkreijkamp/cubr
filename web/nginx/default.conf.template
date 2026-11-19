@@ -156,6 +156,12 @@ server {
   location ^~ /.well-known/ {
     try_files $uri =404;
   }
+  # password managers' "change password" link (W3C: A Well-Known URL for Changing Passwords) leads to
+  # the account page's change-password dialog (CHANGE_PASSWORD_URL in src/lib/password.ts). Unknown
+  # /.well-known/ paths stay 404s, which browsers check before they trust this redirect.
+  location = /.well-known/change-password {
+    return 302 /account#change-password;
+  }
   location = /security.txt {
     return 301 /.well-known/security.txt;
   }

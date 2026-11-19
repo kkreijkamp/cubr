@@ -7,6 +7,7 @@ import robotsTxt from '../../public/robots.txt?raw';
 import sitemapXml from '../../public/sitemap.xml?raw';
 import securityTxt from '../../public/.well-known/security.txt?raw';
 import { BEACON_SRC } from '../lib/analytics';
+import { CHANGE_PASSWORD_URL } from '../lib/password';
 
 // The web container's nginx config (web/nginx/default.conf.template) against the app it serves: which
 // URLs are pages (200) and which are real 404s, the security headers, the crawler files. nginx's
@@ -334,5 +335,24 @@ describe('security.txt (RFC 9116)', () => {
     const days = (Date.parse(fields.Expires) - Date.now()) / 86_400_000;
     expect(days, 'security.txt expires soon: move Expires up to a year ahead').toBeGreaterThan(30);
     expect(days).toBeLessThanOrEqual(366);
+  });
+});
+
+describe('/.well-known/change-password (W3C: A Well-Known URL for Changing Passwords)', () => {
+  it("sends password managers to the account page's change-password dialog (302), a page of the app", () => {
+    const l = locationFor('/.well-known/change-password');
+    expect(l).toMatchObject({ mod: '=', pattern: '/.well-known/change-password' });
+    expect(l.body.trim()).toBe(`return 302 ${CHANGE_PASSWORD_URL};`);
+    const [page] = CHANGE_PASSWORD_URL.split('#');
+    expect(appPaths).toContain(page);
+    expect(isAppPage(locationFor(page))).toBe(true);
+    expect(redirectFor('/.well-known/change-password')).toBe(''); // not caught by the canonical-address redirect first
+  });
+
+  it('keeps unknown /.well-known/ paths real 404s, which browsers check before they trust the redirect', () => {
+    for (const p of ['/.well-known/resource-that-should-not-exist-whose-status-code-should-not-be-200', '/.well-known/change-password/', '/.well-known/change-passwords']) {
+      expect(locationFor(p), p).toMatchObject({ mod: '^~', pattern: '/.well-known/' });
+      expect(locationFor(p).body.trim(), p).toBe('try_files $uri =404;');
+    }
   });
 });

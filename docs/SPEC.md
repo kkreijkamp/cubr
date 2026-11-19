@@ -608,9 +608,10 @@ custom properties, command palette (Esc / Ctrl+K), focus mode while timing, toas
 **Changing the password.** The account page's "password" row opens a dialog (`ChangePasswordModal`):
 the current password, then the new one, with a show button. An account made with a provider sets its
 first instead, after a fresh sign-in (the dialog offers one, as changing the email does).
-- **For password managers:** the fields say which password is which (`autocomplete`), and a hidden
-  username field says whose. `/account#change-password` opens the dialog; a signed-out visitor signs in
-  first and comes back to it.
+- **For password managers:** `/.well-known/change-password` (W3C's well-known URL for changing
+  passwords) redirects to `/account#change-password`, which opens the dialog. A signed-out visitor
+  signs in first and comes back to it. The fields say which password is which (`autocomplete`), and a
+  hidden username field says whose.
 - **Other tabs stay signed in:** a change or a reset revokes every older token. A tab that hears through
   `localStorage` of a new token for the same account switches to it (`lib/api.ts`). A 401 never
   deletes a newer token another tab stored; the tab carries on with that one instead (`lib/auth.tsx`).
@@ -703,7 +704,8 @@ the browser lacks the API (iOS before 16.4, or before 18.4 in a home-screen app;
     - `/assets/*`: cache first;
     - other same-origin GETs: network first, falling back to the cache;
     - never touched: anything but GET, other origins, `/api/*`, `/internal/*`, `/socket.io`,
-      `/_info`, `/healthz`, `/readyz` and `/sw.js`.
+      `/.well-known/*` (the server's answers for other programs, such as the redirect password
+      managers follow), `/_info`, `/healthz`, `/readyz` and `/sw.js`.
   - Installing copies unchanged hashed files from the previous version's cache. Activating keeps
     the current and the previous cache (tabs still on the old version can load its chunks),
     deletes older ones, and takes over open pages.
@@ -786,6 +788,9 @@ The web container's nginx (`web/nginx/default.conf.template`) serves the app and
 - **security.txt** (RFC 9116) at `/.well-known/security.txt`: contact `hello@cubr.dev`, the policy
   in `SECURITY.md`. `/security.txt` redirects to it. Its `Expires` must stay under a year ahead; a
   test fails 30 days before it passes.
+- **`/.well-known/change-password`** redirects (302) to `/account#change-password`, the
+  change-password dialog (section 10). Other unknown `/.well-known/` paths are 404s, which browsers
+  check before they trust the redirect.
 - Redirects are relative (`absolute_redirect off`): behind the gateway and Cloudflare, nginx would
   build them with the wrong scheme and port.
 
