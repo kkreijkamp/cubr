@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { z } from 'zod';
+import { escapeHtml, page, type Email } from './mail.js';
 
 // ---------------------------------------------------------------------------------------------
 // Password reset: token helpers, request schemas and the email (pure, unit-tested). The routes are
@@ -36,11 +37,8 @@ export function resetLink(publicUrl: string, token: string): string {
   return `${publicUrl.replace(/\/+$/, '')}/reset#${token}`;
 }
 
-const escapeHtml = (s: string) =>
-  s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
-
-/** The reset email: plain text plus a minimal HTML version in the default theme's colours. */
-export function resetEmail(o: { username: string; link: string; minutes: number }): { subject: string; text: string; html: string } {
+/** The reset email, in plain text and HTML (mail.ts's page, like every account email). */
+export function resetEmail(o: { username: string; link: string; minutes: number }): Email {
   const subject = 'Reset your cubr password';
   const text = [
     `Hi ${o.username},`,
@@ -53,18 +51,11 @@ export function resetEmail(o: { username: string; link: string; minutes: number 
     '',
     '- cubr',
   ].join('\n');
-  const user = escapeHtml(o.username);
-  const link = escapeHtml(o.link);
-  const html = `<!doctype html>
-<html><body style="margin:0;padding:32px 16px;background:#ffffff;color:#1d2024;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.55">
-<div style="max-width:480px;margin:0 auto">
-<p style="font-size:20px;font-weight:600;margin:0 0 24px">cubr</p>
-<p style="margin:0 0 16px">Hi ${user},</p>
-<p style="margin:0 0 24px">Someone (hopefully you) asked to reset the password of your cubr account.</p>
-<p style="margin:0 0 24px"><a href="${link}" style="display:inline-block;padding:10px 18px;border-radius:8px;background:#00a04d;color:#ffffff;text-decoration:none;font-weight:600">choose a new password</a></p>
-<p style="margin:0 0 16px;color:#77746b;font-size:13px">The link works once and expires in ${o.minutes} minutes. If you didn't ask for it, ignore this email: your password stays the same.</p>
-<p style="margin:0;color:#77746b;font-size:13px;word-break:break-all">${link}</p>
-</div>
-</body></html>`;
+  const html = page({
+    title: subject,
+    paragraphs: [`Hi ${escapeHtml(o.username)},`, 'Someone (hopefully you) asked to reset the password of your cubr account.'],
+    button: { label: 'choose a new password', href: o.link },
+    footnote: `The link works once and expires in ${o.minutes} minutes. If you didn't ask for it, ignore this email: your password stays the same.`,
+  });
   return { subject, text, html };
 }

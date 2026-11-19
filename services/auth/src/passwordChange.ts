@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { escapeHtml, page, type Email } from './emailChange.js';
+import { escapeHtml, page, type Email } from './mail.js';
 
 // ---------------------------------------------------------------------------------------------
 // Changing the password while signed in (POST /api/auth/me/password): the request schema and the
@@ -26,7 +26,7 @@ export function passwordChangedNotice(o: { username: string; first: boolean; sig
     : 'The password of your cubr account was changed, and every other device was signed out.';
   const back = `If you didn't do this, choose a new password with "forgot password?" on the sign-in page (${o.signInUrl}), or reply to this email and we'll help you get the account back.`;
   const text = [`Hi ${o.username},`, '', what, '', back, '', '- cubr'].join('\n');
-  const html = page([`Hi ${escapeHtml(o.username)},`, escapeHtml(what), escapeHtml(back)]);
+  const html = page({ title: subject, paragraphs: [`Hi ${escapeHtml(o.username)},`, escapeHtml(what), escapeHtml(back)] });
   return { subject, text, html };
 }
 

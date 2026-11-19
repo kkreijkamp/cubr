@@ -444,6 +444,14 @@ signed in (mode `link`, from the account page), so owning an email at a provider
 account. Each provider is configured by environment variables on the auth service (services/auth/README.md);
 the redirect URI to register with it is `<PUBLIC_URL>/api/auth/oauth/<provider>/callback`.
 
+**Emails** (password resets, email confirmations, and the notices after an email or password change) go
+through Resend from `cubr <no-reply@cubr.dev>`, with replies to `hello@cubr.dev`, each in plain text
+and HTML. The HTML is one page for all of them (`page()` in services/auth/src/mail.ts): the "cubr"
+wordmark, the message, a button with its address printed under it, and the small print, in white cross,
+or white cross dark in mail apps that follow dark mode. Each email carries its own `X-Entity-Ref-ID`,
+so Gmail doesn't fold a second reset link into the first one's thread. Without `RESEND_API_KEY` they
+are logged instead; mail to reserved domains (`example.com`, `.test`...) is never sent.
+
 Rate limits are per client IP; callers that present `INTERNAL_API_TOKEN` (section 4) are exempt. Redis is
 a soft dependency: while it is down, rate limits and revocation checks fail open, `user.*` events
 are skipped, and only logout answers 503 (the revocation could not be stored).

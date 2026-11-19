@@ -47,7 +47,8 @@ SPEC section 9.1, and below.
   (common's `internalTokenMatches`).
 
 Env: `PORT`, `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, `INTERNAL_API_TOKEN`, `TRUST_PROXY_HOPS`, `POD_NAME`, `NODE_NAME`,
-`APP_VERSION`, `LOG_LEVEL`, `PUBLIC_URL`, `RESEND_API_KEY`, `KOFI_VERIFICATION_TOKEN`, and the provider variables (below).
+`APP_VERSION`, `LOG_LEVEL`, `PUBLIC_URL`, `RESEND_API_KEY`, `MAIL_FROM` (default `cubr <no-reply@cubr.dev>`), `MAIL_REPLY_TO`
+(default `hello@cubr.dev`), `KOFI_VERIFICATION_TOKEN`, and the provider variables (below).
 
 Dev against the compose stack: `docker compose up -d postgres redis`, then
 `PORT=8081 DATABASE_URL=postgres://cubr:cubr@localhost:55433/cubr REDIS_URL=redis://localhost:56380 npm run dev -w services/auth`

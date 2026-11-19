@@ -162,7 +162,10 @@ and run the WCA import.
 - **Secrets** live only in `/opt/cubr/.env` (mode 600): `deploy.sh init` generated the Postgres
   password, JWT secret and internal token on the VM; the tunnel token comes from Cloudflare's API.
   Changing `JWT_SECRET` signs everyone out. `RESEND_API_KEY` (only the auth container gets it)
-  sends password-reset emails from `no-reply@cubr.dev`; without it they are only logged.
+  sends the account emails (password resets, email confirmations, change notices) from
+  `cubr <no-reply@cubr.dev>`, with replies going to `hello@cubr.dev`; without it they are only logged.
+  To score one, open mail-tester.com and send the reset email to the address it shows, from the repo:
+  `RESEND_API_KEY="$(security find-generic-password -s cubr-resend-api -w)" npx tsx scripts/test-email.ts <address>`.
   The sign-in providers' client secrets and Apple's key are there too ("Sign-in providers").
 - **Email DNS** (Cloudflare): `cubr.dev` MX to iCloud+ (`hello@cubr.dev`, a custom-domain address),
   SPF for iCloud, Apple's domain TXT and DKIM CNAME (`sig1._domainkey`), `_dmarc` (report-only for
