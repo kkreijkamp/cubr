@@ -187,6 +187,14 @@ and run the WCA import.
   `scripts/smoke.mjs`, none of which can answer a challenge. It also forces Cloudflare's JavaScript
   detections on: an inline script in every page, which the CSP refuses unless its header carries a
   nonce.
+- **Down page** (`deploy/cloudflare/down-page/`, docs/SPEC.md 10.2): a Cloudflare Worker shows
+  visitors a cubr-styled "back in a moment" instead of Cloudflare's error page while the server is
+  down. `deploy.sh up` builds and uploads it and routes `cubr.dev/*` through it (`/api/*`,
+  `/socket.io/*`, `/assets/*` and `/healthz` skip it). `deploy.sh status` shows the routes, and
+  `deploy.sh down` deletes them, which serves the site as before. After the first `up`, set the
+  `cubr.dev/*` route's request limit failure mode to **Fail open** in the dashboard (cubr.dev >
+  Workers Routes; the API can't): past the free plan's 100,000 Worker runs a day, failing closed
+  would show error 1027 instead of the site.
 - **Logs rotate.** Every container logs through `json-file` with at most 3 x 10 MB (`x-logging` in
   `compose.prod.yml`), so the gateway's access log, which holds visitors' IPs, is overwritten as it
   fills up. The privacy policy (`/privacy`) relies on this.

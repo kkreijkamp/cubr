@@ -18,7 +18,7 @@ is covered in `deploy/README.md`.
 cubr/
   package.json                # npm workspaces: packages/*, services/*, jobs/*
   tsconfig.base.json          # strict TypeScript settings shared by all workspaces
-  vitest.config.ts            # unit tests of packages, services and jobs
+  vitest.config.ts            # unit tests of packages, services, jobs and the Cloudflare Worker
   docker-compose.yml          # full local stack: Postgres, Redis, all services, web, gateway (+ "jobs" profile)
   cloudbuild.yaml             # Cloud Build: all images in parallel
   .github/workflows/ci.yml    # typecheck, tests, bundles, web build and kustomize render on every push
@@ -34,9 +34,12 @@ cubr/
   deploy/
     gateway/nginx.conf        # compose gateway mimicking the K8s Ingress routes
     k8s/                      # Kubernetes manifests (kustomize): base/, overlays/gke/, jobs/seed/
+    vps/                      # production: compose.prod.yml, release.sh, deploy.sh, backups (README = runbook)
+    cloudflare/down-page/     # the Worker that shows "back in a moment" while the server is down (deploy.sh)
   scripts/
     build-service.mjs         # esbuild bundler: node scripts/build-service.mjs services/auth
     smoke.mjs                 # end-to-end check through any entry point: node scripts/smoke.mjs <baseUrl>
+    test-email.ts             # sends the reset email as cubr.dev does, e.g. to mail-tester.com
     commands.sh               # every GKE command, each with a comment
   docs/                       # SPEC.md (this file)
 ```
@@ -803,6 +806,16 @@ The web container's nginx (`web/nginx/default.conf.template`) serves the app and
   check before they trust the redirect.
 - Redirects are relative (`absolute_redirect off`): behind the gateway and Cloudflare, nginx would
   build them with the wrong scheme and port.
+- **While the server is down** (built in v1.5.16, live once `deploy/cloudflare/down-page/deploy.sh up`
+  has run): a Cloudflare Worker (`deploy/cloudflare/down-page/worker.ts`) answers page loads the
+  server can't answer with a cubr-styled "back in a moment" instead of Cloudflare's error page. The
+  server can't answer when Cloudflare gets a 530 (tunnel down), a 52x (origin unreachable) or the
+  gateway's 502-504. The page is a 503 with `Retry-After: 30`, `no-store` and `noindex`, and it is
+  self-contained: inline styles, Lexend Deca as a data URI, white cross or white cross dark, no
+  scripts. It reloads every 30 seconds. Everything else passes through untouched, so the app and the
+  uptime check see the real failure. Routes skip the Worker for `/api/*`, `/socket.io/*`, `/assets/*`
+  and `/healthz`, so nothing stands between the app and its data and the server still sees each
+  visitor's address. The installed app doesn't need it: its service worker opens it offline.
 
 ### 10.3 Analytics (Cloudflare Web Analytics)
 
