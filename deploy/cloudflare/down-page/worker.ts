@@ -40,7 +40,8 @@ const FAVICON =
 /**
  * The page, self-contained: the server it would load anything from is the one that's down. White cross,
  * or white cross dark in dark mode (web/src/lib/themes.ts), in Lexend Deca, the app's font, with the
- * header's logo and the app's button. It reloads itself every 30 seconds; once the server answers, the
+ * header's logo and the app's button. It asks to try again in a couple of minutes, and meanwhile reloads
+ * itself every 30 seconds, so an open tab comes back on its own; once the server answers, the
  * reload is the real page.
  */
 export const DOWN_PAGE = `<!doctype html>
@@ -81,7 +82,7 @@ p { margin: 0; line-height: 1.5; text-wrap: balance; color: var(--sub); }
 <a class="logo" href="/" aria-label="cubr home"><svg viewBox="0 0 26 26" aria-hidden="true">${CUBE}</svg><span>cubr</span></a>
 <main>
 <h1>back in a moment</h1>
-<p>cubr's server isn't answering right now.<br>this page tries again every ${RETRY_SEC} seconds.</p>
+<p>cubr's server isn't answering right now.<br>please try again in a couple of minutes.</p>
 <a class="btn" href="">try again</a>
 </main>
 </body>

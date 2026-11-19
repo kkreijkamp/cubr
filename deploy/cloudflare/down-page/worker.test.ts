@@ -90,10 +90,11 @@ describe('the down page', () => {
     expect(DOWN_HEADERS['Content-Security-Policy']).toBe("default-src 'none'; style-src 'unsafe-inline'; font-src data:; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
   });
 
-  it('tries again by itself, and says so', () => {
+  it('asks to try again in a couple of minutes, and reloads itself meanwhile', () => {
     expect(RETRY_SEC).toBe(30);
     expect(DOWN_PAGE).toContain('<meta http-equiv="refresh" content="30">');
-    expect(DOWN_PAGE).toContain('this page tries again every 30 seconds.');
+    expect(DOWN_PAGE).toContain("cubr's server isn't answering right now.<br>please try again in a couple of minutes.");
+    expect(DOWN_PAGE).not.toContain('tries again every');
     expect(DOWN_PAGE).toContain('<title>back in a moment | cubr</title>');
     expect(DOWN_PAGE).toContain('<html lang="en">');
   });

@@ -7,10 +7,12 @@
 # Uses the Cloudflare API token in the keychain (service cubr-cloudflare-api), which is never printed.
 #
 # Once, after the first `up`: in the dashboard (cubr.dev > Workers Routes), set the cubr.dev/* route's
-# "Request limit failure mode" to "Fail open". The API can't set it. The free plan runs a Worker
-# 100,000 times a day, and past that a route that fails closed shows Cloudflare's error 1027 instead
-# of the site, so a flood of page loads could take cubr.dev down until midnight UTC. Failing open,
-# the requests skip the Worker and the site carries on.
+# "Request limit failure mode" to "Fail open" (done 2026-11-19). The API shows it as the route's
+# request_limit_fail_open, and `status` prints it, but the routes API doesn't document setting it.
+# The free plan runs a Worker 100,000 times a day. Past that, a route that fails closed shows
+# Cloudflare's error 1027 instead of the site, so a flood of page loads could take cubr.dev down until
+# midnight UTC. Failing open, the requests skip the Worker and the site carries on. `up` never saves a
+# route that's already right, so a redeploy keeps the setting.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -44,21 +46,29 @@ zone=$(api GET "/zones?name=$ZONE_NAME" | check)
 ZONE=$(jq -r '.result[0].id' <<<"$zone")
 ACCOUNT=$(jq -r '.result[0].account.id' <<<"$zone")
 
-route_id() { # PATTERN: the id of the zone's route with exactly that pattern, or nothing
-  api GET "/zones/$ZONE/workers/routes" | check | jq -r --arg p "$1" '.result[] | select(.pattern == $p) | .id'
+route() { # PATTERN: the zone's route with exactly that pattern, as JSON, or nothing
+  api GET "/zones/$ZONE/workers/routes" | check | jq -c --arg p "$1" '.result[] | select(.pattern == $p)'
 }
+route_id() { route "$1" | jq -r '.id // empty'; }
 
-set_route() { # PATTERN [SCRIPT]: creates or updates the route; without a script, Workers skip the pattern
-  local pattern=$1 script=${2:-} id body
+set_route() { # PATTERN [SCRIPT]: creates the route, or fixes its Worker; without a script, Workers skip the pattern
+  local pattern=$1 script=${2:-} current body
+  current=$(route "$pattern")
+  # already right: left alone, so settings made in the dashboard (Fail open) stay
+  if [ -n "$current" ] && [ "$(jq -r '.script // ""' <<<"$current")" = "$script" ]; then
+    echo "route $pattern -> ${script:-(no Worker)} (unchanged)"
+    return
+  fi
   body=$(jq -nc --arg p "$pattern" --arg s "$script" '{pattern: $p} + (if $s == "" then {} else {script: $s} end)')
-  id=$(route_id "$pattern")
-  if [ -n "$id" ]; then
-    api PUT "/zones/$ZONE/workers/routes/$id" -H 'Content-Type: application/json' --data "$body" | check >/dev/null
+  if [ -n "$current" ]; then
+    api PUT "/zones/$ZONE/workers/routes/$(jq -r '.id' <<<"$current")" -H 'Content-Type: application/json' --data "$body" | check >/dev/null
   else
     api POST "/zones/$ZONE/workers/routes" -H 'Content-Type: application/json' --data "$body" | check >/dev/null
   fi
   echo "route $pattern -> ${script:-(no Worker)}"
 }
+
+fail_open() { route "$MAIN" | jq -r '.request_limit_fail_open // false'; }
 
 tmp=''
 trap 'if [ -n "$tmp" ]; then rm -rf "$tmp"; fi' EXIT # at exit, when up() has returned: so not a local
@@ -82,7 +92,11 @@ up() {
   # the skips first, so the API never runs through the Worker, not even for a moment
   for p in "${SKIP[@]}"; do set_route "$p"; done
   set_route "$MAIN" "$SCRIPT"
-  echo "live. Once: set the $MAIN route's request limit failure mode to Fail open in the dashboard (see the top of this file)."
+  if [ "$(fail_open)" = true ]; then
+    echo "live; the $MAIN route fails open"
+  else
+    echo "live. Now set the $MAIN route's request limit failure mode to Fail open in the dashboard (see the top of this file)."
+  fi
 }
 
 down() {
@@ -97,7 +111,8 @@ down() {
 }
 
 status() {
-  api GET "/zones/$ZONE/workers/routes" | check | jq -r '.result[] | "route \(.pattern) -> \(.script // "(no Worker)")"'
+  api GET "/zones/$ZONE/workers/routes" | check |
+    jq -r '.result[] | "route \(.pattern) -> \(.script // "(no Worker)")\(if .script then (if .request_limit_fail_open then ", fails open" else ", FAILS CLOSED: set Fail open in the dashboard" end) else "" end)"'
   api GET "/accounts/$ACCOUNT/workers/scripts" | check |
     jq -r --arg s "$SCRIPT" 'if any(.result[]; .id == $s) then "worker \($s): uploaded" else "worker \($s): not uploaded" end'
 }
