@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { api, ApiError, getToken, onUnauthorized, setToken } from './api';
+import { api, ApiError, getToken, onUnauthorized, setToken, storedToken } from './api';
 import { mergeServerSettings, setSettingsServerSync } from './settings';
 import { loadJson, saveJson } from './store';
 import { toast } from './toast';
@@ -14,6 +14,9 @@ interface AuthContextValue {
   register(username: string, email: string, password: string): Promise<void>;
   /** Sets a new password with a reset link's token and signs in (every other session ends). */
   resetPassword(token: string, password: string): Promise<void>;
+  /** Changes the password (`password`: the current one; left out by an account without one, which
+   *  sets its first). Every other session ends; this one carries on with a fresh token. */
+  changePassword(newPassword: string, password?: string): Promise<void>;
   logout(): Promise<void>;
   /** Deletes the account for good (after checking the password, or the username for an account
    *  without one), then signs out. */
@@ -69,23 +72,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    onUnauthorized(() => {
-      if (!currentUser) return;
-      setToken(null);
-      applyUser(null);
-      toast.notice('Your session expired - please log in again.');
-    });
-    if (!getToken()) {
-      applyUser(null);
-      return;
-    }
     let ctrl = new AbortController();
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let failures = 0;
     const check = () => {
       if (retryTimer) clearTimeout(retryTimer);
       retryTimer = null;
-      if (!getToken()) return;
+      const sent = getToken();
+      if (!sent) return;
       ctrl.abort();
       const c = (ctrl = new AbortController());
       api.auth
@@ -98,6 +92,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .catch((err) => {
           if (c.signal.aborted) return;
           if (err instanceof ApiError && err.status === 401) {
+            // another tab's newer token arrived meanwhile (lib/api.ts): check with that one
+            if (getToken() !== sent) return check();
             window.removeEventListener('online', check);
             setToken(null);
             applyUser(null);
@@ -109,13 +105,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           retryTimer = setTimeout(check, Math.min(60_000, 2000 * 2 ** failures++));
         });
     };
-    window.addEventListener('online', check);
-    check();
-    return () => {
+    const cleanup = () => {
       ctrl.abort();
       if (retryTimer) clearTimeout(retryTimer);
       window.removeEventListener('online', check);
     };
+    onUnauthorized((sent) => {
+      // signed out already, or a request sent before this tab got a newer token: nothing to undo
+      if (!currentUser || sent !== getToken()) return;
+      // Another tab stored a newer token (it signed in again, or changed the password before this
+      // tab heard): carry on with that one. Signing out here would delete it from storage too.
+      const stored = storedToken();
+      if (stored && stored !== sent) {
+        setToken(stored);
+        check();
+        return;
+      }
+      setToken(null);
+      applyUser(null);
+      toast.notice('Your session expired - please log in again.');
+    });
+    if (!getToken()) {
+      applyUser(null);
+      return cleanup;
+    }
+    window.addEventListener('online', check);
+    check();
+    return cleanup;
   }, [applyUser]);
 
   const value = useMemo<AuthContextValue>(
@@ -147,6 +163,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           /* settings are optional */
         }
+        applyUser(res.user);
+      },
+      async changePassword(newPassword, password) {
+        const res = await api.auth.changePassword({ newPassword, ...(password !== undefined ? { password } : {}) });
+        setToken(res.token);
         applyUser(res.user);
       },
       async logout() {

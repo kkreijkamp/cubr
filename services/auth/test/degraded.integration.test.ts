@@ -1,7 +1,8 @@
 // Auth with Redis down. Redis is a soft dependency (src/safe.ts): sign-up, login and tokens keep
 // working (rate limits and revocation checks fail open, events are logged), but every change that
 // would weaken security without it - making a profile private, logging out, deleting the account,
-// resetting a password - refuses with 503 and changes nothing. Also the private-profile set sync.
+// resetting or changing a password - refuses with 503 and changes nothing. Also the private-profile
+// set sync.
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 import { Redis } from 'ioredis';
 import { makeAuth, PRIVATE_USERS_KEY } from '@cubr/common';
@@ -81,6 +82,14 @@ describeIntegration('auth with Redis down', () => {
     expect(res.statusCode).toBe(503);
     expect((await row(user.id)).password_hash).toBe(before);
     expect((await s.pool.query('select 1 from auth.password_resets where user_id = $1', [user.id])).rowCount).toBe(1);
+  }, 20_000);
+
+  it('refuses a password change it cannot follow by signing out the other sessions, and changes nothing', async () => {
+    const { user, token } = await signUp();
+    const before = (await row(user.id)).password_hash;
+    const res = await s.request('POST', '/api/auth/me/password', { token, body: { password: PASSWORD, newPassword: 'brand new pass' } });
+    expect(res.statusCode).toBe(503);
+    expect((await row(user.id)).password_hash).toBe(before);
   }, 20_000);
 });
 

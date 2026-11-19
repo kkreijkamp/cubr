@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowDownTrayIcon,
@@ -6,6 +6,7 @@ import {
   ArrowUpTrayIcon,
   DocumentArrowUpIcon,
   EnvelopeIcon,
+  LockClosedIcon,
   PaperAirplaneIcon,
   PencilIcon,
   UserCircleIcon,
@@ -17,12 +18,14 @@ import { api, ApiError } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useRegisterCommands } from '../../lib/commands';
 import { formatDate, formatNumber, localDateKey } from '../../lib/format';
+import { CHANGE_PASSWORD_HASH } from '../../lib/password';
 import { exportAll, importSessions } from '../../lib/solves';
 import { toast } from '../../lib/toast';
 import type { PrivateUser } from '../../lib/types';
 import { Modal } from '../Modal';
 import { SignInMethods } from './SignInMethods';
 import { ChangeEmailModal } from './ChangeEmailModal';
+import { ChangePasswordModal } from './ChangePasswordModal';
 import { SessionName } from '../SessionName';
 import { Spinner } from '../Spinner';
 
@@ -157,6 +160,14 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
   const changing = pendingEmail !== null && pendingEmail.toLowerCase() !== user.email.toLowerCase();
   // false only: a user cached by an older version doesn't say (unknown, not unconfirmed)
   const unconfirmed = user.emailVerified === false && !changing;
+  // /account#change-password (where /.well-known/change-password leads) opens the dialog at once
+  const [changingPassword, setChangingPassword] = useState(() => window.location.hash === CHANGE_PASSWORD_HASH);
+  const hasPassword = user.hasPassword !== false;
+
+  useEffect(() => {
+    // the fragment has done its job: a reload doesn't open the dialog again
+    if (window.location.hash === CHANGE_PASSWORD_HASH) history.replaceState(history.state, '', window.location.pathname);
+  }, []);
 
   /** A new link that confirms the current email (the one from sign-up expired, or never came). */
   const sendConfirmation = async () => {
@@ -233,11 +244,18 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
       { id: 'account-export', label: 'Export data (json)', icon: <ArrowDownTrayIcon />, keywords: ['backup', 'download'], run: () => void doExport('json') },
       { id: 'account-export-cstimer', label: 'Export for csTimer', icon: <ArrowDownTrayIcon />, keywords: ['cstimer', 'backup', 'download'], run: () => void doExport('cstimer') },
       { id: 'account-email', label: 'Change email...', icon: <EnvelopeIcon />, keywords: ['address', 'account'], run: () => setChangingEmail(true) },
+      {
+        id: 'account-password',
+        label: hasPassword ? 'Change password...' : 'Set a password...',
+        icon: <LockClosedIcon />,
+        keywords: ['password', 'security', 'account'],
+        run: () => setChangingPassword(true),
+      },
       ...(unconfirmed
         ? [{ id: 'account-email-confirm', label: 'Send email confirmation link', icon: <PaperAirplaneIcon />, keywords: ['confirm', 'verify', 'address'], run: () => void sendConfirmation() }]
         : []),
     ],
-    [onEdit, unconfirmed],
+    [onEdit, unconfirmed, hasPassword],
   );
 
   return (
@@ -279,7 +297,27 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
             </button>
           </div>
         </div>
-        <SignInMethods />
+        {/* reloads once a first password is set, so it lists it */}
+        <SignInMethods key={hasPassword ? 'password' : 'none'} />
+        <div className="ac-row">
+          <div>
+            <div className="t">
+              <LockClosedIcon /> password
+            </div>
+            <div className="d">
+              {hasPassword ? (
+                <>changing it signs you out on every other device.</>
+              ) : (
+                <>none yet: you sign in with Google or GitHub. set one to sign in with your username or email too.</>
+              )}
+            </div>
+          </div>
+          <div className="ac-actions">
+            <button className="btn" onClick={() => setChangingPassword(true)}>
+              <LockClosedIcon /> {hasPassword ? 'change password' : 'set a password'}
+            </button>
+          </div>
+        </div>
         <div className="ac-row">
           <div>
             <div className="t">
@@ -342,6 +380,18 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
             setChangingEmail(false);
             setPendingEmail(email);
             toast.success(`open the link we sent to ${email}. your email stays ${user.email} until then.`, { title: 'check your inbox' });
+          }}
+        />
+      )}
+      {changingPassword && (
+        <ChangePasswordModal
+          user={user}
+          onClose={() => setChangingPassword(false)}
+          onDone={() => {
+            setChangingPassword(false);
+            toast.success(hasPassword ? 'you are still signed in here, and signed out everywhere else.' : 'you can now sign in with your username or email too.', {
+              title: hasPassword ? 'password changed' : 'password set',
+            });
           }}
         />
       )}

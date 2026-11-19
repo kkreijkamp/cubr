@@ -43,13 +43,14 @@ export function confirmEmailLink(publicUrl: string, token: string): string {
   return `${publicUrl.replace(/\/+$/, '')}/confirm-email#${token}`;
 }
 
-const escapeHtml = (s: string) =>
+export const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
-type Email = { subject: string; text: string; html: string };
+export type Email = { subject: string; text: string; html: string };
 
-/** The minimal HTML around a message, in the default theme's colours (as the reset email). */
-function page(paragraphs: string[], button?: { label: string; href: string }, footnote?: string, link?: string): string {
+/** The minimal HTML around a message, in the default theme's colours (as the reset email). Also used
+ *  by the other account emails (passwordChange.ts). */
+export function page(paragraphs: string[], button?: { label: string; href: string }, footnote?: string, link?: string): string {
   const ps = paragraphs.map((p) => `<p style="margin:0 0 16px">${p}</p>`).join('\n');
   const btn = button
     ? `<p style="margin:8px 0 24px"><a href="${button.href}" style="display:inline-block;padding:10px 18px;border-radius:8px;background:#00a04d;color:#ffffff;text-decoration:none;font-weight:600">${button.label}</a></p>`

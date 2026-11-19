@@ -68,7 +68,7 @@ export function SignInMethods() {
         </div>
         <div className="d">
           you sign in with <span className="text">{ways.join(', ').replace(/, ([^,]*)$/, ' and $1') || 'nothing yet'}</span>.
-          {!methods.password && <> no password yet: &quot;forgot password?&quot; on the sign-in page sets one.</>}
+          {!methods.password && <> no password yet: you can set one below.</>}
         </div>
       </div>
       <div className="ac-actions">

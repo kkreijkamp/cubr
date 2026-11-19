@@ -580,6 +580,82 @@ describeIntegration('auth API', () => {
     });
   });
 
+  describe('changing the password', () => {
+    const changePassword = (token: string, body: Record<string, unknown>) => s.request('POST', '/api/auth/me/password', { token, body, ip: freshIp() });
+
+    it('checks the current password, then signs out every other session and signs this one in again', async () => {
+      const { user, token } = await signUp();
+      const otherDevice = (await login(user.username)).json().token as string;
+      expect((await changePassword(token, { password: 'not it', newPassword: 'brand new pass' })).statusCode).toBe(403);
+      expect((await changePassword(token, { newPassword: 'brand new pass' })).statusCode).toBe(403);
+      expect((await me(token)).statusCode).toBe(200); // a wrong password changes nothing
+      const res = await changePassword(token, { password: PASSWORD, newPassword: 'brand new pass' });
+      expect(res.statusCode, res.body).toBe(200);
+      const { token: fresh, user: after } = res.json();
+      expect(after).toMatchObject({ id: user.id, username: user.username, hasPassword: true });
+      expect((await me(fresh)).statusCode).toBe(200);
+      expect((await me(token)).statusCode).toBe(401);
+      expect((await me(otherDevice)).statusCode).toBe(401);
+      expect((await login(user.username)).statusCode).toBe(401);
+      expect((await login(user.username, 'brand new pass')).statusCode).toBe(200);
+    });
+
+    it('refuses the same password again, a new one under 8 characters, and no sign-in', async () => {
+      const { token, user } = await signUp();
+      const same = await changePassword(token, { password: PASSWORD, newPassword: PASSWORD });
+      expect(same.statusCode).toBe(400);
+      expect(same.json().error.message).toMatch(/already your password/i);
+      expect((await changePassword(token, { password: PASSWORD, newPassword: 'short' })).statusCode).toBe(400);
+      expect((await s.request('POST', '/api/auth/me/password', { body: { password: PASSWORD, newPassword: 'brand new pass' }, ip: freshIp() })).statusCode).toBe(401);
+      expect((await me(token)).statusCode).toBe(200);
+      expect((await login(user.username)).statusCode).toBe(200); // the password is unchanged
+    });
+
+    it('ends the pending password-reset links', async () => {
+      const { token, user } = await signUp();
+      const reset = newResetToken();
+      await s.pool.query(`insert into auth.password_resets (token_hash, user_id, expires_at) values ($1, $2, now() + interval '1 hour')`, [reset.hash, user.id]);
+      expect((await changePassword(token, { password: PASSWORD, newPassword: 'brand new pass' })).statusCode).toBe(200);
+      const viaLink = await s.request('POST', '/api/auth/password/reset', { body: { token: reset.token, password: 'another pass 2' }, ip: freshIp() });
+      expect(viaLink.statusCode).toBe(400);
+    });
+
+    it('lets an account without a password set its first, only right after signing in', async () => {
+      const { user } = await signUp();
+      await s.pool.query('update auth.users set password_hash = null where id = $1', [user.id]);
+      const now = Math.floor(Date.now() / 1000);
+      const stale = (await signToken(s.config.jwtSecret, user, 3600, now - 20 * 60)).token;
+      const fresh = (await signToken(s.config.jwtSecret, user, 3600, now)).token;
+      const refused = await changePassword(stale, { newPassword: 'first password' });
+      expect(refused.statusCode).toBe(403);
+      expect(refused.json().error.message).toMatch(/sign in again/i);
+      const res = await changePassword(fresh, { newPassword: 'first password' });
+      expect(res.statusCode, res.body).toBe(200);
+      expect(res.json().user.hasPassword).toBe(true);
+      expect((await login(user.username, 'first password')).statusCode).toBe(200);
+    });
+
+    it('allows 5 attempts an hour per account', async () => {
+      const { token } = await signUp();
+      for (let i = 0; i < 5; i++) expect((await changePassword(token, { password: `guess ${i}`, newPassword: 'brand new pass' })).statusCode).toBe(403);
+      expect((await changePassword(token, { password: PASSWORD, newPassword: 'brand new pass' })).statusCode).toBe(429);
+    });
+
+    it("tells the account's email, only if it's confirmed (an unconfirmed one may be a stranger's)", async () => {
+      const notice = 'Your cubr password was changed';
+      const confirmed = await signUp();
+      await confirmEmailOf(confirmed.user.id);
+      expect((await changePassword(confirmed.token, { password: PASSWORD, newPassword: 'brand new pass' })).statusCode).toBe(200);
+      const never = await signUp();
+      expect((await changePassword(never.token, { password: PASSWORD, newPassword: 'brand new pass' })).statusCode).toBe(200);
+
+      await vi.waitFor(() => expect(mailsTo(confirmed.user.email, notice)).toHaveLength(1));
+      expect(mailsTo(confirmed.user.email, notice)[0].text).toMatch(/on the sign-in page \(http\S*\/login\)/);
+      await new Promise((r) => setTimeout(r, 200));
+      expect(mailsTo(never.user.email, notice)).toHaveLength(0);
+    });
+  });
+
   describe('confirming the email', () => {
     const confirm = (token: string) => s.request('POST', '/api/auth/email/confirm', { body: { token }, ip: freshIp() });
     const sendAgain = (token: string) => s.request('POST', '/api/auth/me/email/confirmation', { token, ip: freshIp() });

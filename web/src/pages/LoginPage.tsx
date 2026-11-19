@@ -14,6 +14,7 @@ import { safeNext } from '../components/social/util';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { CONTACT_EMAIL } from '../lib/links';
+import { validatePassword } from '../lib/password';
 import { localDataSummary } from '../lib/solves';
 import { toast } from '../lib/toast';
 import '../components/social/login.css';
@@ -32,12 +33,6 @@ function validateUsername(v: string): string | null {
 function validateEmail(v: string): string | null {
   if (!v) return 'enter your email';
   if (v.length > 254 || !EMAIL_RE.test(v)) return 'that does not look like an email';
-  return null;
-}
-function validatePassword(v: string): string | null {
-  if (!v) return 'choose a password';
-  if (v.length < 8) return 'at least 8 characters';
-  if (v.length > 128) return 'at most 128 characters';
   return null;
 }
 

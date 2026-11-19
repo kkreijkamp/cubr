@@ -415,6 +415,7 @@ type PB = { valueMs: number; solveId: string|null; achievedAt: string };
 | POST `/api/auth/me/email` | req | `{email, password?}` (password required when the account has one) | 202 `{ok: true, email}`: the new address gets a link `<PUBLIC_URL>/confirm-email#<token>` (32 random bytes, valid 60 min, single use; replaces a pending change); nothing changes until it's opened; 400 same as the current email; 403 wrong password, or (no password: made with a provider) no sign-in in the last 10 min (token `iat`); 409 another account uses it; 429 after 5/h per account; 503 the email couldn't be sent (nothing pending) |
 | POST `/api/auth/email/confirm` | - | `{token}` | 200 `{email, changed}`: the address is confirmed (`email_verified_at`) and the user's pending links are deleted. `changed: false`: it was the account's own address. `changed: true`: the email changes too, the user's password-reset links are deleted, and the old address gets a notice with the new one masked (`j***@example.com`) if it was confirmed (an unconfirmed one may be a stranger's); sessions carry on; 400 invalid/expired/used link; 409 another account took the address meanwhile (nothing changes, the link stays); 429 after 20/h/IP |
 | POST `/api/auth/password/reset` | - | `{token, password}` (password: 8-128 chars) | 200 `{token, user: PrivateUser}`: new password set, the address confirmed (the link reached it), the user's other reset links deleted, every older token revoked (per-user revocation; the new token is issued after it); 400 invalid/expired/used link; 503 if the revocation can't be stored (nothing changes) |
+| POST `/api/auth/me/password` | req | `{password?, newPassword}` (password: the current one, required when the account has one; newPassword: 8-128 chars) | 200 `{token, user: PrivateUser}`: the new password set, the user's reset links deleted, every older token revoked (this one's too; the new token is issued after it), and the account's email told ("Your cubr password was changed") if it's confirmed or predates confirming. An account without a password (made with a provider) sets its first this way. 400 the same as the current password; 403 wrong password, or (no password) no sign-in in the last 10 min (token `iat`); 429 after 5/h per account; 503 if the revocation can't be stored (nothing changes) |
 | GET `/api/auth/me` | req | - | `{user: PrivateUser, settings: object}` |
 | PATCH `/api/auth/me` | req | `{displayName?, bio?, country?, wcaId?, private?}` (null clears; `private: true` = private profile) | `{user: PrivateUser}` (+ `user.updated`); 503 if the private flag can't be mirrored to Redis (nothing changes) |
 | PUT `/api/auth/me/settings` | req | `{settings: object}` (<= 16 KB JSON) | `{settings}` |
@@ -603,6 +604,16 @@ Google, Apple or GitHub: signs in, or asks a new account for its username), `/re
 (the link to a new email address), `/terms`, `/privacy`. Guest mode works fully offline in localStorage; logged-in users sync to solve-service
 with an optimistic local store + retry queue (idempotent ids). Monkeytype-style theme system via CSS
 custom properties, command palette (Esc / Ctrl+K), focus mode while timing, toasts.
+
+**Changing the password.** The account page's "password" row opens a dialog (`ChangePasswordModal`):
+the current password, then the new one, with a show button. An account made with a provider sets its
+first instead, after a fresh sign-in (the dialog offers one, as changing the email does).
+- **For password managers:** the fields say which password is which (`autocomplete`), and a hidden
+  username field says whose. `/account#change-password` opens the dialog; a signed-out visitor signs in
+  first and comes back to it.
+- **Other tabs stay signed in:** a change or a reset revokes every older token. A tab that hears through
+  `localStorage` of a new token for the same account switches to it (`lib/api.ts`). A 401 never
+  deletes a newer token another tab stored; the tab carries on with that one instead (`lib/auth.tsx`).
 
 Hover styles apply only where something can hover: the build wraps every `:hover` selector in
 `@media (hover: hover)` (`web/plugins/hoverMedia.ts`, a PostCSS step in `vite.config.ts`), so a tap

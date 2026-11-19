@@ -19,7 +19,8 @@ export default function AccountPage() {
   }, []);
 
   if (status === 'loading') return <PageLoading />;
-  if (status !== 'authed' || !user) return <Navigate to={`/login?next=${encodeURIComponent('/account')}`} replace />;
+  // back here after signing in, still with #change-password (from /.well-known/change-password)
+  if (status !== 'authed' || !user) return <Navigate to={`/login?next=${encodeURIComponent(`/account${window.location.hash}`)}`} replace />;
 
   return (
     <>

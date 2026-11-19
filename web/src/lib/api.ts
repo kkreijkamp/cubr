@@ -24,7 +24,7 @@ try {
 } catch {
   token = null;
 }
-let unauthorizedHandler: (() => void) | null = null;
+let unauthorizedHandler: ((sent: string) => void) | null = null;
 
 export function getToken(): string | null {
   return token;
@@ -38,9 +38,45 @@ export function setToken(t: string | null): void {
     /* storage unavailable */
   }
 }
-/** Called when an authenticated request gets 401 (expired/revoked token). */
-export function onUnauthorized(fn: () => void): void {
+/** The token in storage, which another tab may have replaced since this one read it. */
+export function storedToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+/** Called when an authenticated request gets 401 (expired/revoked token), with the token it sent. */
+export function onUnauthorized(fn: (sent: string) => void): void {
   unauthorizedHandler = fn;
+}
+
+/** Whose a token is (its `sub`), read without verifying it: only to tell whether two tokens belong to
+ *  the same account. */
+export function tokenSubject(t: string | null | undefined): string | null {
+  try {
+    const payload: unknown = JSON.parse(atob((t ?? '').split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    const sub = (payload as { sub?: unknown } | null)?.sub;
+    return typeof sub === 'string' ? sub : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The token this tab should use when another tab stores `stored`: that one if it's the same
+ *  account's (a password change there signs out every older token), else this tab's own. */
+export function followStoredToken(current: string | null, stored: string | null): string | null {
+  if (!current || !stored || stored === current) return current;
+  const sub = tokenSubject(stored);
+  return sub !== null && sub === tokenSubject(current) ? stored : current;
+}
+
+// Another tab changed the password, or reset it: carry on with its new token here too, rather than
+// being signed out by the next request. (A different account's token is left to the 401 handler.)
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === TOKEN_KEY) token = followStoredToken(token, e.newValue);
+  });
 }
 
 const timeZone = (() => {
@@ -96,7 +132,8 @@ export async function requestRaw<T>(
   const raw = body instanceof Blob;
   if (raw) headers['content-type'] = body.type || 'application/octet-stream';
   else if (body !== undefined) headers['content-type'] = 'application/json';
-  if (token) headers.Authorization = `Bearer ${token}`;
+  const sent = token;
+  if (sent) headers.Authorization = `Bearer ${sent}`;
   const started = performance.now();
   let res: Response;
   const signal = withTimeout(opts.signal, opts.timeoutMs);
@@ -130,7 +167,7 @@ export async function requestRaw<T>(
     }
   }
   if (!res.ok) {
-    if (res.status === 401 && token && unauthorizedHandler) unauthorizedHandler();
+    if (res.status === 401 && sent && unauthorizedHandler) unauthorizedHandler(sent);
     throw new ApiError(
       res.status,
       json?.error?.code ?? `HTTP_${res.status}`,
@@ -187,6 +224,12 @@ export const api = {
     /** Uses a reset link's token once; signs out every other session and returns a fresh one. */
     resetPassword: (body: { token: string; password: string }) =>
       request<{ token: string; user: PrivateUser }>('POST', '/api/auth/password/reset', body),
+    /** Changes the password (`password`: the current one, 403 if wrong), or sets the first one for an
+     *  account without (it must have signed in in the last 10 minutes, 403 otherwise). Signs out
+     *  every other session and returns a fresh token. 400 if it's the same password, 429 after 5 an
+     *  hour. */
+    changePassword: (body: { newPassword: string; password?: string }) =>
+      request<{ token: string; user: PrivateUser }>('POST', '/api/auth/me/password', body),
     me: (signal?: AbortSignal) => get<{ user: PrivateUser; settings: Record<string, unknown> }>('/api/auth/me', signal),
     /** Asks to change the email: the new address gets a link, nothing changes until it's opened. The
      *  password is asked again (403 if wrong); an account without one must have signed in in the last
