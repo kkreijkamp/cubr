@@ -16,10 +16,13 @@ import {
   type UserRow,
 } from '../users.js';
 import { allow, publishSafely } from '../safe.js';
+import { AvatarImageError, reencodeAvatar } from '../avatarImage.js';
 
 /**
  * Profile pictures.
- *   PUT    /api/auth/me/avatar          raw image body (image/webp|jpeg|png, <= 300 KB) -> {user}
+ *   PUT    /api/auth/me/avatar          raw image body (image/webp|jpeg|png, <= 300 KB, <= 2048 px a side)
+ *                                        -> {user}; stored as a fresh 256x256 WebP (avatarImage.ts), so
+ *                                        nothing of the upload but its pixels is kept (no EXIF)
  *   DELETE /api/auth/me/avatar          -> {user}
  *   GET    /api/users/:username/avatar  image bytes; the path segment may be a user id or a username
  * A changed picture publishes user.updated (with the new avatarUrl), so other service, e.g. the
@@ -39,14 +42,18 @@ export async function registerAvatarRoutes(app: FastifyInstance, { pool, redis, 
     const actual = sniffImageType(body);
     if (!actual || actual !== declared) throw badRequest('File is not a valid PNG, JPEG or WebP image');
     if (!(await allow(redis, `avatar:${userId}`, 10, 3600))) throw rateLimited('Too many picture changes, try again later');
+    // after the rate limit: decoding is the expensive part
+    const picture = await reencodeAvatar(body).catch((err: unknown) => {
+      throw err instanceof AvatarImageError ? badRequest(err.message) : err;
+    });
 
-    const version = createHash('sha256').update(body).digest('hex').slice(0, 12);
+    const version = createHash('sha256').update(picture).digest('hex').slice(0, 12);
     const row = await withTx(pool, async (client) => {
       await client.query(
         `insert into auth.avatars (user_id, content_type, bytes, version) values ($1, $2, $3, $4)
          on conflict (user_id) do update set content_type = excluded.content_type, bytes = excluded.bytes,
                                              version = excluded.version, updated_at = now()`,
-        [userId, actual, body, version],
+        [userId, 'image/webp', picture, version],
       );
       const { rows } = await client.query<UserRow>(`update auth.users set avatar_version = $2 where id = $1 returning ${USER_COLUMNS}`, [userId, version]);
       return rows[0];

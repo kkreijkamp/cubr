@@ -166,7 +166,9 @@ CREATE TABLE auth.user_settings (
   settings   jsonb NOT NULL DEFAULT '{}',
   updated_at timestamptz NOT NULL DEFAULT now()
 );
--- profile pictures (migration 002): browser-resized <= 300 KB images; users.avatar_version is a
+-- profile pictures (migration 002): uploads (the browser crops them to 256x256) are decoded and stored
+-- again as a 256x256 WebP made from their pixels alone (no EXIF or other metadata; services/auth/src/
+-- avatarImage.ts); rows from before v1.5.15 keep the browser's bytes. users.avatar_version is a
 -- content hash that makes each picture URL unique (immutable, cacheable forever)
 ALTER TABLE auth.users ADD COLUMN avatar_version text;
 -- private profile (migration 004): strangers see only username + picture; mirrored to auth:private-users
@@ -419,7 +421,7 @@ type PB = { valueMs: number; solveId: string|null; achievedAt: string };
 | GET `/api/auth/me` | req | - | `{user: PrivateUser, settings: object}` |
 | PATCH `/api/auth/me` | req | `{displayName?, bio?, country?, wcaId?, private?}` (null clears; `private: true` = private profile) | `{user: PrivateUser}` (+ `user.updated`); 503 if the private flag can't be mirrored to Redis (nothing changes) |
 | PUT `/api/auth/me/settings` | req | `{settings: object}` (<= 16 KB JSON) | `{settings}` |
-| PUT `/api/auth/me/avatar` | req | raw image body, `Content-Type: image/webp\|image/jpeg\|image/png`, <= 300 KB (magic bytes must match) | `{user: PrivateUser}`; 400, 413, 429 (10/h) (+ `user.updated`) |
+| PUT `/api/auth/me/avatar` | req | raw image body, `Content-Type: image/webp\|image/jpeg\|image/png`, <= 300 KB (magic bytes must match), <= 2048 px a side | `{user: PrivateUser}`; stored as a fresh 256x256 WebP: turned upright by its EXIF orientation, cropped to the centre, first frame only, no metadata. 400 (not a decodable PNG, JPEG or WebP, or over 2048 px), 413, 415, 429 (10/h) (+ `user.updated`) |
 | DELETE `/api/auth/me/avatar` | req | - | `{user: PrivateUser}` (+ `user.updated`) |
 | DELETE `/api/auth/me` | req | `{password}`, or `{confirm: username}` (case-insensitive) for an account without a password | 204: the account is deleted and every token of it revoked (+ `user.deleted`, which makes the other services delete its data; its provider identities cascade); 403 wrong password or username; 429 after 5 tries/10 min; 503 when Redis can't take the revocation or the event (then nothing is deleted) |
 | GET `/api/auth/oauth/providers` | - | - | `{providers: ('google'\|'apple'\|'github')[]}`: the providers whose keys are set (none = no buttons); cached 5 min |

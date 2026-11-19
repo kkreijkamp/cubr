@@ -1,5 +1,6 @@
 // The auth service's HTTP API against a real Postgres and Redis (@cubr/testkit): accounts, sign-in,
 // sessions, password reset, account deletion, private profiles, pictures and Ko-fi supporters.
+import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PRIVATE_USERS_KEY, revokedUserKey, signToken } from '@cubr/common';
 import { describeIntegration, startTestServer, type TestServer } from '@cubr/testkit';
@@ -27,9 +28,10 @@ const PASSWORD = 'correct horse 1';
 let ipCount = 0;
 const freshIp = () => `10.1.${Math.floor(++ipCount / 250)}.${(ipCount % 250) + 1}`;
 
-/** PNG / JPEG magic bytes plus a little padding: enough for the sniffing the route does. */
-const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64, 1)]);
-const JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(64, 2)]);
+/** Real pictures: the server decodes every upload and stores it again as a 256 x 256 WebP. */
+const picture = (width: number, height: number) => sharp({ create: { width, height, channels: 3, background: '#00a04d' } });
+const PNG = await picture(64, 64).png().toBuffer();
+const JPEG = await picture(64, 64).jpeg().toBuffer();
 
 describeIntegration('auth API', () => {
   let s: TestServer;
@@ -385,11 +387,11 @@ describeIntegration('auth API', () => {
 
       const got = await s.app.inject({ url: avatarUrl });
       expect(got.statusCode).toBe(200);
-      expect(got.headers['content-type']).toBe('image/png');
+      expect(got.headers['content-type']).toBe('image/webp');
       expect(got.headers['x-content-type-options']).toBe('nosniff');
       expect(got.headers['content-security-policy']).toContain('sandbox');
       expect(got.headers['cache-control']).toContain('immutable');
-      expect(got.rawPayload.equals(PNG)).toBe(true);
+      expect(await sharp(got.rawPayload).metadata()).toMatchObject({ format: 'webp', width: 256, height: 256 });
       const byName = await s.app.inject({ url: `/api/users/${user.username}/avatar` });
       expect(byName.headers['cache-control']).toBe('public, max-age=300');
       const revalidated = await s.app.inject({ url: `/api/users/${user.username}/avatar`, headers: { 'if-none-match': got.headers.etag as string } });
@@ -415,6 +417,43 @@ describeIntegration('auth API', () => {
       const big = Buffer.concat([PNG, Buffer.alloc(300 * 1024)]);
       const res = await s.request('PUT', '/api/auth/me/avatar', { token, body: big, headers: { 'content-type': 'image/png' } });
       expect(res.statusCode).toBe(413);
+    });
+
+    it("stores a fresh picture made from the upload's pixels: its EXIF, GPS location included, is gone", async () => {
+      const { token, user } = await signUp();
+      const photo = await picture(800, 600)
+        .jpeg()
+        .withExif({ IFD0: { ImageDescription: 'taken-at-home' }, IFD3: { GPSLatitudeRef: 'S', GPSLatitude: '27/1 28/1 3000/100', GPSLongitudeRef: 'E', GPSLongitude: '153/1 1/1 4800/100' } })
+        .toBuffer();
+      expect((await sharp(photo).metadata()).exif?.includes('taken-at-home')).toBe(true);
+      const put = await s.request('PUT', '/api/auth/me/avatar', { token, body: photo, headers: { 'content-type': 'image/jpeg' } });
+      expect(put.statusCode, put.body).toBe(200);
+      const got = await s.app.inject({ url: `/api/users/${user.id}/avatar` });
+      const meta = await sharp(got.rawPayload).metadata();
+      expect(meta).toMatchObject({ format: 'webp', width: 256, height: 256 });
+      expect(meta.exif).toBeUndefined();
+      expect(got.rawPayload.includes('taken-at-home')).toBe(false);
+      const { rows } = await s.pool.query<{ content_type: string; bytes: Buffer }>('select content_type, bytes from auth.avatars where user_id = $1', [user.id]);
+      expect(rows[0].content_type).toBe('image/webp');
+      expect(rows[0].bytes.equals(got.rawPayload)).toBe(true);
+    });
+
+    it("refuses a picture over 2048 px a side, or one that doesn't decode, and keeps the old one", async () => {
+      const { token, user } = await signUp();
+      expect((await s.request('PUT', '/api/auth/me/avatar', { token, body: PNG, headers: { 'content-type': 'image/png' } })).statusCode).toBe(200);
+      const before = (await s.pool.query<{ version: string }>('select version from auth.avatars where user_id = $1', [user.id])).rows[0].version;
+
+      const huge = await picture(3000, 3000).png().toBuffer(); // a small file, a 9-megapixel picture
+      const tooBig = await s.request('PUT', '/api/auth/me/avatar', { token, body: huge, headers: { 'content-type': 'image/png' } });
+      expect(tooBig.statusCode).toBe(400);
+      expect(tooBig.json().error.message).toBe('Picture is too big: at most 2048 x 2048 pixels');
+      const junk = Buffer.concat([PNG.subarray(0, 8), Buffer.alloc(64, 1)]); // the PNG signature, then nothing that decodes
+      const broken = await s.request('PUT', '/api/auth/me/avatar', { token, body: junk, headers: { 'content-type': 'image/png' } });
+      expect(broken.statusCode).toBe(400);
+      expect(broken.json().error.message).toBe('File is not a valid PNG, JPEG or WebP image');
+
+      const after = (await s.pool.query<{ version: string }>('select version from auth.avatars where user_id = $1', [user.id])).rows[0].version;
+      expect(after).toBe(before);
     });
   });
 
