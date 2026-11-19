@@ -176,6 +176,14 @@ and run the WCA import.
   centre) are blocked for 10 s with a JSON 429 in the app's error format ("Too many login attempts,
   try again in a few seconds"). It stops bursts before they reach the VM; the auth service's own
   limit (10 a minute per IP) still applies behind it.
+- **Zone settings** (Cloudflare, SSL/TLS and Security > Settings): Always Use HTTPS, minimum TLS 1.2,
+  TLS 1.3, Automatic HTTPS Rewrites and Browser Integrity Check are on. Check the TLS floor with
+  `curl -sSI --tlsv1.1 --tls-max 1.1 https://cubr.dev/`, which must fail with "alert protocol version".
+- **Bot Fight Mode stays off.** The free plan can't exempt anything from it, so it may challenge
+  Google Cloud's uptime check (`/healthz`), Ko-fi's webhook (`/api/supporters/kofi`) and
+  `scripts/smoke.mjs`, none of which can answer a challenge. It also forces Cloudflare's JavaScript
+  detections on: an inline script in every page, which the CSP refuses unless its header carries a
+  nonce.
 - **Logs rotate.** Every container logs through `json-file` with at most 3 x 10 MB (`x-logging` in
   `compose.prod.yml`), so the gateway's access log, which holds visitors' IPs, is overwritten as it
   fills up. The privacy policy (`/privacy`) relies on this.
