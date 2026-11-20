@@ -510,311 +510,315 @@ export default function TimerPage() {
   const isIdle = phase === 'idle' || phase === 'stopped';
 
   return (
-    <div className="timer-page">
+    <>
       {/* the page's heading, for screen readers and search engines: the timer speaks for itself on screen */}
       <h1 className="sr-only">{HOME.heading}</h1>
-      <ConfigBar
-        event={event}
-        sessions={st.sessions}
-        currentSessionId={st.currentSessionId}
-        onEvent={changeEvent}
-        onSession={(id) => void switchSession(id)}
-        onNewSession={() => setModal({ kind: 'newSession' })}
-        onRenameSession={() => setModal({ kind: 'renameSession' })}
-        onTogglePractice={togglePractice}
-        onDeleteSession={() => setModal({ kind: 'deleteSession' })}
-        onMergeSessions={() => setModal({ kind: 'mergeSessions' })}
-        inspection={settings.inspection}
-        onToggleInspection={() => updateSettings({ inspection: !settings.inspection })}
-        input={input}
-        inputs={AVAILABLE}
-        onInput={setInput}
-        onOverlayChange={onOverlayChange}
-        mode={st.mode}
-        pending={st.pending}
-        syncError={st.syncError}
-      />
-
-      <ScrambleBar
-        scramble={scr.current}
-        onNext={scr.next}
-        onPrev={scr.prev}
-        hasPrev={scr.hasPrev}
-        onCustom={scr.setCustom}
-        editing={editingScramble}
-        setEditing={setEditingScramble}
-        hint={input === 'smartcube' ? smartHint : null}
-      />
-
-      <div className={`tp-timer-area input-${input}`} {...(input === 'timer' ? engine.touchHandlers : {})} aria-label={input !== 'timer' ? undefined : touch ? 'timer: hold to get ready, release to start' : 'timer'}>
-        {manual ? (
-          <ManualEntry onSubmit={(r) => record(r, 'manual')} disabled={modal !== null || paletteOpen} />
-        ) : input === 'stackmat' || input === 'moyu' ? (
-          <StackmatInput
-            key={input}
-            kind={input}
-            enabled={inputsEnabled}
-            inspection={settings.inspection && eventInfo.inspection}
-            alerts={settings.inspectionAlerts}
-            useStatus={settings.stackmatStatus}
-            last={lastResult}
-            precision={settings.precision}
-            timerUpdate={settings.timerUpdate}
-            sizeRem={settings.timerSize}
-            pb={pb && isIdle}
-            onState={setAltState}
-            onSolve={(r) => {
-              lastStopAt.current = performance.now();
-              record(r, 'timer');
-            }}
-          />
-        ) : input === 'bttimer' ? (
-          <BtTimerInput
-            enabled={inputsEnabled}
-            inspection={settings.inspection && eventInfo.inspection}
-            alerts={settings.inspectionAlerts}
-            last={lastResult}
-            precision={settings.precision}
-            timerUpdate={settings.timerUpdate}
-            sizeRem={settings.timerSize}
-            pb={pb && isIdle}
-            onState={setAltState}
-            onSolve={(r) => {
-              lastStopAt.current = performance.now();
-              record(r, 'timer');
-            }}
-          />
-        ) : input === 'smartcube' ? (
-          <SmartCubeInput
-            event={event}
-            scramble={scr.current?.text ?? null}
-            enabled={inputsEnabled}
-            inspection={settings.inspection && eventInfo.inspection}
-            alerts={settings.inspectionAlerts}
-            last={lastResult}
-            precision={settings.precision}
-            timerUpdate={settings.timerUpdate}
-            sizeRem={settings.timerSize}
-            pb={pb && isIdle}
-            settings={settings}
-            onState={setAltState}
-            onSolve={(r, own) => {
-              lastStopAt.current = performance.now();
-              record(r, 'timer', own);
-            }}
-            onScramble={scr.setFromCube}
-            onHint={setSmartHint}
-          />
-        ) : input === 'virtual' || input === 'qcube' ? (
-          <VirtualInput
-            key={input}
-            event={event}
-            flat={input === 'qcube'}
-            scramble={scr.current?.text ?? null}
-            enabled={inputsEnabled}
-            inspection={settings.inspection && eventInfo.inspection}
-            alerts={settings.inspectionAlerts}
-            last={lastResult}
-            precision={settings.precision}
-            timerUpdate={settings.timerUpdate}
-            sizeRem={settings.timerSize}
-            pb={pb && isIdle}
-            settings={settings}
-            onState={setAltState}
-            onSolve={(r) => {
-              lastStopAt.current = performance.now();
-              record(r, 'timer');
-            }}
-          />
-        ) : (
-          <div key={pbKey}>
-            <TimerDisplay state={displayState} precision={settings.precision} timerUpdate={settings.timerUpdate} sizeRem={settings.timerSize} pb={pb && isIdle} />
-          </div>
-        )}
-      </div>
-
-      {/* on a touch screen the line under the time starts the timer too: a thumb aimed a little low lands here */}
-      <div className={`tp-under fade-on-focus${input === 'timer' ? ' tp-touch-start' : ''}`} {...(input === 'timer' ? engine.touchHandlers : {})}>
-        {solves.length === 0 && input === 'timer' && st.ready ? (
-          <div className="tp-hint">
-            {touch ? (
-              'hold the timer, release to start - tap anywhere to stop'
-            ) : settings.inspection && eventInfo.inspection ? (
-              <>
-                press <kbd>space</kbd> to start inspection
-              </>
-            ) : (
-              <>
-                hold <kbd>space</kbd> until the time turns green, release to start
-              </>
-            )}
-          </div>
-        ) : (
-          <div className="tp-avgline">
-            {pbKinds && (
-              <span className="pb-badge">
-                <TrophyIcon width={14} height={14} /> {pbKinds}
-              </span>
-            )}
-            <span>
-              ao5<b>{fmtAvg(stats.averages.ao5?.current, settings.precision)}</b>
-            </span>
-            <span>
-              ao12<b>{fmtAvg(stats.averages.ao12?.current, settings.precision)}</b>
-            </span>
-          </div>
-        )}
-        <QuickActions last={last} onPenalty={penaltyLast} onComment={commentLast} onDelete={deleteLast} />
-      </div>
-
-      <div className={`tp-bottom fade-on-focus cols-${cols}`}>
-        <StatsPanel stats={stats} ns={ns} solves={solves} precision={settings.precision} onOpenAverage={openAverage} onOpenSolve={openSolve} />
-        {showPreview && (
-          <section className="tp-panel tp-preview" aria-label="scramble preview">
-            <div className="tp-panel-title">
-              <EyeIcon width={14} height={14} /> scramble preview
-            </div>
-            <div className="tp-preview-box" ref={previewBoxRef}>
-              {previewScramble ? (
-                <TwistyPreview puzzle={eventInfo.puzzle} scramble={previewScramble} visualization={settings.scramblePreview === '3D' ? '3D' : '2D'} height={previewHeight} />
-              ) : null}
-            </div>
-          </section>
-        )}
-        {settings.showSolveList && (
-          <SolveList solves={solves} ao5={ao5} ao12={ao12} pbs={pbs} bestIndex={stats.bestIndex} precision={settings.precision} loading={st.loading || !st.ready} onOpen={openSolve} />
-        )}
-      </div>
-
-      {guest && (
-        <div className="tp-guest fade-on-focus">
-          <span>
-            <Link to="/login">sign in</Link> to save solves to the cloud, appear on leaderboards and race
-          </span>
-          <button
-            className="btn-text"
-            aria-label="dismiss"
-            onClick={() => {
-              setGuestHintHidden(true);
-              try {
-                localStorage.setItem(GUEST_HINT_KEY, '1');
-              } catch {
-                /* ignore */
-              }
-            }}
-            {...noFocus}
-          >
-            <XMarkIcon width={12} height={12} />
-          </button>
-        </div>
-      )}
-
-      {/* ------------------------------------------------------------ modals */}
-      {modal?.kind === 'solve' && solves[modal.index] && (
-        <SolveModal
-          solve={solves[modal.index]}
-          index={modal.index}
-          total={solves.length}
-          precision={settings.precision}
-          preview={settings.scramblePreview}
-          confirmDelete={settings.confirmDelete}
-          onNavigate={(i) => i >= 0 && i < solves.length && setModal({ kind: 'solve', index: i })}
-          onClose={() => setModal(null)}
-        />
-      )}
-      {modal?.kind === 'avg' && avgModal && (
-        <AverageModal label={avgModal.label} window={avgModal.window} precision={settings.precision} onOpenSolve={openSolve} onClose={() => setModal(null)} />
-      )}
-      {modal?.kind === 'newSession' && (
-        <PromptModal
-          title="new session"
-          label={`name - ${eventInfo.short.toLowerCase()}`}
-          initial={suggestSessionName(event)}
-          confirmLabel="create"
-          onSubmit={async (name) => {
-            const s = await createSession(name, event);
-            await switchSession(s.id);
-          }}
-          validate={(v) => (v.trim().length < 1 ? 'give it a name' : null)}
-          onClose={() => setModal(null)}
-        />
-      )}
-      {modal?.kind === 'renameSession' && session && (
-        <PromptModal
-          title="rename session"
-          label="name"
-          initial={session.name}
-          onSubmit={(name) => renameSession(session.id, name)}
-          validate={(v) => (v.trim().length < 1 ? 'give it a name' : null)}
-          onClose={() => setModal(null)}
-        />
-      )}
-      {modal?.kind === 'deleteSession' && session && (
-        <ConfirmModal
-          title="delete session"
-          message={
-            <>
-              Delete <span className="main">{session.name}</span>
-              {session.solveCount > 0 ? ` and its ${session.solveCount} solve${session.solveCount === 1 ? '' : 's'}` : ''}? This can't be undone.
-            </>
-          }
-          confirmLabel="delete session"
-          onConfirm={() => deleteSession(session.id)}
-          onClose={() => setModal(null)}
-        />
-      )}
-      {modal?.kind === 'clearSession' && session && (
-        <ConfirmModal
-          title="clear session"
-          message={
-            <>
-              Delete all {session.solveCount} solve{session.solveCount === 1 ? '' : 's'} in <span className="main">{session.name}</span>? The session stays. This can't be undone.
-            </>
-          }
-          confirmLabel="clear session"
-          onConfirm={async () => {
-            await clearSession(session.id);
-            clearResult();
-            toast.notice(`cleared ${session.name}`, { durationMs: 1500 });
-          }}
-          onClose={() => setModal(null)}
-        />
-      )}
-      {modal?.kind === 'mergeSessions' && (
-        <MergeSessionsModal
+      {/* data-nosnippet: search results never quote the scramble, the time or the hints (Google did,
+          "L' B R' L' F' ... 0.00. hold the timer, release to start"); they show the description instead */}
+      <div className="timer-page" data-nosnippet>
+        <ConfigBar
+          event={event}
           sessions={st.sessions}
           currentSessionId={st.currentSessionId}
-          event={event}
+          onEvent={changeEvent}
+          onSession={(id) => void switchSession(id)}
+          onNewSession={() => setModal({ kind: 'newSession' })}
+          onRenameSession={() => setModal({ kind: 'renameSession' })}
+          onTogglePractice={togglePractice}
+          onDeleteSession={() => setModal({ kind: 'deleteSession' })}
+          onMergeSessions={() => setModal({ kind: 'mergeSessions' })}
+          inspection={settings.inspection}
+          onToggleInspection={() => updateSettings({ inspection: !settings.inspection })}
+          input={input}
+          inputs={AVAILABLE}
+          onInput={setInput}
+          onOverlayChange={onOverlayChange}
           mode={st.mode}
-          userId={st.mode === 'cloud' ? (user?.id ?? null) : null}
-          precision={settings.precision}
-          onClose={() => setModal(null)}
+          pending={st.pending}
+          syncError={st.syncError}
         />
-      )}
-      {modal?.kind === 'deleteLast' && last && (
-        <ConfirmModal
-          title="delete solve"
-          message={
-            <>
-              Delete your last solve (<span className="main">{fmtSolveShort(last, settings.precision)}</span>)?
-            </>
-          }
-          confirmLabel="delete"
-          onConfirm={doDeleteLast}
-          onClose={() => setModal(null)}
+
+        <ScrambleBar
+          scramble={scr.current}
+          onNext={scr.next}
+          onPrev={scr.prev}
+          hasPrev={scr.hasPrev}
+          onCustom={scr.setCustom}
+          editing={editingScramble}
+          setEditing={setEditingScramble}
+          hint={input === 'smartcube' ? smartHint : null}
         />
-      )}
-      {modal?.kind === 'comment' && (
-        <PromptModal
-          title="comment"
-          label={`solve ${solves.findIndex((s) => s.id === modal.solveId) + 1}`}
-          initial={solves.find((s) => s.id === modal.solveId)?.comment ?? ''}
-          placeholder="pll skip, lockup on f2l, ..."
-          maxLength={500}
-          onSubmit={(c) => setComment(modal.solveId, c || null)}
-          onClose={() => setModal(null)}
-        />
-      )}
-    </div>
+
+        <div className={`tp-timer-area input-${input}`} {...(input === 'timer' ? engine.touchHandlers : {})} aria-label={input !== 'timer' ? undefined : touch ? 'timer: hold to get ready, release to start' : 'timer'}>
+          {manual ? (
+            <ManualEntry onSubmit={(r) => record(r, 'manual')} disabled={modal !== null || paletteOpen} />
+          ) : input === 'stackmat' || input === 'moyu' ? (
+            <StackmatInput
+              key={input}
+              kind={input}
+              enabled={inputsEnabled}
+              inspection={settings.inspection && eventInfo.inspection}
+              alerts={settings.inspectionAlerts}
+              useStatus={settings.stackmatStatus}
+              last={lastResult}
+              precision={settings.precision}
+              timerUpdate={settings.timerUpdate}
+              sizeRem={settings.timerSize}
+              pb={pb && isIdle}
+              onState={setAltState}
+              onSolve={(r) => {
+                lastStopAt.current = performance.now();
+                record(r, 'timer');
+              }}
+            />
+          ) : input === 'bttimer' ? (
+            <BtTimerInput
+              enabled={inputsEnabled}
+              inspection={settings.inspection && eventInfo.inspection}
+              alerts={settings.inspectionAlerts}
+              last={lastResult}
+              precision={settings.precision}
+              timerUpdate={settings.timerUpdate}
+              sizeRem={settings.timerSize}
+              pb={pb && isIdle}
+              onState={setAltState}
+              onSolve={(r) => {
+                lastStopAt.current = performance.now();
+                record(r, 'timer');
+              }}
+            />
+          ) : input === 'smartcube' ? (
+            <SmartCubeInput
+              event={event}
+              scramble={scr.current?.text ?? null}
+              enabled={inputsEnabled}
+              inspection={settings.inspection && eventInfo.inspection}
+              alerts={settings.inspectionAlerts}
+              last={lastResult}
+              precision={settings.precision}
+              timerUpdate={settings.timerUpdate}
+              sizeRem={settings.timerSize}
+              pb={pb && isIdle}
+              settings={settings}
+              onState={setAltState}
+              onSolve={(r, own) => {
+                lastStopAt.current = performance.now();
+                record(r, 'timer', own);
+              }}
+              onScramble={scr.setFromCube}
+              onHint={setSmartHint}
+            />
+          ) : input === 'virtual' || input === 'qcube' ? (
+            <VirtualInput
+              key={input}
+              event={event}
+              flat={input === 'qcube'}
+              scramble={scr.current?.text ?? null}
+              enabled={inputsEnabled}
+              inspection={settings.inspection && eventInfo.inspection}
+              alerts={settings.inspectionAlerts}
+              last={lastResult}
+              precision={settings.precision}
+              timerUpdate={settings.timerUpdate}
+              sizeRem={settings.timerSize}
+              pb={pb && isIdle}
+              settings={settings}
+              onState={setAltState}
+              onSolve={(r) => {
+                lastStopAt.current = performance.now();
+                record(r, 'timer');
+              }}
+            />
+          ) : (
+            <div key={pbKey}>
+              <TimerDisplay state={displayState} precision={settings.precision} timerUpdate={settings.timerUpdate} sizeRem={settings.timerSize} pb={pb && isIdle} />
+            </div>
+          )}
+        </div>
+
+        {/* on a touch screen the line under the time starts the timer too: a thumb aimed a little low lands here */}
+        <div className={`tp-under fade-on-focus${input === 'timer' ? ' tp-touch-start' : ''}`} {...(input === 'timer' ? engine.touchHandlers : {})}>
+          {solves.length === 0 && input === 'timer' && st.ready ? (
+            <div className="tp-hint">
+              {touch ? (
+                'hold the timer, release to start - tap anywhere to stop'
+              ) : settings.inspection && eventInfo.inspection ? (
+                <>
+                  press <kbd>space</kbd> to start inspection
+                </>
+              ) : (
+                <>
+                  hold <kbd>space</kbd> until the time turns green, release to start
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="tp-avgline">
+              {pbKinds && (
+                <span className="pb-badge">
+                  <TrophyIcon width={14} height={14} /> {pbKinds}
+                </span>
+              )}
+              <span>
+                ao5<b>{fmtAvg(stats.averages.ao5?.current, settings.precision)}</b>
+              </span>
+              <span>
+                ao12<b>{fmtAvg(stats.averages.ao12?.current, settings.precision)}</b>
+              </span>
+            </div>
+          )}
+          <QuickActions last={last} onPenalty={penaltyLast} onComment={commentLast} onDelete={deleteLast} />
+        </div>
+
+        <div className={`tp-bottom fade-on-focus cols-${cols}`}>
+          <StatsPanel stats={stats} ns={ns} solves={solves} precision={settings.precision} onOpenAverage={openAverage} onOpenSolve={openSolve} />
+          {showPreview && (
+            <section className="tp-panel tp-preview" aria-label="scramble preview">
+              <div className="tp-panel-title">
+                <EyeIcon width={14} height={14} /> scramble preview
+              </div>
+              <div className="tp-preview-box" ref={previewBoxRef}>
+                {previewScramble ? (
+                  <TwistyPreview puzzle={eventInfo.puzzle} scramble={previewScramble} visualization={settings.scramblePreview === '3D' ? '3D' : '2D'} height={previewHeight} />
+                ) : null}
+              </div>
+            </section>
+          )}
+          {settings.showSolveList && (
+            <SolveList solves={solves} ao5={ao5} ao12={ao12} pbs={pbs} bestIndex={stats.bestIndex} precision={settings.precision} loading={st.loading || !st.ready} onOpen={openSolve} />
+          )}
+        </div>
+
+        {guest && (
+          <div className="tp-guest fade-on-focus">
+            <span>
+              <Link to="/login">sign in</Link> to save solves to the cloud, appear on leaderboards and race
+            </span>
+            <button
+              className="btn-text"
+              aria-label="dismiss"
+              onClick={() => {
+                setGuestHintHidden(true);
+                try {
+                  localStorage.setItem(GUEST_HINT_KEY, '1');
+                } catch {
+                  /* ignore */
+                }
+              }}
+              {...noFocus}
+            >
+              <XMarkIcon width={12} height={12} />
+            </button>
+          </div>
+        )}
+
+        {/* ------------------------------------------------------------ modals */}
+        {modal?.kind === 'solve' && solves[modal.index] && (
+          <SolveModal
+            solve={solves[modal.index]}
+            index={modal.index}
+            total={solves.length}
+            precision={settings.precision}
+            preview={settings.scramblePreview}
+            confirmDelete={settings.confirmDelete}
+            onNavigate={(i) => i >= 0 && i < solves.length && setModal({ kind: 'solve', index: i })}
+            onClose={() => setModal(null)}
+          />
+        )}
+        {modal?.kind === 'avg' && avgModal && (
+          <AverageModal label={avgModal.label} window={avgModal.window} precision={settings.precision} onOpenSolve={openSolve} onClose={() => setModal(null)} />
+        )}
+        {modal?.kind === 'newSession' && (
+          <PromptModal
+            title="new session"
+            label={`name - ${eventInfo.short.toLowerCase()}`}
+            initial={suggestSessionName(event)}
+            confirmLabel="create"
+            onSubmit={async (name) => {
+              const s = await createSession(name, event);
+              await switchSession(s.id);
+            }}
+            validate={(v) => (v.trim().length < 1 ? 'give it a name' : null)}
+            onClose={() => setModal(null)}
+          />
+        )}
+        {modal?.kind === 'renameSession' && session && (
+          <PromptModal
+            title="rename session"
+            label="name"
+            initial={session.name}
+            onSubmit={(name) => renameSession(session.id, name)}
+            validate={(v) => (v.trim().length < 1 ? 'give it a name' : null)}
+            onClose={() => setModal(null)}
+          />
+        )}
+        {modal?.kind === 'deleteSession' && session && (
+          <ConfirmModal
+            title="delete session"
+            message={
+              <>
+                Delete <span className="main">{session.name}</span>
+                {session.solveCount > 0 ? ` and its ${session.solveCount} solve${session.solveCount === 1 ? '' : 's'}` : ''}? This can't be undone.
+              </>
+            }
+            confirmLabel="delete session"
+            onConfirm={() => deleteSession(session.id)}
+            onClose={() => setModal(null)}
+          />
+        )}
+        {modal?.kind === 'clearSession' && session && (
+          <ConfirmModal
+            title="clear session"
+            message={
+              <>
+                Delete all {session.solveCount} solve{session.solveCount === 1 ? '' : 's'} in <span className="main">{session.name}</span>? The session stays. This can't be undone.
+              </>
+            }
+            confirmLabel="clear session"
+            onConfirm={async () => {
+              await clearSession(session.id);
+              clearResult();
+              toast.notice(`cleared ${session.name}`, { durationMs: 1500 });
+            }}
+            onClose={() => setModal(null)}
+          />
+        )}
+        {modal?.kind === 'mergeSessions' && (
+          <MergeSessionsModal
+            sessions={st.sessions}
+            currentSessionId={st.currentSessionId}
+            event={event}
+            mode={st.mode}
+            userId={st.mode === 'cloud' ? (user?.id ?? null) : null}
+            precision={settings.precision}
+            onClose={() => setModal(null)}
+          />
+        )}
+        {modal?.kind === 'deleteLast' && last && (
+          <ConfirmModal
+            title="delete solve"
+            message={
+              <>
+                Delete your last solve (<span className="main">{fmtSolveShort(last, settings.precision)}</span>)?
+              </>
+            }
+            confirmLabel="delete"
+            onConfirm={doDeleteLast}
+            onClose={() => setModal(null)}
+          />
+        )}
+        {modal?.kind === 'comment' && (
+          <PromptModal
+            title="comment"
+            label={`solve ${solves.findIndex((s) => s.id === modal.solveId) + 1}`}
+            initial={solves.find((s) => s.id === modal.solveId)?.comment ?? ''}
+            placeholder="pll skip, lockup on f2l, ..."
+            maxLength={500}
+            onSubmit={(c) => setComment(modal.solveId, c || null)}
+            onClose={() => setModal(null)}
+          />
+        )}
+      </div>
+    </>
   );
 }

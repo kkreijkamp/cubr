@@ -107,36 +107,40 @@ export default function WcaPage() {
         <Segmented label="section" value={tab} onChange={setTab} options={TABS} />
       </div>
 
-      {tab === 'rank' && (
-        <RankCalculator
-          params={rankParams}
-          onChange={(p) =>
-            update({
-              ...(p.event !== undefined ? { event: p.event === '333' ? null : p.event } : {}),
-              ...(p.kind !== undefined ? { kind: p.kind === 'single' ? null : p.kind } : {}),
-              ...(p.t !== undefined ? { t: p.t } : {}),
-              ...(p.country !== undefined ? { country: p.country } : {}),
-            })
-          }
-          onPerson={openPerson}
-        />
-      )}
-      {tab === 'records' && (
-        <section aria-label="world records">
-          <RecordsTable onPerson={openPerson} />
-        </section>
-      )}
-      {tab === 'people' &&
-        (person ? (
-          <PersonCard wcaId={person} onBack={() => update({ person: null })} />
-        ) : (
-          <section aria-label="people search" className="stack">
-            <div className="h3" style={{ margin: 0 }}>
-              <UsersIcon /> competitors
-            </div>
-            <PeopleSearch initialQuery={sp.get('q') ?? ''} onQuery={(q) => update({ q })} onPerson={openPerson} />
+      {/* data-nosnippet: search results quote the heading and the line under it, or the page's description,
+          never the event and country lists ("🇦🇫 Afghanistan 🇦🇱 Albania ..."); display: contents keeps the layout */}
+      <div data-nosnippet style={{ display: 'contents' }}>
+        {tab === 'rank' && (
+          <RankCalculator
+            params={rankParams}
+            onChange={(p) =>
+              update({
+                ...(p.event !== undefined ? { event: p.event === '333' ? null : p.event } : {}),
+                ...(p.kind !== undefined ? { kind: p.kind === 'single' ? null : p.kind } : {}),
+                ...(p.t !== undefined ? { t: p.t } : {}),
+                ...(p.country !== undefined ? { country: p.country } : {}),
+              })
+            }
+            onPerson={openPerson}
+          />
+        )}
+        {tab === 'records' && (
+          <section aria-label="world records">
+            <RecordsTable onPerson={openPerson} />
           </section>
-        ))}
+        )}
+        {tab === 'people' &&
+          (person ? (
+            <PersonCard wcaId={person} onBack={() => update({ person: null })} />
+          ) : (
+            <section aria-label="people search" className="stack">
+              <div className="h3" style={{ margin: 0 }}>
+                <UsersIcon /> competitors
+              </div>
+              <PeopleSearch initialQuery={sp.get('q') ?? ''} onQuery={(q) => update({ q })} onPerson={openPerson} />
+            </section>
+          ))}
+      </div>
 
       <Citation />
     </div>

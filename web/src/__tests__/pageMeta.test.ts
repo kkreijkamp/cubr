@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import indexHtml from '../../index.html?raw';
 import appSource from '../App.tsx?raw';
+import timerSource from '../pages/TimerPage.tsx?raw';
+import dailySource from '../pages/DailyPage.tsx?raw';
+import raceSource from '../pages/RaceLobbyPage.tsx?raw';
+import layoutSource from '../components/Layout.tsx?raw';
+import leaderboardsSource from '../pages/LeaderboardsPage.tsx?raw';
+import wcaSource from '../pages/WcaPage.tsx?raw';
+import aboutSource from '../pages/AboutPage.tsx?raw';
 import sitemapXml from '../../public/sitemap.xml?raw';
 import { pageFile, pageHtml } from '../../plugins/pageFiles';
 import { HOME, PAGE_META, type PageMeta } from '../lib/pageMeta';
@@ -155,5 +162,35 @@ describe('each public page\'s own HTML (plugins/pageFiles.ts)', () => {
   it('goes to pages/<path>.html', () => {
     expect(pageFile('/daily')).toBe('pages/daily.html');
     expect(pageFile('/leaderboards')).toBe('pages/leaderboards.html');
+  });
+});
+
+describe('what search results may quote', () => {
+  // Google quotes page text instead of the description when it likes it better: before 1.6 it showed
+  // "L' B R' L' F' ... 0.00. hold the timer, release to start" for cubr.dev. data-nosnippet keeps the
+  // timer's and the tool pages' moving parts out of results (it doesn't change what's shown or indexed).
+  const nosnippet = (source: string, className: string) => new RegExp(`className="${className}"[^>]*\\sdata-nosnippet`).test(source);
+
+  it("never the timer: its scramble, time, hints and stats, while its heading stays quotable", () => {
+    expect(nosnippet(timerSource, 'timer-page')).toBe(true);
+    // the heading comes before (outside) the data-nosnippet block
+    expect(timerSource.indexOf('<h1 className="sr-only">{HOME.heading}</h1>')).toBeLessThan(timerSource.indexOf('<div className="timer-page" data-nosnippet>'));
+    expect(timerSource.indexOf('<h1 className="sr-only">')).toBeGreaterThan(0);
+  });
+
+  it("never the daily page's scrambles, countdown and board, or the race lobby's rooms and forms", () => {
+    for (const c of ['daily-countdown', 'daily-config fade-on-focus', 'daily-layout']) expect(nosnippet(dailySource, c), c).toBe(true);
+    for (const c of ['subtitle', 'race-lobby-grid']) expect(nosnippet(raceSource, c), c).toBe(true);
+  });
+
+  it("never the footer's links and buttons", () => {
+    for (const c of ['footer-links', 'footer-right']) expect(nosnippet(layoutSource, c), c).toBe(true);
+  });
+
+  it("never the leaderboard's filters and table, the WCA page's event and country lists, or About's counters", () => {
+    for (const c of ['lb-group lb-periods', 'lb-group lb-dates', 'lb-group lb-kinds', 'lb-group lb-events', 'lb-toolbar', 'table-wrap']) expect(nosnippet(leaderboardsSource, c), c).toBe(true);
+    // the calculator, records and people search sit in one data-nosnippet block that keeps the layout
+    expect(wcaSource).toMatch(/<div data-nosnippet style=\{\{ display: 'contents' \}\}>\s*\{tab === 'rank'/);
+    expect(aboutSource).toMatch(/<section aria-label="live stats" data-nosnippet>/);
   });
 });

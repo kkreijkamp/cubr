@@ -377,13 +377,15 @@ export default function DailyPage() {
           </h1>
           <div className="subtitle">5 scrambles - the same for everyone - ranked by ao5 - resets at 00:00 UTC</div>
         </div>
-        <div className="daily-countdown" title={`next challenge at ${new Date(nextMidnight).toLocaleString()}`}>
+        <div className="daily-countdown" data-nosnippet title={`next challenge at ${new Date(nextMidnight).toLocaleString()}`}>
           <span className="label">next challenge in</span>
           <span className="value mono-nums">{formatCountdown(nextMidnight - now)}</span>
         </div>
       </div>
 
-      <div className="daily-config fade-on-focus">
+      {/* data-nosnippet below: search results quote the heading and the line under it, or the page's
+          description, never a scramble, a time or the board */}
+      <div className="daily-config fade-on-focus" data-nosnippet>
         <EventPicker events={DAILY_EVENTS} value={event} onChange={setEvent} />
         <Segmented label="day" className="scroll" value={date} onChange={setDate} options={days.map((k) => ({ value: k, label: dayLabel(k, today), tip: k }))} />
       </div>
@@ -401,7 +403,7 @@ export default function DailyPage() {
         </Notice>
       )}
 
-      <div className="daily-layout">
+      <div className="daily-layout" data-nosnippet>
         <div className="daily-main">
           {!isToday && (
             <div className="daily-past sub small fade-on-focus">
