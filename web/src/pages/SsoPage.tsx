@@ -9,6 +9,7 @@ import { ssoErrorMessage } from '../components/social/Sso';
 import { safeNext } from '../components/social/util';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { usePageMeta } from '../lib/usePageMeta';
 import type { OAuthProvider } from '../lib/types';
 import '../components/social/login.css';
 
@@ -24,8 +25,8 @@ export default function SsoPage() {
   const [view, setView] = useState<View>({ kind: 'working' });
   const started = useRef(false);
 
+  usePageMeta({ title: 'signing in | cubr' });
   useEffect(() => {
-    document.title = 'signing in | cubr';
     // the code is single-use and bound to this browser, but it needn't stay in the history either
     if (window.location.hash) history.replaceState(history.state, '', window.location.pathname);
     if (started.current) return; // React's strict mode runs effects twice in development
@@ -50,9 +51,6 @@ export default function SsoPage() {
     } else {
       navigate('/login', { replace: true }); // nothing to finish (back on this page later, say)
     }
-    return () => {
-      document.title = 'cubr';
-    };
   }, []); // once, on arrival
 
   if (view.kind === 'working') return <Loading />;

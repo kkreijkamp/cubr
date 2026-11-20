@@ -10,6 +10,7 @@ import { AVG_CHOICES, parseAvgKey } from '../components/timer/statsUtil';
 import '../components/timer/settings-page.css';
 import { ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { usePageMeta } from '../lib/usePageMeta';
 import { formatNumber } from '../lib/format';
 import { useKeyboardLayout } from '../lib/keyboardLayout';
 import { applyUpdate, checkForUpdate, installHint, promptInstall, usePwa } from '../lib/pwa';
@@ -233,6 +234,7 @@ function Pane({ id, children }: { id: PaneId; children: ReactNode }) {
  * and small labels, and every choice is text with the chosen one in the accent colour.
  */
 export default function SettingsPage() {
+  usePageMeta({ title: 'settings | cubr' });
   const s = useSettings();
   const { status, user } = useAuth();
   const navigate = useNavigate();

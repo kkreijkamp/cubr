@@ -8,6 +8,8 @@ import sitemapXml from '../../public/sitemap.xml?raw';
 import securityTxt from '../../public/.well-known/security.txt?raw';
 import { BEACON_SRC } from '../lib/analytics';
 import { CHANGE_PASSWORD_URL } from '../lib/password';
+import { PAGE_META } from '../lib/pageMeta';
+import { pageFile } from '../../plugins/pageFiles';
 
 // The web container's nginx config (web/nginx/default.conf.template) against the app it serves: which
 // URLs are pages (200) and which are real 404s, the security headers, the crawler files. nginx's
@@ -87,7 +89,13 @@ function locationFor(path: string): Location {
   if (longest?.mod === '^~') return longest;
   return locations.find((l) => (l.mod === '~' || l.mod === '~*') && new RegExp(l.pattern, l.mod === '~*' ? 'i' : '').test(path)) ?? longest;
 }
-const isAppPage = (l: Location) => /try_files \/index\.html =404;/.test(l.body);
+/** A location that answers with the app: index.html, or first the page's own copy of it (pages/). */
+const isAppPage = (l: Location) => /try_files (?:\/pages\$uri\.html )?\/index\.html =404;/.test(l.body);
+/** The file nginx serves a page from: its own copy when the build wrote one, else index.html. */
+function fileFor(path: string, built: readonly string[]): string {
+  const tries = /try_files ([^;]+);/.exec(locationFor(path).body)![1].split(/\s+/).slice(0, -1);
+  return tries.map((t) => t.replace('$uri', path)).find((f) => f === '/index.html' || built.includes(f.slice(1)))!;
+}
 /** Where nginx redirects a path to (301), or '' when it serves it as it is (map $cubr_canonical). */
 const redirectFor = (path: string) => mapLookup('$cubr_canonical', path);
 const isFileOr404 = (l: Location) => /try_files \$uri =404;/.test(l.body) && /error_page 404 \/index\.html;/.test(l.body);
@@ -189,6 +197,20 @@ describe('the app\'s pages and real 404s', () => {
     expect(locationFor('/assets/index-abc.js')).toMatchObject({ pattern: '/assets/' });
     expect(locationFor('/icons/icon-512.png').pattern).toBe('^/(icons|screenshots)/');
     expect(locationFor('/sw.js')).toMatchObject({ mod: '=', pattern: '/sw.js' });
+  });
+
+  it("serves each public page its own copy of index.html (the build's pages/), and the rest index.html", () => {
+    const built = Object.keys(PAGE_META)
+      .filter((p) => p !== '/')
+      .map(pageFile);
+    for (const path of Object.keys(PAGE_META)) expect(fileFor(path, built), path).toBe(path === '/' ? '/index.html' : `/${pageFile(path)}`);
+    for (const path of appPaths.filter((p) => !(p in PAGE_META))) expect(fileFor(path, built), path).toBe('/index.html');
+    // the copies themselves are no page: a 404 like any unknown path, still showing the app
+    const copies = locationFor('/pages/daily.html');
+    expect(copies).toMatchObject({ mod: '^~', pattern: '/pages/' });
+    expect(copies.body).toMatch(/error_page 404 \/index\.html;/);
+    expect(copies.body).toMatch(/return 404;/);
+    expect(redirectFor('/pages/daily.html')).toBe('');
   });
 
   it('sends relative redirects (behind the gateway and Cloudflare nginx would get the scheme and port wrong)', () => {

@@ -4,14 +4,16 @@ import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
 import { serviceWorker } from './plugins/serviceWorker';
 import { hoverMedia } from './plugins/hoverMedia';
+import { pageFiles } from './plugins/pageFiles';
 
 // The SPA talks to the backend through same-origin paths (/api/*, /socket.io). In dev, Vite
 // proxies them to the local gateway (docker compose, port 8080) which mimics the K8s Ingress.
 const gateway = process.env.CUBR_GATEWAY ?? 'http://localhost:8080';
 
 export default defineConfig({
-  // serviceWorker: dist/sw.js, the offline app (src/sw/), built after the app
-  plugins: [react(), serviceWorker()],
+  // pageFiles: dist/pages/*.html, each public page's own title, description and heading for crawlers
+  // (src/lib/pageMeta.ts); serviceWorker: dist/sw.js, the offline app (src/sw/), built after the app
+  plugins: [react(), pageFiles(), serviceWorker()],
   // hover styles only where something can hover: a tap left them on (plugins/hoverMedia.ts)
   css: { postcss: { plugins: [hoverMedia()] } },
   resolve: {

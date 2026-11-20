@@ -9,12 +9,16 @@
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1d2024" />
-    <meta name="description" content="a minimalist speedcubing timer" />
-    <!-- link previews (chat apps, social sites): the same card for every page, as crawlers don't run the app.
-         public/og.png is drawn by web/scripts/pwa-assets.mjs og; no og:url, so a shared page links to itself -->
+    <!-- the title, this description and the summary in #root are the home page's: the build writes each
+         public page's own into its copy of this file (plugins/pageFiles.ts, from src/lib/pageMeta.ts) -->
+    <meta name="description" content="a minimalist speedcube timer for cubers: scrambles for every wca event, csTimer-grade stats, a daily challenge and live races with other speedcubers." />
+    <!-- link previews (chat apps, social sites): crawlers don't run the app, so each page's card is its HTML's.
+         The title is "cubr" on every card; the description is the page's. public/og.png is drawn by
+         web/scripts/pwa-assets.mjs og; no og:url, so a shared page links to itself -->
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="cubr" />
     <meta property="og:title" content="cubr" />
-    <meta property="og:description" content="a minimalist speedcubing timer" />
+    <meta property="og:description" content="a minimalist speedcube timer for cubers: scrambles for every wca event, csTimer-grade stats, a daily challenge and live races with other speedcubers." />
     <meta property="og:image" content="https://cubr.dev/og.png" />
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
@@ -22,8 +26,9 @@
     <meta property="og:image:alt" content="the cubr logo: a green cube face and the word cubr" />
     <meta name="twitter:card" content="summary_large_image" />
     <!-- for search engines: the site's name ("cubr", not "cubr.dev") and its logo. A data block, not a
-         script: the CSP doesn't apply, and src/__tests__/site.test.ts checks it against the site's files.
-         The logo is the maskable icon: opaque white, with the cube clear of a round crop -->
+         script: the CSP doesn't apply, and src/__tests__/structuredData.test.ts checks it against the site's
+         files. The logo is the maskable icon: opaque white, with the cube clear of a round crop. No
+         SoftwareApplication: Google reports one without ratings or reviews as an invalid item -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -34,7 +39,7 @@
             "url": "https://cubr.dev/",
             "name": "cubr",
             "alternateName": ["cubr.dev"],
-            "description": "a minimalist speedcubing timer",
+            "description": "a minimalist speedcube timer for cubers: scrambles for every wca event, csTimer-grade stats, a daily challenge and live races with other speedcubers.",
             "inLanguage": "en",
             "publisher": { "@id": "https://cubr.dev/#organization" }
           },
@@ -163,7 +168,7 @@
     <link rel="apple-touch-startup-image" media="(device-width: 756px) and (device-height: 1158px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape) and (prefers-color-scheme: light)" href="/launch/apple-launch-2316x1512.png" />
     <link rel="apple-touch-startup-image" media="(device-width: 756px) and (device-height: 1158px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape) and (prefers-color-scheme: dark)" href="/launch/apple-launch-2316x1512-dark.png" />
     <!-- /iOS launch images -->
-    <title>cubr</title>
+    <title>cubr | a minimalist cube timer for speedcubers</title>
     <script>
       // Apply the saved theme before first paint to avoid a flash of the default theme: one set of colours,
       // or a light and a dark set while the theme follows the device's mode (lib/settings.ts showTheme).
@@ -179,7 +184,20 @@
     </script>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- What the page is about, for crawlers that don't run the app (AI search engines, link previews, and
+         Bing at times). The app replaces it as it starts; until then it's hidden, so nothing flashes or
+         shifts (a style attribute: the CSP refuses <style> elements). Each public page's copy has its own
+         heading and line (plugins/pageFiles.ts); the links are the public pages in the header -->
+    <div id="root">
+      <div id="page-summary" style="position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap">
+        <h1>cubr: a minimalist speedcube timer</h1>
+        <p>a minimalist speedcube timer for cubers: scrambles for every wca event, csTimer-grade stats, a daily challenge and live races with other speedcubers.</p>
+        <nav aria-label="pages">
+          <a href="/">cube timer</a> <a href="/daily">daily challenge</a> <a href="/race">live races</a> <a href="/leaderboards">leaderboards</a> <a href="/wca">wca rankings</a> <a href="/about">about cubr</a>
+        </nav>
+      </div>
+    </div>
+    <noscript><p style="margin: 3rem 1rem; text-align: center; font-family: system-ui, sans-serif">cubr is a speedcube timer that runs in your browser: turn on javascript to time your solves.</p></noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

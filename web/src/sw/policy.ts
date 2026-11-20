@@ -17,12 +17,13 @@ export const SHELL_URL = '/index.html';
  * the .woff copies of the fonts (every browser with service workers uses the .woff2 ones), the
  * icons, screenshots and iOS launch images, which only the browser's install screens and the home
  * screen use (iOS reads its launch image when the app is added), and the files for other sites and
- * crawlers (the link preview image, robots.txt, the sitemap, security.txt).
+ * crawlers (the link preview image, robots.txt, the sitemap, security.txt, and the public pages' own
+ * copies of index.html in pages/: offline, every page opens from index.html and sets its own title).
  */
 export function shouldPrecache(file: string): boolean {
   if (file === 'sw.js' || file.endsWith('.map') || file.endsWith('.woff')) return false;
   if (file.startsWith('icons/') || file.startsWith('screenshots/') || file.startsWith('launch/') || file.startsWith('apple-touch-icon')) return false;
-  if (file === 'og.png' || file === 'robots.txt' || file === 'sitemap.xml' || file.startsWith('.well-known/')) return false;
+  if (file === 'og.png' || file === 'robots.txt' || file === 'sitemap.xml' || file.startsWith('.well-known/') || file.startsWith('pages/')) return false;
   return /\.(html|js|css|woff2|svg|png|webp|json|webmanifest|txt)$/.test(file);
 }
 

@@ -3,6 +3,7 @@ import manifestText from '../../../public/manifest.webmanifest?raw';
 import indexHtml from '../../../index.html?raw';
 import { DEFAULT_DARK_THEME, DEFAULT_THEME, getTheme } from '../../lib/themes';
 import { isAppPath } from '../policy';
+import { HOME } from '../../lib/pageMeta';
 
 interface Image {
   src: string;
@@ -147,10 +148,10 @@ describe('index.html', () => {
 describe('link previews (index.html)', () => {
   // the tests run without a DOM: read <meta property|name="key" content="..."> with a pattern
   const meta = (key: string) => indexHtml.match(new RegExp(`<meta (?:property|name)="${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}" content="([^"]*)"`))?.[1];
-  it('read "cubr" and "a minimalist speedcubing timer", as does the description for search engines', () => {
+  it('read "cubr" and the home page\'s description, the one search engines show (lib/pageMeta.ts)', () => {
     expect(meta('og:title')).toBe('cubr');
-    expect(meta('og:description')).toBe('a minimalist speedcubing timer');
-    expect(meta('description')).toBe('a minimalist speedcubing timer');
+    expect(meta('og:description')).toBe(HOME.description);
+    expect(meta('description')).toBe(HOME.description);
     expect(meta('og:type')).toBe('website');
   });
   it('show the large image: an absolute https link, its real size, opaque (a transparent one shows black in some apps)', () => {

@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeftIcon, ArrowRightStartOnRectangleIcon, FlagIcon, ForwardIcon, LinkIcon, PencilIcon, SignalSlashIcon } from '@heroicons/react/24/outline';
 import { getEvent, formatTime, type Penalty } from '@cubr/cubestats';
 import { useAuth } from '../lib/auth';
+import { usePageMeta } from '../lib/usePageMeta';
 import { useSettings } from '../lib/settings';
 import { useRegisterCommands } from '../lib/commands';
 import { toast } from '../lib/toast';
@@ -62,6 +63,7 @@ function NicknameModal({ onClose, onSave }: { onClose: () => void; onSave: (name
 }
 
 export default function RaceRoomPage() {
+  usePageMeta({ title: 'race room | cubr' });
   const { roomId = '' } = useParams();
   const id = roomId.toLowerCase();
   const navigate = useNavigate();

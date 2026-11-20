@@ -6,6 +6,8 @@ import { Link } from 'react-router-dom';
 import { DocumentTextIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import './legal.css';
 import { useCanonical } from '../lib/canonical';
+import { PAGE_META, type PageMeta } from '../lib/pageMeta';
+import { usePageMeta } from '../lib/usePageMeta';
 
 // when each page last changed
 const TERMS_EFFECTIVE = '16 November 2026';
@@ -23,19 +25,16 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function LegalShell({ title, icon, children, effective }: { title: string; icon: ReactNode; children: ReactNode; effective: string }) {
+function LegalShell({ page, icon, children, effective }: { page: PageMeta; icon: ReactNode; children: ReactNode; effective: string }) {
+  usePageMeta(page);
   useEffect(() => {
-    document.title = `${title} | cubr`;
     window.scrollTo(0, 0);
-    return () => {
-      document.title = 'cubr';
-    };
-  }, [title]);
+  }, [page]);
   return (
     <article className="legal">
       <header>
         <h1 className="h2">
-          {icon} {title}
+          {icon} {page.heading}
         </h1>
         <p className="legal-meta">
           effective {effective} - questions: <Mail />
@@ -49,7 +48,7 @@ function LegalShell({ title, icon, children, effective }: { title: string; icon:
 export function PrivacyPage() {
   useCanonical('/privacy');
   return (
-    <LegalShell title="privacy policy" effective={PRIVACY_EFFECTIVE} icon={<ShieldCheckIcon />}>
+    <LegalShell page={PAGE_META['/privacy']} effective={PRIVACY_EFFECTIVE} icon={<ShieldCheckIcon />}>
       <p className="legal-intro">
         cubr (cubr.dev) is a free speedcubing timer run by Koen Kreijkamp, an individual in Queensland, Australia (&quot;cubr&quot;,
         &quot;we&quot;). This policy explains what we collect, why, who helps us run cubr, and the choices you have. There are no ads,
@@ -261,7 +260,7 @@ export function PrivacyPage() {
 export function TermsPage() {
   useCanonical('/terms');
   return (
-    <LegalShell title="terms of service" effective={TERMS_EFFECTIVE} icon={<DocumentTextIcon />}>
+    <LegalShell page={PAGE_META['/terms']} effective={TERMS_EFFECTIVE} icon={<DocumentTextIcon />}>
       <p className="legal-intro">
         These terms apply when you use cubr (cubr.dev), a free speedcubing timer run by Koen Kreijkamp in Queensland, Australia
         (&quot;cubr&quot;, &quot;we&quot;). By using cubr or creating an account, you agree to them and to our{' '}

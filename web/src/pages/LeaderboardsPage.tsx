@@ -30,6 +30,8 @@ import type { LbKind, Leaderboard } from '../lib/types';
 import { hiddenNote, missingNote } from '../lib/antiCheat';
 import { useAsync } from '../lib/useAsync';
 import { leaderboardCanonical, useCanonical } from '../lib/canonical';
+import { PAGE_META } from '../lib/pageMeta';
+import { usePageMeta } from '../lib/usePageMeta';
 import '../components/social/leaderboards.css';
 
 const PAGE_SIZE = 50;
@@ -333,7 +335,8 @@ export default function LeaderboardsPage() {
   );
   const [gotoOpen, setGotoOpen] = useState(false);
   const scrollToMe = useRef(false);
-  useCanonical(leaderboardCanonical(sel));
+  const canonical = leaderboardCanonical(sel);
+  useCanonical(canonical);
 
   const update = useCallback(
     (patch: Partial<Selection>) => {
@@ -358,12 +361,9 @@ export default function LeaderboardsPage() {
   const me = data?.me ?? null;
   const myPage = me ? Math.ceil(me.rank / PAGE_SIZE) : null;
 
-  useEffect(() => {
-    document.title = `${boardTitle(sel)} | cubr`;
-    return () => {
-      document.title = 'cubr';
-    };
-  }, [sel]);
+  // the default board is the page search engines list as /leaderboards: it carries the page's title;
+  // every other board is named after itself ("weekly 2x2 ao5 leaderboard")
+  usePageMeta({ title: canonical === '/leaderboards' ? PAGE_META['/leaderboards'].title : `${boardTitle(sel)} | cubr`, description: PAGE_META['/leaderboards'].description });
 
   // clamp pages past the end (e.g. a stale link)
   useEffect(() => {

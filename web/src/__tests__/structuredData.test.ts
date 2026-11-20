@@ -3,6 +3,7 @@ import indexHtml from '../../index.html?raw';
 import logoPng from '../../public/icons/icon-maskable-512.png?inline';
 import { canonicalUrl } from '../lib/canonical';
 import { DONATE_URL, REPO_URL } from '../lib/links';
+import { HOME } from '../lib/pageMeta';
 
 // index.html's JSON-LD: what search engines read for the site's name ("cubr") and its logo.
 
@@ -31,6 +32,7 @@ describe("the site's structured data", () => {
     expect(website.alternateName).toEqual(['cubr.dev']);
     const description = /<meta name="description" content="([^"]+)"/.exec(indexHtml)![1];
     expect(website.description).toBe(description);
+    expect(description).toBe(HOME.description);
     expect(website.publisher).toEqual({ '@id': org['@id'] });
   });
 

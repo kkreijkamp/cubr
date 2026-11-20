@@ -65,6 +65,8 @@ import {
 import { useStore } from '../lib/store';
 import { toast } from '../lib/toast';
 import { useCanonical } from '../lib/canonical';
+import { HOME } from '../lib/pageMeta';
+import { usePageMeta } from '../lib/usePageMeta';
 
 type ModalState =
   | { kind: 'solve'; index: number }
@@ -116,6 +118,7 @@ function isTyping(el: EventTarget | null): boolean {
 
 export default function TimerPage() {
   useCanonical('/'); // the home page, without any query (/?v=1 is the same page)
+  usePageMeta(HOME);
   const settings = useSettings();
   const st = useSolveState();
   const { status: authStatus, user } = useAuth();
@@ -508,6 +511,8 @@ export default function TimerPage() {
 
   return (
     <div className="timer-page">
+      {/* the page's heading, for screen readers and search engines: the timer speaks for itself on screen */}
+      <h1 className="sr-only">{HOME.heading}</h1>
       <ConfigBar
         event={event}
         sessions={st.sessions}

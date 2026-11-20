@@ -21,6 +21,8 @@ import { friendlyError } from '../components/social/util';
 import { api } from '../lib/api';
 import { formatDate, formatNumber } from '../lib/format';
 import { useCanonical } from '../lib/canonical';
+import { PAGE_META } from '../lib/pageMeta';
+import { usePageMeta } from '../lib/usePageMeta';
 import { DONATE_URL } from '../lib/links';
 import { THEMES } from '../lib/themes';
 import type { GlobalStats } from '../lib/types';
@@ -29,14 +31,16 @@ import '../components/social/about.css';
 
 const REFRESH_MS = 15_000;
 
-const FEATURES = [
-  { icon: ClockIcon, t: 'a timer that gets out of the way', d: 'space to start, hold-to-ready, wca inspection with 8 s / 12 s alerts, +2 and dnf, focus mode while solving.' },
+// a feature with a page of its own links to it (`to`): descriptive links between pages help search
+// engines and people find them
+const FEATURES: { icon: typeof ClockIcon; t: string; d: string; to?: string }[] = [
+  { icon: ClockIcon, t: 'a timer that gets out of the way', to: '/', d: 'space to start, hold-to-ready, wca inspection with 8 s / 12 s alerts, +2 and dnf, focus mode while solving.' },
   { icon: ChartBarIcon, t: 'csTimer-grade stats', d: 'mo3, ao5 ... ao1000 with wca trimming, session bests, and a solve history chart on your profile.' },
   { icon: ArrowUpTrayIcon, t: 'sessions & import', d: 'unlimited sessions for all 16 wca events, import from csTimer and every timer it reads, json and csTimer export.' },
-  { icon: CalendarDaysIcon, t: 'daily challenge', d: 'five shared scrambles a day for everyone, ranked by ao5 on a global board.' },
-  { icon: FlagIcon, t: 'live races', d: 'real-time multiplayer rooms over websockets - share a link and race any event.' },
-  { icon: TrophyIcon, t: 'leaderboards', d: 'all-time, weekly and daily boards for every event, single, ao5 and ao12.' },
-  { icon: GlobeAltIcon, t: 'wca comparison', d: 'see where your personal bests would rank among every official wca competitor.' },
+  { icon: CalendarDaysIcon, t: 'daily challenge', to: '/daily', d: 'five shared scrambles a day for everyone, ranked by ao5 on a global board.' },
+  { icon: FlagIcon, t: 'live races', to: '/race', d: 'real-time multiplayer rooms over websockets - share a link and race any event.' },
+  { icon: TrophyIcon, t: 'leaderboards', to: '/leaderboards', d: 'all-time, weekly and daily boards for every event, single, ao5 and ao12.' },
+  { icon: GlobeAltIcon, t: 'wca comparison', to: '/wca', d: 'see where your personal bests would rank among every official wca competitor.' },
   { icon: SwatchIcon, t: 'themes & command line', d: `${THEMES.length} cube-inspired themes with live preview, light or dark with your device. press esc and type - everything is a command.` },
   { icon: SignalSlashIcon, t: 'an app that works offline', d: "install it on your phone or computer. the timer opens and works without a connection, and your solves sync when you're back online." },
 ];
@@ -154,12 +158,7 @@ function Supporters() {
 
 export default function AboutPage() {
   useCanonical('/about');
-  useEffect(() => {
-    document.title = 'about | cubr';
-    return () => {
-      document.title = 'cubr';
-    };
-  }, []);
+  usePageMeta(PAGE_META['/about']);
 
   return (
     <div className="ab">
@@ -179,10 +178,16 @@ export default function AboutPage() {
           <Square3Stack3DIcon /> features
         </h2>
         <div className="ab-features">
-          {FEATURES.map(({ icon: Icon, t, d }) => (
+          {FEATURES.map(({ icon: Icon, t, d, to }) => (
             <div className="ab-feature" key={t}>
               <Icon aria-hidden="true" />
-              <span className="t">{t}</span>
+              {to ? (
+                <Link className="t" to={to}>
+                  {t}
+                </Link>
+              ) : (
+                <span className="t">{t}</span>
+              )}
               <span className="d">{d}</span>
             </div>
           ))}

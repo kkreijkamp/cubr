@@ -10,6 +10,8 @@ import { formatDate } from '../lib/format';
 import { useRegisterCommands } from '../lib/commands';
 import { useAsync } from '../lib/useAsync';
 import { useCanonical } from '../lib/canonical';
+import { PAGE_META } from '../lib/pageMeta';
+import { usePageMeta } from '../lib/usePageMeta';
 import { Segmented } from '../components/live/ui';
 import { PeopleSearch, PersonCard, RankCalculator, RecordsTable, type RankParams } from '../components/live/wca/WcaParts';
 import '../components/live/live.css';
@@ -39,6 +41,7 @@ function Citation() {
 
 export default function WcaPage() {
   useCanonical('/wca');
+  usePageMeta(PAGE_META['/wca']);
   const [sp, setSp] = useSearchParams();
   const person = sp.get('person');
   const rawTab = sp.get('tab');
@@ -97,7 +100,7 @@ export default function WcaPage() {
       <div className="live-head">
         <div className="titles">
           <h1 className="h2">
-            <GlobeAltIcon /> wca rankings
+            <GlobeAltIcon /> {PAGE_META['/wca'].heading}
           </h1>
           <div className="subtitle">official World Cube Association results - see how your times compare with every competitor.</div>
         </div>

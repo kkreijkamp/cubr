@@ -700,16 +700,17 @@ the browser lacks the API (iOS before 16.4, or before 18.4 in a home-screen app;
   - iOS reads the image when the app is added to the home screen: an existing install needs
     re-adding to get it. The images aren't precached.
 - **Link previews** (chat apps, social sites): `index.html` has Open Graph tags and
-  `twitter:card summary_large_image`, the same for every page, since crawlers don't run the app.
-  They give the title "cubr", the description "a minimalist speedcubing timer" (also the search
-  engines' description), and `https://cubr.dev/og.png`: the header's logo centred on white,
-  1200 x 630 and opaque (`pwa-assets.mjs og`). There's no `og:url`, so a link shared from any page
-  leads back to that page.
+  `twitter:card summary_large_image`. Crawlers don't run the app, so each card is its page's HTML:
+  the title "cubr" and `og:site_name` "cubr" on every card, the page's own description (the one
+  search engines show, 10.2: each public page's HTML has its own), and `https://cubr.dev/og.png`:
+  the header's logo centred on white, 1200 x 630 and opaque (`pwa-assets.mjs og`). There's no
+  `og:url`, so a link shared from any page leads back to that page.
 - **Service worker** `/sw.js`, from `web/src/sw/sw.ts`, built after the app by
   `web/plugins/serviceWorker.ts`:
   - It precaches the whole build (about 2.4 MB) except source maps, the `.woff` font fallbacks,
-    the icons, the screenshots, the iOS launch images and the files for other sites (the link
-    preview image, `robots.txt`, `sitemap.xml`, `/.well-known/`), in the cache `cubr-app-<version>`.
+    the icons, the screenshots, the iOS launch images and the files for other sites and crawlers
+    (the link preview image, `robots.txt`, `sitemap.xml`, `/.well-known/`, and the public pages'
+    own copies of `index.html` in `pages/`), in the cache `cubr-app-<version>`.
     The version is a hash of the cached files' names and contents, so a release that doesn't change
     the web app ships the same `sw.js`, and browsers see no update.
   - Requests (`web/src/sw/policy.ts`):
@@ -767,6 +768,34 @@ The web container's nginx (`web/nginx/default.conf.template`) serves the app and
     errors included.
   - The gateway adds nothing to proxied responses (it would duplicate these), only to its own
     errors.
+- **Titles, descriptions and the words to rank for** (`web/src/lib/pageMeta.ts`, built in v1.5.19).
+  cubr wants to be found by cubers' own words: speedcube, cube and timer, and their family
+  (speedcubing, speedcubers, cubing, cubers). Each public page (the sitemap's) has, in one table:
+  - a title of at most 60 characters with the brand last: the home page's is "cubr | a minimalist
+    cube timer for speedcubers", About's "about cubr, a minimalist speedcube timer", the default
+    board's "speedcubing leaderboards for every wca event | cubr" (the other boards are named after
+    themselves, "weekly 2x2 ao5 leaderboard | cubr");
+  - a description of 110 to 160 characters, the one search results and link previews show;
+  - its heading as the page shows it. The timer's, "cubr: a minimalist speedcube timer", is a
+    visually hidden `h1` (`.sr-only`) for screen readers and search engines.
+  - `pageMeta.test.ts` keeps them within those lengths, each page's its own, in lowercase, with at
+    least one of the words, and never stuffed: each word once in a title (three at most), twice in
+    a description (five at most). Every other page is titled "<page> | cubr" and keeps the home
+    page's description.
+  - **In the app**, `lib/usePageMeta.ts` sets the page's title and `<meta name="description">` while it
+    shows, and the home page's again on leaving (search engines read both after running the app).
+  - **In the HTML**, for crawlers that don't run the app (AI search engines, link previews, and Bing at
+    times): `index.html` carries the home page's title and description, and in `#root` a summary (the
+    heading, the description and links to the public pages). The summary is hidden by a style
+    attribute (out of the flow, 1 px, clipped, never `display: none`), so nothing flashes or shifts
+    while the app loads, and the app replaces it as it starts. The build writes every other public
+    page's copy, `pages/<page>.html`, with its own title, description, `og:description` and summary
+    (`web/plugins/pageFiles.ts`); nginx serves it at the page's address
+    (`try_files /pages$uri.html /index.html`), and `/pages/*` itself is a 404. The service worker
+    doesn't cache the copies: offline, every page opens from `index.html` and sets its own title.
+  - About's feature titles link to their pages (the timer, daily, races, leaderboards, WCA), looking
+    as before, green on hover. A browser without JavaScript gets one line (`<noscript>`): what cubr
+    is, and to turn JavaScript on.
 - **The site's name and logo for search engines:** `index.html` carries one JSON-LD block (a data block,
   which the CSP doesn't cover):
   - a `WebSite` (`https://cubr.dev/`, name `cubr`, alternate name `cubr.dev`, the page's description);
@@ -774,6 +803,8 @@ The web container's nginx (`web/nginx/default.conf.template`) serves the app and
     opaque, the cube clear of a round crop) and `sameAs` the GitHub repository and the Ko-fi page.
   - `structuredData.test.ts` checks it against the files and `lib/links.ts`. The Schema Markup
     Validator finds no errors or warnings.
+  - No `SoftwareApplication` (or `WebApplication`): Google reports one without ratings or reviews
+    as an invalid item in Search Console, and cubr has neither.
 - **One address per page.** Search engines split a page's ranking between its addresses, so:
   - **nginx** (`map $cubr_canonical`) sends a page asked for with capitals or a trailing slash to its
     plain lowercase address: 301, query kept (`/About/?x=1` -> `/about?x=1`). A username and a room id
@@ -784,7 +815,7 @@ The web container's nginx (`web/nginx/default.conf.template`) serves the app and
     its name as stored; a board with only its event, kind and period (the default board is plain
     `/leaderboards`, as in the sitemap). Pages with `noindex` get none.
 - **Real 404s.** The app's routes (section 10, case-insensitive, optional trailing slash) get
-  `index.html` with 200. Usernames and room ids must look like `USERNAME_RE` and `ROOM_ID_RE`.
+  `index.html` with 200 (the public pages: their own copy of it, above). Usernames and room ids must look like `USERNAME_RE` and `ROOM_ID_RE`.
   Everything else is a file of the build or a 404 whose body is still `index.html`, so people see
   the app's not-found page and crawlers see the status. A well-formed name nobody has (a missing
   profile) still answers 200; its view adds `<meta name="robots" content="noindex">`, as does the
