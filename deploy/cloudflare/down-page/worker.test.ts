@@ -1,6 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
-import { LEXEND_DECA_400 } from './font';
+import { LEXEND_DECA_400, LEXEND_DECA_400_SHA256 } from './font';
 import worker, { DOWN_HEADERS, DOWN_PAGE, DOWN_STATUSES, RETRY_SEC, handle, isPageLoad } from './worker';
 
 const req = (headers: Record<string, string>, method = 'GET', path = '/daily') => new Request(`https://cubr.dev${path}`, { method, headers });
@@ -110,8 +111,15 @@ describe('the down page', () => {
     expect(DOWN_PAGE).toContain(`<link rel="icon" href="data:image/svg+xml,${encodeURIComponent(favicon)}">`);
   });
 
-  it("embeds the app's font, Lexend Deca, as the package ships it (node deploy/cloudflare/down-page/make-font.mjs)", () => {
-    const woff2 = readFileSync(new URL('../../../web/node_modules/@fontsource/lexend-deca/files/lexend-deca-latin-400-normal.woff2', import.meta.url));
-    expect(Buffer.from(LEXEND_DECA_400, 'base64').equals(woff2)).toBe(true);
+  it('embeds a whole WOFF2 font, the one make-font.mjs wrote', () => {
+    const font = Buffer.from(LEXEND_DECA_400, 'base64');
+    expect(font.subarray(0, 4).toString('latin1')).toBe('wOF2');
+    expect(createHash('sha256').update(font).digest('hex')).toBe(LEXEND_DECA_400_SHA256);
+  });
+
+  // where the web app's packages are installed (not in CI's backend job, which installs the root's only)
+  const PACKAGE_FONT = new URL('../../../web/node_modules/@fontsource/lexend-deca/files/lexend-deca-latin-400-normal.woff2', import.meta.url);
+  it.skipIf(!existsSync(PACKAGE_FONT))("embeds the app's font, Lexend Deca, as the package ships it (node deploy/cloudflare/down-page/make-font.mjs)", () => {
+    expect(Buffer.from(LEXEND_DECA_400, 'base64').equals(readFileSync(PACKAGE_FONT))).toBe(true);
   });
 });
