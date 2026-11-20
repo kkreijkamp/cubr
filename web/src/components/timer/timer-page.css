@@ -319,6 +319,29 @@
   min-height: 5.25rem;
   align-content: start;
 }
+/* the touch timer's surface reaches the line under the time (TimerPage): no scrolling, selecting or
+   callout from a press there either. Its buttons (the last solve's +2, dnf) stay buttons. */
+.tp-under.tp-touch-start {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+/* touch screens: a long press anywhere on a timer page selected text (the scramble, the averages, the
+   stats) when it was meant to start the timer. Nothing there is selectable but what you type in;
+   the scramble has its copy button. */
+@media (hover: none) and (pointer: coarse) {
+  .timer-page {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .timer-page :is(input, textarea) {
+    user-select: text;
+    -webkit-user-select: text;
+  }
+}
 .tp-avgline {
   display: flex;
   gap: 1.5rem;
@@ -585,10 +608,12 @@
   font-variant-numeric: tabular-nums;
   font-size: 0.9rem;
 }
+/* the rows are as tall as the solve list's beside it (SolveList's ROW, in px as there), so the two
+   tables' rows and stripes line up across the panels */
 .tp-stats th,
 .tp-stats td {
   padding: 0;
-  height: 1.75rem;
+  height: 30px;
   font-weight: 400;
   white-space: nowrap;
 }
@@ -691,6 +716,8 @@
   font-size: 0.7rem;
   padding: 0 0.75rem;
   height: 1.4rem;
+  /* the rows start right under the header, as the stats table's do (not a panel gap below it) */
+  margin-bottom: -0.6rem;
 }
 .tp-solve-head > span,
 .tp-solve-row > span {
@@ -865,10 +892,29 @@
 .tp-guest .btn-text {
   padding: 0.2rem;
 }
+/* touch screens: fingertip-sized targets (global.css's touch block sets the buttons) */
 @media (hover: none) and (pointer: coarse) {
   .tp-guest .btn-text {
     padding: 0.5rem;
     margin: -0.3rem 0;
+  }
+  /* the guest note's links sit in a line of text: they grow around it */
+  .tp-guest a {
+    display: inline-block;
+    padding: 0.8rem 0.25rem;
+    margin: -0.8rem -0.25rem;
+  }
+  /* the stats cells open their averages: a row each, a fingertip tall. Every row is as tall as the
+     solve list's (SolveList's TOUCH_ROW), with or without a button in it */
+  .tp-cell-btn {
+    min-height: 44px;
+  }
+  .tp-stats tbody th,
+  .tp-stats tbody td {
+    height: 44px;
+  }
+  .tp-menu-item {
+    min-height: 44px;
   }
 }
 
@@ -1060,9 +1106,11 @@
   .tp-under {
     min-height: 0;
   }
-  /* the bar's menus scroll inside themselves rather than running past the bottom of the screen */
+  /* the bar's menus scroll inside themselves rather than running past the bottom of the screen
+     (the screen as it is now: a phone's browser bars take some of 100vh) */
   .tp-menu {
     max-height: calc(100vh - 8rem);
+    max-height: calc(100dvh - 8rem);
     overflow-y: auto;
   }
 }

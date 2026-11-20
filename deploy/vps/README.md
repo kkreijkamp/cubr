@@ -30,7 +30,9 @@ Work happens on `dev`; every commit gets a patch version and tag from the hooks.
 Build from the tag itself (`git archive`, never the working tree), then runs `deploy.sh`.
 `deploy.sh` makes the same main-only check, copies the compose files and gateway config from the
 tag to `/opt/cubr`, pulls the images, sets `CUBR_VERSION`, restarts what changed, waits for the
-health checks, then checks the gateway.
+health checks, then checks the gateway. A changed gateway config means recreating the gateway (a second or two), which deploy.sh
+does by itself: its `nginx.conf` is a single-file mount, and a running container never sees the release's
+new copy of the file (found with 1.5.0, whose gateway kept the 1.4.0 routing until recreated).
 
 Roll back to an earlier release with `deploy/vps/deploy.sh 1.1.0`. Its images are still in
 Artifact Registry; if they aren't, use `release.sh 1.1.0`.
@@ -160,7 +162,10 @@ and run the WCA import.
 - **Secrets** live only in `/opt/cubr/.env` (mode 600): `deploy.sh init` generated the Postgres
   password, JWT secret and internal token on the VM; the tunnel token comes from Cloudflare's API.
   Changing `JWT_SECRET` signs everyone out. `RESEND_API_KEY` (only the auth container gets it)
-  sends password-reset emails from `no-reply@cubr.dev`; without it they are only logged.
+  sends the account emails (password resets, email confirmations, change notices) from
+  `cubr <no-reply@cubr.dev>`, with replies going to `hello@cubr.dev`; without it they are only logged.
+  To score one, open mail-tester.com and send the reset email to the address it shows, from the repo:
+  `RESEND_API_KEY="$(security find-generic-password -s cubr-resend-api -w)" npx tsx scripts/test-email.ts <address>`.
   The sign-in providers' client secrets and Apple's key are there too ("Sign-in providers").
 - **Email DNS** (Cloudflare): `cubr.dev` MX to iCloud+ (`hello@cubr.dev`, a custom-domain address),
   SPF for iCloud, Apple's domain TXT and DKIM CNAME (`sig1._domainkey`), `_dmarc` (report-only for
@@ -174,6 +179,23 @@ and run the WCA import.
   centre) are blocked for 10 s with a JSON 429 in the app's error format ("Too many login attempts,
   try again in a few seconds"). It stops bursts before they reach the VM; the auth service's own
   limit (10 a minute per IP) still applies behind it.
+- **Zone settings** (Cloudflare, SSL/TLS and Security > Settings): Always Use HTTPS, minimum TLS 1.2,
+  TLS 1.3, Automatic HTTPS Rewrites and Browser Integrity Check are on. Check the TLS floor with
+  `curl -sSI --tlsv1.1 --tls-max 1.1 https://cubr.dev/`, which must fail with "alert protocol version".
+- **Bot Fight Mode stays off.** The free plan can't exempt anything from it, so it may challenge
+  Google Cloud's uptime check (`/healthz`), Ko-fi's webhook (`/api/supporters/kofi`) and
+  `scripts/smoke.mjs`, none of which can answer a challenge. It also forces Cloudflare's JavaScript
+  detections on: an inline script in every page, which the CSP refuses unless its header carries a
+  nonce.
+- **Down page** (`deploy/cloudflare/down-page/`, docs/SPEC.md 10.2): a Cloudflare Worker shows
+  visitors a cubr-styled "back in a moment" instead of Cloudflare's error page while the server is
+  down. `deploy.sh up` builds and uploads it and routes `cubr.dev/*` through it (`/api/*`,
+  `/socket.io/*`, `/assets/*` and `/healthz` skip it). `deploy.sh status` shows the routes, and
+  `deploy.sh down` deletes them, which serves the site as before. The `cubr.dev/*` route's request
+  limit failure mode is **Fail open** (set in the dashboard on 2026-11-19: cubr.dev > Workers Routes).
+  Past the free plan's 100,000 Worker runs a day, failing closed would show error 1027 instead of the
+  site. `deploy.sh status` shows the setting, and `up` leaves routes that are already right alone, so
+  a redeploy keeps it.
 - **Logs rotate.** Every container logs through `json-file` with at most 3 x 10 MB (`x-logging` in
   `compose.prod.yml`), so the gateway's access log, which holds visitors' IPs, is overwritten as it
   fills up. The privacy policy (`/privacy`) relies on this.

@@ -10,6 +10,8 @@ import { timeAgo } from '../lib/format';
 import { defaultGuestName, getGuestName, parseRoomCode, setGuestName } from '../lib/race';
 import type { RaceRoomSummary } from '../lib/types';
 import { useCanonical } from '../lib/canonical';
+import { PAGE_META } from '../lib/pageMeta';
+import { usePageMeta } from '../lib/usePageMeta';
 import { ErrorState, Loading, Spinner } from '../components/Spinner';
 import { useInterval, usePageVisible, useStoredState } from '../components/live/hooks';
 import '../components/live/live.css';
@@ -105,6 +107,7 @@ function RoomsTable({ onJoin }: { onJoin: (id: string) => void }) {
 
 export default function RaceLobbyPage() {
   useCanonical('/race');
+  usePageMeta(PAGE_META['/race']);
   const navigate = useNavigate();
   const { user, status } = useAuth();
   const [nick, setNick] = useState(getGuestName());
@@ -159,7 +162,7 @@ export default function RaceLobbyPage() {
       <div className="live-head">
         <div className="titles">
           <h1 className="h2">
-            <FlagIcon /> race
+            <FlagIcon /> {PAGE_META['/race'].heading}
           </h1>
           <div className="subtitle">
             real-time races with friends - same scramble, live status, results per round. rooms live in redis and websockets are spread across all

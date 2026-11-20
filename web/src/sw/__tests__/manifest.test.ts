@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import manifestText from '../../../public/manifest.webmanifest?raw';
 import indexHtml from '../../../index.html?raw';
-import { DEFAULT_THEME, getTheme } from '../../lib/themes';
+import { DEFAULT_DARK_THEME, DEFAULT_THEME, getTheme } from '../../lib/themes';
 import { isAppPath } from '../policy';
+import { HOME } from '../../lib/pageMeta';
 
 interface Image {
   src: string;
@@ -20,6 +21,7 @@ const manifest = JSON.parse(manifestText) as {
   display: string;
   theme_color: string;
   background_color: string;
+  color_scheme_dark: { background_color: string; theme_color: string };
   icons: Image[];
   shortcuts: { name: string; url: string; icons: Image[] }[];
   screenshots: Image[];
@@ -28,14 +30,54 @@ const manifest = JSON.parse(manifestText) as {
 // every PNG in public/, as data: URLs
 const pngs = import.meta.glob<string>('../../../public/**/*.png', { query: '?inline', import: 'default', eager: true });
 
-/** A PNG's width, height and whether it has an alpha channel (from its IHDR chunk). */
-function png(path: string): { width: number; height: number; alpha: boolean } {
+/** A PNG in public/, as bytes. */
+function pngBytes(path: string): Uint8Array<ArrayBuffer> {
   const url = pngs[`../../../public${path}`];
   if (!url) throw new Error(`public${path} is missing`);
-  const bytes = Uint8Array.from(atob(url.slice(url.indexOf(',') + 1)), (ch) => ch.charCodeAt(0));
+  return Uint8Array.from(atob(url.slice(url.indexOf(',') + 1)), (ch) => ch.charCodeAt(0));
+}
+
+/** A PNG's width, height and whether it has an alpha channel (from its IHDR chunk). */
+function png(path: string): { width: number; height: number; alpha: boolean } {
+  const bytes = pngBytes(path);
   const view = new DataView(bytes.buffer);
   expect(String.fromCharCode(...bytes.slice(12, 16)), `${path} is a PNG`).toBe('IHDR');
   return { width: view.getUint32(16), height: view.getUint32(20), alpha: bytes[25] === 6 || bytes[25] === 4 };
+}
+
+/**
+ * The colour of an 8-bit RGB PNG's top-left pixel, as #rrggbb. Only the start of the image data is
+ * inflated: the first scanline's filter byte, then that pixel, which no filter changes (it has no
+ * neighbours to predict it from).
+ */
+async function corner(path: string): Promise<string> {
+  const bytes = pngBytes(path);
+  expect([bytes[24], bytes[25]], `${path}: 8-bit RGB`).toEqual([8, 2]);
+  const data: Uint8Array<ArrayBuffer>[] = [];
+  for (let at = 8; at < bytes.length; ) {
+    const length = new DataView(bytes.buffer).getUint32(at);
+    if (String.fromCharCode(...bytes.slice(at + 4, at + 8)) === 'IDAT') data.push(bytes.slice(at + 8, at + 8 + length));
+    at += 12 + length;
+  }
+  const reader = new ReadableStream<Uint8Array<ArrayBuffer>>({
+    start(controller) {
+      for (const chunk of data) controller.enqueue(chunk);
+      controller.close();
+    },
+  })
+    .pipeThrough(new DecompressionStream('deflate'))
+    .getReader();
+  let head: number[] = [];
+  while (head.length < 4) {
+    const { value, done } = await reader.read();
+    if (done) throw new Error(`${path} has no image data`);
+    head = [...head, ...value];
+  }
+  await reader.cancel();
+  return `#${head
+    .slice(1, 4)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')}`;
 }
 const declared = (img: Image) => img.sizes.split('x').map(Number);
 
@@ -43,9 +85,13 @@ describe('the web app manifest', () => {
   it('describes an installable app on the whole site', () => {
     expect(manifest).toMatchObject({ id: '/', name: 'cubr', short_name: 'cubr', start_url: '/', scope: '/', display: 'standalone' });
   });
-  it('starts in the default theme', () => {
+  it('starts in the default theme, and in dark mode in the default dark theme', () => {
     expect(manifest.background_color).toBe(getTheme(DEFAULT_THEME).bg);
     expect(manifest.theme_color).toBe(getTheme(DEFAULT_THEME).bg);
+    // the spec's dark colours (w3c/manifest#1207, April 2026); a browser that doesn't read them yet
+    // ignores the member and keeps the light ones
+    const dark = getTheme(DEFAULT_DARK_THEME).bg;
+    expect(manifest.color_scheme_dark).toEqual({ background_color: dark, theme_color: dark });
   });
   it('has 192 and 512 px icons for every platform, each as large as it says', () => {
     for (const purpose of ['any', 'maskable']) {
@@ -102,10 +148,10 @@ describe('index.html', () => {
 describe('link previews (index.html)', () => {
   // the tests run without a DOM: read <meta property|name="key" content="..."> with a pattern
   const meta = (key: string) => indexHtml.match(new RegExp(`<meta (?:property|name)="${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}" content="([^"]*)"`))?.[1];
-  it('read "cubr" and "a minimalist speedcubing timer", as does the description for search engines', () => {
+  it('read "cubr" and the home page\'s description, the one search engines show (lib/pageMeta.ts)', () => {
     expect(meta('og:title')).toBe('cubr');
-    expect(meta('og:description')).toBe('a minimalist speedcubing timer');
-    expect(meta('description')).toBe('a minimalist speedcubing timer');
+    expect(meta('og:description')).toBe(HOME.description);
+    expect(meta('description')).toBe(HOME.description);
     expect(meta('og:type')).toBe('website');
   });
   it('show the large image: an absolute https link, its real size, opaque (a transparent one shows black in some apps)', () => {
@@ -126,11 +172,14 @@ describe('link previews (index.html)', () => {
 
 describe('the iOS launch images', () => {
   const links = [...indexHtml.matchAll(/<link rel="apple-touch-startup-image" media="([^"]+)" href="([^"]+)" \/>/g)].map((m) => ({ media: m[1], href: m[2] }));
-  /** device-width, device-height, pixel ratio and orientation from a link's media query */
+  /** device-width, device-height, pixel ratio, orientation and light or dark mode from a link's media query */
   const screen = (media: string) => {
-    const m = /^\(device-width: (\d+)px\) and \(device-height: (\d+)px\) and \(-webkit-device-pixel-ratio: (\d)\) and \(orientation: (portrait|landscape)\)$/.exec(media);
+    const m =
+      /^\(device-width: (\d+)px\) and \(device-height: (\d+)px\) and \(-webkit-device-pixel-ratio: (\d)\) and \(orientation: (portrait|landscape)\) and \(prefers-color-scheme: (light|dark)\)$/.exec(
+        media,
+      );
     if (!m) throw new Error(`unexpected media query: ${media}`);
-    return { width: Number(m[1]), height: Number(m[2]), ratio: Number(m[3]), orientation: m[4] };
+    return { width: Number(m[1]), height: Number(m[2]), ratio: Number(m[3]), orientation: m[4], mode: m[5] };
   };
 
   it('only work in a home-screen web app, which index.html declares', () => {
@@ -148,15 +197,27 @@ describe('the iOS launch images', () => {
     }
   });
 
-  it('cover both orientations of every screen once, and every image in public/launch is used', () => {
+  it('cover both orientations of every screen once in each mode, and every image in public/launch is used', () => {
     const media = links.map((l) => l.media);
     expect(new Set(media).size).toBe(media.length);
-    for (const m of media.filter((x) => x.endsWith('(orientation: portrait)'))) expect(media).toContain(m.replace('portrait', 'landscape'));
-    expect(media.filter((x) => x.endsWith('(orientation: landscape)'))).toHaveLength(media.length / 2);
+    for (const m of media) {
+      const { orientation, mode } = screen(m);
+      const turned = orientation === 'portrait' ? 'landscape' : 'portrait';
+      expect(media, `${m}, turned`).toContain(m.replace(`(orientation: ${orientation})`, `(orientation: ${turned})`));
+      const other = mode === 'light' ? 'dark' : 'light';
+      expect(media, `${m}, in ${other} mode`).toContain(m.replace(`(prefers-color-scheme: ${mode})`, `(prefers-color-scheme: ${other})`));
+    }
     const files = Object.keys(pngs)
       .filter((f) => f.includes('/public/launch/'))
       .map((f) => f.slice(f.indexOf('/public/') + '/public'.length));
     expect(files.sort()).toEqual(links.map((l) => l.href).sort());
+  });
+
+  it('are the default theme in light mode and the default dark theme in dark mode, as the app starts in each', async () => {
+    for (const { media, href } of links) {
+      const theme = getTheme(screen(media).mode === 'dark' ? DEFAULT_DARK_THEME : DEFAULT_THEME);
+      expect(await corner(href), href).toBe(theme.bg);
+    }
   });
 
   it("include today's iPhones and iPads", () => {

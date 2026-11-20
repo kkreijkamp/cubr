@@ -18,7 +18,7 @@ is covered in `deploy/README.md`.
 cubr/
   package.json                # npm workspaces: packages/*, services/*, jobs/*
   tsconfig.base.json          # strict TypeScript settings shared by all workspaces
-  vitest.config.ts            # unit tests of packages, services and jobs
+  vitest.config.ts            # unit tests of packages, services, jobs and the Cloudflare Worker
   docker-compose.yml          # full local stack: Postgres, Redis, all services, web, gateway (+ "jobs" profile)
   cloudbuild.yaml             # Cloud Build: all images in parallel
   .github/workflows/ci.yml    # typecheck, tests, bundles, web build and kustomize render on every push
@@ -34,9 +34,12 @@ cubr/
   deploy/
     gateway/nginx.conf        # compose gateway mimicking the K8s Ingress routes
     k8s/                      # Kubernetes manifests (kustomize): base/, overlays/gke/, jobs/seed/
+    vps/                      # production: compose.prod.yml, release.sh, deploy.sh, backups (README = runbook)
+    cloudflare/down-page/     # the Worker that shows "back in a moment" while the server is down (deploy.sh)
   scripts/
     build-service.mjs         # esbuild bundler: node scripts/build-service.mjs services/auth
     smoke.mjs                 # end-to-end check through any entry point: node scripts/smoke.mjs <baseUrl>
+    test-email.ts             # sends the reset email as cubr.dev does, e.g. to mail-tester.com
     commands.sh               # every GKE command, each with a comment
   docs/                       # SPEC.md (this file)
 ```
@@ -166,7 +169,9 @@ CREATE TABLE auth.user_settings (
   settings   jsonb NOT NULL DEFAULT '{}',
   updated_at timestamptz NOT NULL DEFAULT now()
 );
--- profile pictures (migration 002): browser-resized <= 300 KB images; users.avatar_version is a
+-- profile pictures (migration 002): uploads (the browser crops them to 256x256) are decoded and stored
+-- again as a 256x256 WebP made from their pixels alone (no EXIF or other metadata; services/auth/src/
+-- avatarImage.ts); rows from before v1.5.15 keep the browser's bytes. users.avatar_version is a
 -- content hash that makes each picture URL unique (immutable, cacheable forever)
 ALTER TABLE auth.users ADD COLUMN avatar_version text;
 -- private profile (migration 004): strangers see only username + picture; mirrored to auth:private-users
@@ -415,10 +420,11 @@ type PB = { valueMs: number; solveId: string|null; achievedAt: string };
 | POST `/api/auth/me/email` | req | `{email, password?}` (password required when the account has one) | 202 `{ok: true, email}`: the new address gets a link `<PUBLIC_URL>/confirm-email#<token>` (32 random bytes, valid 60 min, single use; replaces a pending change); nothing changes until it's opened; 400 same as the current email; 403 wrong password, or (no password: made with a provider) no sign-in in the last 10 min (token `iat`); 409 another account uses it; 429 after 5/h per account; 503 the email couldn't be sent (nothing pending) |
 | POST `/api/auth/email/confirm` | - | `{token}` | 200 `{email, changed}`: the address is confirmed (`email_verified_at`) and the user's pending links are deleted. `changed: false`: it was the account's own address. `changed: true`: the email changes too, the user's password-reset links are deleted, and the old address gets a notice with the new one masked (`j***@example.com`) if it was confirmed (an unconfirmed one may be a stranger's); sessions carry on; 400 invalid/expired/used link; 409 another account took the address meanwhile (nothing changes, the link stays); 429 after 20/h/IP |
 | POST `/api/auth/password/reset` | - | `{token, password}` (password: 8-128 chars) | 200 `{token, user: PrivateUser}`: new password set, the address confirmed (the link reached it), the user's other reset links deleted, every older token revoked (per-user revocation; the new token is issued after it); 400 invalid/expired/used link; 503 if the revocation can't be stored (nothing changes) |
+| POST `/api/auth/me/password` | req | `{password?, newPassword}` (password: the current one, required when the account has one; newPassword: 8-128 chars) | 200 `{token, user: PrivateUser}`: the new password set, the user's reset links deleted, every older token revoked (this one's too; the new token is issued after it), and the account's email told ("Your cubr password was changed") if it's confirmed or predates confirming. An account without a password (made with a provider) sets its first this way. 400 the same as the current password; 403 wrong password, or (no password) no sign-in in the last 10 min (token `iat`); 429 after 5/h per account; 503 if the revocation can't be stored (nothing changes) |
 | GET `/api/auth/me` | req | - | `{user: PrivateUser, settings: object}` |
 | PATCH `/api/auth/me` | req | `{displayName?, bio?, country?, wcaId?, private?}` (null clears; `private: true` = private profile) | `{user: PrivateUser}` (+ `user.updated`); 503 if the private flag can't be mirrored to Redis (nothing changes) |
 | PUT `/api/auth/me/settings` | req | `{settings: object}` (<= 16 KB JSON) | `{settings}` |
-| PUT `/api/auth/me/avatar` | req | raw image body, `Content-Type: image/webp\|image/jpeg\|image/png`, <= 300 KB (magic bytes must match) | `{user: PrivateUser}`; 400, 413, 429 (10/h) (+ `user.updated`) |
+| PUT `/api/auth/me/avatar` | req | raw image body, `Content-Type: image/webp\|image/jpeg\|image/png`, <= 300 KB (magic bytes must match), <= 2048 px a side | `{user: PrivateUser}`; stored as a fresh 256x256 WebP: turned upright by its EXIF orientation, cropped to the centre, first frame only, no metadata. 400 (not a decodable PNG, JPEG or WebP, or over 2048 px), 413, 415, 429 (10/h) (+ `user.updated`) |
 | DELETE `/api/auth/me/avatar` | req | - | `{user: PrivateUser}` (+ `user.updated`) |
 | DELETE `/api/auth/me` | req | `{password}`, or `{confirm: username}` (case-insensitive) for an account without a password | 204: the account is deleted and every token of it revoked (+ `user.deleted`, which makes the other services delete its data; its provider identities cascade); 403 wrong password or username; 429 after 5 tries/10 min; 503 when Redis can't take the revocation or the event (then nothing is deleted) |
 | GET `/api/auth/oauth/providers` | - | - | `{providers: ('google'\|'apple'\|'github')[]}`: the providers whose keys are set (none = no buttons); cached 5 min |
@@ -442,6 +448,14 @@ An account made with a provider has no password: it signs in with the provider, 
 signed in (mode `link`, from the account page), so owning an email at a provider never takes over a cubr
 account. Each provider is configured by environment variables on the auth service (services/auth/README.md);
 the redirect URI to register with it is `<PUBLIC_URL>/api/auth/oauth/<provider>/callback`.
+
+**Emails** (password resets, email confirmations, and the notices after an email or password change) go
+through Resend from `cubr <no-reply@cubr.dev>`, with replies to `hello@cubr.dev`, each in plain text
+and HTML. The HTML is one page for all of them (`page()` in services/auth/src/mail.ts): the "cubr"
+wordmark, the message, a button with its address printed under it, and the small print, in white cross,
+or white cross dark in mail apps that follow dark mode. Each email carries its own `X-Entity-Ref-ID`,
+so Gmail doesn't fold a second reset link into the first one's thread. Without `RESEND_API_KEY` they
+are logged instead; mail to reserved domains (`example.com`, `.test`...) is never sent.
 
 Rate limits are per client IP; callers that present `INTERNAL_API_TOKEN` (section 4) are exempt. Redis is
 a soft dependency: while it is down, rate limits and revocation checks fail open, `user.*` events
@@ -604,9 +618,63 @@ Google, Apple or GitHub: signs in, or asks a new account for its username), `/re
 with an optimistic local store + retry queue (idempotent ids). Monkeytype-style theme system via CSS
 custom properties, command palette (Esc / Ctrl+K), focus mode while timing, toasts.
 
+**Changing the password.** The account page's "password" row opens a dialog (`ChangePasswordModal`):
+the current password, then the new one, with a show button. An account made with a provider sets its
+first instead, after a fresh sign-in (the dialog offers one, as changing the email does).
+- **For password managers:** `/.well-known/change-password` (W3C's well-known URL for changing
+  passwords) redirects to `/account#change-password`, which opens the dialog. A signed-out visitor
+  signs in first and comes back to it. The fields say which password is which (`autocomplete`), and a
+  hidden username field says whose.
+- **Other tabs stay signed in:** a change or a reset revokes every older token. A tab that hears through
+  `localStorage` of a new token for the same account switches to it (`lib/api.ts`). A 401 never
+  deletes a newer token another tab stored; the tab carries on with that one instead (`lib/auth.tsx`).
+
+Hover styles apply only where something can hover: the build wraps every `:hover` selector in
+`@media (hover: hover)` (`web/plugins/hoverMedia.ts`, a PostCSS step in `vite.config.ts`), so a tap
+on a touch screen no longer leaves a button, row or link in its hover colour until the next tap.
+Selectors in the same list that don't use `:hover` (`.x:hover, .x.active`) stay for touch screens
+too. The profile's event donut previews an event under a mouse or keyboard focus only, not on a tap.
+
+On touch screens the timer pages (the timer, the daily challenge, a race) have no selectable text, so
+a long press meant to start the timer can't select the scramble or the averages; fields stay
+selectable, and the scramble has its copy button. The touch timer's surface takes in the line under
+the time (the hint, then the averages), where a thumb aimed a little low lands. A press on a button
+there (the last solve's +2 and dnf) is that button's, not a start (`useTimerEngine` skips controls).
+Double-tap zoom is off page-wide (`touch-action: manipulation`), so two quick taps don't zoom;
+pinch zoom still works.
+
+Touch screens get fingertip-sized controls (`@media (hover: none) and (pointer: coarse)`: global.css's
+touch block, then each component's own).
+- **Buttons and fields:** at least 44 px tall (Apple's minimum; WCAG 2.5.8 asks for 24 px), and
+  buttons are as wide. The menus, the command palette, the stats cells and the solve list's rows are
+  44 px too. `SolveList` sets its row height from the same media query, since it positions its rows
+  itself.
+- **The header:** its icons are full height and as wide as fits (30-32 px on 320-390 px phones).
+- **Controls inside a line of text:** links, the leaderboard's names, the profile's ranks and range,
+  and the login links grow into the space around them (padding with the same negative margin), so
+  nothing moves.
+- **Under 44 px on purpose:**
+  - links inside prose (WCAG's inline exception);
+  - the profile's donut legend, 36 px, a list of pickers kept beside the donut;
+  - the keyboard-binding keys, which only matter with a keyboard.
+- **Text and heights:** fields keep 16 px text, so iOS doesn't zoom into them. Short pages fit a
+  phone's screen with its browser bars showing (`100svh`), and the timer's menus scroll within what's
+  visible (`100dvh`).
+
+The screen stays on while timing (the Screen Wake Lock API, `web/src/lib/wakeLock.ts`, held by
+`TimerDisplay` for every input, races and the daily challenge included). It holds from the press,
+or the start of inspection, until five minutes after the solve stops: long enough to read the time
+and scramble the next one. That matters most with a Stackmat, smart cube or Bluetooth timer, which
+never touch the screen, so the device counts as idle all along. Leaving the timer lets go at once.
+The browser drops the lock while the page is hidden; it's taken again when the page shows. Where
+the browser lacks the API (iOS before 16.4, or before 18.4 in a home-screen app; Firefox before
+126), the screen sleeps as before.
+
 ### 10.1 Installable app and offline (PWA)
 
-- **Manifest** `web/public/manifest.webmanifest`: standalone display, white cross colours, icons
+- **Manifest** `web/public/manifest.webmanifest`: standalone display, white cross colours (and
+  white cross dark's in `color_scheme_dark`, the spec's dark colours since April 2026; no browser
+  reads them yet, November 2026, so Android's splash screen stays white in dark mode), icons
   (any 192/512, maskable 192/512, monochrome 512), shortcuts (daily challenge, race, leaderboards),
   wide and narrow screenshots for Chrome's install dialog, `launch_handler: focus-existing` (a
   shortcut focuses the open window and `lib/pwa.ts` takes it to the shortcut's page). iOS:
@@ -614,29 +682,35 @@ custom properties, command palette (Esc / Ctrl+K), focus mode while timing, toas
   drawn by `web/scripts/pwa-assets.mjs`.
 - **iOS launch images** (`pwa-assets.mjs launch`): what an iPhone or iPad shows while cubr opens
   from the home screen, instead of a blank white screen.
-  - The app icon's cube, 96 points across, centred on white.
-  - One per screen size and orientation: 26 sizes, from the iPhone SE to the iPhone 18 Pro Max,
-    the iPhone Air and every current iPad. The iPhone Duo's two sizes assume 3x, since Apple
-    doesn't publish it.
-  - `public/launch/`, linked from `index.html` by `apple-touch-startup-image` tags whose media
-    queries give the screen in points, the pixel ratio and the orientation. The script writes the
-    tags between markers. iOS uses an image only if it is exactly that size; the tests check every
-    tag against its file.
-  - Light only: iOS doesn't honour `prefers-color-scheme` in these queries (WebKit bug 259328), and
-    its web view is white between the launch image and the first paint anyway.
+  - The app icon's cube, 96 points across, centred, in the favicon's colours for each mode: on
+    white cross's white in light mode, on white cross dark's `#1d2024` with a light centre in dark
+    mode.
+  - One per screen size, orientation and mode: 26 sizes, from the iPhone SE to the iPhone 18 Pro
+    Max, the iPhone Air and every current iPad, so 104 images. The iPhone Duo's two sizes assume 3x,
+    since Apple doesn't publish it.
+  - `public/launch/` (dark ones end in `-dark`), linked from `index.html` by
+    `apple-touch-startup-image` tags whose media queries give the screen in points, the pixel ratio,
+    the orientation and `prefers-color-scheme`. The script writes the tags between markers. iOS uses
+    an image only if it is exactly that size; the tests check every tag against its file, and each
+    image's background against its mode's theme.
+  - iOS picks the light or dark image for the mode the device is in when cubr is added to the home
+    screen, and keeps it when the mode changes later (WebKit bug 259328, open since 2023): removing
+    cubr and adding it again picks again. Untested on a device: whether iOS shows white between a
+    dark launch image and the first paint.
   - iOS reads the image when the app is added to the home screen: an existing install needs
     re-adding to get it. The images aren't precached.
 - **Link previews** (chat apps, social sites): `index.html` has Open Graph tags and
-  `twitter:card summary_large_image`, the same for every page, since crawlers don't run the app.
-  They give the title "cubr", the description "a minimalist speedcubing timer" (also the search
-  engines' description), and `https://cubr.dev/og.png`: the header's logo centred on white,
-  1200 x 630 and opaque (`pwa-assets.mjs og`). There's no `og:url`, so a link shared from any page
-  leads back to that page.
+  `twitter:card summary_large_image`. Crawlers don't run the app, so each card is its page's HTML:
+  the title "cubr" and `og:site_name` "cubr" on every card, the page's own description (the one
+  search engines show, 10.2: each public page's HTML has its own), and `https://cubr.dev/og.png`:
+  the header's logo centred on white, 1200 x 630 and opaque (`pwa-assets.mjs og`). There's no
+  `og:url`, so a link shared from any page leads back to that page.
 - **Service worker** `/sw.js`, from `web/src/sw/sw.ts`, built after the app by
   `web/plugins/serviceWorker.ts`:
   - It precaches the whole build (about 2.4 MB) except source maps, the `.woff` font fallbacks,
-    the icons, the screenshots, the iOS launch images and the files for other sites (the link
-    preview image, `robots.txt`, `sitemap.xml`, `/.well-known/`), in the cache `cubr-app-<version>`.
+    the icons, the screenshots, the iOS launch images and the files for other sites and crawlers
+    (the link preview image, `robots.txt`, `sitemap.xml`, `/.well-known/`, and the public pages'
+    own copies of `index.html` in `pages/`), in the cache `cubr-app-<version>`.
     The version is a hash of the cached files' names and contents, so a release that doesn't change
     the web app ships the same `sw.js`, and browsers see no update.
   - Requests (`web/src/sw/policy.ts`):
@@ -644,7 +718,8 @@ custom properties, command palette (Esc / Ctrl+K), focus mode while timing, toas
     - `/assets/*`: cache first;
     - other same-origin GETs: network first, falling back to the cache;
     - never touched: anything but GET, other origins, `/api/*`, `/internal/*`, `/socket.io`,
-      `/_info`, `/healthz`, `/readyz` and `/sw.js`.
+      `/.well-known/*` (the server's answers for other programs, such as the redirect password
+      managers follow), `/_info`, `/healthz`, `/readyz` and `/sw.js`.
   - Installing copies unchanged hashed files from the previous version's cache. Activating keeps
     the current and the previous cache (tabs still on the old version can load its chunks),
     deletes older ones, and takes over open pages.
@@ -693,6 +768,34 @@ The web container's nginx (`web/nginx/default.conf.template`) serves the app and
     errors included.
   - The gateway adds nothing to proxied responses (it would duplicate these), only to its own
     errors.
+- **Titles, descriptions and the words to rank for** (`web/src/lib/pageMeta.ts`, built in v1.5.19).
+  cubr wants to be found by cubers' own words: speedcube, cube and timer, and their family
+  (speedcubing, speedcubers, cubing, cubers). Each public page (the sitemap's) has, in one table:
+  - a title of at most 60 characters with the brand last: the home page's is "cubr | a minimalist
+    cube timer for speedcubers", About's "about cubr, a minimalist speedcube timer", the default
+    board's "speedcubing leaderboards for every wca event | cubr" (the other boards are named after
+    themselves, "weekly 2x2 ao5 leaderboard | cubr");
+  - a description of 110 to 160 characters, the one search results and link previews show;
+  - its heading as the page shows it. The timer's, "cubr: a minimalist speedcube timer", is a
+    visually hidden `h1` (`.sr-only`) for screen readers and search engines.
+  - `pageMeta.test.ts` keeps them within those lengths, each page's its own, in lowercase, with at
+    least one of the words, and never stuffed: each word once in a title (three at most), twice in
+    a description (five at most). Every other page is titled "<page> | cubr" and keeps the home
+    page's description.
+  - **In the app**, `lib/usePageMeta.ts` sets the page's title and `<meta name="description">` while it
+    shows, and the home page's again on leaving (search engines read both after running the app).
+  - **In the HTML**, for crawlers that don't run the app (AI search engines, link previews, and Bing at
+    times): `index.html` carries the home page's title and description, and in `#root` a summary (the
+    heading, the description and links to the public pages). The summary is hidden by a style
+    attribute (out of the flow, 1 px, clipped, never `display: none`), so nothing flashes or shifts
+    while the app loads, and the app replaces it as it starts. The build writes every other public
+    page's copy, `pages/<page>.html`, with its own title, description, `og:description` and summary
+    (`web/plugins/pageFiles.ts`); nginx serves it at the page's address
+    (`try_files /pages$uri.html /index.html`), and `/pages/*` itself is a 404. The service worker
+    doesn't cache the copies: offline, every page opens from `index.html` and sets its own title.
+  - About's feature titles link to their pages (the timer, daily, races, leaderboards, WCA), looking
+    as before, green on hover. A browser without JavaScript gets one line (`<noscript>`): what cubr
+    is, and to turn JavaScript on.
 - **The site's name and logo for search engines:** `index.html` carries one JSON-LD block (a data block,
   which the CSP doesn't cover):
   - a `WebSite` (`https://cubr.dev/`, name `cubr`, alternate name `cubr.dev`, the page's description);
@@ -700,6 +803,8 @@ The web container's nginx (`web/nginx/default.conf.template`) serves the app and
     opaque, the cube clear of a round crop) and `sameAs` the GitHub repository and the Ko-fi page.
   - `structuredData.test.ts` checks it against the files and `lib/links.ts`. The Schema Markup
     Validator finds no errors or warnings.
+  - No `SoftwareApplication` (or `WebApplication`): Google reports one without ratings or reviews
+    as an invalid item in Search Console, and cubr has neither.
 - **One address per page.** Search engines split a page's ranking between its addresses, so:
   - **nginx** (`map $cubr_canonical`) sends a page asked for with capitals or a trailing slash to its
     plain lowercase address: 301, query kept (`/About/?x=1` -> `/about?x=1`). A username and a room id
@@ -710,7 +815,7 @@ The web container's nginx (`web/nginx/default.conf.template`) serves the app and
     its name as stored; a board with only its event, kind and period (the default board is plain
     `/leaderboards`, as in the sitemap). Pages with `noindex` get none.
 - **Real 404s.** The app's routes (section 10, case-insensitive, optional trailing slash) get
-  `index.html` with 200. Usernames and room ids must look like `USERNAME_RE` and `ROOM_ID_RE`.
+  `index.html` with 200 (the public pages: their own copy of it, above). Usernames and room ids must look like `USERNAME_RE` and `ROOM_ID_RE`.
   Everything else is a file of the build or a 404 whose body is still `index.html`, so people see
   the app's not-found page and crawlers see the status. A well-formed name nobody has (a missing
   profile) still answers 200; its view adds `<meta name="robots" content="noindex">`, as does the
@@ -727,8 +832,21 @@ The web container's nginx (`web/nginx/default.conf.template`) serves the app and
 - **security.txt** (RFC 9116) at `/.well-known/security.txt`: contact `hello@cubr.dev`, the policy
   in `SECURITY.md`. `/security.txt` redirects to it. Its `Expires` must stay under a year ahead; a
   test fails 30 days before it passes.
+- **`/.well-known/change-password`** redirects (302) to `/account#change-password`, the
+  change-password dialog (section 10). Other unknown `/.well-known/` paths are 404s, which browsers
+  check before they trust the redirect.
 - Redirects are relative (`absolute_redirect off`): behind the gateway and Cloudflare, nginx would
   build them with the wrong scheme and port.
+- **While the server is down** (built in v1.5.16, live once `deploy/cloudflare/down-page/deploy.sh up`
+  has run): a Cloudflare Worker (`deploy/cloudflare/down-page/worker.ts`) answers page loads the
+  server can't answer with a cubr-styled "back in a moment" instead of Cloudflare's error page. The
+  server can't answer when Cloudflare gets a 530 (tunnel down), a 52x (origin unreachable) or the
+  gateway's 502-504. The page is a 503 with `Retry-After: 30`, `no-store` and `noindex`, and it is
+  self-contained: inline styles, Lexend Deca as a data URI, white cross or white cross dark, no
+  scripts. It reloads every 30 seconds. Everything else passes through untouched, so the app and the
+  uptime check see the real failure. Routes skip the Worker for `/api/*`, `/socket.io/*`, `/assets/*`
+  and `/healthz`, so nothing stands between the app and its data and the server still sees each
+  visitor's address. The installed app doesn't need it: its service worker opens it offline.
 
 ### 10.3 Analytics (Cloudflare Web Analytics)
 

@@ -38,6 +38,8 @@ export const INSPECTION_MS = 15_000;
 const PLUS2_AT = 15_000;
 const DNF_AT = 17_000;
 const MODIFIERS = new Set(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Tab']);
+/** what a press on the touch surface leaves alone: controls inside it */
+const CONTROLS = 'button, a[href], input, select, textarea, label, [role="button"], [contenteditable="true"]';
 /** stop events this soon after the start are ignored (accidental double press / double tap), like csTimer */
 const MIN_RUN_MS = 150;
 
@@ -295,6 +297,9 @@ export function useTimerEngine(opts: TimerEngineOptions) {
         stop(now(e.nativeEvent), false);
         return;
       }
+      // the touch surface holds buttons too (the last solve's +2 and dnf under the time): a press on one
+      // is that button's, not the start of a solve
+      if ((e.target as Element | null)?.closest?.(CONTROLS)) return;
       press(now(e.nativeEvent));
     },
     [press, stop],

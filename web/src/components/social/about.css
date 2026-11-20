@@ -125,6 +125,10 @@
 .ab-feature .t {
   color: var(--text-color);
 }
+/* a feature with a page of its own links to it: the same text, green on hover */
+.ab-feature a.t:hover {
+  color: var(--main-color);
+}
 .ab-feature .d {
   grid-column: 2;
   color: var(--sub-color);

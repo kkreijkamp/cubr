@@ -378,3 +378,19 @@ table.lb-table tr.me.flash td {
     justify-content: space-between;
   }
 }
+/* touch screens: a name takes its row's height (rows are 39 px apart), and the links inside a line of
+   text grow around it, so the layout stays as it is (global.css's touch block sets the buttons) */
+@media (hover: none) and (pointer: coarse) {
+  table.lb-table td.name a {
+    display: inline-block;
+    padding-block: 0.6rem;
+    margin-block: -0.6rem;
+  }
+  .lb-subtitle a,
+  .lb-me-empty a,
+  .lb-empty a {
+    display: inline-block;
+    padding: 0.8rem 0.25rem;
+    margin: -0.8rem -0.25rem;
+  }
+}

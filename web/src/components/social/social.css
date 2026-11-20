@@ -1256,3 +1256,32 @@ table.ps-table td.dnf {
 .ep-visibility {
   justify-self: start;
 }
+
+/* touch screens: fingertip-sized targets (44 px; global.css's touch block sets the buttons). The event
+   donut's legend rows get 36 px, a list of pickers kept beside the donut; the rank links and the
+   activity range sit in a line of text and grow around it instead, so it stays where it is, as do the
+   header's icon buttons (copy link, edit). iOS zooms into a select under 16px when it opens. */
+@media (hover: none) and (pointer: coarse) {
+  .pf-donut-legend button {
+    min-height: 36px;
+  }
+  .pf-link.btn-text,
+  .pf-actions .btn-text {
+    margin: -0.6rem;
+  }
+  .pf-tab {
+    min-height: 44px;
+  }
+  .pf-rank {
+    display: inline-block;
+    padding: 0.8rem 0.35rem;
+    margin: -0.8rem -0.35rem;
+  }
+  .hm-range {
+    padding: 0.85rem 0.25rem;
+    margin: -0.85rem -0.25rem;
+  }
+  .hm-range select {
+    font-size: 16px;
+  }
+}

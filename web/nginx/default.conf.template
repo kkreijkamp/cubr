@@ -156,6 +156,12 @@ server {
   location ^~ /.well-known/ {
     try_files $uri =404;
   }
+  # password managers' "change password" link (W3C: A Well-Known URL for Changing Passwords) leads to
+  # the account page's change-password dialog (CHANGE_PASSWORD_URL in src/lib/password.ts). Unknown
+  # /.well-known/ paths stay 404s, which browsers check before they trust this redirect.
+  location = /.well-known/change-password {
+    return 302 /account#change-password;
+  }
   location = /security.txt {
     return 301 /.well-known/security.txt;
   }
@@ -164,17 +170,26 @@ server {
   # Case-insensitive and with an optional trailing slash, like React Router. Usernames and race room ids
   # follow the services' rules (USERNAME_RE, ROOM_ID_RE): anything else can't exist, so it's a 404.
   # (Regexes with {n,m} need quotes, or nginx reads the brace as the start of a block.)
+  # The public pages have their own copy of index.html, pages/<page>.html, with the page's title,
+  # description and heading for crawlers that don't run the app (web/plugins/pageFiles.ts). $uri is
+  # always the plain lowercase address here: the others were redirected above.
   location = / {
     try_files /index.html =404;
   }
   location ~* ^/(?:leaderboards|daily|race|account|settings|wca|about|login|login/sso|reset|confirm-email|terms|privacy)/?$ {
-    try_files /index.html =404;
+    try_files /pages$uri.html /index.html =404;
   }
   location ~* "^/race/[a-z0-9]{4,32}/?$" {
     try_files /index.html =404;
   }
   location ~* "^/profile/[a-z0-9_]{3,20}/?$" {
     try_files /index.html =404;
+  }
+
+  # those copies only at their pages' addresses: /pages/daily.html itself is a 404 like any unknown path
+  location ^~ /pages/ {
+    error_page 404 /index.html;
+    return 404;
   }
 
   # Everything else: a file of the site (favicon.svg, robots.txt, og.png...), or a real 404. The 404

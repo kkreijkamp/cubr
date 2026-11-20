@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { ErrorState, PageLoading } from '../components/Spinner';
@@ -10,18 +9,14 @@ import { useAuth } from '../lib/auth';
 import { useAsync } from '../lib/useAsync';
 import { useCanonical } from '../lib/canonical';
 import { useNoIndex } from '../lib/useNoIndex';
+import { usePageMeta } from '../lib/usePageMeta';
 
 export default function ProfilePage() {
   const { username = '' } = useParams();
   const { user: me } = useAuth();
   const profile = useAsync((signal) => api.auth.user(username, signal), [username]);
 
-  useEffect(() => {
-    document.title = `${username} | cubr`;
-    return () => {
-      document.title = 'cubr';
-    };
-  }, [username]);
+  usePageMeta({ title: `${username} | cubr` });
 
   // nobody by this name: the server answered 200 (the name is well-formed), so tell search engines here
   const missing = !profile.data && profile.error instanceof ApiError && profile.error.status === 404;

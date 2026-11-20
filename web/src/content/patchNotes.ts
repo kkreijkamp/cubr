@@ -18,6 +18,44 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: '1.6.0',
+    date: '2026-11-20',
+    title: 'change your password, a screen that stays on while you solve, and a better timer on touch screens',
+    sections: [
+      {
+        heading: 'new',
+        items: [
+          'change your password on your account page, or set one if you signed up with google or github. every other device is signed out, an email tells you it happened, and your password manager\'s "change password" button opens it',
+          'the screen stays on while you time, and for five minutes after a solve, so your phone doesn\'t go to sleep mid-solve or while you scramble',
+          'on an iphone or ipad in dark mode, cubr opens from the home screen on a dark screen. added it before? remove it and add it again: ios saves the picture when the app is added',
+        ],
+      },
+      {
+        heading: 'changed',
+        items: [
+          'on touch screens, holding the timer starts it instead of selecting text, the line under the time starts it too, and a quick double tap no longer zooms in',
+          'buttons and fields are a fingertip tall on touch screens, and a button or row you tapped no longer stays highlighted',
+          'cubr\'s emails follow your mail app\'s dark mode, and a second reset link no longer hides in the first one\'s thread in gmail',
+        ],
+      },
+      {
+        heading: 'fixed',
+        items: [
+          'the stats rows on the timer page line up with the solves beside them',
+          'one solve is "1 solve", not "1 solves"',
+        ],
+      },
+      {
+        heading: 'behind the scenes',
+        items: [
+          'the server makes every profile picture afresh, so none can carry hidden details from the original file, such as where a photo was taken',
+          'if cubr\'s server is ever down, you see a cubr "back in a moment" page instead of an error',
+          'each page tells search engines what it is, in the words cubers search for',
+        ],
+      },
+    ],
+  },
+  {
     version: '1.5.0',
     date: '2026-11-18',
     title: 'light and dark mode, a better fit on phones, and an email you can confirm and change',

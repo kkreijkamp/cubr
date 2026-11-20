@@ -418,10 +418,17 @@
   padding-left: 0;
   background: transparent;
 }
-/* iOS zooms the page into a text field under 16px when it gets focus */
+/* touch screens. iOS zooms the page into a text field under 16px when it gets focus; the theme cards
+   and sliders get a fingertip's height (a slider takes a tap anywhere on its box) */
 @media (hover: none) and (pointer: coarse) {
   .st-theme-search input {
     font-size: 16px;
+  }
+  .st-theme {
+    min-height: 44px;
+  }
+  .st-range {
+    height: 44px;
   }
 }
 .st-theme-search:focus-within {
@@ -720,5 +727,17 @@
 @media (max-width: 400px) {
   .st-random-label {
     display: none;
+  }
+}
+/* touch screens, with the sections as tabs across the top: each tab takes the gap around its word
+   (a short one, "app", was 30 px wide), and the underline stays under the word */
+@media (hover: none) and (pointer: coarse) and (max-width: 860px) {
+  .st-rail-item {
+    padding-inline: 0.6rem;
+    margin-inline: -0.6rem;
+  }
+  .st-rail-item::before {
+    left: 0.6rem;
+    right: 0.6rem;
   }
 }

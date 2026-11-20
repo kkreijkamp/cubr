@@ -1,5 +1,6 @@
 // The auth service's HTTP API against a real Postgres and Redis (@cubr/testkit): accounts, sign-in,
 // sessions, password reset, account deletion, private profiles, pictures and Ko-fi supporters.
+import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PRIVATE_USERS_KEY, revokedUserKey, signToken } from '@cubr/common';
 import { describeIntegration, startTestServer, type TestServer } from '@cubr/testkit';
@@ -27,9 +28,10 @@ const PASSWORD = 'correct horse 1';
 let ipCount = 0;
 const freshIp = () => `10.1.${Math.floor(++ipCount / 250)}.${(ipCount % 250) + 1}`;
 
-/** PNG / JPEG magic bytes plus a little padding: enough for the sniffing the route does. */
-const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64, 1)]);
-const JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(64, 2)]);
+/** Real pictures: the server decodes every upload and stores it again as a 256 x 256 WebP. */
+const picture = (width: number, height: number) => sharp({ create: { width, height, channels: 3, background: '#00a04d' } });
+const PNG = await picture(64, 64).png().toBuffer();
+const JPEG = await picture(64, 64).jpeg().toBuffer();
 
 describeIntegration('auth API', () => {
   let s: TestServer;
@@ -385,11 +387,11 @@ describeIntegration('auth API', () => {
 
       const got = await s.app.inject({ url: avatarUrl });
       expect(got.statusCode).toBe(200);
-      expect(got.headers['content-type']).toBe('image/png');
+      expect(got.headers['content-type']).toBe('image/webp');
       expect(got.headers['x-content-type-options']).toBe('nosniff');
       expect(got.headers['content-security-policy']).toContain('sandbox');
       expect(got.headers['cache-control']).toContain('immutable');
-      expect(got.rawPayload.equals(PNG)).toBe(true);
+      expect(await sharp(got.rawPayload).metadata()).toMatchObject({ format: 'webp', width: 256, height: 256 });
       const byName = await s.app.inject({ url: `/api/users/${user.username}/avatar` });
       expect(byName.headers['cache-control']).toBe('public, max-age=300');
       const revalidated = await s.app.inject({ url: `/api/users/${user.username}/avatar`, headers: { 'if-none-match': got.headers.etag as string } });
@@ -415,6 +417,43 @@ describeIntegration('auth API', () => {
       const big = Buffer.concat([PNG, Buffer.alloc(300 * 1024)]);
       const res = await s.request('PUT', '/api/auth/me/avatar', { token, body: big, headers: { 'content-type': 'image/png' } });
       expect(res.statusCode).toBe(413);
+    });
+
+    it("stores a fresh picture made from the upload's pixels: its EXIF, GPS location included, is gone", async () => {
+      const { token, user } = await signUp();
+      const photo = await picture(800, 600)
+        .jpeg()
+        .withExif({ IFD0: { ImageDescription: 'taken-at-home' }, IFD3: { GPSLatitudeRef: 'S', GPSLatitude: '27/1 28/1 3000/100', GPSLongitudeRef: 'E', GPSLongitude: '153/1 1/1 4800/100' } })
+        .toBuffer();
+      expect((await sharp(photo).metadata()).exif?.includes('taken-at-home')).toBe(true);
+      const put = await s.request('PUT', '/api/auth/me/avatar', { token, body: photo, headers: { 'content-type': 'image/jpeg' } });
+      expect(put.statusCode, put.body).toBe(200);
+      const got = await s.app.inject({ url: `/api/users/${user.id}/avatar` });
+      const meta = await sharp(got.rawPayload).metadata();
+      expect(meta).toMatchObject({ format: 'webp', width: 256, height: 256 });
+      expect(meta.exif).toBeUndefined();
+      expect(got.rawPayload.includes('taken-at-home')).toBe(false);
+      const { rows } = await s.pool.query<{ content_type: string; bytes: Buffer }>('select content_type, bytes from auth.avatars where user_id = $1', [user.id]);
+      expect(rows[0].content_type).toBe('image/webp');
+      expect(rows[0].bytes.equals(got.rawPayload)).toBe(true);
+    });
+
+    it("refuses a picture over 2048 px a side, or one that doesn't decode, and keeps the old one", async () => {
+      const { token, user } = await signUp();
+      expect((await s.request('PUT', '/api/auth/me/avatar', { token, body: PNG, headers: { 'content-type': 'image/png' } })).statusCode).toBe(200);
+      const before = (await s.pool.query<{ version: string }>('select version from auth.avatars where user_id = $1', [user.id])).rows[0].version;
+
+      const huge = await picture(3000, 3000).png().toBuffer(); // a small file, a 9-megapixel picture
+      const tooBig = await s.request('PUT', '/api/auth/me/avatar', { token, body: huge, headers: { 'content-type': 'image/png' } });
+      expect(tooBig.statusCode).toBe(400);
+      expect(tooBig.json().error.message).toBe('Picture is too big: at most 2048 x 2048 pixels');
+      const junk = Buffer.concat([PNG.subarray(0, 8), Buffer.alloc(64, 1)]); // the PNG signature, then nothing that decodes
+      const broken = await s.request('PUT', '/api/auth/me/avatar', { token, body: junk, headers: { 'content-type': 'image/png' } });
+      expect(broken.statusCode).toBe(400);
+      expect(broken.json().error.message).toBe('File is not a valid PNG, JPEG or WebP image');
+
+      const after = (await s.pool.query<{ version: string }>('select version from auth.avatars where user_id = $1', [user.id])).rows[0].version;
+      expect(after).toBe(before);
     });
   });
 
@@ -577,6 +616,82 @@ describeIntegration('auth API', () => {
       await new Promise((r) => setTimeout(r, 200));
       expect(mailsTo(never.user.email, notice)).toHaveLength(0);
       for (const { token } of [confirmed, never]) expect((await me(token)).json().user.emailVerified).toBe(true);
+    });
+  });
+
+  describe('changing the password', () => {
+    const changePassword = (token: string, body: Record<string, unknown>) => s.request('POST', '/api/auth/me/password', { token, body, ip: freshIp() });
+
+    it('checks the current password, then signs out every other session and signs this one in again', async () => {
+      const { user, token } = await signUp();
+      const otherDevice = (await login(user.username)).json().token as string;
+      expect((await changePassword(token, { password: 'not it', newPassword: 'brand new pass' })).statusCode).toBe(403);
+      expect((await changePassword(token, { newPassword: 'brand new pass' })).statusCode).toBe(403);
+      expect((await me(token)).statusCode).toBe(200); // a wrong password changes nothing
+      const res = await changePassword(token, { password: PASSWORD, newPassword: 'brand new pass' });
+      expect(res.statusCode, res.body).toBe(200);
+      const { token: fresh, user: after } = res.json();
+      expect(after).toMatchObject({ id: user.id, username: user.username, hasPassword: true });
+      expect((await me(fresh)).statusCode).toBe(200);
+      expect((await me(token)).statusCode).toBe(401);
+      expect((await me(otherDevice)).statusCode).toBe(401);
+      expect((await login(user.username)).statusCode).toBe(401);
+      expect((await login(user.username, 'brand new pass')).statusCode).toBe(200);
+    });
+
+    it('refuses the same password again, a new one under 8 characters, and no sign-in', async () => {
+      const { token, user } = await signUp();
+      const same = await changePassword(token, { password: PASSWORD, newPassword: PASSWORD });
+      expect(same.statusCode).toBe(400);
+      expect(same.json().error.message).toMatch(/already your password/i);
+      expect((await changePassword(token, { password: PASSWORD, newPassword: 'short' })).statusCode).toBe(400);
+      expect((await s.request('POST', '/api/auth/me/password', { body: { password: PASSWORD, newPassword: 'brand new pass' }, ip: freshIp() })).statusCode).toBe(401);
+      expect((await me(token)).statusCode).toBe(200);
+      expect((await login(user.username)).statusCode).toBe(200); // the password is unchanged
+    });
+
+    it('ends the pending password-reset links', async () => {
+      const { token, user } = await signUp();
+      const reset = newResetToken();
+      await s.pool.query(`insert into auth.password_resets (token_hash, user_id, expires_at) values ($1, $2, now() + interval '1 hour')`, [reset.hash, user.id]);
+      expect((await changePassword(token, { password: PASSWORD, newPassword: 'brand new pass' })).statusCode).toBe(200);
+      const viaLink = await s.request('POST', '/api/auth/password/reset', { body: { token: reset.token, password: 'another pass 2' }, ip: freshIp() });
+      expect(viaLink.statusCode).toBe(400);
+    });
+
+    it('lets an account without a password set its first, only right after signing in', async () => {
+      const { user } = await signUp();
+      await s.pool.query('update auth.users set password_hash = null where id = $1', [user.id]);
+      const now = Math.floor(Date.now() / 1000);
+      const stale = (await signToken(s.config.jwtSecret, user, 3600, now - 20 * 60)).token;
+      const fresh = (await signToken(s.config.jwtSecret, user, 3600, now)).token;
+      const refused = await changePassword(stale, { newPassword: 'first password' });
+      expect(refused.statusCode).toBe(403);
+      expect(refused.json().error.message).toMatch(/sign in again/i);
+      const res = await changePassword(fresh, { newPassword: 'first password' });
+      expect(res.statusCode, res.body).toBe(200);
+      expect(res.json().user.hasPassword).toBe(true);
+      expect((await login(user.username, 'first password')).statusCode).toBe(200);
+    });
+
+    it('allows 5 attempts an hour per account', async () => {
+      const { token } = await signUp();
+      for (let i = 0; i < 5; i++) expect((await changePassword(token, { password: `guess ${i}`, newPassword: 'brand new pass' })).statusCode).toBe(403);
+      expect((await changePassword(token, { password: PASSWORD, newPassword: 'brand new pass' })).statusCode).toBe(429);
+    });
+
+    it("tells the account's email, only if it's confirmed (an unconfirmed one may be a stranger's)", async () => {
+      const notice = 'Your cubr password was changed';
+      const confirmed = await signUp();
+      await confirmEmailOf(confirmed.user.id);
+      expect((await changePassword(confirmed.token, { password: PASSWORD, newPassword: 'brand new pass' })).statusCode).toBe(200);
+      const never = await signUp();
+      expect((await changePassword(never.token, { password: PASSWORD, newPassword: 'brand new pass' })).statusCode).toBe(200);
+
+      await vi.waitFor(() => expect(mailsTo(confirmed.user.email, notice)).toHaveLength(1));
+      expect(mailsTo(confirmed.user.email, notice)[0].text).toMatch(/on the sign-in page \(http\S*\/login\)/);
+      await new Promise((r) => setTimeout(r, 200));
+      expect(mailsTo(never.user.email, notice)).toHaveLength(0);
     });
   });
 

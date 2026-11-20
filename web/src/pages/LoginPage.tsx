@@ -13,7 +13,9 @@ import { SsoButtons } from '../components/social/Sso';
 import { safeNext } from '../components/social/util';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { usePageMeta } from '../lib/usePageMeta';
 import { CONTACT_EMAIL } from '../lib/links';
+import { validatePassword } from '../lib/password';
 import { localDataSummary } from '../lib/solves';
 import { toast } from '../lib/toast';
 import '../components/social/login.css';
@@ -32,12 +34,6 @@ function validateUsername(v: string): string | null {
 function validateEmail(v: string): string | null {
   if (!v) return 'enter your email';
   if (v.length > 254 || !EMAIL_RE.test(v)) return 'that does not look like an email';
-  return null;
-}
-function validatePassword(v: string): string | null {
-  if (!v) return 'choose a password';
-  if (v.length < 8) return 'at least 8 characters';
-  if (v.length > 128) return 'at most 128 characters';
   return null;
 }
 
@@ -433,12 +429,7 @@ export function ResetPasswordPage() {
   const passwordRef = useRef<HTMLInputElement>(null);
   const wellFormed = /^[A-Za-z0-9_-]{43}$/.test(token);
   useFocusWhenActive(wellFormed && !expired, passwordRef);
-  useEffect(() => {
-    document.title = 'reset password | cubr';
-    return () => {
-      document.title = 'cubr';
-    };
-  }, []);
+  usePageMeta({ title: 'reset password | cubr' });
   const error = validatePassword(password);
 
   const onSubmit = async (e: FormEvent) => {
@@ -528,12 +519,7 @@ export function ConfirmEmailPage() {
   const [attempt, setAttempt] = useState(0);
   // the link works once: send it once per attempt, even when an effect runs twice (React's strict mode)
   const sentFor = useRef(-1);
-  useEffect(() => {
-    document.title = 'confirm email | cubr';
-    return () => {
-      document.title = 'cubr';
-    };
-  }, []);
+  usePageMeta({ title: 'confirm email | cubr' });
   useEffect(() => {
     if (!wellFormed || sentFor.current === attempt) return;
     sentFor.current = attempt;
@@ -659,15 +645,7 @@ export default function LoginPage() {
     tabRefs.current[other]?.focus();
   };
 
-  useEffect(() => {
-    document.title = `${tab.label} | cubr`;
-  }, [tab.label]);
-  useEffect(
-    () => () => {
-      document.title = 'cubr';
-    },
-    [],
-  );
+  usePageMeta({ title: `${tab.label} | cubr` });
 
   if (status === 'loading') return <Loading />;
   if (status === 'authed') return <Navigate to={next} replace />;

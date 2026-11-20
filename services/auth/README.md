@@ -12,7 +12,7 @@ Accounts, JWT login/logout, sign-in with Google, Apple and GitHub, profiles with
 | `GET /api/auth/me` | req | `{user: PrivateUser, settings}` |
 | `PATCH /api/auth/me` | req | `{displayName?, bio?, country?, wcaId?}`; `null` or `""` clears; country/wcaId are uppercased |
 | `PUT /api/auth/me/settings` | req | `{settings: object}`; > 16 KB JSON -> 413 `PAYLOAD_TOO_LARGE` |
-| `PUT /api/auth/me/avatar` | req | raw image body (`image/webp`, `image/jpeg` or `image/png`, <= 300 KB, magic bytes must match the Content-Type) -> `{user}`; 10/hour/user; publishes `user.updated` |
+| `PUT /api/auth/me/avatar` | req | raw image body (`image/webp`, `image/jpeg` or `image/png`, <= 300 KB, <= 2048 px a side, magic bytes must match the Content-Type) -> `{user}`; stored re-encoded as a 256x256 WebP; 10/hour/user; publishes `user.updated` |
 | `DELETE /api/auth/me/avatar` | req | removes the picture -> `{user}`; publishes `user.updated` |
 | `DELETE /api/auth/me` | req | `{password}` (or `{confirm: <username>}` for an account without a password) -> 204: deletes the account (settings and picture cascade), revokes all its tokens (`auth:revoked-user:<id>`) and publishes `user.deleted` in one transaction - if Redis can't take either, nothing is deleted (503). 403 wrong password (or username), 5 tries/10 min/user |
 | `GET /api/users/:idOrUsername/avatar` | - | the image; `?v=<version>` matching the current picture -> `Cache-Control: immutable` (1 year), else 5 min; ETag/304; `nosniff` + sandbox CSP |
@@ -28,9 +28,15 @@ SPEC section 9.1, and below.
 - Tokens: HS256 JWTs from `@cubr/common` (`sub` = user id, `username`, `jti`), valid for 30 days.
   Every service verifies them with `makeAuth`, which also rejects revoked `jti`s and every token of a deleted
   account (issued at or before `auth:revoked-user:<id>`).
-- Profile pictures: the browser crops/resizes to a 256x256 WebP/JPEG (~20-40 KB) before uploading, so the server
-  never decodes images (no native image libraries in the bundle): it checks the declared type against the file's
-  magic bytes, caps the size and stores the bytes in `auth.avatars` (bytea, migration `002_avatars`).
+- Profile pictures: the browser crops/resizes to a 256x256 WebP/JPEG (~20-40 KB) before uploading. The server
+  doesn't trust that: it checks the declared type against the file's magic bytes and caps the size (300 KB), then
+  decodes it with sharp (`src/avatarImage.ts`) and stores a fresh 256x256 WebP made from the pixels alone, in
+  `auth.avatars` (bytea, migration `002_avatars`). Nothing else of the upload survives: no EXIF (which can hold
+  where a photo was taken), XMP or colour profile, no other animation frames, no bytes after the image. Uploads
+  over 2048 px a side are refused from their header, before any decoding (a small PNG can claim a huge
+  picture). Only the PNG, JPEG and WebP decoders are reachable: every other libvips loader is blocked. sharp is
+  native, so it's left out of the bundle (`cubr.external`) and installed by the Dockerfile for the image's
+  platform; the build fails if it doesn't load.
   `users.avatar_version` (first 12 hex chars of the SHA-256) is part of `avatarUrl`, so every new picture gets a new
   URL that browsers and caches can keep forever.
 - Events published: `user.registered`, `user.updated` (SPEC section 8 fields incl. `avatarUrl`, eventId `auth-<uuid>`),
@@ -47,7 +53,8 @@ SPEC section 9.1, and below.
   (common's `internalTokenMatches`).
 
 Env: `PORT`, `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, `INTERNAL_API_TOKEN`, `TRUST_PROXY_HOPS`, `POD_NAME`, `NODE_NAME`,
-`APP_VERSION`, `LOG_LEVEL`, `PUBLIC_URL`, `RESEND_API_KEY`, `KOFI_VERIFICATION_TOKEN`, and the provider variables (below).
+`APP_VERSION`, `LOG_LEVEL`, `PUBLIC_URL`, `RESEND_API_KEY`, `MAIL_FROM` (default `cubr <no-reply@cubr.dev>`), `MAIL_REPLY_TO`
+(default `hello@cubr.dev`), `KOFI_VERIFICATION_TOKEN`, and the provider variables (below).
 
 Dev against the compose stack: `docker compose up -d postgres redis`, then
 `PORT=8081 DATABASE_URL=postgres://cubr:cubr@localhost:55433/cubr REDIS_URL=redis://localhost:56380 npm run dev -w services/auth`

@@ -54,6 +54,7 @@ import {
   emailChangedNotice,
   isFreshSignIn,
 } from '../emailChange.js';
+import { changePasswordSchema, passwordChangedNotice, signInUrl } from '../passwordChange.js';
 
 const BCRYPT_COST = 10;
 
@@ -242,6 +243,50 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
     const user = toPrivateUser(row);
     const { token: jwt } = await signToken(config.jwtSecret, user, TOKEN_TTL_SEC, revokedAt + 1);
     return { token: jwt, user };
+  });
+
+  // ---- POST /api/auth/me/password ---------------------------------------------------------------
+  // Changes the password while signed in. Proof it's you: the current password; an account without
+  // one (made with Google, Apple or GitHub) sets its first instead, after signing in in the last 10
+  // minutes. Like a reset, it ends the pending reset links and every other session (fails closed),
+  // signs this one in again with a fresh token, and tells the account's email, if it's confirmed (an
+  // unconfirmed address may be a stranger's).
+  app.post('/api/auth/me/password', { preHandler: auth.requireAuth }, async (req) => {
+    const me = req.user!;
+    if (!UUID_RE.test(me.id)) throw unauthorized();
+    if (!(await allow(redis, `password-change:${me.id}`, 5, 3600))) throw rateLimited('Too many attempts, try again later');
+    const { password, newPassword } = parse(changePasswordSchema, req.body ?? {});
+    const passwordHash = await bcrypt.hash(newPassword, BCRYPT_COST);
+    const done = await withTx(pool, async (c) => {
+      const { rows } = await c.query<{ username: string; email: string; password_hash: string | null; trusted: boolean }>(
+        `select username, email, password_hash, (email_verified_at is not null or predates_email_confirmation) as trusted
+           from auth.users where id = $1 for update`,
+        [me.id],
+      );
+      const found = rows[0];
+      if (!found) throw unauthorized('Account no longer exists');
+      // 403, not 401: a wrong password must not look like an expired session to the client
+      if (found.password_hash) {
+        if (!password || !(await bcrypt.compare(password, found.password_hash))) throw forbidden('Wrong password');
+        if (await bcrypt.compare(newPassword, found.password_hash)) throw badRequest("That's already your password");
+      } else if (!isFreshSignIn(me.iat)) {
+        throw forbidden('Sign in again to set a password');
+      }
+      const updated = await c.query<UserRow>(`update auth.users set password_hash = $2 where id = $1 returning ${USER_COLUMNS}`, [me.id, passwordHash]);
+      await c.query('delete from auth.password_resets where user_id = $1', [me.id]);
+      const at = Math.floor(Date.now() / 1000);
+      const revoked = await withTimeout(redis.set(revokedUserKey(me.id), String(at), 'EX', TOKEN_TTL_SEC).then(() => true), 2000, false);
+      if (!revoked) throw unavailable('Could not change the password right now, please retry');
+      return { row: updated.rows[0], revokedAt: at, first: !found.password_hash, username: found.username, email: found.email, trusted: found.trusted };
+    });
+    req.log.info({ userId: me.id }, done.first ? 'password set' : 'password changed');
+    if (done.trusted) {
+      const notice = passwordChangedNotice({ username: done.username, first: done.first, signInUrl: signInUrl(mail.publicUrl) });
+      sendMail(mail, { to: done.email, ...notice }, req.log).catch((err: Error) => req.log.error({ err: err.message }, 'password change: the notice failed'));
+    }
+    const user = toPrivateUser(done.row);
+    const { token } = await signToken(config.jwtSecret, user, TOKEN_TTL_SEC, done.revokedAt + 1);
+    return { token, user };
   });
 
   // ---- POST /api/auth/me/email ------------------------------------------------------------------

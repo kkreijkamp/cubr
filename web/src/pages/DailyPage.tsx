@@ -12,6 +12,8 @@ import { utcDateKey } from '../lib/format';
 import { useAsync } from '../lib/useAsync';
 import { addSolve, ensureSession, setPenaltyIn, solveStore } from '../lib/solves';
 import { useCanonical } from '../lib/canonical';
+import { PAGE_META } from '../lib/pageMeta';
+import { usePageMeta } from '../lib/usePageMeta';
 import { ErrorState, Loading, Spinner } from '../components/Spinner';
 import { TwistyPreview } from '../components/TwistyPreview';
 import { formatCountdown, isTypingTarget, useNow, useStoredState } from '../components/live/hooks';
@@ -132,6 +134,7 @@ function ao5Of(attempts: Attempt[]): number | null {
 
 export default function DailyPage() {
   useCanonical('/daily');
+  usePageMeta(PAGE_META['/daily']);
   const { user, status } = useAuth();
   const settings = useSettings();
   // phones and tablets have no space or esc key: the tips say what to do with the screen instead
@@ -370,7 +373,7 @@ export default function DailyPage() {
       <div className="live-head fade-on-focus">
         <div className="titles">
           <h1 className="h2">
-            <CalendarDaysIcon /> daily challenge
+            <CalendarDaysIcon /> {PAGE_META['/daily'].heading}
           </h1>
           <div className="subtitle">5 scrambles - the same for everyone - ranked by ao5 - resets at 00:00 UTC</div>
         </div>

@@ -17,12 +17,13 @@ export const SHELL_URL = '/index.html';
  * the .woff copies of the fonts (every browser with service workers uses the .woff2 ones), the
  * icons, screenshots and iOS launch images, which only the browser's install screens and the home
  * screen use (iOS reads its launch image when the app is added), and the files for other sites and
- * crawlers (the link preview image, robots.txt, the sitemap, security.txt).
+ * crawlers (the link preview image, robots.txt, the sitemap, security.txt, and the public pages' own
+ * copies of index.html in pages/: offline, every page opens from index.html and sets its own title).
  */
 export function shouldPrecache(file: string): boolean {
   if (file === 'sw.js' || file.endsWith('.map') || file.endsWith('.woff')) return false;
   if (file.startsWith('icons/') || file.startsWith('screenshots/') || file.startsWith('launch/') || file.startsWith('apple-touch-icon')) return false;
-  if (file === 'og.png' || file === 'robots.txt' || file === 'sitemap.xml' || file.startsWith('.well-known/')) return false;
+  if (file === 'og.png' || file === 'robots.txt' || file === 'sitemap.xml' || file.startsWith('.well-known/') || file.startsWith('pages/')) return false;
   return /\.(html|js|css|woff2|svg|png|webp|json|webmanifest|txt)$/.test(file);
 }
 
@@ -45,13 +46,14 @@ export function isHashedAsset(path: string): boolean {
  * - asset: a hashed build file: the cache first (it never changes), else the network
  * - file: another file of the site (favicon, manifest): the network first, else the cache
  * - pass: not answered at all, as if there were no worker: anything but GET, other sites, the API,
- *   live races (Socket.IO), the health and version checks, the worker script, and navigations to
- *   files (e.g. /robots.txt)
+ *   live races (Socket.IO), the health and version checks, the worker script, /.well-known/ (the
+ *   server's answers for other programs, like the redirect password managers follow from
+ *   /.well-known/change-password), and navigations to files (e.g. /robots.txt)
  */
 export type Route = 'shell' | 'asset' | 'file' | 'pass';
 
 /** Paths the worker never answers (always the network). */
-const NETWORK_ONLY = /^\/(?:api|internal|socket\.io)(?:\/|$)|^\/(?:_info|healthz|readyz|sw\.js)$/;
+const NETWORK_ONLY = /^\/(?:api|internal|socket\.io|\.well-known)(?:\/|$)|^\/(?:_info|healthz|readyz|sw\.js)$/;
 
 export function routeFor(request: { url: string; method: string; mode: string }, origin: string): Route {
   if (request.method !== 'GET') return 'pass';

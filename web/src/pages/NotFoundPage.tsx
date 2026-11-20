@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useNoIndex } from '../lib/useNoIndex';
+import { usePageMeta } from '../lib/usePageMeta';
 
 /**
  * Any URL the app doesn't know. The server already answers these with a 404 (web/nginx), so crawlers
@@ -8,12 +8,7 @@ import { useNoIndex } from '../lib/useNoIndex';
  */
 export default function NotFoundPage() {
   useNoIndex();
-  useEffect(() => {
-    document.title = 'page not found | cubr';
-    return () => {
-      document.title = 'cubr';
-    };
-  }, []);
+  usePageMeta({ title: 'page not found | cubr' });
   return (
     <div className="empty stack" style={{ justifyItems: 'center', paddingTop: '4rem' }}>
       <h1 style={{ fontSize: '4rem' }} className="main">
