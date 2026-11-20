@@ -164,14 +164,15 @@ export default function RaceLobbyPage() {
           <h1 className="h2">
             <FlagIcon /> {PAGE_META['/race'].heading}
           </h1>
-          <div className="subtitle">
+          <div className="subtitle" data-nosnippet>
             real-time races with friends - same scramble, live status, results per round. rooms live in redis and websockets are spread across all
             race pods.
           </div>
         </div>
       </div>
 
-      <div className="race-lobby-grid">
+      {/* data-nosnippet: search results quote the page's description, not room lists or guest names */}
+      <div className="race-lobby-grid" data-nosnippet>
         <RoomsTable onJoin={(id) => join(id)} />
 
         <div className="stack">

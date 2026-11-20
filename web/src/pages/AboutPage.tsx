@@ -86,7 +86,7 @@ function GlobalCounters() {
   const d = stats.data;
   const hours = d ? d.totalMs / 3_600_000 : null;
   return (
-    <section aria-label="live stats">
+    <section aria-label="live stats" data-nosnippet>
       <div className="ab-counters">
         <Counter label="cubers" value={d ? d.users : null} />
         <Counter label="solves" value={d ? d.solves : null} />

@@ -92,7 +92,8 @@ function Footer() {
   }, []);
   return (
     <footer className="footer">
-      <div className="footer-links">
+      {/* data-nosnippet: never quoted in search results ("command line github contact support ...") */}
+      <div className="footer-links" data-nosnippet>
         <button className="btn-text" onClick={() => openPalette()} aria-label="command line">
           <CommandLineIcon width={14} height={14} />
           {/* the icon alone on phones: the footer keeps to two rows */}
@@ -108,7 +109,7 @@ function Footer() {
           <HeartIcon width={14} height={14} /> support
         </a>
       </div>
-      <div className="footer-right">
+      <div className="footer-right" data-nosnippet>
         <Link to="/terms" className="btn-text">
           terms
         </Link>

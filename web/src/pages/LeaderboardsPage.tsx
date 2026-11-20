@@ -447,8 +447,10 @@ export default function LeaderboardsPage() {
 
   return (
     <div className="lb">
+      {/* data-nosnippet (on the divs: Google honours it on div, span and section): search results quote
+          the board's heading and description, not "all-time | weekly | daily | single | ao5 ..." */}
       <aside className="lb-side" aria-label="leaderboard filters">
-        <div className="lb-group lb-periods" role="group" aria-label="period">
+        <div className="lb-group lb-periods" role="group" aria-label="period" data-nosnippet>
           {PERIODS.map(({ id, label, icon: Icon }) => (
             <button key={id} className={`btn${sel.period === id ? ' active' : ''}`} aria-pressed={sel.period === id} onClick={() => update({ period: id })}>
               <Icon /> {label}
@@ -456,7 +458,7 @@ export default function LeaderboardsPage() {
           ))}
         </div>
         {sel.period === 'challenge' ? (
-          <div className="lb-group lb-dates" role="group" aria-label="challenge date">
+          <div className="lb-group lb-dates" role="group" aria-label="challenge date" data-nosnippet>
             {days.map((d, i) => (
               <button key={d} className={`btn${sel.date === d ? ' active' : ''}`} aria-pressed={sel.date === d} onClick={() => update({ date: d })}>
                 {i < 2 && <CalendarDaysIcon />} {shortDay(d, i)}
@@ -464,7 +466,7 @@ export default function LeaderboardsPage() {
             ))}
           </div>
         ) : (
-          <div className="lb-group lb-kinds" role="group" aria-label="result type">
+          <div className="lb-group lb-kinds" role="group" aria-label="result type" data-nosnippet>
             {KINDS.filter((k) => kindsFor(sel.period).includes(k.id)).map(({ id, icon: Icon }) => (
               <button key={id} className={`btn${sel.kind === id ? ' active' : ''}`} aria-pressed={sel.kind === id} onClick={() => update({ kind: id })}>
                 <Icon /> {id}
@@ -472,7 +474,7 @@ export default function LeaderboardsPage() {
             ))}
           </div>
         )}
-        <div className="lb-group lb-events" role="group" aria-label="event">
+        <div className="lb-group lb-events" role="group" aria-label="event" data-nosnippet>
           {visibleEvents.map((e) => (
             <button
               key={e.id}
@@ -520,7 +522,7 @@ export default function LeaderboardsPage() {
           </div>
         ) : (
           <>
-            <div className="lb-toolbar">
+            <div className="lb-toolbar" data-nosnippet>
               <span className="lb-count">
                 {formatNumber(from)}-{formatNumber(to)} of {formatNumber(total)} {total === 1 ? 'cuber' : 'cubers'}
                 {board.loading && <Spinner size={14} />}
@@ -543,7 +545,7 @@ export default function LeaderboardsPage() {
                 </button>
               </nav>
             </div>
-            <div className="table-wrap">
+            <div className="table-wrap" data-nosnippet>
               <table className={`table lb-table${stale ? ' stale' : ''}`}>
                 <thead>
                   <tr>
