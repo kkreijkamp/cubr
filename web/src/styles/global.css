@@ -1,5 +1,6 @@
 /* cubr global styles - Monkeytype-inspired design system.
-   Only the 10 theme tokens below are used for colour, so every theme "just works". */
+   Only the theme's tokens below are used for colour (its 10 colours, and the timer's ready green made for its
+   background), so every theme "just works". */
 
 :root {
   /* white_cross, the default theme (lib/themes.ts) */
@@ -13,6 +14,8 @@
   --error-extra-color: #8f1920;
   --colorful-error-color: #ff6a13;
   --colorful-error-extra-color: #b34507;
+  /* the timer's "let go to start" green, deeper on backgrounds where this one would be faint (lib/themes.ts readyColor) */
+  --timer-ready: #3ec46d;
   /* the browser's own parts (scrollbars, dropdown lists, pickers) match the theme (lib/themes.ts themeColors) */
   color-scheme: light;
 
@@ -22,8 +25,7 @@
   --dur: 0.125s;
   --page-max: 1280px;
   --pad: 2rem;
-  /* timer state colours, derived from the theme */
-  --timer-ready: #3ec46d;
+  /* timer state colours, derived from the theme (--timer-ready is one of its colours, above) */
   --timer-holding: var(--error-color);
   --timer-inspect: var(--main-color);
 }
@@ -42,6 +44,7 @@
     --error-extra-color: #b3323a;
     --colorful-error-color: #ff6a13;
     --colorful-error-extra-color: #b34507;
+    --timer-ready: #3ec46d;
     color-scheme: dark;
   }
 }

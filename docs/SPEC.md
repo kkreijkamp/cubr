@@ -868,9 +868,20 @@ The web container's nginx (`web/nginx/default.conf.template`) serves the app and
 
 ### 10.4 Themes, light and dark mode
 
-- **Themes** (`web/src/lib/themes.ts`): 11 cube-inspired palettes of ten CSS custom properties.
-  White cross is the default; white cross dark is its dark twin (the logo's ink background, the same
-  green, white text).
+- **Themes** (`web/src/lib/themes.ts`): 42 cube-inspired palettes of ten CSS custom properties,
+  named after puzzles, methods, algorithms and competition words (17 light, 25 dark). White cross is
+  the default; white cross dark is its dark twin (the logo's ink background, the same green, white
+  text).
+  - **Order:** the light themes first, led by white cross, then the dark ones, led by white cross
+    dark; pale before bold, and round the colour wheel within each. The picker and the command line
+    list them in this order.
+  - **What every theme keeps** (checked by `themes.test.ts`): text at 7:1 on the background, the
+    accent at 3:1, errors at 4:1, labels at 2:1 and quieter than the text, cards visible but never
+    loud, an error colour that never looks like the accent, and a look of its own (no two too alike
+    in background and accent).
+  - **The ready green** (`--timer-ready`: the timer's "let go to start", the live dot and the "ok"
+    pill) comes with the theme too: `#3ec46d` wherever it reads at least 2:1, as on white cross,
+    otherwise a deeper green at 3:1 (`readyColor`).
 - **Following the device** (`web/src/lib/settings.ts`):
   - `autoSwitchTheme` (on by default) shows `themeLight` while the device is in light mode and
     `themeDark` in dark mode (`prefers-color-scheme`), switching live when the mode changes. With it
