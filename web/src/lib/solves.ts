@@ -15,7 +15,7 @@
 //    (1 s ... 60 s, retried immediately on `online`). Server reads are overlaid with queued ops so
 //    optimistic changes survive reloads. The current session is cached (`cubr.cloudcache.v1`)
 //    so a logged-in user can keep timing while solve-service is down.
-import { defaultSessionName, isEventId, type ImportedSession, type Penalty } from '@cubr/cubestats';
+import { defaultSessionName, isEventId, isPracticeScramble, scrambleSessionName, type ImportedSession, type Penalty } from '@cubr/cubestats';
 import { api, ApiError, getToken, type ImportPayload } from './api';
 import { getCurrentUser, onAuthChange } from './auth';
 import { settingsStore, updateSettings } from './settings';
@@ -353,6 +353,7 @@ async function send(op: SyncOp): Promise<void> {
         name: op.session.name,
         event: op.session.event,
         ...(op.session.practice ? { practice: true } : {}),
+        ...(op.session.scramble ? { scramble: op.session.scramble } : {}),
         ...(op.keepCreatedAt ? { createdAt: op.session.createdAt } : {}),
       });
       return;
@@ -750,12 +751,14 @@ function validName(name: string): string {
   return n;
 }
 
-function createSessionInternal(name: string, event: string, practice = false, createdAt = new Date().toISOString()): Session {
+function createSessionInternal(name: string, event: string, practice = false, createdAt = new Date().toISOString(), scramble?: string): Session {
   const now = createdAt;
-  const session: Session = { id: uuid(), name, event, ...(practice ? { practice } : {}), createdAt: now, updatedAt: now, solveCount: 0 };
+  // a practice scramble's session is always a practice session: only the default scramble counts
+  const extra = { ...(practice || scramble ? { practice: true } : {}), ...(scramble ? { scramble } : {}) };
+  const session: Session = { id: uuid(), name, event, ...extra, createdAt: now, updatedAt: now, solveCount: 0 };
   model.sessions = [...model.sessions, session];
   model.solves.set(session.id, []);
-  if (scope?.mode === 'cloud') enqueue({ kind: 'createSession', session: { id: session.id, name, event, ...(practice ? { practice } : {}), createdAt: now } });
+  if (scope?.mode === 'cloud') enqueue({ kind: 'createSession', session: { id: session.id, name, event, ...extra, createdAt: now } });
   else saveLocalSoon();
   return session;
 }
@@ -891,10 +894,11 @@ export async function deleteSolve(solveId: string): Promise<void> {
   commit();
 }
 
-export async function createSession(name: string, event: string, opts: { practice?: boolean } = {}): Promise<Session> {
+export async function createSession(name: string, event: string, opts: { practice?: boolean; scramble?: string } = {}): Promise<Session> {
   if (!solveStore.get().ready) await whenReady();
   if (!isEventId(event)) throw new Error(`Unknown event ${event}`);
-  const s = createSessionInternal(validName(name), event, opts.practice === true);
+  const scramble = opts.scramble && isPracticeScramble(event, opts.scramble) ? opts.scramble : undefined;
+  const s = createSessionInternal(validName(name), event, opts.practice === true, undefined, scramble);
   commit();
   return s;
 }
@@ -903,6 +907,7 @@ export async function createSession(name: string, event: string, opts: { practic
 export async function setSessionPractice(sessionId: string, practice: boolean): Promise<void> {
   const s = sessionById(sessionId);
   if (!s || (s.practice === true) === practice) return;
+  if (!practice && s.scramble) return; // only the default scramble counts: its sessions stay practice
   patchSession(sessionId, { practice, updatedAt: new Date().toISOString() });
   if (scope?.mode === 'cloud') enqueue({ kind: 'setPractice', id: sessionId, practice });
   commit();
@@ -925,8 +930,12 @@ export async function deleteSession(sessionId: string): Promise<void> {
   for (const [ev, id] of Object.entries(model.lastByEvent)) if (id === sessionId) delete model.lastByEvent[ev];
   if (scope?.mode === 'cloud') enqueue({ kind: 'deleteSession', id: sessionId });
   if (model.current === sessionId) {
-    const sibling = [...model.sessions].reverse().find((x) => x.event === s.event);
-    const next = sibling ?? createSessionInternal(suggestSessionNameFor(s.event), s.event);
+    const sibling = [...model.sessions].reverse().find((x) => x.event === s.event && x.scramble === s.scramble);
+    const next =
+      sibling ??
+      (s.scramble
+        ? createSessionInternal(freeSessionName(scrambleSessionName(s.event, s.scramble), model.sessions), s.event, true, undefined, s.scramble)
+        : createSessionInternal(suggestSessionNameFor(s.event), s.event));
     commit();
     await switchSession(next.id);
     return;
@@ -949,14 +958,23 @@ export async function clearSession(sessionId: string): Promise<void> {
     commit();
     return;
   }
-  const fresh: Session = { id: uuid(), name: old.name, event: old.event, ...(old.practice ? { practice: true } : {}), createdAt: old.createdAt, updatedAt: now, solveCount: 0 };
+  const fresh: Session = {
+    id: uuid(),
+    name: old.name,
+    event: old.event,
+    ...(old.practice ? { practice: true } : {}),
+    ...(old.scramble ? { scramble: old.scramble } : {}),
+    createdAt: old.createdAt,
+    updatedAt: now,
+    solveCount: 0,
+  };
   model.sessions = model.sessions.map((s) => (s.id === sessionId ? fresh : s));
   model.solves.delete(sessionId);
   model.solves.set(fresh.id, []);
   for (const [ev, id] of Object.entries(model.lastByEvent)) if (id === sessionId) model.lastByEvent[ev] = fresh.id;
   enqueue({
     kind: 'createSession',
-    session: { id: fresh.id, name: fresh.name, event: fresh.event, ...(fresh.practice ? { practice: true } : {}), createdAt: fresh.createdAt },
+    session: { id: fresh.id, name: fresh.name, event: fresh.event, ...(fresh.practice ? { practice: true } : {}), ...(fresh.scramble ? { scramble: fresh.scramble } : {}), createdAt: fresh.createdAt },
     keepCreatedAt: true,
   });
   enqueue({ kind: 'deleteSession', id: sessionId });
@@ -972,7 +990,7 @@ export async function switchSession(sessionId: string): Promise<void> {
   const s = sessionById(sessionId);
   if (!s) throw new Error('Unknown session');
   model.current = sessionId;
-  model.lastByEvent = { ...model.lastByEvent, [s.event]: sessionId };
+  model.lastByEvent = { ...model.lastByEvent, [s.event]: sessionId, [scrambleScope(s.event, s.scramble)]: sessionId };
   if (settingsStore.get().lastEvent !== s.event) updateSettings({ lastEvent: s.event });
   if (scope?.mode === 'cloud') {
     writeLastSession();
@@ -987,6 +1005,29 @@ function findSessionFor(event: string, counts = false): Session | undefined {
   const last = sessionById(model.lastByEvent[event]);
   if (ok(last)) return last;
   return model.sessions.find(ok);
+}
+
+/** lastByEvent's key for the last session of one scramble type ("333#" = the default, "333#pll") */
+const scrambleScope = (event: string, scramble: string | undefined) => `${event}#${scramble ?? ''}`;
+
+/**
+ * Switch `event` to a scramble type (null = its default): to the session of that type used last,
+ * else its first, else a new one. A practice type's new session is "3x3 pll", a practice session
+ * (only the default scramble counts for PBs and leaderboards); the default's are made as usual.
+ */
+export async function switchScramble(event: string, scramble: string | null): Promise<void> {
+  if (!solveStore.get().ready) await whenReady();
+  if (!isEventId(event)) throw new Error(`Unknown event ${event}`);
+  const type = scramble && isPracticeScramble(event, scramble) ? scramble : undefined;
+  const ok = (s: Session | undefined): s is Session => !!s && s.event === event && s.scramble === type;
+  const last = sessionById(model.lastByEvent[scrambleScope(event, type)]);
+  let target = ok(last) ? last : model.sessions.find(ok);
+  if (!target) {
+    target = type
+      ? createSessionInternal(freeSessionName(scrambleSessionName(event, type), model.sessions), event, true, undefined, type)
+      : createDefaultSessions(event);
+  }
+  await switchSession(target.id);
 }
 
 /** Switch to the first session of `event`, creating one if none exists. */
@@ -1016,6 +1057,7 @@ export async function ensureSession(event: string, opts: { counts?: boolean } = 
 
 const MERGE_CHUNK = 50; // the API merges at most 50 sources per request
 const SAME_EVENT_MSG = 'only sessions of the same event can be merged';
+const SAME_SCRAMBLE_MSG = 'only sessions of the same scramble type can be merged';
 
 /** The session a queued op touches (same rule as storeUtils' coalescing). */
 function opSessionId(op: SyncOp): string {
@@ -1097,6 +1139,7 @@ export async function mergeSessions(targetId: string, sourceIds: string[]): Prom
   const sources = ids.map((id) => sessionById(id));
   if (sources.some((s) => !s)) throw new Error("one of these sessions doesn't exist anymore");
   if (sources.some((s) => s!.event !== target.event)) throw new Error(SAME_EVENT_MSG);
+  if (sources.some((s) => s!.scramble !== target.scramble)) throw new Error(SAME_SCRAMBLE_MSG);
   return scope?.mode === 'cloud' ? mergeCloud(target, ids) : mergeLocal(target, ids);
 }
 
@@ -1162,7 +1205,8 @@ export async function importSessions(sessions: ImportedSession[]): Promise<{ ses
     const payload: ImportPayload['sessions'] = valid.map((s) => ({
       name: (s.name.trim() || 'import').slice(0, 40),
       event: s.event,
-      ...(s.practice ? { practice: true } : {}),
+      ...(s.practice || s.scramble ? { practice: true } : {}),
+      ...(s.scramble ? { scramble: s.scramble } : {}),
       solves: s.solves.map((x) => ({ timeMs: x.timeMs, penalty: x.penalty, scramble: x.scramble, comment: x.comment, createdAt: x.createdAt })),
     }));
     const total = { sessions: 0, solves: 0 };
@@ -1182,7 +1226,8 @@ export async function importSessions(sessions: ImportedSession[]): Promise<{ ses
       id: uuid(),
       name: (s.name.trim() || 'import').slice(0, 40),
       event: s.event,
-      ...(s.practice ? { practice: true } : {}),
+      ...(s.practice || s.scramble ? { practice: true } : {}),
+      ...(s.scramble ? { scramble: s.scramble } : {}),
       createdAt: now,
       updatedAt: now,
       solveCount: s.solves.length,

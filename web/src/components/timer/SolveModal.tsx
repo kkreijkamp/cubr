@@ -70,7 +70,9 @@ export function SolveModal({ solve, index, total, precision, preview, confirmDel
     onClose();
   };
 
-  const puzzle = getEvent(solve.event)?.puzzle ?? '3x3x3';
+  // null: a puzzle cubing.js can't draw (no preview); an unknown event shows as a 3x3
+  const info = getEvent(solve.event);
+  const puzzle = info ? info.puzzle : '3x3x3';
   const dnf = solve.penalty === 'DNF';
 
   return (

@@ -25,7 +25,7 @@ export interface ImportRow {
 }
 
 export interface ImportPlan {
-  sessions: { id: string; name: string; event: string; practice: boolean }[];
+  sessions: { id: string; name: string; event: string; practice: boolean; scramble: string | null }[];
   rows: ImportRow[];
   /** Distinct events that received at least one solve. */
   events: string[];
@@ -38,7 +38,9 @@ export function planImport(body: ImportBody, newId: () => string = randomUUID): 
   const events = new Set<string>();
   for (const s of body.sessions) {
     const sessionId = newId();
-    sessions.push({ id: sessionId, name: s.name, event: s.event, practice: s.practice });
+    // a practice scramble's session is always a practice session
+    const scramble = s.scramble ?? null;
+    sessions.push({ id: sessionId, name: s.name, event: s.event, practice: s.practice || scramble !== null, scramble });
     if (s.solves.length) events.add(s.event);
     for (const v of s.solves) {
       rows.push({
@@ -96,10 +98,17 @@ export async function writeImport(client: PoolClient, userId: string, plan: Impo
   if (plan.sessions.length) {
     // created_at offset by 1 us per session keeps the file's session order in GET /api/sessions.
     await client.query(
-      `INSERT INTO solve.sessions (id, user_id, name, event, practice, created_at, updated_at)
-       SELECT t.id, $1::uuid, t.name, t.event, t.practice, now() + (t.ord - 1) * interval '1 microsecond', now()
-         FROM unnest($2::uuid[], $3::text[], $4::text[], $5::boolean[]) WITH ORDINALITY AS t(id, name, event, practice, ord)`,
-      [userId, plan.sessions.map((s) => s.id), plan.sessions.map((s) => s.name), plan.sessions.map((s) => s.event), plan.sessions.map((s) => s.practice)],
+      `INSERT INTO solve.sessions (id, user_id, name, event, practice, scramble, created_at, updated_at)
+       SELECT t.id, $1::uuid, t.name, t.event, t.practice, t.scramble, now() + (t.ord - 1) * interval '1 microsecond', now()
+         FROM unnest($2::uuid[], $3::text[], $4::text[], $5::boolean[], $6::text[]) WITH ORDINALITY AS t(id, name, event, practice, scramble, ord)`,
+      [
+        userId,
+        plan.sessions.map((s) => s.id),
+        plan.sessions.map((s) => s.name),
+        plan.sessions.map((s) => s.event),
+        plan.sessions.map((s) => s.practice),
+        plan.sessions.map((s) => s.scramble),
+      ],
     );
   }
   let inserted = 0;

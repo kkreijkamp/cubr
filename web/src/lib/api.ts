@@ -209,6 +209,8 @@ export interface ImportPayload {
     name: string;
     event: string;
     practice?: boolean;
+    /** a practice scramble type (always a practice session) */
+    scramble?: string;
     solves: { timeMs: number; penalty: Penalty; scramble: string; comment?: string | null; createdAt: string }[];
   }[];
 }
@@ -267,19 +269,20 @@ export const api = {
     users: (ids: string[]) => get<{ users: PublicUser[] }>(`/api/users${qs({ ids: ids.join(',') })}`),
   },
   scrambles: {
-    events: () => get<{ events: { id: string; name: string; puzzle: string }[] }>('/api/scrambles/events'),
-    get: (event: string, count = 1, fresh = false, opts: { signal?: AbortSignal; timeoutMs?: number } = {}) =>
+    events: () => get<{ events: { id: string; name: string; puzzle: string | null }[] }>('/api/scrambles/events'),
+    /** `type`: a practice scramble type (the event's default when omitted) */
+    get: (event: string, count = 1, fresh = false, opts: { signal?: AbortSignal; timeoutMs?: number; type?: string } = {}) =>
       request<{ event: string; scrambles: string[]; source: string }>(
         'GET',
-        `/api/scrambles/${enc(event)}${qs({ count, fresh: fresh ? 1 : undefined })}`,
+        `/api/scrambles/${enc(event)}${qs({ count, fresh: fresh ? 1 : undefined, type: opts.type })}`,
         undefined,
-        opts,
+        { signal: opts.signal, timeoutMs: opts.timeoutMs },
       ),
     daily: (date?: string) => get<{ date: string; events: Record<string, string[]> }>(`/api/scrambles/daily${qs({ date })}`),
   },
   sessions: {
     list: (signal?: AbortSignal) => get<{ sessions: Session[] }>('/api/sessions', signal),
-    create: (body: { id?: string; name: string; event: string; practice?: boolean; createdAt?: string }) => request<{ session: Session }>('POST', '/api/sessions', body),
+    create: (body: { id?: string; name: string; event: string; practice?: boolean; scramble?: string; createdAt?: string }) => request<{ session: Session }>('POST', '/api/sessions', body),
     rename: (id: string, name: string) => request<{ session: Session }>('PATCH', `/api/sessions/${enc(id)}`, { name }),
     /** practice: its solves count for no personal best and no leaderboard */
     setPractice: (id: string, practice: boolean) => request<{ session: Session }>('PATCH', `/api/sessions/${enc(id)}`, { practice }),

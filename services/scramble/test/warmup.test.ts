@@ -3,6 +3,7 @@
 import type { FastifyBaseLogger } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ScrambleGenerator } from '../src/generator.js';
+import { jobLabel } from '../src/practice.js';
 import { WARMUP_EVENTS, newWarmupState, warmUp } from '../src/warmup.js';
 import { fakeBackend } from './fakes.js';
 
@@ -28,7 +29,7 @@ describe('warm-up', () => {
     expect(state).toEqual({
       done: true,
       totalMs: WARMUP_EVENTS.length * 7, // the slots warm up side by side
-      timings: Object.fromEntries(WARMUP_EVENTS.map((e) => [e, 7])),
+      timings: Object.fromEntries(WARMUP_EVENTS.map((e) => [jobLabel(e), 7])),
       failures: [],
     });
   });
@@ -42,7 +43,7 @@ describe('warm-up', () => {
     await done;
     expect(state.done).toBe(true);
     expect(state.failures).toEqual(['444: no tables for 444', 'sq1: no tables for sq1']);
-    expect(Object.keys(state.timings).sort()).toEqual(WARMUP_EVENTS.filter((e) => e !== '444' && e !== 'sq1').sort());
+    expect(Object.keys(state.timings).sort()).toEqual(WARMUP_EVENTS.filter((e) => e !== '444' && e !== 'sq1').map(jobLabel).sort());
   });
 
   it('retries every 5 s while every event fails, instead of reporting ready', async () => {

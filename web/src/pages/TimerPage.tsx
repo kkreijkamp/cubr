@@ -17,7 +17,7 @@ import {
   TrophyIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
-import { EVENTS, effectiveMs, formatTime, getEvent, rollingAverage, sessionStats, type Penalty } from '@cubr/cubestats';
+import { ALL_EVENTS, EVENTS, RELAY_EVENTS, effectiveMs, formatTime, getEvent, isEventReady, rollingAverage, scrambleSessionName, sessionStats, type Penalty } from '@cubr/cubestats';
 import { TimerDisplay } from '../timer/TimerDisplay';
 import { useTimerEngine, type TimerResult, type TimerState } from '../timer/useTimerEngine';
 import { useScrambleQueue } from '../timer/useScrambleQueue';
@@ -59,6 +59,7 @@ import {
   setSessionPractice,
   suggestSessionName,
   switchEvent,
+  switchScramble,
   switchSession,
   useSolveState,
 } from '../lib/solves';
@@ -127,7 +128,9 @@ export default function TimerPage() {
   const session = st.sessions.find((s) => s.id === st.currentSessionId) ?? null;
   const event = session?.event ?? settings.lastEvent;
   const eventInfo = getEvent(event) ?? EVENTS[0];
-  const scr = useScrambleQueue(event);
+  /** the session's practice scramble type: its scrambles, and its solves count for no pbs */
+  const scrambleType = session?.event === event ? session.scramble : undefined;
+  const scr = useScrambleQueue(event, scrambleType);
 
   const device = useInputState();
   const input: InputMode = AVAILABLE.includes(device.mode) ? device.mode : 'timer';
@@ -285,6 +288,13 @@ export default function TimerPage() {
     setEditingScramble(false);
     void switchEvent(ev).catch((e: Error) => toast.error(e.message));
   }, []);
+  const changeScramble = useCallback(
+    (type: string | null) => {
+      setEditingScramble(false);
+      void switchScramble(event, type).catch((e: Error) => toast.error(e.message));
+    },
+    [event],
+  );
 
   // ---------------------------------------------------------------- keyboard
   useEffect(() => {
@@ -387,7 +397,7 @@ export default function TimerPage() {
           icon: <ClockIcon />,
           keywords: ['puzzle', 'cube'],
           children: () =>
-            EVENTS.map((e) => ({
+            ALL_EVENTS.filter((e) => isEventReady(e.id)).map((e) => ({
               id: `timer-event-${e.id}`,
               label: `${e.short.toLowerCase()} - ${e.name}`,
               keywords: [e.id],
@@ -521,6 +531,8 @@ export default function TimerPage() {
           sessions={st.sessions}
           currentSessionId={st.currentSessionId}
           onEvent={changeEvent}
+          scramble={scrambleType ?? null}
+          onScramble={changeScramble}
           onSession={(id) => void switchSession(id)}
           onNewSession={() => setModal({ kind: 'newSession' })}
           onRenameSession={() => setModal({ kind: 'renameSession' })}
@@ -540,6 +552,7 @@ export default function TimerPage() {
 
         <ScrambleBar
           scramble={scr.current}
+          lines={RELAY_EVENTS.includes(event)}
           onNext={scr.next}
           onPrev={scr.prev}
           hasPrev={scr.hasPrev}
@@ -731,11 +744,12 @@ export default function TimerPage() {
         {modal?.kind === 'newSession' && (
           <PromptModal
             title="new session"
-            label={`name - ${eventInfo.short.toLowerCase()}`}
-            initial={suggestSessionName(event)}
+            label={`name - ${scrambleType ? scrambleSessionName(event, scrambleType).toLowerCase() : eventInfo.short.toLowerCase()}`}
+            initial={scrambleType ? scrambleSessionName(event, scrambleType) : suggestSessionName(event)}
             confirmLabel="create"
             onSubmit={async (name) => {
-              const s = await createSession(name, event);
+              // a new session of the practice scramble in use (a practice session too)
+              const s = await createSession(name, event, scrambleType ? { scramble: scrambleType } : {});
               await switchSession(s.id);
             }}
             validate={(v) => (v.trim().length < 1 ? 'give it a name' : null)}
@@ -785,7 +799,7 @@ export default function TimerPage() {
         )}
         {modal?.kind === 'mergeSessions' && (
           <MergeSessionsModal
-            sessions={st.sessions}
+            sessions={st.sessions.filter((x) => x.scramble === scrambleType)}
             currentSessionId={st.currentSessionId}
             event={event}
             mode={st.mode}

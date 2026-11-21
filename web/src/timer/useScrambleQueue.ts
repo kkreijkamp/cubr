@@ -2,12 +2,14 @@
 // falls back to the client-side random-move scramblers when the service is down or slow.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
-import { fallbackScramble } from './fallbackScramble';
+import { offlineScramble } from './fallbackScramble';
 
 export interface ScrambleItem {
   text: string;
   /** generated in the browser because the scramble service was unreachable */
   offline: boolean;
+  /** no scramble: the service is unreachable and this kind can't be made offline (text is '') */
+  unavailable?: boolean;
   /** typed in by the user */
   custom?: boolean;
   /** worked out from the state a smart cube was scrambled into by hand */
@@ -15,28 +17,36 @@ export interface ScrambleItem {
 }
 
 const BATCH = 5;
+/** queues, requests and shown scrambles are per event and scramble type: "333", "333/pll" */
 const queues = new Map<string, ScrambleItem[]>();
 const inflight = new Map<string, Promise<void>>();
-/** the scramble currently shown per event, so switching events back and forth keeps it */
+/** the scramble currently shown per event (and type), so switching back and forth keeps it */
 const currentByEvent = new Map<string, ScrambleItem>();
 let serviceDownUntil = 0;
 
-function refill(event: string): Promise<void> {
-  const running = inflight.get(event);
+const queueKey = (event: string, type?: string) => (type ? `${event}/${type}` : event);
+const parseKey = (key: string): [string, string | undefined] => {
+  const i = key.indexOf('/');
+  return i < 0 ? [key, undefined] : [key.slice(0, i), key.slice(i + 1)];
+};
+
+function refill(key: string): Promise<void> {
+  const running = inflight.get(key);
   if (running) return running;
   if (Date.now() < serviceDownUntil) return Promise.resolve();
+  const [event, type] = parseKey(key);
   const p = api.scrambles
-    .get(event, BATCH)
+    .get(event, BATCH, false, { type })
     .then((r) => {
       const fresh = (r?.scrambles ?? []).filter((s) => typeof s === 'string' && s.trim()).map((text) => ({ text: text.trim(), offline: false }));
-      queues.set(event, [...(queues.get(event) ?? []), ...fresh]);
+      queues.set(key, [...(queues.get(key) ?? []), ...fresh]);
       serviceDownUntil = 0;
     })
     .catch(() => {
       serviceDownUntil = Date.now() + 30_000;
     })
-    .finally(() => inflight.delete(event));
-  inflight.set(event, p);
+    .finally(() => inflight.delete(key));
+  inflight.set(key, p);
   return p;
 }
 
@@ -49,16 +59,19 @@ function shiftQueued(event: string): ScrambleItem | null {
 }
 
 /** Next scramble: from the queue, else wait briefly for the service, else generate offline. */
-async function take(event: string): Promise<ScrambleItem> {
-  const queued = shiftQueued(event);
+async function take(key: string): Promise<ScrambleItem> {
+  const queued = shiftQueued(key);
   if (queued) return queued;
-  await Promise.race([refill(event), new Promise((r) => setTimeout(r, 2500))]);
-  return shiftQueued(event) ?? { text: fallbackScramble(event), offline: true };
+  await Promise.race([refill(key), new Promise((r) => setTimeout(r, 2500))]);
+  const [event, type] = parseKey(key);
+  const offline = offlineScramble(event, type);
+  return shiftQueued(key) ?? (offline ? { text: offline, offline: true } : { text: '', offline: true, unavailable: true });
 }
 
-/** Warm the queue for an event (e.g. on page load) without consuming anything. */
-export function prefetchScrambles(event: string): void {
-  if ((queues.get(event)?.length ?? 0) < 2) void refill(event);
+/** Warm the queue for an event (and scramble type) without consuming anything. */
+export function prefetchScrambles(event: string, type?: string): void {
+  const key = queueKey(event, type);
+  if ((queues.get(key)?.length ?? 0) < 2) void refill(key);
 }
 
 export interface ScrambleQueue {
@@ -75,7 +88,12 @@ export interface ScrambleQueue {
   setFromCube: (text: string) => void;
 }
 
-export function useScrambleQueue(event: string): ScrambleQueue {
+/** `type`: a practice scramble type (the event's default when absent) */
+export function useScrambleQueue(event: string, type?: string): ScrambleQueue {
+  return useKeyedScrambleQueue(queueKey(event, type));
+}
+
+function useKeyedScrambleQueue(event: string): ScrambleQueue {
   const [state, setState] = useState<{ event: string; item: ScrambleItem | null }>(() => ({
     event,
     item: currentByEvent.get(event) ?? null,
@@ -112,7 +130,7 @@ export function useScrambleQueue(event: string): ScrambleQueue {
       req.current++;
       show(event, existing);
     } else load(event);
-    prefetchScrambles(event);
+    if ((queues.get(event)?.length ?? 0) < 2) void refill(event);
   }, [event, load, show]);
 
   const item = state.event === event ? state.item : null;

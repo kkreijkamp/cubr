@@ -114,7 +114,7 @@ function installServer(ApiError: ApiErrorClass, server: FakeServer): void {
   const sortList = (list: Solve[]) => list.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const { sessions, solves } = h.api;
   sessions.list.mockImplementation(async () => ({ sessions: listOf(server, caller()).map(view) }));
-  sessions.create.mockImplementation(async (body: { id: string; name: string; event: string; practice?: boolean; createdAt?: string }) => {
+  sessions.create.mockImplementation(async (body: { id: string; name: string; event: string; practice?: boolean; scramble?: string; createdAt?: string }) => {
     const uid = caller();
     const existing = server.sessions.find((s) => s.id === body.id);
     if (existing) {
@@ -122,7 +122,17 @@ function installServer(ApiError: ApiErrorClass, server: FakeServer): void {
       return { session: view(existing) };
     }
     const now = new Date().toISOString();
-    const s: ServerSession = { id: body.id, userId: uid, name: body.name, event: body.event, practice: body.practice ?? false, createdAt: body.createdAt ?? now, updatedAt: now, solveCount: 0 };
+    const s: ServerSession = {
+      id: body.id,
+      userId: uid,
+      name: body.name,
+      event: body.event,
+      practice: (body.practice ?? false) || !!body.scramble,
+      ...(body.scramble ? { scramble: body.scramble } : {}),
+      createdAt: body.createdAt ?? now,
+      updatedAt: now,
+      solveCount: 0,
+    };
     server.sessions.push(s);
     server.solves.set(s.id, []);
     return { session: view(s) };
@@ -469,6 +479,46 @@ describe('guest mode (localStorage)', () => {
     const again = await start();
     expect(again.getCurrentSession()?.name).toBe('2x2 practice');
     expect(again.settingsStore.get().lastEvent).toBe('222');
+  });
+
+  it('switches to a practice scramble: its own practice session, made once, remembered, and back to the default', async () => {
+    const s = await start();
+    await s.switchScramble('333', 'pll');
+    const pll = s.getCurrentSession()!;
+    expect(pll).toMatchObject({ name: '3x3 pll', event: '333', scramble: 'pll', practice: true });
+    await s.switchScramble('333', null);
+    expect(s.getCurrentSession()?.name).toBe('3x3');
+    await s.switchScramble('333', 'pll');
+    expect(s.getCurrentSession()?.id).toBe(pll.id); // the same session, not a second one
+    expect(s.state().sessions.filter((x) => x.scramble === 'pll')).toHaveLength(1);
+    // switching events and back returns to where you were, the practice scramble included
+    await s.switchEvent('222');
+    await s.switchEvent('333');
+    expect(s.getCurrentSession()?.id).toBe(pll.id);
+    // a practice scramble's session stays a practice session
+    await s.setSessionPractice(pll.id, false);
+    expect(s.getCurrentSession()?.practice).toBe(true);
+    // the daily challenge and races never use it
+    expect((await s.ensureSession('333', { counts: true })).scramble).toBeUndefined();
+    // unknown types fall back to the default
+    await s.switchScramble('333', 'nope');
+    expect(s.getCurrentSession()?.name).toBe('3x3');
+    await advance(250);
+    expect(storedGuest().sessions.find((x) => x.id === pll.id)).toMatchObject({ scramble: 'pll', practice: true });
+    await newPage();
+    const again = await start();
+    expect(again.state().sessions.find((x) => x.id === pll.id)).toMatchObject({ scramble: 'pll', practice: true });
+  });
+
+  it('merges only sessions of the same scramble type, and replaces a deleted one with its own kind', async () => {
+    const s = await start();
+    const main = s.state().sessions[0];
+    await s.switchScramble('333', 'pll');
+    const pll = s.getCurrentSession()!;
+    await expect(s.mergeSessions(main.id, [pll.id])).rejects.toThrow('only sessions of the same scramble type can be merged');
+    await s.deleteSession(pll.id);
+    expect(s.getCurrentSession()).toMatchObject({ name: '3x3 pll', scramble: 'pll' });
+    expect(s.getCurrentSession()?.id).not.toBe(pll.id);
   });
 
   it('ensureSession finds a counting session for the daily challenge and races, without switching', async () => {
@@ -948,6 +998,15 @@ describe('signed in (cloud)', () => {
     await flush();
     expect(h.api.sessions.create).toHaveBeenLastCalledWith({ id: warmUp.id, name: 'warm up', event: '333', practice: true });
     expect(s.state().pending).toBe(0);
+  });
+
+  it("sends a practice scramble's session with its type, as a practice session", async () => {
+    const s = await start(U1, { seed: seedU1 });
+    await s.switchScramble('333', 'oll');
+    const oll = s.getCurrentSession()!;
+    await flush();
+    expect(h.api.sessions.create).toHaveBeenLastCalledWith({ id: oll.id, name: '3x3 oll', event: '333', practice: true, scramble: 'oll' });
+    expect(s.server.sessions.find((x) => x.id === oll.id)).toMatchObject({ scramble: 'oll', practice: true });
   });
 
   it('treats changes to a session deleted on another device (404) as done, and skips edits to a session being deleted', async () => {

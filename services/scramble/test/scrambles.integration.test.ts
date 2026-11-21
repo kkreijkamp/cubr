@@ -3,7 +3,7 @@
 // outages and generator failures. Searches come from a fake backend, so no cubing.js here.
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createServer, loadConfig } from '@cubr/common';
-import { EVENT_IDS } from '@cubr/cubestats';
+import { ALL_EVENT_IDS, EVENT_IDS } from '@cubr/cubestats';
 import { describeIntegration, startTestServer, type TestServer } from '@cubr/testkit';
 import { DailyChallenges } from '../src/daily.js';
 import { ScrambleGenerator } from '../src/generator.js';
@@ -77,8 +77,35 @@ describeIntegration('scramble API', () => {
     const res = await get('/api/scrambles/events');
     expect(res.statusCode).toBe(200);
     expect(res.headers['cache-control']).toBe('public, max-age=300');
-    expect(res.json().events.map((e: { id: string }) => e.id)).toEqual(EVENT_IDS);
-    expect(res.json().events[0]).toEqual({ id: '333', name: '3x3x3 Cube', short: '3x3', puzzle: '3x3x3' });
+    expect(res.json().events.map((e: { id: string }) => e.id)).toEqual(ALL_EVENT_IDS);
+    const first = res.json().events[0];
+    expect(first).toMatchObject({ id: '333', name: '3x3x3 Cube', short: '3x3', puzzle: '3x3x3', kind: 'wca' });
+    expect(first.types[0]).toEqual({ id: '333', label: 'wca' });
+    expect(first.types.find((t: { id: string }) => t.id === 'wvls')).toEqual({ id: 'wvls', label: 'wvls', pending: true });
+    expect(res.json().events.find((e: { id: string }) => e.id === 'r234')).toMatchObject({ kind: 'other', puzzle: null });
+  });
+
+  it('makes practice scrambles and the other events on request, never from the pool', async () => {
+    await stock('333', 'pool A', 'pool B');
+    const pll = await get('/api/scrambles/333?count=2&type=pll');
+    expect(pll.statusCode).toBe(200);
+    expect(pll.json()).toMatchObject({ event: '333', type: 'pll', source: 'generated' });
+    // the fake backend echoes the job: a 3x3 practice state to solve
+    expect(pll.json().scrambles).toEqual([expect.stringMatching(/^solve:3x3x3:\{.*\} scramble \d+$/), expect.stringMatching(/^solve:3x3x3:\{.*\} scramble \d+$/)]);
+    expect(await s.redis.llen(poolKey('333'))).toBe(2); // the pool's wca scrambles stay for wca solves
+    const moves = await get('/api/scrambles/333?type=333o');
+    expect(moves.json().scrambles[0].split(' ')).toHaveLength(25);
+    // a relay takes its parts from the pools
+    await stock('222', 'two'); await stock('444', 'four');
+    expect((await get('/api/scrambles/r234')).json().scrambles).toEqual(['2x2: two\n3x3: pool A\n4x4: four']);
+  });
+
+  it('answers 404 to a scramble type the event does not have, or one that is not available yet', async () => {
+    expect((await get('/api/scrambles/333?type=nope')).statusCode).toBe(404);
+    expect((await get('/api/scrambles/pyram?type=pll')).statusCode).toBe(404);
+    expect((await get('/api/scrambles/333?type=wvls')).statusCode).toBe(404);
+    expect((await get('/api/scrambles/15p')).statusCode).toBe(404);
+    expect((await get('/api/scrambles/333?type=bad%20id')).statusCode).toBe(400);
   });
 
   it('generates past the pool for fresh=1 with the internal token, and ignores fresh=1 from everyone else', async () => {

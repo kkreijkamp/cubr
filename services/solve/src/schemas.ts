@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { badRequest } from '@cubr/common';
-import { isEventId, DAILY_EVENTS } from '@cubr/cubestats';
+import { isEventId, isPracticeScramble, DAILY_EVENTS } from '@cubr/cubestats';
 
 // Request validation (docs/SPEC.md section 5 limits, section 9.3 bodies). Route handlers call
 // `parse(schema, req.body ?? {})` from common, which turns failures into 400 BAD_REQUEST.
@@ -26,14 +26,24 @@ export const SOLVE_SOURCES = ['timer', 'manual', 'race', 'daily', 'import', 'see
 
 export const idParams = z.object({ id: uuid });
 
-export const createSessionBody = z.object({
-  id: uuid.optional(),
-  name: sessionName,
-  event: eventId,
-  practice: z.boolean().default(false),
-  // sessions are listed oldest first: a cleared session's empty replacement keeps its place
-  createdAt: isoDateTime.optional(),
-});
+/** a practice scramble type id (checked against the event in practiceScrambleRule) */
+const scrambleType = z.string().regex(/^[A-Za-z0-9_]{1,32}$/, 'scramble: a scramble type id').nullish();
+/** `scramble` must be one of the event's practice scramble types (never its default) */
+const isEventsPracticeScramble = (b: { event: string; scramble?: string | null }) => !b.scramble || isPracticeScramble(b.event, b.scramble);
+const notPracticeScramble = { message: "scramble: not one of this event's practice scramble types", path: ['scramble'] };
+
+export const createSessionBody = z
+  .object({
+    id: uuid.optional(),
+    name: sessionName,
+    event: eventId,
+    practice: z.boolean().default(false),
+    /** a practice scramble type; such a session is always a practice session */
+    scramble: scrambleType,
+    // sessions are listed oldest first: a cleared session's empty replacement keeps its place
+    createdAt: isoDateTime.optional(),
+  })
+  .refine(isEventsPracticeScramble, notPracticeScramble);
 
 export const patchSessionBody = z
   .object({ name: sessionName.optional(), practice: z.boolean().optional() })
@@ -84,7 +94,9 @@ export const importBody = z
   .object({
     sessions: z
       .array(
-        z.object({ name: sessionName, event: eventId, practice: z.boolean().default(false), solves: z.array(importSolve).max(MAX_IMPORT_SOLVES) }),
+        z
+          .object({ name: sessionName, event: eventId, practice: z.boolean().default(false), scramble: scrambleType, solves: z.array(importSolve).max(MAX_IMPORT_SOLVES) })
+          .refine(isEventsPracticeScramble, notPracticeScramble),
       )
       .min(1)
       .max(MAX_IMPORT_SESSIONS),

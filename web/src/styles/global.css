@@ -1147,6 +1147,15 @@ body.focus .toast:not(.important) {
 
 /* scramble preview net (ScrambleNet): as big as the box allows, never wider; the face plates are
    the theme's background darkened, so they stand apart from it on light and dark themes alike */
+/* a puzzle cubing.js can't draw (TwistyPreview): a quiet line where the net would be */
+.twisty-none {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sub-color);
+  font-size: 0.8rem;
+  text-align: center;
+}
 .scramble-net {
   display: block;
   width: 100%;

@@ -1,11 +1,14 @@
 import { Worker } from 'node:worker_threads';
 import type { FastifyBaseLogger } from 'fastify';
 import { GenerationTimeoutError } from './errors.js';
+import { decodeSolveJob, type SolvePuzzle, type SolveState } from './practice.js';
 import { errorMessage, withTimeout } from './util.js';
 
 /**
  * Something that can run scramble searches. `size` = how many can run in parallel; the
- * generator queue (generator.ts) hands each search to a free `slot` (0 ... size-1).
+ * generator queue (generator.ts) hands each search to a free `slot` (0 ... size-1). A job is a
+ * cubing.js event id ("333", "kilominx") or a practice state to solve ("solve:3x3x3:{...}",
+ * practice.ts), whose solution backwards is the scramble.
  */
 export interface ScrambleBackend {
   readonly kind: 'in-process' | 'worker-pool';
@@ -26,36 +29,104 @@ const SEARCH_DEBUG = { logPerf: false, scramblePrefetchLevel: 'none' } as const;
 export async function createInProcessBackend(): Promise<ScrambleBackend> {
   // Dynamic import: cubing is an *external* of the esbuild bundle (it spawns its own worker
   // files), so it is resolved from node_modules at runtime.
-  const [{ randomScrambleForEvent }, { setSearchDebug }] = await Promise.all([
+  const [{ randomScrambleForEvent }, search, { puzzles }, { KTransformation }] = await Promise.all([
     import('cubing/scramble'),
     import('cubing/search'),
+    import('cubing/puzzles'),
+    import('cubing/kpuzzle'),
   ]);
-  setSearchDebug(SEARCH_DEBUG);
+  search.setSearchDebug(SEARCH_DEBUG);
+  const kpuzzles = new Map<SolvePuzzle, Promise<KPuzzleLike>>();
+  const solve = async (puzzle: SolvePuzzle, state: SolveState): Promise<string> => {
+    let kp = kpuzzles.get(puzzle);
+    if (!kp) {
+      kp = puzzles[puzzle].kpuzzle() as Promise<KPuzzleLike>;
+      kpuzzles.set(puzzle, kp);
+    }
+    const k = await kp;
+    let pattern = k.defaultPattern();
+    if (state.pre) pattern = pattern.applyAlg(state.pre);
+    pattern = pattern.applyTransformation(new KTransformation(k as never, transformationData(k, state)) as never);
+    if (state.post) pattern = pattern.applyAlg(state.post);
+    const solution = puzzle === '2x2x2' ? await search.experimentalSolve2x2x2(pattern as never) : await search.experimentalSolve3x3x3IgnoringCenters(pattern as never);
+    return backwards(solution.invert().toString());
+  };
   return {
     kind: 'in-process',
     size: 1,
-    run: (_slot, event, timeoutMs) =>
-      withTimeout(
-        randomScrambleForEvent(event).then((alg) => alg.toString()),
+    run: (_slot, job, timeoutMs) => {
+      const practice = decodeSolveJob(job);
+      return withTimeout(
+        practice ? solve(practice.puzzle, practice.state) : randomScrambleForEvent(job).then((alg) => alg.toString()),
         timeoutMs,
         () => new GenerationTimeoutError(),
-      ),
+      );
+    },
     close: async () => {},
   };
 }
+
+/** the parts of a cubing.js KPuzzle / KPattern the solve step uses */
+interface KPatternLike {
+  applyAlg(alg: string): KPatternLike;
+  applyTransformation(t: never): KPatternLike;
+}
+interface KPuzzleLike {
+  definition: { orbits: { orbitName: string; numPieces: number }[] };
+  defaultPattern(): KPatternLike;
+}
+
+/** A practice state as a cubing.js transformation (orbits it doesn't pin stay solved, e.g. centres). */
+export function transformationData(k: KPuzzleLike, state: SolveState): Record<string, { permutation: number[]; orientationDelta: number[] }> {
+  const data: Record<string, { permutation: number[]; orientationDelta: number[] }> = {};
+  for (const { orbitName, numPieces } of k.definition.orbits) {
+    const o = (state as unknown as Record<string, { pieces: number[]; orientation: number[] } | undefined>)[orbitName];
+    data[orbitName] = o
+      ? { permutation: o.pieces, orientationDelta: o.orientation }
+      : { permutation: Array.from({ length: numPieces }, (_, i) => i), orientationDelta: new Array<number>(numPieces).fill(0) };
+  }
+  return data;
+}
+
+/** cubing.js writes an undone half turn as R2'; scrambles say R2 */
+export const backwards = (alg: string) => alg.replace(/2'/g, '2');
 
 // Code for each pool thread (evaluated as CommonJS, so no extra file has to survive bundling).
 // It imports cubing.js by absolute URL - each thread gets its own cubing instance + search worker.
 const WORKER_SOURCE = `
 const { parentPort, workerData } = require('node:worker_threads');
 (async () => {
-  const { setSearchDebug } = await import(workerData.searchUrl);
-  setSearchDebug(workerData.searchDebug);
+  const search = await import(workerData.searchUrl);
+  search.setSearchDebug(workerData.searchDebug);
   const { randomScrambleForEvent } = await import(workerData.scrambleUrl);
+  const { puzzles } = await import(workerData.puzzlesUrl);
+  const { KTransformation } = await import(workerData.kpuzzleUrl);
+  const kpuzzles = new Map();
+  // a practice state (practice.ts): pre, the pinned pieces, post; solved and given backwards
+  async function solve(job) {
+    const at = job.indexOf(':', 6);
+    const puzzle = job.slice(6, at);
+    const state = JSON.parse(job.slice(at + 1));
+    if (!kpuzzles.has(puzzle)) kpuzzles.set(puzzle, puzzles[puzzle].kpuzzle());
+    const k = await kpuzzles.get(puzzle);
+    const data = {};
+    for (const { orbitName, numPieces } of k.definition.orbits) {
+      const o = state[orbitName];
+      data[orbitName] = o
+        ? { permutation: o.pieces, orientationDelta: o.orientation }
+        : { permutation: Array.from({ length: numPieces }, (_, i) => i), orientationDelta: new Array(numPieces).fill(0) };
+    }
+    let pattern = k.defaultPattern();
+    if (state.pre) pattern = pattern.applyAlg(state.pre);
+    pattern = pattern.applyTransformation(new KTransformation(k, data));
+    if (state.post) pattern = pattern.applyAlg(state.post);
+    const solution = puzzle === '2x2x2' ? await search.experimentalSolve2x2x2(pattern) : await search.experimentalSolve3x3x3IgnoringCenters(pattern);
+    return solution.invert().toString().replace(/2'/g, '2');
+  }
   parentPort.on('message', async (msg) => {
     try {
-      const alg = await randomScrambleForEvent(msg.event);
-      parentPort.postMessage({ type: 'result', id: msg.id, scramble: alg.toString() });
+      const scramble = msg.event.startsWith('solve:') ? await solve(msg.event) : (await randomScrambleForEvent(msg.event)).toString();
+      parentPort.postMessage({ type: 'result', id: msg.id, scramble });
     } catch (err) {
       parentPort.postMessage({ type: 'result', id: msg.id, error: String((err && err.message) || err) });
     }
@@ -156,6 +227,8 @@ export function createWorkerPoolBackend(size: number, log: FastifyBaseLogger): S
   const data = {
     scrambleUrl: import.meta.resolve('cubing/scramble'),
     searchUrl: import.meta.resolve('cubing/search'),
+    puzzlesUrl: import.meta.resolve('cubing/puzzles'),
+    kpuzzleUrl: import.meta.resolve('cubing/kpuzzle'),
     searchDebug: SEARCH_DEBUG,
   };
   const threads = Array.from({ length: size }, (_, i) => new PoolThread(i, data, log));

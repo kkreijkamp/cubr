@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowDownTrayIcon, ArrowPathIcon, ArrowUpRightIcon, ArrowUpTrayIcon, ArrowUturnLeftIcon, ArrowsRightLeftIcon, MagnifyingGlassIcon, PlayIcon } from '@heroicons/react/24/outline';
-import { CsTimerFormatError, EVENTS, parseTimerFile, toCsTimerExport, type TimerImport } from '@cubr/cubestats';
+import { CsTimerFormatError, getEvent, parseTimerFile, toCsTimerExport, type TimerImport } from '@cubr/cubestats';
 import { Modal } from '../components/Modal';
 import { csTimerFileName, skippedNotes } from '../components/social/util';
 import { ConfirmModal } from '../components/timer/Dialogs';
@@ -1179,7 +1179,7 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
   const summary = useMemo(() => {
     if (!parsed) return null;
     const solves = parsed.sessions.reduce((a, x) => a + x.solves.length, 0);
-    const events = Array.from(new Set(parsed.sessions.map((x) => x.event))).map((e) => EVENTS.find((ev) => ev.id === e)?.short.toLowerCase() ?? e);
+    const events = Array.from(new Set(parsed.sessions.map((x) => x.event))).map((e) => getEvent(e)?.short.toLowerCase() ?? e);
     return { solves, events };
   }, [parsed]);
 

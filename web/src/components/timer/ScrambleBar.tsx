@@ -16,6 +16,8 @@ interface Props {
   setEditing: (v: boolean) => void;
   /** a smart cube's progress along the scramble */
   hint?: ScrambleHint | null;
+  /** one line per puzzle (relays: "2x2: ...", "3x3: ...") */
+  lines?: boolean;
 }
 
 /** Font size steps by scramble length: 2x2/3x3 large, big cubes & megaminx smaller. */
@@ -29,7 +31,7 @@ function sizeFor(text: string): string {
   return '0.85rem';
 }
 
-export function ScrambleBar({ scramble, onNext, onPrev, hasPrev, onCustom, editing, setEditing, hint }: Props) {
+export function ScrambleBar({ scramble, onNext, onPrev, hasPrev, onCustom, editing, setEditing, hint, lines = false }: Props) {
   const [draft, setDraft] = useState('');
   const taRef = useRef<HTMLTextAreaElement>(null);
 
@@ -91,8 +93,14 @@ export function ScrambleBar({ scramble, onNext, onPrev, hasPrev, onCustom, editi
 
   return (
     <div className="tp-scramble-wrap fade-on-focus">
-      {scramble ? (
-        <div className={`tp-scramble${hint?.pending ? ' off' : ''}`} style={{ ['--scramble-size' as string]: sizeFor(scramble.text) }} key={scramble.text}>
+      {scramble?.unavailable ? (
+        <div className="tp-scramble tp-scramble-loading">no connection: this kind of scramble needs the scramble service</div>
+      ) : scramble ? (
+        <div
+          className={`tp-scramble${hint?.pending ? ' off' : ''}${lines ? ' tp-scramble-lines' : ''}`}
+          style={{ ['--scramble-size' as string]: sizeFor(scramble.text) }}
+          key={scramble.text}
+        >
           {hint && !hint.pending ? <HintedMoves hint={hint} /> : scramble.text}
         </div>
       ) : (

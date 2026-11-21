@@ -42,6 +42,8 @@ export interface Session {
   event: string;
   /** a practice session: its solves count for no personal best and no leaderboard (absent = no) */
   practice?: boolean;
+  /** a practice scramble type (packages/cubestats scrambleTypes.ts, e.g. "pll"): always a practice session; absent = the event's default */
+  scramble?: string;
   createdAt: string;
   updatedAt: string;
   solveCount: number;

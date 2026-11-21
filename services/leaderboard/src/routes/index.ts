@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { badRequest, canViewProfile, forbidden, parse, type Redis, type makeAuth } from '@cubr/common';
-import { DAILY_EVENTS, isEventId } from '@cubr/cubestats';
+import { DAILY_EVENTS, isWcaEvent } from '@cubr/cubestats';
 import { readBoard, readUserRanks } from '../board.js';
 import {
   PERIODS,
@@ -69,7 +69,7 @@ export async function registerRoutes(app: FastifyInstance, { redis, auth }: Deps
     async (req) => {
       const { event, kind } = req.params;
       const q = parse(boardQuery, req.query);
-      if (!isEventId(event)) throw badRequest(`event: unknown event '${event}'`);
+      if (!isWcaEvent(event)) throw badRequest(`event: no leaderboards for '${event}' (WCA events only)`);
       if (!isKind(kind)) throw badRequest(`kind: expected one of single, ao5, ao12`);
       if (!PERIOD_KINDS[q.period].includes(kind)) {
         throw badRequest(`kind: ${q.period} boards exist for ${PERIOD_KINDS[q.period].join(', ')} only`);

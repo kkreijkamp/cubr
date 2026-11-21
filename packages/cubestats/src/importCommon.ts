@@ -1,5 +1,6 @@
 import type { Penalty } from './averages.js';
 import { isEventId } from './events.js';
+import { isPracticeScramble } from './scrambleTypes.js';
 
 /** One solve ready for POST /api/sessions/import (or the guest store). */
 export interface ImportedSolve {
@@ -17,6 +18,8 @@ export interface ImportedSession {
   sourceType: string;
   /** a cubr practice session (its solves count for no PB or leaderboard) */
   practice?: boolean;
+  /** a practice scramble type (scrambleTypes.ts), e.g. csTimer's "pll": always a practice session */
+  scramble?: string;
   solves: ImportedSolve[];
 }
 
@@ -36,6 +39,8 @@ export interface RawSession {
   /** Sort key where the source has one (csTimer rank, CubeDesk order). */
   rank?: number;
   practice?: boolean;
+  /** the session's practice scramble type, where the source says (csTimer's PLL, OLL ...) */
+  scramble?: string;
   solves: RawSolve[];
 }
 
@@ -100,11 +105,14 @@ export function finishImport(raw: RawSession[]): { sessions: ImportedSession[]; 
     }
     if (!solves.length) continue;
     const name = text(session.name).trim().slice(0, MAX_NAME) || `import ${index + 1}`;
+    const event = isEventId(session.event) ? session.event : '333';
+    const scramble = session.scramble && isPracticeScramble(event, session.scramble) ? session.scramble : undefined;
     sessions.push({
       name,
-      event: isEventId(session.event) ? session.event : '333',
+      event,
       sourceType: session.sourceType,
-      ...(session.practice ? { practice: true } : {}),
+      ...(session.practice || scramble ? { practice: true } : {}),
+      ...(scramble ? { scramble } : {}),
       solves,
     });
   }

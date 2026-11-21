@@ -53,6 +53,23 @@ describe('createSolveBody', () => {
   });
 });
 
+describe('practice scramble sessions', () => {
+  it("accepts one of the event's practice scramble types, never its default or another event's", () => {
+    expect(parse(createSessionBody, { name: '3x3 pll', event: '333', scramble: 'pll' })).toMatchObject({ event: '333', scramble: 'pll' });
+    expect(parse(createSessionBody, { name: 'x', event: '333', scramble: null })).toMatchObject({ scramble: null });
+    expect(errorOf(() => parse(createSessionBody, { name: 'x', event: '333', scramble: '333' })).message).toMatch(/^scramble:/);
+    expect(errorOf(() => parse(createSessionBody, { name: 'x', event: 'pyram', scramble: 'pll' })).message).toMatch(/^scramble:/);
+    expect(errorOf(() => parse(createSessionBody, { name: 'x', event: '333', scramble: 'p ll' })).message).toMatch(/^scramble:/);
+  });
+
+  it('carries the type through an import, checked the same way', () => {
+    const solve = { timeMs: 1840, createdAt: '2026-11-21T10:00:00Z' };
+    const ok = parse(importBody, { sessions: [{ name: 'pll', event: '333', scramble: 'pll', solves: [solve] }] });
+    expect(ok.sessions[0]).toMatchObject({ scramble: 'pll' });
+    expect(errorOf(() => parse(importBody, { sessions: [{ name: 'x', event: '222', scramble: 'pll', solves: [solve] }] })).message).toMatch(/scramble/);
+  });
+});
+
 describe('createSessionBody / patchSolveBody', () => {
   it('validates session name and event', () => {
     expect(parse(createSessionBody, { name: '  OH  ', event: '333oh' })).toEqual({ name: 'OH', event: '333oh', practice: false });

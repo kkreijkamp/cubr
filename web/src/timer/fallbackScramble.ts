@@ -1,3 +1,5 @@
+import { cuboidPrefix, defaultScrambleType, isWcaEvent, randomMoveScramble } from '@cubr/cubestats';
+
 // Client-side random-move scramblers, used only when the scramble service is unreachable.
 // They are not random-state (like WCA's TNoodle / cubing.js), so the UI marks them as
 // "offline scramble". Notation matches cubing.js / WCA so the preview and the solve list work.
@@ -190,7 +192,40 @@ export function fallbackScramble(event: string, rng: Rng = Math.random): string 
       return clockScramble(rng);
     case 'sq1':
       return square1Scramble(12, rng);
+    case 'fto':
+      return randomMoveScramble('fto', rng) ?? '';
     default:
-      return cubeScramble(3, 21, rng);
+      return isWcaEvent(event) ? cubeScramble(3, 21, rng) : otherEventScramble(event, rng);
   }
+}
+
+/** relays offline: each part's random-move scramble, labelled as the service labels them */
+const RELAY_PARTS: Record<string, [string, string][]> = {
+  r234: [['2x2', '222'], ['3x3', '333'], ['4x4', '444']],
+  r2345: [['2x2', '222'], ['3x3', '333'], ['4x4', '444'], ['5x5', '555']],
+  r23456: [['2x2', '222'], ['3x3', '333'], ['4x4', '444'], ['5x5', '555'], ['6x6', '666']],
+  r234567: [['2x2', '222'], ['3x3', '333'], ['4x4', '444'], ['5x5', '555'], ['6x6', '666'], ['7x7', '777']],
+  rmngf: [['2x2', '222'], ['3x3', '333'], ['4x4', '444'], ['5x5', '555'], ['3x3 oh', '333'], ['pyra', 'pyram'], ['skewb', 'skewb'], ['sq-1', 'sq1'], ['clock', 'clock'], ['mega', 'minx']],
+  r3: [['1', '333'], ['2', '333'], ['3', '333'], ['4', '333'], ['5', '333']],
+};
+
+/** One of the other events offline: random moves where csTimer has them, '' where only the service can scramble it. */
+function otherEventScramble(event: string, rng: Rng): string {
+  const parts = RELAY_PARTS[event];
+  if (parts) return parts.map(([label, ev]) => `${label}: ${fallbackScramble(ev, rng)}`).join('\n');
+  if (event === 'mrbl') return cubeScramble(3, 21, rng);
+  if (event === '335' || event === '337') return `${cuboidPrefix(event, rng)} / ${cubeScramble(3, 21, rng)}`;
+  if (event === 'klm') return randomMoveScramble('klmp', rng) ?? '';
+  const def = defaultScrambleType(event);
+  return (def && randomMoveScramble(def.id, rng)) ?? '';
+}
+
+/**
+ * A scramble made here while the service is unreachable: the event's random-move fallback, or a
+ * practice type's when it's made of random moves. '' when there's no way to make it offline
+ * (the practice types that need a solver, random-state-only puzzles).
+ */
+export function offlineScramble(event: string, type?: string, rng: Rng = Math.random): string {
+  if (!type) return fallbackScramble(event, rng);
+  return randomMoveScramble(type, rng) ?? '';
 }

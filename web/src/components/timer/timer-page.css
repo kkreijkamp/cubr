@@ -62,6 +62,47 @@
   max-width: calc(100vw - 2rem);
 }
 
+/* other events: csTimer's other puzzles and the relays, under the WCA events, in three columns
+   (down one column, then the next). With them the menu can be taller than the window, so it scrolls. */
+.tp-menu.tp-events-menu {
+  max-height: calc(100vh - 10rem);
+  max-height: calc(100dvh - 10rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.tp-events-other {
+  grid-column: 1 / -1;
+}
+.tp-events-other-list {
+  columns: 3;
+  column-gap: 0.25rem;
+}
+.tp-events-other-list .tp-menu-item {
+  break-inside: avoid;
+}
+/* the scramble type menu: what counts, then the practice types (scrolling when there are many) */
+.tp-menu-note {
+  color: var(--sub-color);
+  font-size: 0.7rem;
+  padding: 0.1rem 0.6rem 0.3rem;
+}
+.tp-menu.tp-scramble-types {
+  min-width: 16rem;
+}
+.tp-scramble-types .tp-menu-list {
+  max-height: min(22rem, calc(100dvh - 17rem));
+}
+.tp-scramble-label {
+  white-space: nowrap;
+  max-width: 8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* relays: one line per puzzle */
+.tp-scramble.tp-scramble-lines {
+  white-space: pre-line;
+}
+
 @media (max-width: 560px) {
   .tp-hide-narrow {
     display: none;
@@ -94,6 +135,62 @@
   .tp-events-menu .tp-menu-count {
     display: none;
   }
+  .tp-events-other-list {
+    column-gap: 0;
+  }
+  /* the bar keeps to the screen with the scramble menu in it: the default scramble shows as its
+     icon, a practice one as its beaker and a short label; icon buttons drop their chevrons, the
+     session its stack icon, and a long event name is cut short. The scramble menu hangs from the bar
+     (centred on the page), not from its button. */
+  .tp-bar .tp-scramble-menu {
+    position: static;
+  }
+  .tp-scramble-menu .tp-session-btn:not(.practice) .tp-scramble-label {
+    display: none;
+  }
+  .tp-scramble-menu .tp-scramble-label {
+    max-width: 4.5rem;
+  }
+  .tp-scramble-menu .tp-chevron,
+  .tp-input .tp-chevron,
+  .tp-session-btn .tp-session-icon {
+    display: none;
+  }
+  .tp-event-label {
+    max-width: 5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+/* small phones: the bar's buttons and dividers a little closer together, so it fits with the
+   scramble type in it (320 px: 3x3, a practice scramble, or one of the other events, cut short) */
+@media (max-width: 420px) {
+  .tp-bar .btn-text {
+    padding-left: 0.5em;
+    padding-right: 0.5em;
+  }
+  .tp-bar .divider {
+    margin: 0 0.25em;
+  }
+  /* a guest's plain "local" note: the sign-in note under the timer says it already (a sync warning
+     still shows) */
+  .tp-bar .tp-sync:not(.warn),
+  .tp-bar .divider:has(+ .tp-sync:not(.warn)) {
+    display: none;
+  }
+}
+/* the smallest phones (320-360 px): every bar button keeps its 44 px tap target, so the bar leaves
+   out the inspection toggle, which is also in settings and the command line (alt+w); a practice
+   scramble shows as its beaker */
+@media (max-width: 360px) {
+  .tp-event-label {
+    max-width: 3.75rem;
+  }
+  .tp-bar .tp-inspection-btn,
+  .tp-scramble-menu .tp-scramble-label {
+    display: none;
+  }
 }
 
 /* session dropdown */
@@ -111,10 +208,11 @@
   max-width: 11rem;
 }
 /* phones: a long session name gives way first, so the bar (which doesn't wrap) stays on the screen.
-   The rest of the bar and the page's side padding take 17.25rem at most ("3x3 oh", a monospace font) */
+   The rest of the bar (the scramble type's icon included) and the page's side padding take 20rem at
+   most ("3x3 oh", a monospace font) */
 @media (max-width: 560px) {
   .tp-session-name {
-    max-width: max(2.75rem, calc(100vw - 17.25rem));
+    max-width: max(2.75rem, calc(100vw - 20rem));
   }
 }
 /* the narrowest screens (a folding phone's cover, 280px): the whole bar a size smaller */

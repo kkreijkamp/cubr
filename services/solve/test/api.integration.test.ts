@@ -114,12 +114,35 @@ describeIntegration('solve API', () => {
     });
 
     it.each([
-      ['an unknown event', { name: 'x', event: '999' }],
+      ['an unknown event', { name: 'x', event: '333mbf' }],
       ['an empty name', { name: '', event: '333' }],
       ['a 41-character name', { name: 'x'.repeat(41), event: '333' }],
       ['a malformed id', { id: 'not-a-uuid', name: 'x', event: '333' }],
     ])('answers 400 to %s', async (_what, body) => {
       expect((await as(await newUser()).post('/api/sessions', body)).statusCode).toBe(400);
+    });
+
+    it("keeps a practice scramble's session a practice session, and its solves off the PBs and boards", async () => {
+      const u = await newUser();
+      const res = await as(u).post('/api/sessions', { name: '3x3 pll', event: '333', scramble: 'pll' });
+      expect(res.statusCode).toBe(201);
+      const sess = res.json().session;
+      expect(sess).toMatchObject({ event: '333', scramble: 'pll', practice: true });
+      expect((await as(u).patch(`/api/sessions/${sess.id}`, { practice: false })).statusCode).toBe(400);
+      expect((await as(u).post('/api/sessions', { name: 'x', event: '333', scramble: '333' })).statusCode).toBe(400);
+      const listed = (await as(u).get('/api/sessions')).json().sessions.find((x: Session) => x.id === sess.id);
+      expect(listed).toMatchObject({ scramble: 'pll', practice: true });
+      // a solve in it is published as a practice solve (stats: no PB; leaderboard: no board)
+      await addSolve(u, sess.id, 1840);
+      const [created] = await outbox('solve.created', u.id);
+      expect(created.payload.practice).toBe(true);
+    });
+
+    it('merges only sessions of the same scramble type', async () => {
+      const u = await newUser();
+      const plain = await newSession(u);
+      const pll = (await as(u).post('/api/sessions', { name: '3x3 pll', event: '333', scramble: 'pll' })).json().session;
+      expect((await as(u).post(`/api/sessions/${plain.id}/merge`, { sourceIds: [pll.id] })).statusCode).toBe(409);
     });
 
     it('renames (session.renamed) and marks practice (session.updated only when it changes)', async () => {

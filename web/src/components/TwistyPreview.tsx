@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrambleNet } from './ScrambleNet';
 
 interface Props {
-  /** cubing.js puzzle id, e.g. "3x3x3", "pyraminx", "megaminx", "square1", "clock", "skewb" */
-  puzzle: string;
+  /** cubing.js puzzle id, e.g. "3x3x3", "pyraminx", "megaminx", "square1", "clock", "skewb"; null: cubing.js can't draw it */
+  puzzle: string | null;
   /** scramble to apply */
   scramble: string;
   visualization?: '2D' | '3D';
@@ -18,14 +18,21 @@ export function TwistyPreview(props: Props) {
   const [netFailed, setNetFailed] = useState(false);
   const onNetError = useCallback(() => setNetFailed(true), []);
   const { puzzle, scramble, visualization = '2D', height = 180 } = props;
+  if (puzzle === null) {
+    return (
+      <div className="twisty-host twisty-none" style={{ minHeight: height }}>
+        no preview for this puzzle yet
+      </div>
+    );
+  }
   if (visualization === '2D' && puzzle !== 'clock' && !netFailed) {
     return <ScrambleNet puzzle={puzzle} scramble={scramble} height={height} onError={onNetError} />;
   }
-  return <TwistyPlayerPreview {...props} />;
+  return <TwistyPlayerPreview {...props} puzzle={puzzle} />;
 }
 
 /** cubing/twisty is large, so it is lazy-loaded the first time a preview is shown */
-function TwistyPlayerPreview({ puzzle, scramble, visualization = '2D', height = 180 }: Props) {
+function TwistyPlayerPreview({ puzzle, scramble, visualization = '2D', height = 180 }: Props & { puzzle: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<HTMLElement | null>(null);
   const [failed, setFailed] = useState(false);

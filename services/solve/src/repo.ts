@@ -10,7 +10,7 @@ import { defaultSessionName, practiceSessionName, type Penalty } from '@cubr/cub
 type Db = Pool | PoolClient;
 
 const SESSION_SELECT = `
-SELECT s.id, s.name, s.event, s.practice, s.created_at, s.updated_at,
+SELECT s.id, s.name, s.event, s.practice, s.scramble, s.created_at, s.updated_at,
        (SELECT count(*) FROM solve.solves v WHERE v.session_id = s.id) AS solve_count
   FROM solve.sessions s`;
 

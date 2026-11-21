@@ -1,9 +1,11 @@
 import type { Migration } from '@cubr/common';
-import { EVENTS, practiceSessionName } from '@cubr/cubestats';
+import { practiceSessionName } from '@cubr/cubestats';
 
 const sqlText = (s: string) => `'${s.replace(/'/g, "''")}'`;
+/** the events migration 004 knew (kept as they were, so its SQL never changes) */
+const EVENTS_AT_004 = ['333', '222', '444', '555', '666', '777', '333oh', '333bf', '333fm', '444bf', '555bf', 'clock', 'minx', 'pyram', 'skewb', 'sq1'];
 /** (event, practice session name) rows for migration 004, e.g. ('333', '3x3 practice') */
-const PRACTICE_NAMES = EVENTS.map((e) => `(${sqlText(e.id)}, ${sqlText(practiceSessionName(e.id))})`).join(',\n         ');
+const PRACTICE_NAMES = EVENTS_AT_004.map((e) => `(${sqlText(e)}, ${sqlText(practiceSessionName(e))})`).join(',\n         ');
 
 // Schema `solve` exactly as in docs/SPEC.md section 7.2. `migrate()` creates the schema itself and
 // tracks applied ids in solve.schema_migrations (advisory-locked, safe with many replicas).
@@ -98,6 +100,15 @@ SELECT gen_random_uuid(), u.user_id, coalesce(n.name, u.event || ' practice'), u
  WHERE NOT EXISTS (
    SELECT 1 FROM solve.sessions p WHERE p.user_id = u.user_id AND p.event = u.event AND p.practice
  );
+`,
+  },
+  {
+    id: '005_session_scramble',
+    sql: `
+-- A session's scramble type when it isn't its event's default ("pll", "222eg1": csTimer's ids,
+-- packages/cubestats/src/scrambleTypes.ts). Such a session is always a practice session, so only
+-- the default scramble counts for personal bests and leaderboards. NULL = the default.
+ALTER TABLE solve.sessions ADD COLUMN scramble text;
 `,
   },
 ];

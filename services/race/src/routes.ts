@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { conflict, forbidden, notFound, parse, rateLimit, rateLimited, type Redis, type makeAuth } from '@cubr/common';
-import { isEventId } from '@cubr/cubestats';
+import { isWcaEvent } from '@cubr/cubestats';
 import { ROOM_ID_RE, sanitizeText } from './sanitize.js';
 import type { RoomStore } from './store.js';
 
@@ -13,7 +13,7 @@ const createRoomSchema = z.object({
     .max(40)
     .transform((s) => sanitizeText(s, 40))
     .refine((s) => s.length > 0, 'name must contain visible characters'),
-  event: z.string().refine(isEventId, 'unknown event'),
+  event: z.string().refine(isWcaEvent, 'races are for WCA events'),
   isPrivate: z.boolean().optional().default(false),
 });
 

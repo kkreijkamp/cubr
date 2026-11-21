@@ -135,13 +135,32 @@ documented in the service READMEs.
 - **Pagination params:** `page` (1-based) and `size` (max 100) where relevant.
 - **Validation limits:** `timeMs` 1...86 400 000; scramble <= 2 000 chars; comment <= 500 chars; session name 1...40 chars; username `^[a-zA-Z0-9_]{3,20}$`; password 8...128 chars.
 
-## 6. WCA events
+## 6. Events and scramble types
 
-Supported event ids (WCA ids): `333, 222, 444, 555, 666, 777, 333oh, 333bf, 333fm, 444bf, 555bf, clock, minx, pyram, skewb, sq1`.
-Event metadata (names, cubing.js puzzle ids, inspection, default scramble count) lives in
-`@cubr/cubestats` `EVENTS`. `333oh` scrambles like `333`; `333bf/444bf/555bf` use the cubing.js
-bld scramblers (orientation-randomised); `333fm` uses `333fm` scrambler. The daily challenge uses
-`333, 222, 444, pyram, skewb` (`DAILY_EVENTS`).
+WCA events (WCA ids, `EVENTS`, `kind: 'wca'`): `333, 222, 444, 555, 666, 777, 333oh, 333bf, 333fm, 444bf, 555bf, clock, minx, pyram, skewb, sq1, fto`.
+FTO is official from 2 January 2027 (WCA, June 2026). Event metadata (names, cubing.js puzzle ids,
+inspection) lives in `@cubr/cubestats` `EVENTS`. `333oh` scrambles like `333`; `333bf/444bf/555bf`
+use the cubing.js bld scramblers (orientation-randomised); `333fm` uses `333fm` scrambler. The daily
+challenge uses `333, 222, 444, pyram, skewb` (`DAILY_EVENTS`). Leaderboards and races are for the
+WCA events only (`isWcaEvent`).
+
+Other events (`OTHER_EVENTS`, `kind: 'other'`, 45): csTimer's other puzzles and relays (its "other"
+and "special" groups without the jokes). A csTimer group of different puzzles (LxMxN, Cmetrick,
+Helicopter, Siamese, Square, Bandaged, Relays) is split into one event per puzzle; the relays
+(2-4 to 2-7, Mini Guildford, 3x3 relay of 5) use WCA scrambles. `puzzle` is null where cubing.js
+can't draw the puzzle (no preview). They count for personal bests like any event; they have no
+leaderboards.
+
+Scramble types (`SCRAMBLE_TYPES`, scrambleTypes.ts): csTimer's second scramble menu per event, with
+csTimer's ids (`pll`, `222eg1`, `444m`...). The first is the event's default: the only one whose
+solves count for personal bests and leaderboards. A session made for any other type (its
+`scramble` field) is always a practice session. `pending` types are listed but not scrambled yet
+(they need csTimer's own scramblers). How each is made (services/scramble/src/kinds.ts): a WCA
+event's default from the pool / cubing.js; the 3x3 and 2x2 practice types from a random state with
+pinned pieces (csTimer's masks, practice.ts) solved by cubing.js and given backwards; csTimer's
+random-move types from its move tables (cubestats randomMoves.ts, also the web app's offline
+fallback); relays, cuboids and mirror blocks from WCA scrambles; kilominx, redi cube and master
+pyraminx from cubing.js.
 
 ## 7. Database design (PostgreSQL, schema-per-service)
 
@@ -236,6 +255,7 @@ CREATE TABLE solve.sessions (
   name       text NOT NULL,
   event      text NOT NULL,
   practice   boolean NOT NULL DEFAULT false,  -- migration 003: its solves count for no PB / leaderboard
+  scramble   text,                            -- migration 005: a practice scramble type (always practice); NULL = the default
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -464,9 +484,9 @@ are skipped, and only logout answers 503 (the revocation could not be stored).
 ### 9.2 scramble (`/api/scrambles`)
 | Method & path | Response |
 |---|---|
-| GET `/api/scrambles/events` | `{events: [{id, name, short, puzzle}]}` |
+| GET `/api/scrambles/events` | `{events: [{id, name, short, puzzle, kind, types: [{id, label, pending?}]}]}` (every event, WCA first; `types[0]` is the default) |
 | GET `/api/scrambles/daily?date=YYYY-MM-DD` (default today, UTC; the last 30 days) | `{date, events: {"333": string[5], "222": [...], "444": [...], "pyram": [...], "skewb": [...]}}` (generated once, persisted, identical for everyone); 400 for future dates; 503 while Postgres is unreachable and nothing is cached |
-| GET `/api/scrambles/:event?count=1..25&fresh=0/1` | `{event, scrambles: string[], source: "pool"\|"generated"}`; `fresh=1` bypasses the pool (load tests / HPA demo), honoured only with `X-Internal-Token`, which also skips the limits; per IP otherwise: 120 requests/min and 60 newly generated scrambles/min (weighted by count; past it the pool's scrambles are returned, or 429 if there are none); 404 unknown event; 503 when generation times out or the queue is full |
+| GET `/api/scrambles/:event?count=1..25&fresh=0/1&type=` | `{event, scrambles: string[], source: "pool"\|"generated"}`; `type` = a scramble type (section 6; default when omitted): a WCA event's default comes from the pool, everything else is made on request (`{event, type, scrambles, source: "generated"}`, counted against the generation budget), 404 for a type the event doesn't have or a pending one; `fresh=1` bypasses the pool (load tests / HPA demo), honoured only with `X-Internal-Token`, which also skips the limits; per IP otherwise: 120 requests/min and 60 newly generated scrambles/min (weighted by count; past it the pool's scrambles are returned, or 429 if there are none); 404 unknown event; 503 when generation times out or the queue is full |
 | GET `/api/scrambles/_info` | info (+ warm-up, generator queue, pool sizes) |
 
 Pool: keep `scramble:pool:<event>` topped up (333/222/pyram/skewb: 200; 444/sq1/clock/minx/333oh/333bf/333fm: 50; 555-777/444bf/555bf: 20) by a background loop in every replica (check LLEN, generate up to the target, `LTRIM` to cap). The loop only uses idle CPU; requests that find the pool short generate the rest on the fly.
@@ -474,16 +494,16 @@ Pool: keep `scramble:pool:<event>` topped up (333/222/pyram/skewb: 200; 444/sq1/
 ### 9.3 solve (`/api/sessions`, `/api/solves`) - all routes require auth
 | Method & path | Body / query | Response |
 |---|---|---|
-| GET `/api/sessions` | - | `{sessions: Session[]}` (created_at asc; `Session = {id, name, event, practice, createdAt, updatedAt, solveCount}`). If the user has none, create a default "3x3" session (event 333) first. |
-| POST `/api/sessions` | `{id?, name, event, practice?, createdAt?}` | 201 `{session}` (idempotent on id: same id again -> 200; an id of another user -> 409). `createdAt` (ISO 8601, future values clamped to now) lets the empty session that replaces a cleared one keep its place in the list. |
-| PATCH `/api/sessions/:id` | `{name?, practice?}` (at least one) | `{session}` (+ `session.renamed` for a name, `session.updated` when `practice` changes). A practice session's solves count for no personal best and no leaderboard; its own session stats are unchanged. |
+| GET `/api/sessions` | - | `{sessions: Session[]}` (created_at asc; `Session = {id, name, event, practice, scramble?, createdAt, updatedAt, solveCount}`). If the user has none, create a default "3x3" session (event 333) first. |
+| POST `/api/sessions` | `{id?, name, event, practice?, scramble?, createdAt?}` | 201 `{session}` (idempotent on id: same id again -> 200; an id of another user -> 409). `createdAt` (ISO 8601, future values clamped to now) lets the empty session that replaces a cleared one keep its place in the list. `scramble`: one of the event's practice scramble types (400 otherwise); the session is then always a practice session. |
+| PATCH `/api/sessions/:id` | `{name?, practice?}` (at least one) | `{session}` (+ `session.renamed` for a name, `session.updated` when `practice` changes). A practice session's solves count for no personal best and no leaderboard; its own session stats are unchanged. 400 for `practice: false` on a session with a `scramble`. |
 | DELETE `/api/sessions/:id` | - | 204 (+ `session.deleted`) |
-| POST `/api/sessions/:id/merge` | `{sourceIds: uuid[]}` (1-50, != `:id`) | `{session, merged: {sessions, solves}}` - moves all solves of the source sessions into `:id` and deletes the sources in one transaction; 404 unknown session, 409 different event (+ `sessions.merged`). The merged solves take the target's `practice`. |
+| POST `/api/sessions/:id/merge` | `{sourceIds: uuid[]}` (1-50, != `:id`) | `{session, merged: {sessions, solves}}` - moves all solves of the source sessions into `:id` and deletes the sources in one transaction; 404 unknown session, 409 different event or scramble type (+ `sessions.merged`). The merged solves take the target's `practice`. |
 | GET `/api/sessions/:id/solves` | - | `{solves: Solve[], truncated: boolean}` all solves, created_at asc (capped at the latest 50 000) |
 | POST `/api/solves` | `{id, sessionId, timeMs, penalty, scramble, comment?, source?, createdAt?, daily?: {date, index}}` | 201 `{solve, rolling: {ao5, ao12}}`; if `id` already exists for this user -> 200 same shape (idempotent). A `createdAt` in the future (fast device clock) is clamped to the server time. `daily` solves: see below. |
 | PATCH `/api/solves/:id` | `{penalty?, comment?}` | `{solve}` (+ `solve.updated`) |
 | DELETE `/api/solves/:id` | - | 204 (+ `solve.deleted`) |
-| POST `/api/sessions/import` | `{sessions: [{name, event, practice?, solves: [{timeMs, penalty, scramble, comment?, createdAt}]}]}` (<= 1 000 sessions, <= 100 000 solves, body <= 25 MB) | `{imported: {sessions, solves}}` (+ one `solves.imported`) - bulk insert in batches inside a transaction; 10 imports/h per user (429, checked before the body is read); an account holds at most 250 000 solves (400 if the import would pass it; one import per account at a time) |
+| POST `/api/sessions/import` | `{sessions: [{name, event, practice?, scramble?, solves: [{timeMs, penalty, scramble, comment?, createdAt}]}]}` (<= 1 000 sessions, <= 100 000 solves, body <= 25 MB) | `{imported: {sessions, solves}}` (+ one `solves.imported`) - bulk insert in batches inside a transaction; 10 imports/h per user (429, checked before the body is read); an account holds at most 250 000 solves (400 if the import would pass it; one import per account at a time) |
 | GET `/api/solves/export` | - | `{exportedAt, sessions: [Session & {solves: Solve[]}]}`, streamed from one read-only snapshot in pages of 2 000 solves (memory stays flat; 200k solves = 52 MB in ~2.5 s locally); 10 exports/h per user (429) |
 | GET `/api/solves/daily?date=` | - | `{date, events: {"333": {solves: Solve[], ao5: number\|-1\|null}, ...}}` (only events with >=1 attempt; ao5 = the official result of the five attempts: times as submitted, penalties as last set while the day was open) |
 | GET `/api/solves/_info`, `/api/sessions/_info` | - | info (+ outbox backlog and relay state) |
@@ -634,6 +654,21 @@ Hover styles apply only where something can hover: the build wraps every `:hover
 on a touch screen no longer leaves a button, row or link in its hover colour until the next tap.
 Selectors in the same list that don't use `:hover` (`.x:hover, .x.active`) stay for touch screens
 too. The profile's event donut previews an event under a mouse or keyboard focus only, not on a tap.
+
+The timer bar reads: event, scramble type, session, inspection, input, sync. The event menu has the
+WCA events in three columns (cubes, variants, other) and, under them, "other events": csTimer's other
+puzzles and the relays, in three columns, the ones without a scrambler yet marked "soon". The
+scramble menu lists the event's default ("wca" for WCA events: "counts for pbs and leaderboards")
+and its practice types by group ("practice scrambles: no pbs or leaderboards"); picking one moves
+to that type's own practice session ("3x3 pll", made the first time, `switchScramble`), and the bar
+shows a beaker while one is in use. The session menu lists the sessions of the event and scramble
+type in use. Scramble queues are per event and type; offline, a type made of random moves is made in
+the browser, and one that needs the service says so. Relays show one line per puzzle; a puzzle
+cubing.js can't draw has no preview ("no preview for this puzzle yet"). On phones every bar button
+keeps its 44 px tap target, so the default scramble shows as its icon (a practice one as its beaker
+and label), icon buttons drop their chevrons, the session its stack icon, a guest's plain "local"
+note goes (420 px and under; a sync warning stays) and, at 360 px and under, the inspection toggle
+(it's in settings and the command line too); the bar fits at 320 px.
 
 On touch screens the timer pages (the timer, the daily challenge, a race) have no selectable text, so
 a long press meant to start the timer can't select the scramble or the averages; fields stay
