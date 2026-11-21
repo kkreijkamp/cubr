@@ -1007,6 +1007,25 @@ body.focus .toast:not(.important) {
   color: var(--sub-color);
 }
 
+/* feedback (the footer's feedback opens it): a line, email or a github issue, and what they come with */
+.feedback-text,
+.feedback-note {
+  margin: 0;
+  color: var(--sub-color);
+  line-height: 1.5;
+}
+.feedback-text {
+  font-size: 0.9rem;
+}
+.feedback-note {
+  font-size: 0.8rem;
+}
+.feedback-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
 /* command palette */
 .palette {
   max-width: 600px;
