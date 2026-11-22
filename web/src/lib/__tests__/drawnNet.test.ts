@@ -214,5 +214,8 @@ describe('relayColumns', () => {
     // narrow and tall: one above the other
     expect(relayColumns(3, 120, 400, 16)).toBe(1);
     expect(relayColumns(1, 350, 180, 16)).toBe(1);
+    // in 3D a puzzle is about square: four in a row beat two rows of two
+    expect(relayColumns(4, 350, 180, 16, 1)).toBe(4);
+    expect(relayColumns(10, 350, 180, 16, 1)).toBe(5);
   });
 });

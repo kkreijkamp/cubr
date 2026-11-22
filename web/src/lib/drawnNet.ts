@@ -385,13 +385,14 @@ export function drawnColour(fill: string, event: string, custom?: Readonly<Recor
 
 /**
  * How many to a row a relay's `n` puzzles go in a `width` x `height` box, each under a `label`
- * pixels tall: whichever makes the nets biggest (a net is about 4 wide by 3 high).
+ * pixels tall: whichever makes them biggest. `tall` is a puzzle's height for its width: a net is
+ * about 4 wide by 3 high, a puzzle in 3D about square.
  */
-export function relayColumns(n: number, width: number, height: number, label: number): number {
+export function relayColumns(n: number, width: number, height: number, label: number, tall = 0.75): number {
   let best = 1;
   let biggest = -Infinity;
   for (let cols = 1; cols <= n; cols++) {
-    const size = Math.min(height / Math.ceil(n / cols) - label, (width / cols) * 0.75);
+    const size = Math.min(height / Math.ceil(n / cols) - label, (width / cols) * tall);
     if (size > biggest + 0.5) {
       best = cols;
       biggest = size;

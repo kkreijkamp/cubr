@@ -1071,7 +1071,12 @@
 }
 .tp-detail-preview {
   display: grid;
-  justify-items: center;
+}
+/* the dialog's whole width, the preview centred in it: a 3D player has no width of its own, so a
+   box that shrank to fit it was 0 wide */
+.tp-detail-preview .twisty-host {
+  display: grid;
+  place-items: center;
 }
 .tp-detail-actions {
   justify-content: space-between;

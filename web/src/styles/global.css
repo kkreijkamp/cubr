@@ -1189,7 +1189,7 @@ body.focus .toast:not(.important) {
   font-weight: 600;
   user-select: none;
 }
-/* a relay (TwistyPreview): each puzzle's own net under its label, as many to a row as fit best */
+/* a relay (TwistyPreview): each puzzle's own preview under its label, as many to a row as fit best */
 .relay-preview {
   display: grid;
   width: 100%;

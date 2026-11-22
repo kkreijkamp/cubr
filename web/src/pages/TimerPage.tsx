@@ -26,6 +26,7 @@ import { shortcutFor, type ShortcutAction } from '../timer/shortcuts';
 import { PracticeBottle } from '../components/SessionName';
 import { TwistyPreview } from '../components/TwistyPreview';
 import { prefetchDrawnNet } from '../components/DrawnNet';
+import { preview3D } from '../lib/cubing3d';
 import { ConfigBar } from '../components/timer/ConfigBar';
 import { ScrambleBar } from '../components/timer/ScrambleBar';
 import { StatsPanel } from '../components/timer/StatsPanel';
@@ -512,14 +513,19 @@ export default function TimerPage() {
   }, [modal, stats, solves]);
 
   const showPreview = settings.scramblePreview !== 'off';
-  const previewScramble = useDeferredValue(scr.current?.text ?? null);
+  // deferred with the event and type it belongs to: the text alone would pair, for a render, the
+  // event just picked with the last event's scramble
+  const shownScramble = useMemo(() => (scr.current?.text ? { event, type: scrambleType, text: scr.current.text } : null), [scr.current, event, scrambleType]);
+  const preview = useDeferredValue(shownScramble);
   // csTimer draws the puzzles cubing.js can't: the next scramble's drawing is fetched while this one
-  // is up, so it shows at once (relays are drawn here, from their puzzles' own nets)
+  // is up, so it shows at once (relays are drawn here, from their puzzles' own nets; in 3D, the
+  // puzzles cubing.js builds from their geometry show its model instead)
   useEffect(() => {
     if (!showPreview || eventInfo.puzzle !== null || RELAY_EVENTS.includes(event)) return;
     const next = peekScramble(event, scrambleType);
-    if (next) prefetchDrawnNet(scrambleImageUrl(event, next, scrambleType), event);
-  }, [scr.current, showPreview, eventInfo.puzzle, event, scrambleType]);
+    if (!next || (settings.scramblePreview === '3D' && preview3D(event, scrambleType, next))) return;
+    prefetchDrawnNet(scrambleImageUrl(event, next, scrambleType), event);
+  }, [scr.current, showPreview, settings.scramblePreview, eventInfo.puzzle, event, scrambleType]);
   const previewBoxRef = useRef<HTMLDivElement>(null);
   const previewHeight = usePreviewHeight(previewBoxRef, showPreview);
   const cols = 1 + (showPreview ? 1 : 0) + (settings.showSolveList ? 1 : 0);
@@ -700,14 +706,15 @@ export default function TimerPage() {
                 <EyeIcon width={14} height={14} /> scramble preview
               </div>
               <div className="tp-preview-box" ref={previewBoxRef}>
-                {previewScramble ? (
+                {preview ? (
                   <TwistyPreview
-                    puzzle={eventInfo.puzzle}
-                    scramble={previewScramble}
+                    puzzle={getEvent(preview.event)?.puzzle ?? null}
+                    scramble={preview.text}
                     visualization={settings.scramblePreview === '3D' ? '3D' : '2D'}
                     height={previewHeight}
-                    event={event}
-                    imageUrl={scrambleImageUrl(event, previewScramble, scrambleType)}
+                    event={preview.event}
+                    scrambleType={preview.type}
+                    imageUrl={scrambleImageUrl(preview.event, preview.text, preview.type)}
                   />
                 ) : null}
               </div>

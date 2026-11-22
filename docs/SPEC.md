@@ -148,9 +148,9 @@ Other events (`OTHER_EVENTS`, `kind: 'other'`, 45): csTimer's other puzzles and 
 and "special" groups without the jokes). A csTimer group of different puzzles (LxMxN, Cmetrick,
 Helicopter, Siamese, Square, Bandaged, Relays) is split into one event per puzzle; the relays
 (2-4 to 2-7, Mini Guildford, 3x3 relay of 5) use WCA scrambles (`RELAY_PARTS`). `puzzle` is null
-where cubing.js can't draw the puzzle: the preview is csTimer's drawing redrawn as a cubr net, or a
-relay's puzzles' own nets (section 10). They count for personal bests like any event; they have no
-leaderboards.
+where cubing.js has no puzzle of its own: the preview is csTimer's drawing redrawn as a cubr net, in
+3D the model cubing.js builds from the puzzle's geometry where it can, or a relay's puzzles' own
+previews (section 10). They count for personal bests like any event; they have no leaderboards.
 
 Scramble types (`SCRAMBLE_TYPES`, scrambleTypes.ts): csTimer's second scramble menu per event, with
 csTimer's ids (`pll`, `222eg1`, `444m`...). The first is the event's default: the only one whose
@@ -691,6 +691,21 @@ square-1 is; a sliding puzzle is a board with its numbers; a clock's drawing is 
 draws it. The next scramble's drawing is fetched while the current one is up. A relay shows each
 puzzle's own preview under its label, as many to a row as make them biggest. "No preview for this
 puzzle (or scramble) yet" where csTimer can't draw it either.
+
+In 3D the preview is cubing.js's `<twisty-player>`. Some puzzles have no cubing.js puzzle of their
+own, but cubing.js's puzzle geometry builds them from their shape and cuts (8x8 to 11x11,
+helicopter, curvy copter, dino, pyraminx crystal, csTimer's diamond as the skewb diamond, icosamate,
+and the master pyraminx with its tips for its random-move type). Some scramble types are written in
+csTimer's notation (all of gigaminx; megaminx carrot, old style and random state). For both, the
+scramble is rewritten move by move in cubing.js's notation (`lib/cubing3d`, `preview3D`). Every
+translation is checked against csTimer's own drawings of real scrambles, sticker for sticker
+(`scripts/cstimer-fixtures.ts` writes them, the web tests compare). Two differences: cubing.js's
+curvy copter has a fixed centre on each face that the real puzzle hasn't, and the icosamate takes
+cubing.js's colours in 3D and csTimer's in 2D. Square-1, clock and redi cube have no 3D model in
+cubing.js, so it draws them flat; the other puzzles it has no model of keep their 2D net. A relay's
+puzzles are in 3D too, each in a square box (a clock's two faces in a wide one). A 3D view draws
+once it is on screen, so a long scramble (gigaminx, Mini Guildford) can leave it below the window
+until you scroll.
 
 On touch screens the timer pages (the timer, the daily challenge, a race) have no selectable text, so
 a long press meant to start the timer can't select the scramble or the averages; fields stay

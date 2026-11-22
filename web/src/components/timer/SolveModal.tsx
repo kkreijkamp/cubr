@@ -136,6 +136,7 @@ export function SolveModal({ solve, index, total, precision, preview, scrambleTy
               visualization={preview}
               height={150}
               event={solve.event}
+              scrambleType={scrambleType}
               imageUrl={scrambleImageUrl(solve.event, solve.scramble, scrambleType)}
             />
           </div>
