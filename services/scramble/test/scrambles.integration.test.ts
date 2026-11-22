@@ -111,7 +111,7 @@ describeIntegration('scramble API', () => {
     expect(cstimer.calls).toContain('15prp:0');
   });
 
-  it("draws, with csTimer, the scrambles of puzzles cubr can't draw: an SVG that runs nothing, cached by the browser", async () => {
+  it("draws, with csTimer, the scrambles cubr can't draw (puzzles cubing.js lacks, notation it can't read): an SVG that runs nothing, cached by the browser", async () => {
     const res = await get(`/api/scrambles/15p/image?scramble=${encodeURIComponent('R D L')}`);
     expect(res.statusCode).toBe(200);
     expect(res.headers['content-type']).toBe('image/svg+xml; charset=utf-8');
@@ -122,7 +122,7 @@ describeIntegration('scramble API', () => {
     const relay = await get(`/api/scrambles/r234/image?scramble=${encodeURIComponent('2x2: R U\n3x3: F2\n4x4: Rw2')}`);
     expect(relay.statusCode).toBe(200);
     expect(relay.body).toContain('<desc>19</desc>'); // "2) R U\n3) F2\n4) Rw2"
-    expect((await get('/api/scrambles/333/image?scramble=R')).statusCode).toBe(404); // cubr draws 3x3s itself
+    expect((await get('/api/scrambles/giga/image?scramble=R%2B%2B%20D--')).statusCode).toBe(200); // notation cubing.js can't read
     expect((await get('/api/scrambles/334/image?scramble=R')).statusCode).toBe(404); // csTimer can't either
     expect((await get('/api/scrambles/15p/image')).statusCode).toBe(400);
     expect((await get('/api/scrambles/nope/image?scramble=R')).statusCode).toBe(404);

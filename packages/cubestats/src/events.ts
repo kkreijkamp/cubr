@@ -115,8 +115,41 @@ export const OTHER_EVENTS: EventInfo[] = [
 
 export const ALL_EVENTS: EventInfo[] = [...EVENTS, ...OTHER_EVENTS];
 
+/**
+ * The relays' puzzles, in order: the label each one's scramble starts with ("2x2: ...", one line
+ * per puzzle) and the WCA event it is scrambled as.
+ */
+export const RELAY_PARTS: Readonly<Record<string, readonly (readonly [label: string, event: string])[]>> = {
+  r234: [['2x2', '222'], ['3x3', '333'], ['4x4', '444']],
+  r2345: [['2x2', '222'], ['3x3', '333'], ['4x4', '444'], ['5x5', '555']],
+  r23456: [['2x2', '222'], ['3x3', '333'], ['4x4', '444'], ['5x5', '555'], ['6x6', '666']],
+  r234567: [['2x2', '222'], ['3x3', '333'], ['4x4', '444'], ['5x5', '555'], ['6x6', '666'], ['7x7', '777']],
+  rmngf: [['2x2', '222'], ['3x3', '333'], ['4x4', '444'], ['5x5', '555'], ['3x3 oh', '333oh'], ['pyra', 'pyram'], ['skewb', 'skewb'], ['sq-1', 'sq1'], ['clock', 'clock'], ['mega', 'minx']],
+  r3: [['1', '333'], ['2', '333'], ['3', '333'], ['4', '333'], ['5', '333']],
+};
+
 /** the relays: one scramble line per puzzle ("2x2: ...", "3x3: ...") */
-export const RELAY_EVENTS: readonly string[] = ['r234', 'r2345', 'r23456', 'r234567', 'rmngf', 'r3'];
+export const RELAY_EVENTS: readonly string[] = Object.keys(RELAY_PARTS);
+
+/**
+ * A relay's scramble split into its puzzles' scrambles, in order. A line that doesn't start with one
+ * of the relay's labels carries on the one before (a megaminx scramble is several lines). Null for
+ * an event that isn't a relay or a scramble that doesn't start with its first label.
+ */
+export function splitRelay(event: string, scramble: string): { label: string; event: string; scramble: string }[] | null {
+  const parts = RELAY_PARTS[event];
+  if (!parts) return null;
+  const labels = new Map(parts.map(([label, ev]) => [label, ev]));
+  const out: { label: string; event: string; scramble: string }[] = [];
+  for (const line of scramble.split('\n')) {
+    const m = /^\s*([^:]+?)\s*:\s*(.*)$/.exec(line);
+    const ev = m ? labels.get(m[1]) : undefined;
+    if (m && ev) out.push({ label: m[1], event: ev, scramble: m[2].trim() });
+    else if (out.length) out[out.length - 1].scramble = `${out[out.length - 1].scramble}\n${line.trim()}`.trim();
+    else if (line.trim()) return null;
+  }
+  return out.length ? out : null;
+}
 
 /** The WCA events' ids (leaderboards, scramble pools, races) */
 export const EVENT_IDS = EVENTS.map((e) => e.id);

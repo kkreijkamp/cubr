@@ -61,7 +61,7 @@ export function registerScrambleRoutes(app: FastifyInstance, deps: ScrambleRoute
   };
   const make: MakeDeps = { generate: (job) => generator.generate(job, 'request'), wca: wcaScramble, cstimer: (type, length) => cstimer.scramble(type, length) };
 
-  /** csTimer's drawings of the scrambles cubr can't draw (no cubing.js puzzle), by scramble: cached */
+  /** csTimer's drawings of scrambles cubr can't draw itself (no cubing.js puzzle, or notation cubing.js can't read), by scramble: cached */
   const images = new Map<string, string>();
   app.get<{ Params: { event: string } }>('/api/scrambles/:event/image', async (req, reply) => {
     const { event } = req.params;

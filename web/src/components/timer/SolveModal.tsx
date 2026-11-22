@@ -18,6 +18,8 @@ interface Props {
   total: number;
   precision: Precision;
   preview: PreviewMode;
+  /** the session's practice scramble type, if it has one (csTimer draws its scrambles as that type) */
+  scrambleType?: string;
   confirmDelete: boolean;
   onNavigate: (index: number) => void;
   onClose: () => void;
@@ -25,7 +27,7 @@ interface Props {
 
 const PENALTIES: Penalty[] = ['OK', '+2', 'DNF'];
 
-export function SolveModal({ solve, index, total, precision, preview, confirmDelete, onNavigate, onClose }: Props) {
+export function SolveModal({ solve, index, total, precision, preview, scrambleType, confirmDelete, onNavigate, onClose }: Props) {
   const [comment, setCommentText] = useState(solve.comment ?? '');
   const [armed, setArmed] = useState(false);
   const armTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -133,7 +135,8 @@ export function SolveModal({ solve, index, total, precision, preview, confirmDel
               scramble={solve.scramble}
               visualization={preview}
               height={150}
-              imageUrl={puzzle === null ? scrambleImageUrl(solve.event, solve.scramble) : undefined}
+              event={solve.event}
+              imageUrl={scrambleImageUrl(solve.event, solve.scramble, scrambleType)}
             />
           </div>
         )}

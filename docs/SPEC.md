@@ -147,8 +147,9 @@ WCA events only (`isWcaEvent`).
 Other events (`OTHER_EVENTS`, `kind: 'other'`, 45): csTimer's other puzzles and relays (its "other"
 and "special" groups without the jokes). A csTimer group of different puzzles (LxMxN, Cmetrick,
 Helicopter, Siamese, Square, Bandaged, Relays) is split into one event per puzzle; the relays
-(2-4 to 2-7, Mini Guildford, 3x3 relay of 5) use WCA scrambles. `puzzle` is null where cubing.js
-can't draw the puzzle (no preview). They count for personal bests like any event; they have no
+(2-4 to 2-7, Mini Guildford, 3x3 relay of 5) use WCA scrambles (`RELAY_PARTS`). `puzzle` is null
+where cubing.js can't draw the puzzle: the preview is csTimer's drawing redrawn as a cubr net, or a
+relay's puzzles' own nets (section 10). They count for personal bests like any event; they have no
 leaderboards.
 
 Scramble types (`SCRAMBLE_TYPES`, scrambleTypes.ts): csTimer's second scramble menu per event, with
@@ -491,7 +492,7 @@ are skipped, and only logout answers 503 (the revocation could not be stored).
 | Method & path | Response |
 |---|---|
 | GET `/api/scrambles/events` | `{events: [{id, name, short, puzzle, kind, types: [{id, label, pending?}]}]}` (every event, WCA first; `types[0]` is the default) |
-| GET `/api/scrambles/:event/image?scramble=&type=` | csTimer's SVG drawing of the scramble, for the events cubing.js can't draw (`puzzle: null`); relays are drawn as a grid of their puzzles. `image/svg+xml`, `cache-control: public, max-age=86400`, its own CSP (`default-src 'none'; style-src 'unsafe-inline'`); refused (404) if it holds anything that could run or load something, if cubr draws the event itself, or if csTimer can't draw it (cuboids, siamese, cmetrick...); counts as a request against the per-IP limit |
+| GET `/api/scrambles/:event/image?scramble=&type=` | csTimer's SVG drawing of the scramble, for any event and type (the web app asks for it where cubing.js can't draw the puzzle, `puzzle: null`, or can't read the scramble: csTimer's own notation, such as the gigaminx's or megaminx carrot); relays are drawn as a grid of their puzzles. `image/svg+xml`, `cache-control: public, max-age=86400`, its own CSP (`default-src 'none'; style-src 'unsafe-inline'`); refused (404) if it holds anything that could run or load something, or if csTimer can't draw it (cuboids, siamese, cmetrick, clock's concise notation...); counts as a request against the per-IP limit |
 | GET `/api/scrambles/daily?date=YYYY-MM-DD` (default today, UTC; the last 30 days) | `{date, events: {"333": string[5], "222": [...], "444": [...], "pyram": [...], "skewb": [...]}}` (generated once, persisted, identical for everyone); 400 for future dates; 503 while Postgres is unreachable and nothing is cached |
 | GET `/api/scrambles/:event?count=1..25&fresh=0/1&type=` | `{event, scrambles: string[], source: "pool"\|"generated"}`; `type` = a scramble type (section 6; default when omitted): a WCA event's default comes from the pool, everything else is made on request (`{event, type, scrambles, source: "generated"}`, counted against the generation budget), 404 for a type the event doesn't have or a pending one; `fresh=1` bypasses the pool (load tests / HPA demo), honoured only with `X-Internal-Token`, which also skips the limits; per IP otherwise: 120 requests/min and 60 newly generated scrambles/min (weighted by count; past it the pool's scrambles are returned, or 429 if there are none); 404 unknown event; 503 when generation times out or the queue is full |
 | GET `/api/scrambles/_info` | info (+ warm-up, generator queue, pool sizes) |
@@ -673,13 +674,23 @@ type in use. Scramble queues are per event and type; offline, a type made of ran
 the browser, and one that needs the service says so ("too many new scrambles" when the service
 refused for the minute: it then waits 10 s, not 30). Practice types and the other events are
 fetched two at a time (each counts against the per-IP generation budget). Relays show one line per
-puzzle. A puzzle cubing.js can't draw shows csTimer's drawing from the scramble service (an
-`<img>`, `scrambleImageUrl`), and "no preview for this puzzle yet" where csTimer can't draw it
-either. On phones every bar button
-keeps its 44 px tap target, so the default scramble shows as its icon (a practice one as its beaker
-and label), icon buttons drop their chevrons, the session its stack icon, a guest's plain "local"
-note goes (420 px and under; a sync warning stays) and, at 360 px and under, the inspection toggle
-(it's in settings and the command line too); the bar fits at 320 px.
+puzzle. On phones every bar button keeps its 44 px tap target, so the default scramble shows as its
+icon (a practice one as its beaker and label), icon buttons drop their chevrons, the session its
+stack icon, a guest's plain "local" note goes (420 px and under; a sync warning stays) and, at 360 px
+and under, the inspection toggle (it's in settings and the command line too); the bar fits at 320 px.
+
+Scramble previews look the same for every puzzle: cubr's flat net (`ScrambleNet`), rounded stickers
+on a dark plate per face, in cubr's colours or your own (settings: sticker colours, one scheme per
+kind of puzzle: kilominx and gigaminx take the megaminx's, master pyraminx the pyraminx's, redi cube
+and csTimer's cube-shaped puzzles the cubes', and FTO has its own). A puzzle cubing.js can't draw, or a scramble it can't read (a type in csTimer's own
+notation), shows csTimer's drawing from the scramble service (`scrambleImageUrl`) redrawn the same
+way (`DrawnNet`, `lib/drawnNet`): its shapes are read from the SVG, stickers that meet make a face
+with a plate behind it (a jagged face, as a mirror block's, follows its outline), the faces are
+drawn closer, and csTimer's colours become the scheme's. Square-1's relatives are drawn flat, as
+square-1 is; a sliding puzzle is a board with its numbers; a clock's drawing is shown as csTimer
+draws it. The next scramble's drawing is fetched while the current one is up. A relay shows each
+puzzle's own preview under its label, as many to a row as make them biggest. "No preview for this
+puzzle (or scramble) yet" where csTimer can't draw it either.
 
 On touch screens the timer pages (the timer, the daily challenge, a race) have no selectable text, so
 a long press meant to start the timer can't select the scramble or the averages; fields stay

@@ -80,6 +80,11 @@ async function take(key: string): Promise<ScrambleItem> {
   return shiftQueued(key) ?? (offline ? { text: offline, offline: true } : { text: '', offline: true, unavailable: true, ...(busy ? { busy } : {}) });
 }
 
+/** The scramble that comes after the current one, when the service has sent it already. */
+export function peekScramble(event: string, type?: string): string | null {
+  return queues.get(queueKey(event, type))?.[0]?.text ?? null;
+}
+
 /** Warm the queue for an event (and scramble type) without consuming anything. */
 export function prefetchScrambles(event: string, type?: string): void {
   const key = queueKey(event, type);

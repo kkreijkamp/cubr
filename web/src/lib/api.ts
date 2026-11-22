@@ -193,8 +193,9 @@ const qs = (params: Record<string, string | number | boolean | null | undefined>
 const enc = encodeURIComponent;
 
 /**
- * csTimer's drawing of a scramble, for the puzzles cubing.js can't draw (the scramble service draws
- * it; an <img> URL, cached by the browser). `type`: the session's practice scramble type, if any.
+ * csTimer's drawing of a scramble (the scramble service draws it; cached by the browser), for the
+ * puzzles cubing.js can't draw and the scrambles it can't read (components/TwistyPreview fetches it
+ * only then). `type`: the session's practice scramble type, if any.
  */
 export function scrambleImageUrl(event: string, scramble: string, type?: string): string {
   return `/api/scrambles/${enc(event)}/image${qs({ scramble: scramble.slice(0, 2000), type })}`;

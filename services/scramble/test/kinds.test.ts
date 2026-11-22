@@ -97,13 +97,16 @@ describe('the scramble types the service can make', () => {
     for (const t of ['333', 'pll', '222eg1', 'r234w', '333o', 'klmso']) expect(CSTIMER_TYPES.has(t), t).toBe(false);
   });
 
-  it("writes relays the way csTimer's drawing wants them, and draws only what cubr can't", () => {
+  it("writes relays the way csTimer's drawing wants them, and asks for any known event's type", () => {
     expect(cstimerImageRequest('r234', undefined, '2x2: R U\n3x3: F2\n4x4: Rw2 U')).toEqual({ type: 'r234w', scramble: '2) R U\n3) F2\n4) Rw2 U' });
     expect(cstimerImageRequest('rmngf', undefined, '3x3 oh: R\npyra: U\nsq-1: (1,0) /\nmega: R++ D--\nU')?.scramble).toBe('3oh) R\npyr) U\nsq1) (1,0) /\nmgm) R++ D--\nU');
     expect(cstimerImageRequest('r3', undefined, '1: R\n2: U')?.scramble).toBe('1) R\n2) U');
     expect(cstimerImageRequest('15p', '15p', 'R D L')).toEqual({ type: '15p', scramble: 'R D L' });
-    expect(cstimerImageRequest('333', undefined, 'R U')).toBeNull(); // cubing.js draws it
-    expect(cstimerImageRequest('klm', undefined, 'R U')).toBeNull();
+    // a puzzle cubing.js draws, for a scramble it can't read (csTimer's own notation)
+    expect(cstimerImageRequest('giga', undefined, 'R++ d-- y')).toEqual({ type: 'giga', scramble: 'R++ d-- y' });
+    expect(cstimerImageRequest('minx', 'mgmc', '+- ++ U')).toEqual({ type: 'mgmc', scramble: '+- ++ U' });
+    expect(cstimerImageRequest('333', undefined, 'R U')).toEqual({ type: '333', scramble: 'R U' });
     expect(cstimerImageRequest('nope', undefined, 'R')).toBeNull();
+    expect(cstimerImageRequest('333', 'nope', 'R')).toBeNull();
   });
 });

@@ -20,11 +20,12 @@ import {
 import { ALL_EVENTS, EVENTS, RELAY_EVENTS, effectiveMs, formatTime, getEvent, isEventReady, rollingAverage, scrambleSessionName, sessionStats, type Penalty } from '@cubr/cubestats';
 import { TimerDisplay } from '../timer/TimerDisplay';
 import { useTimerEngine, type TimerResult, type TimerState } from '../timer/useTimerEngine';
-import { useScrambleQueue } from '../timer/useScrambleQueue';
+import { peekScramble, useScrambleQueue } from '../timer/useScrambleQueue';
 import { scrambleImageUrl } from '../lib/api';
 import { shortcutFor, type ShortcutAction } from '../timer/shortcuts';
 import { PracticeBottle } from '../components/SessionName';
 import { TwistyPreview } from '../components/TwistyPreview';
+import { prefetchDrawnNet } from '../components/DrawnNet';
 import { ConfigBar } from '../components/timer/ConfigBar';
 import { ScrambleBar } from '../components/timer/ScrambleBar';
 import { StatsPanel } from '../components/timer/StatsPanel';
@@ -512,6 +513,13 @@ export default function TimerPage() {
 
   const showPreview = settings.scramblePreview !== 'off';
   const previewScramble = useDeferredValue(scr.current?.text ?? null);
+  // csTimer draws the puzzles cubing.js can't: the next scramble's drawing is fetched while this one
+  // is up, so it shows at once (relays are drawn here, from their puzzles' own nets)
+  useEffect(() => {
+    if (!showPreview || eventInfo.puzzle !== null || RELAY_EVENTS.includes(event)) return;
+    const next = peekScramble(event, scrambleType);
+    if (next) prefetchDrawnNet(scrambleImageUrl(event, next, scrambleType), event);
+  }, [scr.current, showPreview, eventInfo.puzzle, event, scrambleType]);
   const previewBoxRef = useRef<HTMLDivElement>(null);
   const previewHeight = usePreviewHeight(previewBoxRef, showPreview);
   const cols = 1 + (showPreview ? 1 : 0) + (settings.showSolveList ? 1 : 0);
@@ -698,7 +706,8 @@ export default function TimerPage() {
                     scramble={previewScramble}
                     visualization={settings.scramblePreview === '3D' ? '3D' : '2D'}
                     height={previewHeight}
-                    imageUrl={eventInfo.puzzle === null ? scrambleImageUrl(event, previewScramble, scrambleType) : undefined}
+                    event={event}
+                    imageUrl={scrambleImageUrl(event, previewScramble, scrambleType)}
                   />
                 ) : null}
               </div>
@@ -740,6 +749,7 @@ export default function TimerPage() {
             total={solves.length}
             precision={settings.precision}
             preview={settings.scramblePreview}
+            scrambleType={session?.scramble}
             confirmDelete={settings.confirmDelete}
             onNavigate={(i) => i >= 0 && i < solves.length && setModal({ kind: 'solve', index: i })}
             onClose={() => setModal(null)}

@@ -4,6 +4,7 @@ import {
   closeUp,
   convexHull,
   insetConvex,
+  insetPolygon,
   parsePoints,
   parseTransform,
   pathPoints,
@@ -128,6 +129,38 @@ describe('insetConvex', () => {
   });
 });
 
+describe('insetPolygon', () => {
+  const ell: Point[] = [
+    [0, 0],
+    [20, 0],
+    [20, 10],
+    [10, 10],
+    [10, 20],
+    [0, 20],
+  ];
+  it('moves the sides of a concave shape in too: its concave corner moves out', () => {
+    close(insetPolygon(ell, 1), [
+      [1, 1],
+      [19, 1],
+      [19, 9],
+      [9, 9],
+      [9, 19],
+      [1, 19],
+    ]);
+    // the same as insetConvex for a convex one, and either winding
+    close(insetPolygon(square(0, 0, 10), 1), insetConvex(square(0, 0, 10), 1)!);
+    close(insetPolygon([...ell].reverse(), 1), [...insetPolygon(ell, 1)!].reverse());
+  });
+  it("moves a hole's sides outwards when told which way the shape goes round", () => {
+    const hole = [...square(5, 5, 10)].reverse();
+    close(insetPolygon(hole, 1, 1), [...square(4, 4, 12)].reverse());
+  });
+  it('gives up where the shape is narrower than twice the distance', () => {
+    expect(insetPolygon(ell, 4.9)).not.toBeNull();
+    expect(insetPolygon(ell, 5.1)).toBeNull();
+  });
+});
+
 describe('tile', () => {
   it('rounds stickers with room for it, squares off smaller ones, shrinks the rest', () => {
     const big = tile(square(0, 0, 10), 1, 2);
@@ -149,6 +182,21 @@ describe('tile', () => {
     );
     expect(notch.stroke).toBe(0);
     expect(Math.abs(signedArea(notch.points))).toBeLessThan(Math.abs(signedArea(square(0, 0, 10))));
+    // with a general inset, a concave sticker is rounded like the rest
+    const rounded = tile(
+      [
+        [0, 0],
+        [10, 0],
+        [10, 10],
+        [5, 4],
+        [0, 10],
+      ],
+      1,
+      1,
+      (pts, d) => insetPolygon(pts, d),
+    );
+    expect(rounded.stroke).toBe(2);
+    expect(rounded.points).toHaveLength(5);
   });
 });
 
@@ -240,7 +288,7 @@ describe('stickerSources (cubing.js puzzles)', () => {
 });
 
 describe('stickerColour / schemes', () => {
-  const ALL = ['2x2x2', '3x3x3', '4x4x4', '5x5x5', '6x6x6', '7x7x7', 'megaminx', 'pyraminx', 'skewb', 'square1'];
+  const ALL = ['2x2x2', '3x3x3', '4x4x4', '5x5x5', '6x6x6', '7x7x7', 'megaminx', 'pyraminx', 'skewb', 'square1', 'fto', 'kilominx', 'gigaminx', 'master_tetraminx', 'redi_cube'];
   const fills = async (id: string) => [...(await puzzles[id].svg()).matchAll(/id="([A-Z0-9]+-l\d+-o\d+)"[^>]*style="fill: ?([^;"]+)/g)].map((m) => m[2]);
 
   it('every sticker net has a scheme, and every face of it is a colour on the net', async () => {
@@ -276,5 +324,30 @@ describe('stickerColour / schemes', () => {
     expect(stickerColour('yellow', cube, own)).toBe(stickerColour('yellow', cube)); // bottom: past the end
     // 4x4 nets spell the colours differently but share the cube's scheme
     expect(stickerColour('#ffffff', schemeFor('4x4x4'), own)).toBe('#000000');
+  });
+
+  it("knows csTimer's colours for each face too, and every colour means one face of its scheme", () => {
+    for (const scheme of SCHEMES) {
+      for (const c of new Set(scheme.faces.flatMap((f) => [...f.cubing, ...(f.cstimer ?? [])]))) {
+        expect(scheme.faces.filter((f) => f.cubing.includes(c) || f.cstimer?.includes(c)), `${scheme.id} ${c}`).toHaveLength(1);
+      }
+      for (const f of scheme.faces) for (const c of f.cstimer ?? []) expect(c, `${scheme.id} ${f.name}`).toMatch(/^#[0-9a-f]{6}$/);
+    }
+    const cube = schemeFor('3x3x3')!;
+    // csTimer's cube colours (D L B U R F: '#ff0#fa0#00f#fff#f00#0d0')
+    expect(['#ffff00', '#ffaa00', '#0000ff', '#ffffff', '#ff0000', '#00dd00'].map((c) => stickerColour(c, cube))).toEqual(
+      ['yellow', 'orange', '#26f', 'white', 'red', 'limegreen'].map((c) => stickerColour(c, cube)),
+    );
+    // its megaminx colours ('#fff#d00#060#81f#fc0#00b#ffb#8df#f83#7e0#f9f#999'), square-1's and the FTO's, face for face
+    const mega = SCHEMES.find((s) => s.id === 'megaminx')!;
+    expect(['#ffffff', '#dd0000', '#006600', '#8811ff', '#ffcc00', '#0000bb', '#ffffbb', '#88ddff', '#ff8833', '#77ee00', '#ff99ff', '#999999'].map((c) => stickerColour(c, mega))).toEqual(
+      ['#ffffff', '#ff0000', '#008800', '#8800dd', '#f4f400', '#0000ff', '#e8d0a0', '#3399ff', '#ff8000', '#99ff00', '#ff66cc', '#888888'].map((c) => stickerColour(c, mega)),
+    );
+    const sq1 = schemeFor('square1')!;
+    expect(['#ffff00', '#ff8800', '#00ff00', '#ffffff', '#ff0000', '#0000ff'].map((c) => stickerColour(c, sq1))).toEqual(['yellow', 'orange', 'limegreen', 'white', 'red', '#26f'].map((c) => stickerColour(c, sq1)));
+    const fto = schemeFor('fto')!;
+    expect(['#ffffff', '#880088', '#00dd00', '#ff0000', '#0000ff', '#bbbbbb', '#ffff00', '#ffaa00'].map((c) => stickerColour(c, fto))).toEqual(
+      ['#ffffff', '#8800dd', '#44ee00', 'red', '#2266ff', '#aaaaaa', '#f4f400', '#ff8000'].map((c) => stickerColour(c, fto)),
+    );
   });
 });

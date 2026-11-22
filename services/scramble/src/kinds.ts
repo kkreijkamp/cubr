@@ -3,7 +3,7 @@
 // pinned random state (practice.ts); csTimer's random-move types from its move tables
 // (randomMoves.ts); relays and cuboids from WCA scrambles; a few other puzzles from cubing.js; and
 // everything else from csTimer's own scramblers (cstimer.ts). Pending types throw.
-import { ALL_EVENTS, cuboidPrefix, defaultScrambleType, getEvent, getScrambleType, isWcaEvent, randomMoveScramble, RANDOM_MOVE_TYPES, RELAY_EVENTS, scrambleTypesFor } from '@cubr/cubestats';
+import { ALL_EVENTS, cuboidPrefix, defaultScrambleType, getEvent, getScrambleType, isWcaEvent, randomMoveScramble, RANDOM_MOVE_TYPES, RELAY_EVENTS, RELAY_PARTS, scrambleTypesFor } from '@cubr/cubestats';
 import { encodeSolveJob, practiceJob, PRACTICE_STATE_TYPES } from './practice.js';
 
 export interface MakeDeps {
@@ -34,15 +34,8 @@ const CUBING: Readonly<Record<string, string>> = {
   mpyrso: 'master_tetraminx',
 };
 
-/** relays: [label, WCA event] per puzzle, in order */
-const RELAYS: Readonly<Record<string, readonly (readonly [string, string])[]>> = {
-  r234w: [['2x2', '222'], ['3x3', '333'], ['4x4', '444']],
-  r2345w: [['2x2', '222'], ['3x3', '333'], ['4x4', '444'], ['5x5', '555']],
-  r23456w: [['2x2', '222'], ['3x3', '333'], ['4x4', '444'], ['5x5', '555'], ['6x6', '666']],
-  r234567w: [['2x2', '222'], ['3x3', '333'], ['4x4', '444'], ['5x5', '555'], ['6x6', '666'], ['7x7', '777']],
-  rmngf: [['2x2', '222'], ['3x3', '333'], ['4x4', '444'], ['5x5', '555'], ['3x3 oh', '333oh'], ['pyra', 'pyram'], ['skewb', 'skewb'], ['sq-1', 'sq1'], ['clock', 'clock'], ['mega', 'minx']],
-  r3: [['1', '333'], ['2', '333'], ['3', '333'], ['4', '333'], ['5', '333']],
-};
+/** a relay's own (only) scramble type: one WCA scramble per puzzle (cubestats RELAY_PARTS) */
+const isRelay = (event: string, id: string) => RELAY_PARTS[event] !== undefined && defaultScrambleType(event)?.id === id;
 
 export class ScrambleTypeUnavailableError extends Error {}
 
@@ -70,7 +63,7 @@ export async function makeScramble(event: string, typeId: string | undefined, de
   if (CUBING[id]) return deps.generate(CUBING[id]);
   if (id === 'mrbl') return deps.wca('333');
   if (id === '335' || id === '337') return `${cuboidPrefix(id)} / ${await deps.wca('333')}`;
-  const relay = RELAYS[id];
+  const relay = isRelay(event, id) ? RELAY_PARTS[event] : undefined;
   if (relay) {
     const parts = await Promise.all(relay.map(([, ev]) => deps.wca(ev)));
     return relay.map(([label], i) => `${label}: ${parts[i]}`).join('\n');
@@ -83,7 +76,7 @@ function ownMaker(event: string, id: string): boolean {
   const def = defaultScrambleType(event);
   if (def?.id === id && isWcaEvent(event)) return true;
   if (CSTIMER_RANDOM_STATE.has(id)) return false;
-  return RANDOM_MOVE_TYPES.has(id) || PRACTICE_STATE_TYPES.has(id) || id in CUBING || id === 'mrbl' || id === '335' || id === '337' || id in RELAYS;
+  return RANDOM_MOVE_TYPES.has(id) || PRACTICE_STATE_TYPES.has(id) || id in CUBING || id === 'mrbl' || id === '335' || id === '337' || isRelay(event, id);
 }
 
 /** The types csTimer's scramblers make: every listed, non-pending type cubr has no maker of its own for. */
@@ -103,12 +96,12 @@ const CSTIMER_RELAY_LABELS: Readonly<Record<string, string>> = {
 
 /**
  * What to ask csTimer for to draw a scramble of `event` (type `typeId`, the default when absent):
- * its type, and the scramble as csTimer writes it (relays). Null for events cubr draws itself
- * (cubing.js knows the puzzle) or that aren't known.
+ * its type, and the scramble as csTimer writes it (relays). The web app asks for it where cubing.js
+ * can't draw the puzzle, or can't read the scramble (a type in csTimer's own notation). Null for an
+ * event or type that isn't known.
  */
 export function cstimerImageRequest(event: string, typeId: string | undefined, scramble: string): { type: string; scramble: string } | null {
-  const info = getEvent(event);
-  if (!info || info.puzzle !== null) return null;
+  if (!getEvent(event)) return null;
   const type = typeId === undefined ? defaultScrambleType(event) : getScrambleType(event, typeId);
   if (!type) return null;
   if (RELAY_EVENTS.includes(event)) {

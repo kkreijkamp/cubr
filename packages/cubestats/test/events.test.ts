@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ALL_EVENT_IDS, ALL_EVENTS, RELAY_EVENTS, DAILY_EVENTS, defaultSessionName, EVENT_IDS, EVENTS, getEvent, isEventId, isWcaEvent, OTHER_EVENTS, practiceSessionName } from '../src/events.js';
+import { ALL_EVENT_IDS, ALL_EVENTS, RELAY_EVENTS, RELAY_PARTS, DAILY_EVENTS, defaultSessionName, EVENT_IDS, EVENTS, getEvent, isEventId, isWcaEvent, OTHER_EVENTS, practiceSessionName, splitRelay } from '../src/events.js';
 
 // the puzzle ids <twisty-player> understands for these events
 const TWISTY_PUZZLES = ['2x2x2', '3x3x3', '4x4x4', '5x5x5', '6x6x6', '7x7x7', 'clock', 'megaminx', 'pyraminx', 'skewb', 'square1', 'fto', 'kilominx', 'gigaminx', 'master_tetraminx', 'redi_cube'];
@@ -65,6 +65,39 @@ describe('events', () => {
     const names = ALL_EVENT_IDS.flatMap((id) => [defaultSessionName(id), practiceSessionName(id)]);
     for (const n of names) expect(n.length).toBeLessThanOrEqual(40);
     expect(new Set(names.map((n) => n.toLowerCase())).size).toBe(names.length);
+  });
+
+  it("lists each relay's puzzles as WCA events, labelled as its scramble lines are", () => {
+    expect(RELAY_EVENTS).toEqual(['r234', 'r2345', 'r23456', 'r234567', 'rmngf', 'r3']);
+    for (const id of RELAY_EVENTS) {
+      expect(getEvent(id)?.puzzle, id).toBeNull();
+      const labels = RELAY_PARTS[id].map(([label]) => label);
+      expect(new Set(labels).size, id).toBe(labels.length);
+      for (const [label, ev] of RELAY_PARTS[id]) {
+        expect(isWcaEvent(ev), `${id} ${ev}`).toBe(true);
+        expect(label, id).not.toMatch(/[:\n]/);
+      }
+    }
+    expect(RELAY_PARTS.rmngf.map(([, ev]) => ev)).toEqual(['222', '333', '444', '555', '333oh', 'pyram', 'skewb', 'sq1', 'clock', 'minx']);
+  });
+
+  it("splits a relay's scramble into its puzzles', a megaminx's lines kept together", () => {
+    expect(splitRelay('r234', "2x2: R U F'\n3x3: D2 L\n4x4: Rw2 U")).toEqual([
+      { label: '2x2', event: '222', scramble: "R U F'" },
+      { label: '3x3', event: '333', scramble: 'D2 L' },
+      { label: '4x4', event: '444', scramble: 'Rw2 U' },
+    ]);
+    const mini = splitRelay('rmngf', 'clock: UR3+ DR2- ALL1+ y2\nmega: R++ D-- U\nR-- D++ U\'\nR++ D++ U');
+    expect(mini?.map((p) => p.label)).toEqual(['clock', 'mega']);
+    expect(mini?.[1].scramble).toBe("R++ D-- U\nR-- D++ U'\nR++ D++ U");
+    expect(splitRelay('r3', '1: R\n2: U')?.map((p) => [p.label, p.event])).toEqual([
+      ['1', '333'],
+      ['2', '333'],
+    ]);
+    // not a relay, or not a relay's scramble
+    expect(splitRelay('333', '2x2: R U')).toBeNull();
+    expect(splitRelay('r234', "R U R' U'")).toBeNull();
+    expect(splitRelay('r234', '')).toBeNull();
   });
 
   it('offers the daily challenge only for known events', () => {

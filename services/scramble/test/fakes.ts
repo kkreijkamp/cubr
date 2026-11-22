@@ -37,7 +37,7 @@ export function fakeBackend(size = 1, ms = 0): FakeBackend {
 }
 
 /** A stand-in for csTimer's scramblers (cstimer.ts): "<type> cstimer <n>", and a tiny SVG for the drawable types. */
-export function fakeCsTimer(drawable: readonly string[] = ['15prp', 'gear', 'r234w', 'r3', '888']): CsTimerHost & { calls: string[] } {
+export function fakeCsTimer(drawable: readonly string[] = ['15prp', 'gear', 'r234w', 'r3', '888', 'giga']): CsTimerHost & { calls: string[] } {
   let n = 0;
   const calls: string[] = [];
   return {
