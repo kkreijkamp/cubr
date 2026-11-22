@@ -94,7 +94,9 @@ export function ScrambleBar({ scramble, onNext, onPrev, hasPrev, onCustom, editi
   return (
     <div className="tp-scramble-wrap fade-on-focus">
       {scramble?.unavailable ? (
-        <div className="tp-scramble tp-scramble-loading">no connection: this kind of scramble needs the scramble service</div>
+        <div className="tp-scramble tp-scramble-loading">
+          {scramble.busy ? 'too many new scrambles in the last minute: one moment, then tab for a new one' : 'no connection: this kind of scramble needs the scramble service'}
+        </div>
       ) : scramble ? (
         <div
           className={`tp-scramble${hint?.pending ? ' off' : ''}${lines ? ' tp-scramble-lines' : ''}`}

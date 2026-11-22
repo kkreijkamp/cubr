@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon, Square2StackIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { getEvent, type Penalty, type Precision } from '@cubr/cubestats';
+import { scrambleImageUrl } from '../../lib/api';
 import { Modal } from '../Modal';
 import { TwistyPreview } from '../TwistyPreview';
 import type { Solve } from '../../lib/types';
@@ -127,7 +128,13 @@ export function SolveModal({ solve, index, total, precision, preview, confirmDel
         <div className="tp-detail-scramble">{solve.scramble || <span className="sub">no scramble recorded</span>}</div>
         {preview !== 'off' && solve.scramble && (
           <div className="tp-detail-preview">
-            <TwistyPreview puzzle={puzzle} scramble={solve.scramble} visualization={preview} height={150} />
+            <TwistyPreview
+              puzzle={puzzle}
+              scramble={solve.scramble}
+              visualization={preview}
+              height={150}
+              imageUrl={puzzle === null ? scrambleImageUrl(solve.event, solve.scramble) : undefined}
+            />
           </div>
         )}
       </div>

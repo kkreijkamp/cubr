@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { Redis } from '@cubr/common';
+import type { CsTimerHost } from '../cstimer.js';
 import type { DailyChallenges } from '../daily.js';
 import type { ScrambleGenerator } from '../generator.js';
 import type { ScramblePool } from '../pool.js';
@@ -12,6 +13,7 @@ export interface RouteDeps {
   daily: DailyChallenges;
   redis: Redis;
   internalToken: string;
+  cstimer: CsTimerHost;
 }
 
 export async function registerRoutes(app: FastifyInstance, deps: RouteDeps) {

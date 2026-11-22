@@ -1,7 +1,8 @@
 // Scramble queue: keeps ~5 scrambles per event from the scramble service (api.scrambles.get) and
 // falls back to the client-side random-move scramblers when the service is down or slow.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api } from '../lib/api';
+import { isWcaEvent } from '@cubr/cubestats';
+import { api, ApiError } from '../lib/api';
 import { offlineScramble } from './fallbackScramble';
 
 export interface ScrambleItem {
@@ -10,6 +11,8 @@ export interface ScrambleItem {
   offline: boolean;
   /** no scramble: the service is unreachable and this kind can't be made offline (text is '') */
   unavailable?: boolean;
+  /** ...because the service refused for now: too many new scrambles from here in the last minute */
+  busy?: boolean;
   /** typed in by the user */
   custom?: boolean;
   /** worked out from the state a smart cube was scrambled into by hand */
@@ -17,12 +20,16 @@ export interface ScrambleItem {
 }
 
 const BATCH = 5;
+/** the scrambles the service makes on request (practice types, other events): fewer at a time, as each counts against its per-minute budget */
+const MADE_BATCH = 2;
 /** queues, requests and shown scrambles are per event and scramble type: "333", "333/pll" */
 const queues = new Map<string, ScrambleItem[]>();
 const inflight = new Map<string, Promise<void>>();
 /** the scramble currently shown per event (and type), so switching back and forth keeps it */
 const currentByEvent = new Map<string, ScrambleItem>();
 let serviceDownUntil = 0;
+/** the service refused (429): too many new scrambles from here; it'll take more shortly */
+let busyUntil = 0;
 
 const queueKey = (event: string, type?: string) => (type ? `${event}/${type}` : event);
 const parseKey = (key: string): [string, string | undefined] => {
@@ -35,15 +42,19 @@ function refill(key: string): Promise<void> {
   if (running) return running;
   if (Date.now() < serviceDownUntil) return Promise.resolve();
   const [event, type] = parseKey(key);
+  const made = !!type || !isWcaEvent(event);
+  if (made && Date.now() < busyUntil) return Promise.resolve();
   const p = api.scrambles
-    .get(event, BATCH, false, { type })
+    .get(event, made ? MADE_BATCH : BATCH, false, { type })
     .then((r) => {
       const fresh = (r?.scrambles ?? []).filter((s) => typeof s === 'string' && s.trim()).map((text) => ({ text: text.trim(), offline: false }));
       queues.set(key, [...(queues.get(key) ?? []), ...fresh]);
       serviceDownUntil = 0;
     })
-    .catch(() => {
-      serviceDownUntil = Date.now() + 30_000;
+    .catch((e: unknown) => {
+      // a refusal (429) isn't an outage: try again in a few seconds, and the pooled wca scrambles keep coming
+      if (e instanceof ApiError && e.status === 429) busyUntil = Date.now() + 10_000;
+      else serviceDownUntil = Date.now() + 30_000;
     })
     .finally(() => inflight.delete(key));
   inflight.set(key, p);
@@ -65,7 +76,8 @@ async function take(key: string): Promise<ScrambleItem> {
   await Promise.race([refill(key), new Promise((r) => setTimeout(r, 2500))]);
   const [event, type] = parseKey(key);
   const offline = offlineScramble(event, type);
-  return shiftQueued(key) ?? (offline ? { text: offline, offline: true } : { text: '', offline: true, unavailable: true });
+  const busy = Date.now() < busyUntil;
+  return shiftQueued(key) ?? (offline ? { text: offline, offline: true } : { text: '', offline: true, unavailable: true, ...(busy ? { busy } : {}) });
 }
 
 /** Warm the queue for an event (and scramble type) without consuming anything. */

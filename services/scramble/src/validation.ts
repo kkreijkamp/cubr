@@ -16,6 +16,15 @@ export const scrambleQuerySchema = z.object({
     .transform((v) => v === '1' || v === 'true'),
 });
 
+/** GET /api/scrambles/:event/image?scramble=...&type=<scramble type> */
+export const imageQuerySchema = z.object({
+  scramble: z.string().trim().min(1, 'scramble: required').max(2000),
+  type: z
+    .string()
+    .regex(/^[A-Za-z0-9_]{1,32}$/, 'type: a scramble type id')
+    .optional(),
+});
+
 /** GET /api/scrambles/daily?date=YYYY-MM-DD */
 export const dailyQuerySchema = z.object({ date: z.string().optional() });
 

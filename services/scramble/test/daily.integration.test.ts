@@ -13,7 +13,7 @@ import { migrations } from '../src/migrations.js';
 import { ScramblePool } from '../src/pool.js';
 import { registerRoutes } from '../src/routes/index.js';
 import { todayUtc } from '../src/validation.js';
-import { fakeBackend } from './fakes.js';
+import { fakeBackend, fakeCsTimer } from './fakes.js';
 
 const DAY_MS = 86_400_000;
 /** The date `n` days before today (UTC). Each test uses its own day, so rows and caches don't overlap. */
@@ -39,6 +39,7 @@ describeIntegration('daily challenge', () => {
           daily: new DailyChallenges({ pool, generator, isMigrated: () => migrated, log: app.log }),
           redis,
           internalToken: config.internalToken,
+          cstimer: fakeCsTimer(),
         }),
     });
   });

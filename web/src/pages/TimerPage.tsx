@@ -21,6 +21,7 @@ import { ALL_EVENTS, EVENTS, RELAY_EVENTS, effectiveMs, formatTime, getEvent, is
 import { TimerDisplay } from '../timer/TimerDisplay';
 import { useTimerEngine, type TimerResult, type TimerState } from '../timer/useTimerEngine';
 import { useScrambleQueue } from '../timer/useScrambleQueue';
+import { scrambleImageUrl } from '../lib/api';
 import { shortcutFor, type ShortcutAction } from '../timer/shortcuts';
 import { PracticeBottle } from '../components/SessionName';
 import { TwistyPreview } from '../components/TwistyPreview';
@@ -692,7 +693,13 @@ export default function TimerPage() {
               </div>
               <div className="tp-preview-box" ref={previewBoxRef}>
                 {previewScramble ? (
-                  <TwistyPreview puzzle={eventInfo.puzzle} scramble={previewScramble} visualization={settings.scramblePreview === '3D' ? '3D' : '2D'} height={previewHeight} />
+                  <TwistyPreview
+                    puzzle={eventInfo.puzzle}
+                    scramble={previewScramble}
+                    visualization={settings.scramblePreview === '3D' ? '3D' : '2D'}
+                    height={previewHeight}
+                    imageUrl={eventInfo.puzzle === null ? scrambleImageUrl(event, previewScramble, scrambleType) : undefined}
+                  />
                 ) : null}
               </div>
             </section>

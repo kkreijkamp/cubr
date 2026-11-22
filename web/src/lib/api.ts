@@ -192,6 +192,14 @@ const qs = (params: Record<string, string | number | boolean | null | undefined>
 };
 const enc = encodeURIComponent;
 
+/**
+ * csTimer's drawing of a scramble, for the puzzles cubing.js can't draw (the scramble service draws
+ * it; an <img> URL, cached by the browser). `type`: the session's practice scramble type, if any.
+ */
+export function scrambleImageUrl(event: string, scramble: string, type?: string): string {
+  return `/api/scrambles/${enc(event)}/image${qs({ scramble: scramble.slice(0, 2000), type })}`;
+}
+
 export interface NewSolve {
   id: string;
   sessionId: string;

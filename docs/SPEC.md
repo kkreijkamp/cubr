@@ -154,13 +154,19 @@ leaderboards.
 Scramble types (`SCRAMBLE_TYPES`, scrambleTypes.ts): csTimer's second scramble menu per event, with
 csTimer's ids (`pll`, `222eg1`, `444m`...). The first is the event's default: the only one whose
 solves count for personal bests and leaderboards. A session made for any other type (its
-`scramble` field) is always a practice session. `pending` types are listed but not scrambled yet
-(they need csTimer's own scramblers). How each is made (services/scramble/src/kinds.ts): a WCA
-event's default from the pool / cubing.js; the 3x3 and 2x2 practice types from a random state with
-pinned pieces (csTimer's masks, practice.ts) solved by cubing.js and given backwards; csTimer's
-random-move types from its move tables (cubestats randomMoves.ts, also the web app's offline
-fallback); relays, cuboids and mirror blocks from WCA scrambles; kilominx, redi cube and master
-pyraminx from cubing.js.
+`scramble` field) is always a practice session. `pending` types (three: `mgms2l`, `pyrtop`,
+`skbll`) are listed but not scrambled: csTimer added them after the version of its scramblers cubr
+uses. How each is made (services/scramble/src/kinds.ts): a WCA event's default from the pool /
+cubing.js; the 3x3 and 2x2 practice types from a random state with pinned pieces (csTimer's
+masks, practice.ts) solved by cubing.js and given backwards; csTimer's random-move types from its
+move tables (cubestats randomMoves.ts, also the web app's offline fallback); relays, cuboids and
+mirror blocks from WCA scrambles; kilominx, redi cube and master pyraminx from cubing.js; and
+everything else from csTimer's own scramblers, npm `cstimer_module` (GPL-3.0, by csTimer's
+author, pinned to 0.1.5 in package.json and the Dockerfile), at csTimer's default lengths
+(`CSTIMER_LENGTHS`). The 3x3 move subsets (`2gen`, `roux`, `half`...) come from csTimer too, random
+state within the subgroup (offline, the web app makes them as random moves). The module runs in a
+worker thread of its own (cstimer.ts: one request at a time, the scramble timeout per request, a
+runaway scrambler's thread killed and replaced, at most `SCRAMBLE_MAX_QUEUE` waiting).
 
 ## 7. Database design (PostgreSQL, schema-per-service)
 
@@ -485,6 +491,7 @@ are skipped, and only logout answers 503 (the revocation could not be stored).
 | Method & path | Response |
 |---|---|
 | GET `/api/scrambles/events` | `{events: [{id, name, short, puzzle, kind, types: [{id, label, pending?}]}]}` (every event, WCA first; `types[0]` is the default) |
+| GET `/api/scrambles/:event/image?scramble=&type=` | csTimer's SVG drawing of the scramble, for the events cubing.js can't draw (`puzzle: null`); relays are drawn as a grid of their puzzles. `image/svg+xml`, `cache-control: public, max-age=86400`, its own CSP (`default-src 'none'; style-src 'unsafe-inline'`); refused (404) if it holds anything that could run or load something, if cubr draws the event itself, or if csTimer can't draw it (cuboids, siamese, cmetrick...); counts as a request against the per-IP limit |
 | GET `/api/scrambles/daily?date=YYYY-MM-DD` (default today, UTC; the last 30 days) | `{date, events: {"333": string[5], "222": [...], "444": [...], "pyram": [...], "skewb": [...]}}` (generated once, persisted, identical for everyone); 400 for future dates; 503 while Postgres is unreachable and nothing is cached |
 | GET `/api/scrambles/:event?count=1..25&fresh=0/1&type=` | `{event, scrambles: string[], source: "pool"\|"generated"}`; `type` = a scramble type (section 6; default when omitted): a WCA event's default comes from the pool, everything else is made on request (`{event, type, scrambles, source: "generated"}`, counted against the generation budget), 404 for a type the event doesn't have or a pending one; `fresh=1` bypasses the pool (load tests / HPA demo), honoured only with `X-Internal-Token`, which also skips the limits; per IP otherwise: 120 requests/min and 60 newly generated scrambles/min (weighted by count; past it the pool's scrambles are returned, or 429 if there are none); 404 unknown event; 503 when generation times out or the queue is full |
 | GET `/api/scrambles/_info` | info (+ warm-up, generator queue, pool sizes) |
@@ -663,8 +670,12 @@ and its practice types by group ("practice scrambles: no pbs or leaderboards"); 
 to that type's own practice session ("3x3 pll", made the first time, `switchScramble`), and the bar
 shows a beaker while one is in use. The session menu lists the sessions of the event and scramble
 type in use. Scramble queues are per event and type; offline, a type made of random moves is made in
-the browser, and one that needs the service says so. Relays show one line per puzzle; a puzzle
-cubing.js can't draw has no preview ("no preview for this puzzle yet"). On phones every bar button
+the browser, and one that needs the service says so ("too many new scrambles" when the service
+refused for the minute: it then waits 10 s, not 30). Practice types and the other events are
+fetched two at a time (each counts against the per-IP generation budget). Relays show one line per
+puzzle. A puzzle cubing.js can't draw shows csTimer's drawing from the scramble service (an
+`<img>`, `scrambleImageUrl`), and "no preview for this puzzle yet" where csTimer can't draw it
+either. On phones every bar button
 keeps its 44 px tap target, so the default scramble shows as its icon (a practice one as its beaker
 and label), icon buttons drop their chevrons, the session its stack icon, a guest's plain "local"
 note goes (420 px and under; a sync warning stays) and, at 360 px and under, the inspection toggle

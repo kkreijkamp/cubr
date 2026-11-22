@@ -8,6 +8,8 @@ interface Props {
   scramble: string;
   visualization?: '2D' | '3D';
   height?: number;
+  /** a puzzle cubing.js can't draw: csTimer's drawing of the scramble (lib/api scrambleImageUrl) */
+  imageUrl?: string;
 }
 
 /**
@@ -17,18 +19,33 @@ interface Props {
 export function TwistyPreview(props: Props) {
   const [netFailed, setNetFailed] = useState(false);
   const onNetError = useCallback(() => setNetFailed(true), []);
-  const { puzzle, scramble, visualization = '2D', height = 180 } = props;
+  const { puzzle, scramble, visualization = '2D', height = 180, imageUrl } = props;
   if (puzzle === null) {
-    return (
-      <div className="twisty-host twisty-none" style={{ minHeight: height }}>
-        no preview for this puzzle yet
-      </div>
-    );
+    return imageUrl ? <DrawnPreview key={imageUrl} url={imageUrl} height={height} /> : <NoPreview height={height} />;
   }
   if (visualization === '2D' && puzzle !== 'clock' && !netFailed) {
     return <ScrambleNet puzzle={puzzle} scramble={scramble} height={height} onError={onNetError} />;
   }
   return <TwistyPlayerPreview {...props} puzzle={puzzle} />;
+}
+
+function NoPreview({ height }: { height: number }) {
+  return (
+    <div className="twisty-host twisty-none" style={{ minHeight: height }}>
+      no preview for this puzzle yet
+    </div>
+  );
+}
+
+/** csTimer's drawing, from the scramble service; when it can't draw the puzzle (404) or is unreachable, no preview */
+function DrawnPreview({ url, height }: { url: string; height: number }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <NoPreview height={height} />;
+  return (
+    <div className="twisty-host twisty-drawn" style={{ minHeight: height }}>
+      <img src={url} alt="" style={{ height }} onError={() => setFailed(true)} draggable={false} />
+    </div>
+  );
 }
 
 /** cubing/twisty is large, so it is lazy-loaded the first time a preview is shown */

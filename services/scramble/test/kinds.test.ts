@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ALL_EVENTS, scrambleTypesFor } from '@cubr/cubestats';
-import { canMake, makeScramble, ScrambleTypeUnavailableError, type MakeDeps } from '../src/kinds.js';
+import { canMake, cstimerImageRequest, CSTIMER_TYPES, makeScramble, ScrambleTypeUnavailableError, type MakeDeps } from '../src/kinds.js';
 
 // Which scramble types the service makes, and how: every listed type that isn't pending has a
 // maker, and the pending ones say so. The cubing.js parts are faked here (cubing.test.ts runs them).
@@ -15,6 +15,10 @@ function fakeDeps() {
     wca: async (event) => {
       calls.push(`wca:${event}`);
       return `<${event}>`;
+    },
+    cstimer: async (type, length) => {
+      calls.push(`cstimer:${type}:${length}`);
+      return `${type} from csTimer`;
     },
   };
   return { deps, calls };
@@ -71,10 +75,35 @@ describe('the scramble types the service can make', () => {
     expect(calls).toEqual(['kilominx', 'redi_cube', 'master_tetraminx']);
   });
 
-  it('refuses types an event does not have', async () => {
+  it('refuses types an event does not have, and the ones newer than the csTimer scramblers cubr has', async () => {
     const { deps } = fakeDeps();
     await expect(makeScramble('333', 'nope', deps)).rejects.toBeInstanceOf(ScrambleTypeUnavailableError);
     await expect(makeScramble('pyram', 'pll', deps)).rejects.toBeInstanceOf(ScrambleTypeUnavailableError);
-    await expect(makeScramble('15p', undefined, deps)).rejects.toBeInstanceOf(ScrambleTypeUnavailableError);
+    for (const [event, type] of [['minx', 'mgms2l'], ['pyram', 'pyrtop'], ['skewb', 'skbll']]) {
+      await expect(makeScramble(event, type, deps)).rejects.toBeInstanceOf(ScrambleTypeUnavailableError);
+    }
+  });
+
+  it("asks csTimer for what cubr doesn't make itself, at csTimer's own lengths", async () => {
+    const { deps, calls } = fakeDeps();
+    expect(await makeScramble('15p', undefined, deps)).toBe('15prp from csTimer');
+    await makeScramble('15p', '15p', deps);
+    await makeScramble('sq1', 'sqrcsp', deps);
+    await makeScramble('heli', undefined, deps);
+    expect(calls).toEqual(['cstimer:15prp:0', 'cstimer:15p:80', 'cstimer:sqrcsp:0', 'cstimer:heli:40']);
+    // the 3x3 move subsets: csTimer's random state on the server (cubr's random moves only offline)
+    for (const t of ['2gen', 'roux', 'half', '333drud']) expect(CSTIMER_TYPES.has(t), t).toBe(true);
+    // and never what cubr makes: wca scrambles, pinned states, relays
+    for (const t of ['333', 'pll', '222eg1', 'r234w', '333o', 'klmso']) expect(CSTIMER_TYPES.has(t), t).toBe(false);
+  });
+
+  it("writes relays the way csTimer's drawing wants them, and draws only what cubr can't", () => {
+    expect(cstimerImageRequest('r234', undefined, '2x2: R U\n3x3: F2\n4x4: Rw2 U')).toEqual({ type: 'r234w', scramble: '2) R U\n3) F2\n4) Rw2 U' });
+    expect(cstimerImageRequest('rmngf', undefined, '3x3 oh: R\npyra: U\nsq-1: (1,0) /\nmega: R++ D--\nU')?.scramble).toBe('3oh) R\npyr) U\nsq1) (1,0) /\nmgm) R++ D--\nU');
+    expect(cstimerImageRequest('r3', undefined, '1: R\n2: U')?.scramble).toBe('1) R\n2) U');
+    expect(cstimerImageRequest('15p', '15p', 'R D L')).toEqual({ type: '15p', scramble: 'R D L' });
+    expect(cstimerImageRequest('333', undefined, 'R U')).toBeNull(); // cubing.js draws it
+    expect(cstimerImageRequest('klm', undefined, 'R U')).toBeNull();
+    expect(cstimerImageRequest('nope', undefined, 'R')).toBeNull();
   });
 });

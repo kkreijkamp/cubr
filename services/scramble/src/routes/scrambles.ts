@@ -3,10 +3,11 @@ import { INTERNAL_TOKEN_HEADER, internalTokenMatches, notFound, parse, rateLimit
 import { ALL_EVENTS, defaultScrambleType, getScrambleType, isEventId, isWcaEvent, scrambleTypesFor } from '@cubr/cubestats';
 import { toHttpError } from '../errors.js';
 import type { ScrambleGenerator } from '../generator.js';
-import { makeScramble, ScrambleTypeUnavailableError, type MakeDeps } from '../kinds.js';
+import type { CsTimerHost } from '../cstimer.js';
+import { cstimerImageRequest, makeScramble, ScrambleTypeUnavailableError, type MakeDeps } from '../kinds.js';
 import type { ScramblePool } from '../pool.js';
 import { errorMessage, throttledWarn } from '../util.js';
-import { scrambleQuerySchema } from '../validation.js';
+import { imageQuerySchema, scrambleQuerySchema } from '../validation.js';
 
 /**
  * Per-IP limits for internet callers (fixed one-minute windows). Pool hits are cheap; generating
@@ -23,10 +24,12 @@ export interface ScrambleRouteDeps {
   redis: Redis;
   /** INTERNAL_API_TOKEN: callers presenting it (in-cluster load tests) skip the limits and may use fresh=1 */
   internalToken: string;
+  /** csTimer's scramblers and drawings (cstimer.ts) */
+  cstimer: CsTimerHost;
 }
 
 export function registerScrambleRoutes(app: FastifyInstance, deps: ScrambleRouteDeps) {
-  const { generator, pool, redis, internalToken } = deps;
+  const { generator, pool, redis, internalToken, cstimer } = deps;
   const warn = throttledWarn(app.log, 15_000);
   const isInternal = (req: FastifyRequest) => internalToken.length >= 16 && internalTokenMatches(internalToken, req.headers[INTERNAL_TOKEN_HEADER]);
 
@@ -56,7 +59,43 @@ export function registerScrambleRoutes(app: FastifyInstance, deps: ScrambleRoute
     }
     return generator.generate(event, 'request');
   };
-  const make: MakeDeps = { generate: (job) => generator.generate(job, 'request'), wca: wcaScramble };
+  const make: MakeDeps = { generate: (job) => generator.generate(job, 'request'), wca: wcaScramble, cstimer: (type, length) => cstimer.scramble(type, length) };
+
+  /** csTimer's drawings of the scrambles cubr can't draw (no cubing.js puzzle), by scramble: cached */
+  const images = new Map<string, string>();
+  app.get<{ Params: { event: string } }>('/api/scrambles/:event/image', async (req, reply) => {
+    const { event } = req.params;
+    if (!isEventId(event)) throw notFound(`Unknown event "${event}"`);
+    const query = parse(imageQuerySchema, req.query);
+    const ask = cstimerImageRequest(event, query.type, query.scramble);
+    if (!ask) throw notFound(`no csTimer drawing for ${event}${query.type ? ` (${query.type})` : ''}`);
+    if (!isInternal(req) && !(await rateLimit(redis, `scramble-req:${req.ip}`, REQUESTS_PER_MIN, 60))) {
+      throw rateLimited('Too many scramble requests, try again in a minute');
+    }
+    const key = `${ask.type}\n${ask.scramble}`;
+    let svg = images.get(key);
+    if (svg === undefined) {
+      let drawn: string | null;
+      try {
+        drawn = await cstimer.image(ask.type, ask.scramble);
+      } catch (err) {
+        throw toHttpError(err);
+      }
+      // an SVG of polygons and labels: anything that could run or load something is refused
+      if (!drawn || !drawn.startsWith('<svg') || /<script|<foreignObject|\bon\w+\s*=|javascript:|<image|href=/i.test(drawn)) {
+        throw notFound(`csTimer can't draw ${event}`);
+      }
+      svg = drawn;
+      images.set(key, svg);
+      if (images.size > 500) images.delete(images.keys().next().value!);
+    }
+    reply
+      .header('content-type', 'image/svg+xml; charset=utf-8')
+      .header('cache-control', 'public, max-age=86400')
+      .header('content-security-policy', "default-src 'none'; style-src 'unsafe-inline'")
+      .header('x-content-type-options', 'nosniff');
+    return svg;
+  });
 
   app.get<{ Params: { event: string } }>('/api/scrambles/:event', async (req, reply) => {
     const { event } = req.params;

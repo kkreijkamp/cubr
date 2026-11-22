@@ -34,11 +34,11 @@ describe('scramble types', () => {
     expect(scrambleTypesFor('nope')).toEqual([]);
   });
 
-  it('knows which events can be scrambled yet', () => {
-    expect(isEventReady('333')).toBe(true);
-    expect(isEventReady('r234')).toBe(true);
-    expect(isEventReady('15p')).toBe(false);
+  it('can scramble every event (csTimer makes what cubing.js and cubr do not); only three types wait', () => {
+    for (const e of ALL_EVENTS) expect(isEventReady(e.id), e.id).toBe(true);
     expect(isEventReady('nope')).toBe(false);
+    const waiting = ALL_EVENTS.flatMap((e) => scrambleTypesFor(e.id).filter((t) => t.pending).map((t) => t.id));
+    expect(waiting.sort()).toEqual(['mgms2l', 'pyrtop', 'skbll']);
   });
 
   it('names practice sessions after the event and the type, within 40 characters', () => {
