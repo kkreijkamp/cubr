@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { HttpError } from '@cubr/common';
-import { MAX_PLAYERS, addPlayer, newRoom, normalize, removePlayer, setStatus, startRound, submitResult, toRoomState } from '../src/room.js';
+import { MAX_PLAYERS, ROUNDS_KEPT, addPlayer, newRoom, normalize, removePlayer, setStatus, startRound, submitResult, toRoomState } from '../src/room.js';
+import { computeStandings } from '../src/standings.js';
 import { presenceFrom } from '../src/store.js';
 import type { Identity, StoredRoom } from '../src/types.js';
 
@@ -116,6 +117,58 @@ describe('room rules', () => {
     expect(code(() => setStatus(r, 'guest-aaaaaa', 'inspecting'))).toBe('BAD_REQUEST');
     expect(setStatus(r, 'guest-aaaaaa', 'idle')).toBe(false);
     expect(code(() => setStatus(r, 'guest-nobody', 'idle'))).toBe('BAD_REQUEST');
+  });
+
+  it('a player can only look done with a result (the October review\'s #12)', () => {
+    const r = room();
+    addPlayer(r, guest('guest-aaaaaa'), 1);
+    normalize(r, new Set(['guest-aaaaaa']));
+    startRound(r, 'guest-aaaaaa', 0, 'R', 'fallback', 10);
+    expect(code(() => setStatus(r, 'guest-aaaaaa', 'done'))).toBe('BAD_REQUEST');
+    expect(r.players[0].status).toBe('idle');
+    submitResult(r, 'guest-aaaaaa', 1, 9000, 'OK');
+    expect(setStatus(r, 'guest-aaaaaa', 'done')).toBe(false); // already done by the result
+  });
+
+  it(`keeps the last ${ROUNDS_KEPT} rounds, folding older ones into standings that stay exact`, () => {
+    const r = room();
+    const ids = ['guest-aaaaaa', 'guest-bbbbbb', 'guest-cccccc'];
+    ids.forEach((id, i) => addPlayer(r, guest(id), i + 1));
+    normalize(r, new Set(ids));
+    const all: Record<string, Record<string, { timeMs: number; penalty: 'OK' | '+2' | 'DNF' }>> = {};
+    let seed = 7;
+    const rand = () => (seed = (seed * 48271) % 2147483647) / 2147483647;
+    for (let n = 1; n <= 70; n++) {
+      startRound(r, 'guest-aaaaaa', n - 1, 'R', 'fallback', 10 + n);
+      all[n] = {};
+      for (const id of ids) {
+        if (rand() < 0.15) continue; // sat this round out
+        const penalty = rand() < 0.1 ? 'DNF' : rand() < 0.1 ? '+2' : 'OK';
+        const timeMs = 8000 + Math.floor(rand() * 4000);
+        submitResult(r, id, n, timeMs, penalty);
+        all[n][id] = { timeMs, penalty };
+      }
+      normalize(r, new Set(ids));
+    }
+    expect(Object.keys(r.results)).toHaveLength(ROUNDS_KEPT);
+    expect(Object.keys(r.results)[0]).toBe(String(70 - ROUNDS_KEPT + 1));
+    const state = toRoomState(r, new Map(ids.map((id) => [id, ['pod-a']])));
+    expect(state.standings).toEqual(computeStandings(r.players, all)); // as if every round were kept
+    expect(JSON.stringify(state).length).toBeLessThan(8_000);
+  });
+
+  it('forgets a leaving player in the folded rounds too', () => {
+    const r = room();
+    addPlayer(r, guest('guest-aaaaaa'), 1);
+    addPlayer(r, guest('guest-bbbbbb'), 2);
+    normalize(r, new Set(['guest-aaaaaa', 'guest-bbbbbb']));
+    for (let n = 1; n <= ROUNDS_KEPT + 2; n++) {
+      startRound(r, 'guest-aaaaaa', n - 1, 'R', 'fallback', 10 + n);
+      submitResult(r, 'guest-bbbbbb', n, 9000, 'OK');
+    }
+    expect(r.earlier?.['guest-bbbbbb']).toMatchObject({ solves: 2 }); // rounds 1 and 2 folded
+    removePlayer(r, 'guest-bbbbbb');
+    expect(r.earlier?.['guest-bbbbbb']).toBeUndefined();
   });
 
   it('explicit leave removes the player and their results', () => {

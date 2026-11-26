@@ -3,7 +3,7 @@ import { Server, type DefaultEventsMap, type Socket } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { z, ZodError } from 'zod';
 import type { FastifyBaseLogger } from 'fastify';
-import { HttpError, badRequest, forbidden, hasSlur, notFound, rateLimit, rateLimited, unavailable, type Redis } from '@cubr/common';
+import { HttpError, badRequest, conflict, forbidden, hasSlur, notFound, rateLimit, rateLimited, unavailable, type Redis } from '@cubr/common';
 import { resolveIdentity } from './identity.js';
 import { MAX_RESULT_MS, addPlayer, removePlayer, setStatus, startRound, submitResult } from './room.js';
 import { ROOM_ID_RE, sanitizeText } from './sanitize.js';
@@ -24,6 +24,8 @@ interface SocketData {
   roomId: string | null;
   /** per-socket promise chain: a socket's events are handled strictly in order */
   chain: Promise<unknown>;
+  /** events waiting in the chain */
+  queued: number;
   flood: { windowStart: number; count: number };
 }
 
@@ -33,6 +35,10 @@ type Ack = (res: Record<string, unknown>) => void;
 
 const FLOOD_WINDOW_MS = 10_000;
 const FLOOD_MAX_EVENTS = 60;
+/** a socket that keeps flooding past this many events in a window is disconnected */
+const FLOOD_DISCONNECT_EVENTS = FLOOD_MAX_EVENTS * 3;
+/** events a socket can have waiting in its chain, across flood windows too; more are refused at once */
+const MAX_QUEUED = FLOOD_MAX_EVENTS;
 
 /**
  * Socket.IO attached to Fastify's own HTTP server: engine.io answers `/socket.io/*` (websocket
@@ -55,6 +61,8 @@ export function createSocketServer(httpServer: HttpServer, pub: Redis, sub: Redi
 const schemas = {
   join: z.object({ roomId: z.string().trim().toLowerCase().regex(ROOM_ID_RE, 'invalid room id') }),
   none: z.object({}).passthrough(),
+  /** fromRound: the round the host saw (absent from the previous release's tabs) */
+  next: z.object({ fromRound: z.number().int().min(0).optional() }).passthrough(),
   status: z.object({ status: z.enum(['idle', 'inspecting', 'solving', 'done']) }),
   result: z.object({
     round: z.number().int().min(1),
@@ -118,9 +126,20 @@ export function registerSocketHandlers(deps: SocketDeps) {
     socket.on(event, (...args: unknown[]) => {
       const ack = (typeof args[args.length - 1] === 'function' ? args.pop() : undefined) as Ack | undefined;
       const payload = args[0];
+      // counted as it arrives, before it's queued: a flood can't grow the socket's queue or keep the
+      // room's lock busy for everyone else (the October review's #12)
+      if (flooding(socket)) {
+        ack?.({ ok: false, ...errorReply(rateLimited('Too many messages, slow down')) });
+        if (socket.data.flood.count > FLOOD_DISCONNECT_EVENTS) socket.disconnect(true);
+        return;
+      }
+      if (socket.data.queued >= MAX_QUEUED) {
+        ack?.({ ok: false, ...errorReply(rateLimited('Too many requests at once, slow down')) });
+        return;
+      }
+      socket.data.queued++;
       void serial(socket, async () => {
         try {
-          if (flooding(socket)) throw rateLimited('Too many messages, slow down');
           const data = schema.parse(payload ?? {});
           const res = await handler(data);
           ack?.({ ok: true, ...(res ?? {}) });
@@ -130,6 +149,8 @@ export function registerSocketHandlers(deps: SocketDeps) {
             log.error({ err, event, playerId: socket.data.identity.playerId }, 'race socket handler failed');
           }
           ack?.({ ok: false, ...reply });
+        } finally {
+          socket.data.queued--;
         }
       });
     });
@@ -170,6 +191,7 @@ export function registerSocketHandlers(deps: SocketDeps) {
         socket.data.identity = identity;
         socket.data.roomId = null;
         socket.data.chain = Promise.resolve();
+        socket.data.queued = 0;
         socket.data.flood = { windowStart: Date.now(), count: 0 };
         next();
       })
@@ -210,12 +232,16 @@ export function registerSocketHandlers(deps: SocketDeps) {
       await leaveCurrent(socket, true);
     });
 
-    on(socket, 'round:next', schemas.none, async () => {
+    on(socket, 'round:next', schemas.next, async ({ fromRound }) => {
       const roomId = currentRoom(socket);
       const loaded = await store.load(roomId);
       if (!loaded) throw notFound('Room not found (it may have expired)');
       if (loaded.room.hostId !== me.playerId) throw forbidden('Only the host can start the next round');
-      const expectedN = loaded.room.round?.n ?? 0;
+      const current = loaded.room.round?.n ?? 0;
+      // the round the host saw: a retry after a lost answer, or a double click, starts nothing more
+      if (fromRound !== undefined && current === fromRound + 1) return { round: loaded.room.round };
+      if (fromRound !== undefined && current !== fromRound) throw conflict('Round was already advanced');
+      const expectedN = fromRound ?? current;
       // Network call happens outside the room lock; startRound re-checks host + round number.
       const { scramble, source } = await scrambles.get(loaded.room.event);
       const { state } = await store.mutateRoom(roomId, (room) =>

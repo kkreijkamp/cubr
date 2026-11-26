@@ -1,5 +1,5 @@
 import { averageOfN, effectiveMs, toApiValue } from '@cubr/cubestats';
-import type { Results, Standing } from './types.js';
+import type { EarlierTotals, ResultEntry, Results, Standing } from './types.js';
 
 /** Round keys in numeric order ("2" before "10"). */
 function roundKeys(results: Results): string[] {
@@ -15,7 +15,7 @@ function roundKeys(results: Results): string[] {
  * - ao5: WCA average of the player's last 5 results (-1 = DNF), null with fewer than 5.
  * Sorted by wins desc, then meanMs asc (null last), then solves desc, then name.
  */
-export function computeStandings(players: { id: string; name: string }[], results: Results): Standing[] {
+export function computeStandings(players: { id: string; name: string }[], results: Results, earlier: Record<string, EarlierTotals> = {}): Standing[] {
   const wins = new Map<string, number>();
   const times = new Map<string, number[]>(); // chronological effective times per player
 
@@ -35,15 +35,19 @@ export function computeStandings(players: { id: string; name: string }[], result
   }
 
   const standings = players.map((p): Standing => {
+    const e = earlier[p.id];
     const ts = times.get(p.id) ?? [];
     const finite = ts.filter((t) => Number.isFinite(t));
+    const count = finite.length + (e?.finite ?? 0);
+    const sum = finite.reduce((a, b) => a + b, 0) + (e?.sumMs ?? 0);
+    const recent = [...(e?.last ?? []).map(effectiveMs), ...ts];
     return {
       playerId: p.id,
       name: p.name,
-      wins: wins.get(p.id) ?? 0,
-      solves: ts.length,
-      meanMs: finite.length ? Math.round(finite.reduce((a, b) => a + b, 0) / finite.length) : null,
-      ao5: ts.length >= 5 ? toApiValue(averageOfN(ts.slice(-5), 5)) : null,
+      wins: (wins.get(p.id) ?? 0) + (e?.wins ?? 0),
+      solves: ts.length + (e?.solves ?? 0),
+      meanMs: count ? Math.round(sum / count) : null,
+      ao5: recent.length >= 5 ? toApiValue(averageOfN(recent.slice(-5), 5)) : null,
     };
   });
 
@@ -54,4 +58,21 @@ export function computeStandings(players: { id: string; name: string }[], result
       b.solves - a.solves ||
       a.name.localeCompare(b.name),
   );
+}
+
+/** Adds a round that is being pruned to the players' earlier totals (same rules as computeStandings). */
+export function foldRound(earlier: Record<string, EarlierTotals>, round: Record<string, ResultEntry>): void {
+  let best = Number.POSITIVE_INFINITY;
+  for (const r of Object.values(round)) best = Math.min(best, effectiveMs(r));
+  for (const [playerId, r] of Object.entries(round)) {
+    const e = (earlier[playerId] ??= { wins: 0, solves: 0, sumMs: 0, finite: 0, last: [] });
+    const t = effectiveMs(r);
+    e.solves++;
+    if (Number.isFinite(t)) {
+      e.sumMs += t;
+      e.finite++;
+    }
+    if (Number.isFinite(best) && t === best) e.wins++;
+    e.last = [...e.last, r].slice(-5);
+  }
 }

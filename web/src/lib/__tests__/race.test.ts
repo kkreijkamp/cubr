@@ -12,6 +12,8 @@ const fake = vi.hoisted(() => {
     /** the race service's answer to an emit (throw = no answer in time) */
     answer: (event: string, payload: unknown) => unknown = () => ({ ok: true });
     io = { on: (_event: string, _fn: Handler) => this.io, removeAllListeners: () => this.io };
+    /** the options io() was called with (auth: the handshake) */
+    opts: { auth?: (cb: (a: Record<string, unknown>) => void) => void } = {};
     on(event: string, fn: Handler) {
       this.handlers.set(event, [...(this.handlers.get(event) ?? []), fn]);
       return this;
@@ -45,7 +47,13 @@ const fake = vi.hoisted(() => {
   }
   return { FakeSocket, last: null as InstanceType<typeof FakeSocket> | null };
 });
-vi.mock('socket.io-client', () => ({ io: () => (fake.last = new fake.FakeSocket()) }));
+vi.mock('socket.io-client', () => ({
+  io: (opts: InstanceType<typeof fake.FakeSocket>['opts']) => {
+    fake.last = new fake.FakeSocket();
+    fake.last.opts = opts;
+    return fake.last;
+  },
+}));
 
 const NOW = '2026-11-16T10:00:00.000Z';
 let local: MemoryStorage;
@@ -124,26 +132,29 @@ describe('room codes, invite links and guest identity', () => {
     expect(parseRoomCode(inviteLink('room42'))).toBe('room42');
   });
 
-  it('keeps one guest id per browser and replaces a malformed one', async () => {
-    const { getGuestId, defaultGuestName } = await load();
-    const id = getGuestId();
-    expect(id).toMatch(/^guest-[a-z0-9]{10}$/);
-    expect(getGuestId()).toBe(id);
-    expect(local.getItem('cubr.guestId')).toBe(id);
-    expect(defaultGuestName()).toBe(`guest-${id.slice(-4)}`);
-    local.setItem('cubr.guestId', 'admin');
-    expect(getGuestId()).toMatch(/^guest-[a-z0-9]{10}$/);
+  it('keeps one secret guest key per browser, and replaces a malformed one (the October review\'s #12)', async () => {
+    local.setItem('cubr.guestId', 'guest-old123'); // an id from before keys
+    const { getGuestKey, getGuestId, defaultGuestName } = await load();
+    const key = getGuestKey();
+    expect(key).toMatch(/^[a-z0-9]{32}$/);
+    expect(getGuestKey()).toBe(key);
+    expect(local.getItem('cubr.guestKey')).toBe(key);
+    expect(getGuestId()).toBeNull(); // the old id went with the new key: the server makes a new one from it
+    expect(defaultGuestName()).toBe('guest');
+    local.setItem('cubr.guestKey', 'short');
+    expect(getGuestKey()).toMatch(/^[a-z0-9]{32}$/);
+    expect(getGuestKey()).not.toBe(key);
   });
 
-  it('keeps the same guest id for the page when storage is blocked', async () => {
+  it('keeps the same guest key for the page when storage is blocked', async () => {
     const blocked = () => {
       throw new DOMException('denied', 'SecurityError');
     };
     vi.stubGlobal('localStorage', { getItem: blocked, setItem: blocked, removeItem: blocked });
-    const { getGuestId, getGuestName, setGuestName } = await load();
-    const id = getGuestId();
-    expect(id).toMatch(/^guest-[a-z0-9]{10}$/);
-    expect(getGuestId()).toBe(id);
+    const { getGuestKey, getGuestName, setGuestName } = await load();
+    const key = getGuestKey();
+    expect(key).toMatch(/^[a-z0-9]{32}$/);
+    expect(getGuestKey()).toBe(key);
     expect(getGuestName()).toBe('');
     expect(() => setGuestName('x')).not.toThrow();
   });
@@ -168,6 +179,22 @@ describe('RaceConnection', () => {
     expect(state().room?.rev).toBe(1);
     expect(state().chat.map((m) => m.text)).toEqual(['hi']);
     expect(local.getItem('cubr.guestId')).toBe('guest-me1234');
+  });
+
+  it('sends its secret guest key in the handshake, never an id, and uses the id it was given for its default name', async () => {
+    const { socket } = await joined({ playerId: 'gst-abcdef123456' });
+    const auth = await new Promise<Record<string, unknown>>((resolve) => socket.opts.auth!(resolve));
+    expect(auth.guestKey).toMatch(/^[a-z0-9]{32}$/);
+    expect(auth).not.toHaveProperty('guestId');
+    const { defaultGuestName } = await load();
+    expect(defaultGuestName()).toBe('guest-3456');
+  });
+
+  it('starts the round after the one on screen, so a retry cannot skip one', async () => {
+    const { conn, socket } = await joined();
+    socket.fire('room:state', room(2, [player('host'), player('guest-me1234')], { round: { n: 3, scramble: 'R U', startedAt: NOW } }));
+    await conn.nextRound();
+    expect(socket.emitted.at(-1)).toEqual({ event: 'round:next', payload: { fromRound: 3 } });
   });
 
   it('ignores room states older than the one it has (broadcasts from other pods arrive out of order) and those of other rooms', async () => {

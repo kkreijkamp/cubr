@@ -3,7 +3,7 @@
 # laptop upload of images) and pushes them to Artifact Registry. Submitted by
 # scripts/commands.sh section 4:
 #   gcloud builds submit --region=australia-southeast1 --config=cloudbuild.yaml \
-#     --substitutions=_VERSION=1.6.33 .
+#     --substitutions=_VERSION=1.6.34 .
 # The source upload honours .gitignore (node_modules/, dist/ are not uploaded).
 #
 # All build steps start at once (waitFor: ['-']) and run in parallel on the same Docker
@@ -13,7 +13,7 @@
 #   _REGION   Artifact Registry region      _REPO  Artifact Registry repository name
 # =============================================================================================
 substitutions:
-  _VERSION: 1.6.33
+  _VERSION: 1.6.34
   _REGION: australia-southeast1
   _REPO: cubr
 

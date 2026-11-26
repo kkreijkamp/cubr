@@ -108,6 +108,7 @@ export function ResultsGrid({ room, playerId, precision }: { room: LiveRoomState
   // players who left still have results? (server removes them) - show only current players
   const players = order.map((id) => room.players.find((p) => p.id === id)!);
   if (rounds.length === 0) return null;
+  const total = Math.max(rounds.length, room.round?.n ?? 0);
   return (
     <section className="race-results" aria-labelledby="results-title">
       <div className="live-section-title">
@@ -115,7 +116,9 @@ export function ResultsGrid({ room, playerId, precision }: { room: LiveRoomState
           <TrophyIcon /> results
         </h3>
         <span className="meta">
-          {rounds.length} round{rounds.length === 1 ? '' : 's'}
+          {/* a room keeps its last 25 rounds (services/race room.ts ROUNDS_KEPT); the standings count them all */}
+          {total} round{total === 1 ? '' : 's'}
+          {total > rounds.length && `, the last ${rounds.length} shown`}
         </span>
       </div>
       <div className="table-wrap">

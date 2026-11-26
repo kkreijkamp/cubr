@@ -613,17 +613,21 @@ GET `/api/race/_info` -> info.
 
 Socket.IO (client uses `transports: ["websocket"]` so no sticky sessions are needed; the Redis
 adapter fans out broadcasts across all race pods; all room state lives in Redis so any pod can
-serve any player). Handshake `auth: {token?, name?, guestId?}` (guests choose a nickname).
+serve any player). Handshake `auth: {token?, name?, guestKey?}` (guests choose a nickname).
 
 client -> server (with ack callbacks `{ok:true,...}|{ok:false,error,code}`):
 - `room:join {roomId}` -> ack `{ok, room: RoomState, playerId, name, servedBy, chat}` (`servedBy` = the pod holding this socket, `chat` = last 50 messages)
 - `room:leave {}`
-- `round:next {}` (host only; fetches 1 scramble from scramble-service, falling back to a local random-move scramble, and starts round n+1) -> ack `{ok, round}`
-- `player:status {status: "idle"|"inspecting"|"solving"|"done"}`
+- `round:next {fromRound}` (host only; `fromRound` = the round on the host's screen: a retry or a second click answers with the round already started, a stale one gets CONFLICT; fetches 1 scramble from scramble-service, falling back to a local random-move scramble, and starts round n+1) -> ack `{ok, round}`
+- `player:status {status: "idle"|"inspecting"|"solving"|"done"}` ("done" only with a result: `player:result` sets it)
 - `player:result {round, timeMs, penalty}` (current round only, once per player)
 - `chat:send {text}` (<= 200 chars, 5 per 10 s; a slur is refused, `text: that message has a word cubr doesn't allow`: see Moderation below)
 
 server -> client: `room:state RoomState` (full state after every change), `chat:message {playerId, name, text, at}`.
+
+Each socket may send 60 events per 10 s, counted as they arrive (before they queue), with at most 60
+waiting; more are refused with RATE_LIMITED, and a socket that keeps sending past three times that is
+disconnected.
 
 ```ts
 type RoomState = { id; name; event; isPrivate: boolean; rev: number /* +1 per saved change; ignore a lower rev */;
@@ -634,9 +638,13 @@ type RoomState = { id; name; event; isPrivate: boolean; rev: number /* +1 per sa
   standings: { playerId: string; name: string; wins: number; solves: number; meanMs: number|null; ao5: number|null }[];
   createdAt: string };
 ```
-playerId = userId for logged-in users, else a stable guest id derived from the socket handshake
-(`guest-<random>`; client stores it in localStorage and sends it as `auth.guestId`). Rooms expire
-after 2 h without activity and hold at most 16 players. Host leaves -> oldest connected player
+playerId = userId for logged-in users, else a guest id made from the guest's secret key
+(`gst-` + 12 characters of an HMAC with the server's secret; the client keeps the key, 32 characters,
+in localStorage as `cubr.guestKey` and sends it as `auth.guestKey`). Every member sees the id, and it
+can't be used to play as that guest. The previous release's `auth.guestId` (the id itself, in its old
+`guest-` form) is accepted until the release after this one. Rooms expire after 2 h without activity
+and hold at most 16 players. A room keeps its last 25 rounds in `results` (and so in every state);
+older rounds are folded into each player's totals, so `standings` still count every round. Host leaves -> oldest connected player
 becomes host. Socket.IO does not keep room membership across reconnects, so the client re-emits
 `room:join` on every `connect`.
 
