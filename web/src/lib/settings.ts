@@ -2,7 +2,7 @@
 // (PUT /api/auth/me/settings) for logged-in users so they follow you across devices.
 import { useSyncExternalStore } from 'react';
 import { cleanKeyMaps, type KeyMaps } from '../input/virtual/keymap';
-import { applyTheme, DEFAULT_DARK_THEME, DEFAULT_THEME, getTheme, isLightTheme, randomTheme, themeColors, themeLabel, THEMES, type Theme } from './themes';
+import { applyTheme, DEFAULT_DARK_THEME, DEFAULT_THEME, getTheme, isLightTheme, randomTheme, setHighContrast, themeColors, themeLabel, THEMES, type Theme } from './themes';
 import { createStore, loadJson, saveJson, useStore } from './store';
 
 export type TimerUpdate = 'realtime' | 'tenths' | 'seconds' | 'hidden';
@@ -17,6 +17,8 @@ export interface Settings {
   themeLight: string;
   /** the dark theme used in dark mode while autoSwitchTheme is on */
   themeDark: string;
+  /** labels, links and errors at 4.5:1 in every theme (lib/themes.ts highContrastTheme) */
+  highContrast: boolean;
   font: string;
   /** WCA 15 s inspection before each solve */
   inspection: boolean;
@@ -75,6 +77,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoSwitchTheme: true,
   themeLight: DEFAULT_THEME,
   themeDark: DEFAULT_DARK_THEME,
+  highContrast: false,
   font: 'Lexend Deca',
   inspection: false,
   inspectionAlerts: 'beep',
@@ -189,7 +192,7 @@ export function activeTheme(s: Settings = settingsStore.get(), dark = deviceIsDa
   return s.autoSwitchTheme ? (dark ? s.themeDark : s.themeLight) : s.theme;
 }
 
-const THEME_KEYS = ['theme', 'autoSwitchTheme', 'themeLight', 'themeDark'] as const;
+const THEME_KEYS = ['theme', 'autoSwitchTheme', 'themeLight', 'themeDark', 'highContrast'] as const;
 
 /**
  * Shows the theme these settings call for, and stores its colours for the pre-paint script in index.html:
@@ -197,6 +200,7 @@ const THEME_KEYS = ['theme', 'autoSwitchTheme', 'themeLight', 'themeDark'] as co
  * so the page opens in the right one even after the mode changed while it was closed).
  */
 function showTheme(s: Settings): void {
+  setHighContrast(s.highContrast === true);
   applyTheme(activeTheme(s));
   saveJson('cubr.themeColors', s.autoSwitchTheme ? { light: themeColors(getTheme(s.themeLight)), dark: themeColors(getTheme(s.themeDark)) } : themeColors(getTheme(s.theme)));
 }

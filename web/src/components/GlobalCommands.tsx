@@ -151,6 +151,7 @@ export function GlobalCommands() {
         options('scramblePreview', 'Scramble preview', [{ value: 'off', label: 'off' }, { value: '2D', label: '2D' }, { value: '3D', label: '3D' }], settings.scramblePreview),
         { ...options('stickerColours', 'Sticker colours', [{ value: 'default', label: 'default' }, { value: 'custom', label: 'custom (pick them in settings)' }], settings.stickerColours), icon: <SwatchIcon /> },
         { ...options('focusMode', 'Focus mode', [{ value: true, label: 'on' }, { value: false, label: 'off' }], settings.focusMode), icon: <EyeIcon /> },
+        { ...options('highContrast', 'High contrast', [{ value: true, label: 'on' }, { value: false, label: 'off' }], settings.highContrast === true), icon: <SwatchIcon /> },
         { ...options('inspectionAlerts', 'Inspection alerts', [{ value: 'off', label: 'off' }, { value: 'beep', label: 'beep' }, { value: 'voice', label: 'voice' }], settings.inspectionAlerts), icon: <BoltIcon /> },
       ];
       const auth: Command[] = user

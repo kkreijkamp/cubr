@@ -111,6 +111,48 @@ export function readyColor(theme: Theme): string {
   return READY_DEEP;
 }
 
+/** WCAG AA for text: what labels, links and errors reach with the high-contrast setting. */
+export const HIGH_CONTRAST_RATIO = 4.5;
+
+/** The colour `t` of the way from `a` to `b` (0 to 1), channel by channel. */
+function mixHex(a: string, b: string, t: number): string {
+  const channel = (hex: string, i: number) => parseInt(hex.slice(i, i + 2), 16);
+  return `#${[1, 3, 5].map((i) => Math.round(channel(a, i) + (channel(b, i) - channel(a, i)) * t).toString(16).padStart(2, '0')).join('')}`;
+}
+
+/** `colour`, moved toward `towards` only as far as it takes to read at `ratio` on every one of `on` (`towards` itself if nothing short of it does). */
+function lift(colour: string, towards: string, on: string[], ratio: number): string {
+  for (let step = 0; step < 50; step++) {
+    const c = step === 0 ? colour : mixHex(colour, towards, step / 50);
+    if (on.every((bg) => contrast(c, bg) >= ratio)) return c;
+  }
+  return towards;
+}
+
+/**
+ * A theme as the high-contrast setting shows it: its labels and other quiet text (sub) read at 4.5:1
+ * (WCAG AA) on the background and on cards (sub-alt), and so do its accent (main: links, the choice
+ * that's on) and its errors on the background. Each moves toward the theme's text colour only as far as
+ * that takes, so the theme keeps its look, a little crisper.
+ */
+export function highContrastTheme(theme: Theme): Theme {
+  return {
+    ...theme,
+    sub: lift(theme.sub, theme.text, [theme.bg, theme.subAlt], HIGH_CONTRAST_RATIO),
+    main: lift(theme.main, theme.text, [theme.bg], HIGH_CONTRAST_RATIO),
+    error: lift(theme.error, theme.text, [theme.bg], HIGH_CONTRAST_RATIO),
+  };
+}
+
+// The high-contrast setting, as lib/settings.ts last applied it: every theme shown from then on (the
+// one in use, and the previews in settings and the command line) is drawn with it.
+let highContrastOn = false;
+
+/** Turns the high-contrast colours on or off for every theme shown from now on (lib/settings.ts calls it). */
+export function setHighContrast(on: boolean): void {
+  highContrastOn = on;
+}
+
 /** A random theme other than `current`, optionally limited to light or dark ones. */
 export function randomTheme(current: string, kind?: 'light' | 'dark'): Theme {
   const pool = THEMES.filter((t) => t.name !== current && (!kind || isLightTheme(t) === (kind === 'light')));
@@ -154,13 +196,14 @@ export function faviconSvg(theme: Theme, dark?: Theme): string {
 }
 
 /**
- * A theme as the page's CSS: its colour variables, the timer's ready green for its background, and
- * `color-scheme` so the browser draws its own parts (scrollbars, dropdown lists, date and colour pickers,
- * autofill) light or dark to match.
+ * A theme as the page's CSS: its colour variables (with the high-contrast setting, highContrastTheme's),
+ * the timer's ready green for its background, and `color-scheme` so the browser draws its own parts
+ * (scrollbars, dropdown lists, date and colour pickers, autofill) light or dark to match.
  */
-export function themeColors(theme: Theme): Record<string, string> {
+export function themeColors(theme: Theme, highContrast = highContrastOn): Record<string, string> {
+  const shown = highContrast ? highContrastTheme(theme) : theme;
   const colors: Record<string, string> = {};
-  for (const [k, v] of VARS) colors[v] = theme[k];
+  for (const [k, v] of VARS) colors[v] = shown[k];
   colors['--timer-ready'] = readyColor(theme);
   colors['color-scheme'] = isLightTheme(theme) ? 'light' : 'dark';
   return colors;

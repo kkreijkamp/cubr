@@ -1061,6 +1061,12 @@ function ThemePicker({ settings: s }: { settings: Settings }) {
       >
         <Options value={auto} options={onOff} onChange={setAutoSwitchTheme} />
       </SettingRow>
+      <SettingRow
+        title="high contrast"
+        description="Labels, links and errors in every theme at least 4.5:1 against the background (WCAG AA), so they're easier to read. Each theme keeps its look."
+      >
+        <Options value={s.highContrast === true} options={onOff} onChange={(v) => updateSettings({ highContrast: v })} />
+      </SettingRow>
       <div className={`st-theme-now${auto ? ' pair' : ''}`}>
         {auto ? (
           <>

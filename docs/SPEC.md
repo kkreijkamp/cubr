@@ -971,6 +971,12 @@ The web container's nginx (`web/nginx/default.conf.template`) serves the app and
   named after puzzles, methods, algorithms and competition words (17 light, 25 dark). White cross is
   the default; white cross dark is its dark twin (the logo's ink background, the same green, white
   text).
+  - **High contrast** (settings > theme, and the command line; decided 2026-11-26): every theme's
+    labels and other quiet text (`--sub-color`) read at 4.5:1 (WCAG AA) on the background and on
+    cards, and its accent and errors on the background (`highContrastTheme`): each colour moves toward
+    the theme's text colour only as far as that takes, so the themes keep their look. Off by default;
+    labels change in 41 of the 42 themes, the accent in 4. The pre-paint script applies it too (it
+    reads the stored colours).
   - **Order:** the light themes first, led by white cross, then the dark ones, led by white cross
     dark; pale before bold, and round the colour wheel within each. The picker and the command line
     list them in this order.

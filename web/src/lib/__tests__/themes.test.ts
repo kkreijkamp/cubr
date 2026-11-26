@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_DARK_THEME, DEFAULT_THEME, faviconSvg, getTheme, isLightTheme, randomTheme, READY_GREEN, readyColor, themeColors, THEMES } from '../themes';
+import { DEFAULT_DARK_THEME, DEFAULT_THEME, faviconSvg, getTheme, isLightTheme, randomTheme, READY_GREEN, readyColor, themeColors, THEMES, HIGH_CONTRAST_RATIO, highContrastTheme, setHighContrast } from '../themes';
 import shippedFavicon from '../../../public/favicon.svg?raw';
 import globalCss from '../../styles/global.css?raw';
 import indexHtml from '../../../index.html?raw';
@@ -219,5 +219,47 @@ describe("index.html's pre-paint script", () => {
       expect(style.size).toBe(0);
       expect(tc).toEqual([undefined, undefined]);
     }
+  });
+});
+
+describe('the high-contrast setting', () => {
+  it('brings every theme\'s labels to 4.5:1 on the background and on cards, and its links and errors on the background', () => {
+    for (const t of THEMES) {
+      const hc = highContrastTheme(t);
+      expect(contrast(hc.sub, t.bg), `${t.name} labels`).toBeGreaterThanOrEqual(HIGH_CONTRAST_RATIO);
+      if (hc.sub !== t.text) expect(contrast(hc.sub, t.subAlt), `${t.name} labels on cards`).toBeGreaterThanOrEqual(HIGH_CONTRAST_RATIO);
+      expect(contrast(hc.main, t.bg), `${t.name} accent`).toBeGreaterThanOrEqual(HIGH_CONTRAST_RATIO);
+      expect(contrast(hc.error, t.bg), `${t.name} errors`).toBeGreaterThanOrEqual(HIGH_CONTRAST_RATIO);
+      // labels stay quieter than the text, or at most as loud
+      expect(contrast(hc.sub, t.bg), t.name).toBeLessThanOrEqual(contrast(t.text, t.bg) + 1e-9);
+      // nothing else changes
+      expect({ ...hc, sub: t.sub, main: t.main, error: t.error }).toEqual(t);
+    }
+  });
+
+  it('moves a colour only as far as it takes, and leaves one that already reads alone', () => {
+    const wc = getTheme('white_cross');
+    expect(contrast(wc.sub, wc.bg)).toBeLessThan(HIGH_CONTRAST_RATIO);
+    const hc = highContrastTheme(wc);
+    expect(hc.sub).not.toBe(wc.sub);
+    // the tighter of the two (its cards, here) lands just past 4.5:1
+    expect(Math.min(contrast(hc.sub, wc.bg), contrast(hc.sub, wc.subAlt))).toBeLessThan(HIGH_CONTRAST_RATIO + 0.4);
+    // white cross dark's labels pass already
+    const dark = getTheme('white_cross_dark');
+    if (contrast(dark.sub, dark.bg) >= HIGH_CONTRAST_RATIO && contrast(dark.sub, dark.subAlt) >= HIGH_CONTRAST_RATIO) expect(highContrastTheme(dark).sub).toBe(dark.sub);
+  });
+
+  it('draws every theme with it once it is on, and without it once it is off', () => {
+    const wc = getTheme('white_cross');
+    expect(themeColors(wc)['--sub-color']).toBe(wc.sub);
+    expect(themeColors(wc, true)['--sub-color']).toBe(highContrastTheme(wc).sub);
+    setHighContrast(true);
+    try {
+      expect(themeColors(wc)['--sub-color']).toBe(highContrastTheme(wc).sub);
+      expect(themeColors(wc)['--main-color']).toBe(highContrastTheme(wc).main);
+    } finally {
+      setHighContrast(false);
+    }
+    expect(themeColors(wc)['--sub-color']).toBe(wc.sub);
   });
 });
