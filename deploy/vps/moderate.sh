@@ -11,6 +11,7 @@
 #   deploy/vps/moderate.sh clear-profile <username>         its display name and bio
 #   deploy/vps/moderate.sh remove-picture <username>
 #   deploy/vps/moderate.sh clear-chat <room-id>             a race room's chat, for everyone in it too
+#   deploy/vps/moderate.sh log [n]                          the last n (50) actions, newest first: kept 2 years
 #
 # --local first runs it on the local docker compose stack instead. Settings (env): CUBR_VM (cubr-1),
 # CUBR_ZONE (australia-southeast1-a), CUBR_GCLOUD_CONFIG (cubr).
@@ -23,12 +24,18 @@ if [ "${1:-}" = "--local" ]; then LOCAL=1; shift; fi
 cd "$HERE/../.."
 
 usage() {
-  sed -n '7,13p' "$0" | sed 's/^# \{0,1\}//' >&2
+  sed -n '7,14p' "$0" | sed 's/^# \{0,1\}//' >&2
   exit 2
 }
 
 cmd="${1:-}"
 user="${2:-}"
+if [ "$cmd" = log ]; then
+  n="${2:-50}"
+  [[ "$n" =~ ^[0-9]+$ ]] || usage
+  call auth GET "/internal/moderation/log?limit=$n" | show
+  exit
+fi
 [ -n "$cmd" ] && [ -n "$user" ] || usage
 users=/internal/moderation/users
 case "$cmd" in
@@ -41,6 +48,10 @@ case "$cmd" in
     ;;
   clear-profile) call auth POST "$users/$user/clear-profile" | show ;;
   remove-picture) call auth POST "$users/$user/remove-picture" | show ;;
-  clear-chat) call race POST "/internal/moderation/rooms/$user/clear-chat" ;;
+  clear-chat)
+    call race POST "/internal/moderation/rooms/$user/clear-chat"
+    # the race service keeps no records: the moderation log is auth's
+    call auth POST /internal/moderation/log "$(jq -nc --arg room "$user" '{action: "clear-chat", detail: ("room " + $room)}')" >/dev/null
+    ;;
   *) usage ;;
 esac

@@ -679,7 +679,12 @@ and `suspended_note`, migration 009): every token of the account is revoked, the
 the password (403 `This account is suspended. Questions: hello@cubr.dev`, only after a right password),
 a reset link (403, the link kept), Google, Apple or GitHub (`#error=suspended`, and the code exchange
 checks again). The times stay. Lifting it lets the account sign in; the profile stays private until its
-owner changes that.
+owner changes that. **The moderation log** (`auth.moderation_log`, migration 010): every action above
+(and a cleared chat, which `moderate.sh` records with `POST /internal/moderation/log {action:
+"clear-chat", detail}`) with its time, account and detail (a suspension's note, a rename's old and new
+name), kept 2 years (the online-safety codes' records, Tier 2, decided 2026-11-26; a record outlives
+a deleted account); `GET /internal/moderation/log?limit=` lists the newest first. The terms name class
+1A and 1B material, and say how to report and that eSafety takes complaints.
 
 ### 9.7 wca (`/api/wca`) - values converted to ms (WCA centiseconds x 10); 333fm kept as moves (`unit:"moves"`, averages x100 in export -> divide); 333mbf excluded
 | Method & path | Response |

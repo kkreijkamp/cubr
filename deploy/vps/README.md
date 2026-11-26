@@ -182,8 +182,23 @@ deploy/vps/moderate.sh unsuspend <username>             # it can sign in again (
 ```
 
 A suspended account keeps its times. Its owner is told "This account is suspended. Questions:
-hello@cubr.dev" when signing in. Every action is in the auth or race log with the account's id
+hello@cubr.dev" when signing in. Every action goes into the moderation log, kept 2 years
+(`deploy/vps/moderate.sh log [n]`), and into the auth or race log with the account's id
 (`$C logs auth | grep moderation`). `--local` first runs a command on the local stack.
+
+**The procedure** (Tier 2 under the online-safety codes, decided 2026-11-26; the terms say it publicly):
+
+1. Acknowledge the report (a short reply from hello@cubr.dev), then look: `show`, the profile, the room.
+2. Act within 24 hours when it breaks the terms. Child sexual exploitation, pro-terror, or extreme
+   crime, violence or drug material (class 1A and 1B): clear it and `suspend` at once, and keep the
+   person out (a new account of theirs gets the same).
+3. Tell the reporter what you did, without naming them to the person reported. They can complain to
+   eSafety (esafety.gov.au/report) if they aren't happy; the terms say so.
+4. Away for more than a day? Put an auto-reply on hello@cubr.dev saying reports may take longer, and
+   suspend first, review later.
+5. Before a release that adds a social feature (follows, feeds, messages, comments, uploads), redo the
+   online-safety self-assessment (`A4/cubr-online-safety-self-assessment-2026-11-26.md`); if the risk
+   goes up, tell eSafety.
 
 ## Dead letters (events a service couldn't handle)
 

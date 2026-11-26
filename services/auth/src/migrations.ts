@@ -142,4 +142,21 @@ export const migrations: Migration[] = [
       ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS suspended_note text;
     `,
   },
+  {
+    id: '010_moderation_log',
+    sql: `
+      -- what moderation did (routes/moderation.ts, deploy/vps/moderate.sh), kept 2 years: the records Tier 2
+      -- of the online-safety codes asks for (decided 2026-11-26). user_id isn't a foreign key: a record
+      -- outlives a deleted account; username is the name it had then. A room's chat has no account.
+      CREATE TABLE IF NOT EXISTS auth.moderation_log (
+        id       bigserial PRIMARY KEY,
+        at       timestamptz NOT NULL DEFAULT now(),
+        action   text NOT NULL,
+        user_id  uuid,
+        username text,
+        detail   text
+      );
+      CREATE INDEX IF NOT EXISTS moderation_log_at ON auth.moderation_log (at);
+    `,
+  },
 ];

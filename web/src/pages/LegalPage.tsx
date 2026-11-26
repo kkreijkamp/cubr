@@ -329,7 +329,12 @@ export function TermsPage() {
         <p>Don&apos;t use cubr, including usernames, display names, bios, profile pictures and race chat, to:</p>
         <ul>
           <li>harass, threaten, bully or spread hate about anyone;</li>
-          <li>post sexual, violent or illegal content, or content that infringes someone else&apos;s rights;</li>
+          <li>
+            post or share child sexual exploitation or abuse material, material that promotes or instructs in terrorism, or material that
+            shows or instructs in extreme crime, violence or drug use (what Australian law calls class 1A and 1B material): we remove it at
+            once, and close the account and keep it out;
+          </li>
+          <li>post other sexual, violent or illegal content, or content that infringes someone else&apos;s rights;</li>
           <li>spam, advertise or scam;</li>
           <li>attack, overload or disrupt cubr, get around its limits, get into other people&apos;s accounts, or create accounts automatically.</li>
         </ul>
@@ -347,6 +352,19 @@ export function TermsPage() {
         <p>
           We may remove content, or suspend or close an account, that breaks these terms or the law. Where reasonable, we will tell you why,
           and you can always contact us at <Mail />.
+        </p>
+        <p>
+          To report a profile, a race room or anything else on cubr, use the flag link beside it or email <Mail />. We aim to act within 24
+          hours, we tell you what we did, and we never tell the person you reported who you are.
+        </p>
+        <p>
+          If you&apos;re in Australia: the eSafety Commissioner is the independent regulator for online safety. It can help with serious
+          online abuse and with illegal or restricted content, and if you aren&apos;t happy with how we handled a report, you can complain
+          to it at{' '}
+          <a href="https://www.esafety.gov.au/report" target="_blank" rel="noreferrer noopener">
+            esafety.gov.au/report
+          </a>
+          .
         </p>
       </Section>
 

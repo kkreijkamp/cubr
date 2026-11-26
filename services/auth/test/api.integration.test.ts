@@ -716,6 +716,33 @@ describeIntegration('auth API', () => {
       expect((await login(user.username)).statusCode).toBe(200);
     });
 
+    it('records every action in the moderation log, newest first, and forgets records over 2 years old', async () => {
+      const { user } = await signUp();
+      const newName = `renamed_${Date.now() % 100_000}`;
+      await mod('POST', `/users/${user.username}/suspend`, { note: 'spam in race chat' });
+      await mod('POST', `/users/${user.username}/unsuspend`);
+      expect((await mod('POST', `/users/${user.username}/rename`, { to: newName })).statusCode).toBe(200);
+      await mod('POST', `/users/${newName}/clear-profile`);
+      await mod('POST', `/users/${newName}/remove-picture`);
+      expect((await mod('POST', '/log', { action: 'clear-chat', detail: 'room abcd1234' })).statusCode).toBe(204);
+      const log = (await mod('GET', '/log?limit=6')).json().log;
+      expect(log.map((e: { action: string; username: string | null; detail: string | null }) => [e.action, e.username, e.detail])).toEqual([
+        ['clear-chat', null, 'room abcd1234'],
+        ['remove-picture', newName, null],
+        ['clear-profile', newName, null],
+        ['rename', user.username, `${user.username} -> ${newName}`],
+        ['unsuspend', user.username, null],
+        ['suspend', user.username, 'spam in race chat'],
+      ]);
+      expect(log[1].userId).toBe(user.id);
+      // a record over 2 years old goes when the next one is written
+      await s.pool.query("insert into auth.moderation_log (at, action, username) values (now() - interval '731 days', 'suspend', 'long_ago')");
+      await mod('POST', '/log', { action: 'clear-chat', detail: 'room efgh5678' });
+      expect((await s.pool.query("select count(*)::int as n from auth.moderation_log where username = 'long_ago'")).rows[0].n).toBe(0);
+      expect((await mod('POST', '/log', { action: 'delete-everything' })).statusCode).toBe(400);
+      expect((await s.request('GET', '/internal/moderation/log')).statusCode).toBe(403);
+    });
+
     it('refuses a reset link opened after the suspension, and keeps the link', async () => {
       const { user } = await signUp();
       const { token, hash } = newResetToken();
