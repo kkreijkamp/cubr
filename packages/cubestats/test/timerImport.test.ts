@@ -6,6 +6,17 @@ import { parseLocalDateTime, parseTimeString, parseTimerFile, readDelimited, Tim
 const iso = (ms: number) => new Date(ms).toISOString();
 const local = (y: number, mo: number, d: number, h = 0, mi = 0, s = 0) => iso(new Date(y, mo - 1, d, h, mi, s).getTime());
 
+describe('a time with a +2 mark', () => {
+  it('is read in linear time, however long a run of spaces it holds', () => {
+    // the old pattern (/\s*\+2?$/) took over a second here: it tried every start in the run
+    const t0 = performance.now();
+    expect(parseTimeString(`1${' '.repeat(50_000)}2+`)).toBeNull();
+    expect(performance.now() - t0).toBeLessThan(250);
+    expect(parseTimeString('12.34 +2')).toEqual({ ms: 12340, penalty: '+2' });
+    expect(parseTimeString('1:02.50+')).toEqual({ ms: 62500, penalty: '+2' });
+  });
+});
+
 describe('cubr export', () => {
   const exported = {
     exportedAt: '2026-10-20T10:00:00.000Z',

@@ -141,7 +141,7 @@ export function parseTimeString(s: string): { ms: number; penalty: Penalty } | n
     if (!t) return { ms: NaN, penalty };
   } else if (/\+2?$/.test(t)) {
     penalty = '+2';
-    t = t.replace(/\s*\+2?$/, '');
+    t = t.replace(/\+2?$/, '').trimEnd(); // not /\s*\+2?$/, whose time grows with the square of a run of spaces
   }
   const parts = t.split(':');
   if (parts.length > 3 || !parts.every((p) => /^\d+(\.\d+)?$/.test(p) || (p === '' && parts.length > 1))) return null;
