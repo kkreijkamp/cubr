@@ -3,6 +3,8 @@ import { CloudArrowUpIcon } from '@heroicons/react/24/outline';
 import { Modal } from '../Modal';
 import { Spinner } from '../Spinner';
 import { dismissUploadOffer, uploadLocalSolves, useUploadOffer } from '../../lib/solves';
+import { useStore } from '../../lib/store';
+import { solvingStore } from '../../timer/useTimerEngine';
 import { formatNumber } from '../../lib/format';
 import { toast } from '../../lib/toast';
 import './dialogs.css';
@@ -16,10 +18,12 @@ const solvesText = (n: number) => `${formatNumber(n)} solve${n === 1 ? '' : 's'}
  */
 export function LocalUploadOffer() {
   const offer = useUploadOffer();
+  // it waits while a solve is under way: it must never open over a running timer
+  const solving = useStore(solvingStore);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!offer) return null;
+  if (!offer || solving) return null;
   const one = offer.solves === 1;
 
   const upload = async () => {
@@ -56,7 +60,7 @@ export function LocalUploadOffer() {
         <button className="btn" onClick={dismissUploadOffer} disabled={busy}>
           not now
         </button>
-        <button className="btn primary" onClick={upload} disabled={busy} autoFocus>
+        <button className="btn primary" onClick={upload} disabled={busy}>
           {busy ? <Spinner size={16} /> : <CloudArrowUpIcon width={16} height={16} />} upload {solvesText(offer.solves)}
         </button>
       </div>
