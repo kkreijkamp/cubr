@@ -586,6 +586,20 @@ describeIntegration('solve API', () => {
       expect(new Set(mine.map((e) => e.data.eventId)).size).toBe(3);
     });
 
+    it('is woken by the commit of new events (NOTIFY), with no polling in between', async () => {
+      // polls only every minute: a solve's event can reach the stream within seconds only by the wake-up
+      const relay = startOutboxRelay({ pool: s.pool, redis: s.redis, log: s.app.log, intervalMs: 60_000, idleMs: 60_000 });
+      try {
+        await expect.poll(async () => (await relay.info()).listening, { timeout: 5000 }).toBe(true);
+        const u = await newUser();
+        const sess = await newSession(u);
+        await addSolve(u, sess.id, 11_111);
+        await expect.poll(async () => (await s.events()).filter((e) => e.data.userId === u.id && e.type === 'solve.created').length, { timeout: 5000 }).toBe(1);
+      } finally {
+        await relay.stop();
+      }
+    });
+
     it('keeps events while Redis is unreachable and delivers them once it is back', async () => {
       const u = await newUser();
       const sess = await newSession(u);

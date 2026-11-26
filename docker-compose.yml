@@ -45,12 +45,16 @@ x-service-env: &service-env
 x-service: &service
   restart: unless-stopped            # come back after crashes / docker restarts
   environment: *service-env
+  # Every 30 s once up, every 2 s while starting (start_interval, Docker 25+), so a deploy still sees
+  # a service healthy within seconds; each check starts a process, and every 10 s for every container
+  # was much of the stack's idle CPU.
   healthcheck:                       # readiness = /readyz (deps reachable, migrations applied)
     test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/readyz"]
-    interval: 10s
+    interval: 30s
     timeout: 3s
     retries: 3
     start_period: 60s                # scramble/wca may need a while on first start
+    start_interval: 2s
   depends_on:
     postgres: { condition: service_healthy }
     redis: { condition: service_healthy }
@@ -73,9 +77,11 @@ services:
       - "127.0.0.1:55433:5432"            # psql / services on the host: localhost:55433
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U cubr -d cubr"]
-      interval: 5s
+      interval: 30s
       timeout: 3s
-      retries: 20
+      retries: 3
+      start_period: 60s                # the services wait for this: every second while it starts
+      start_interval: 1s
 
   redis:
     image: redis:7-alpine
@@ -87,9 +93,11 @@ services:
       - "127.0.0.1:56380:6379"            # redis-cli / services on the host: localhost:56380
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
+      interval: 30s
       timeout: 3s
-      retries: 20
+      retries: 3
+      start_period: 30s
+      start_interval: 1s
 
   # ---- microservices (build context = repo root: every image also needs packages/) ------------
   auth:
@@ -150,9 +158,11 @@ services:
       NODE_NAME: docker-compose       # shown by /_info
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
-      interval: 10s
+      interval: 30s
       timeout: 3s
       retries: 3
+      start_period: 20s
+      start_interval: 2s
 
   # ---- gateway: local stand-in for the GKE Ingress ----------------------------------------------
   gateway:
@@ -168,9 +178,11 @@ services:
       web: { condition: service_started }
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
-      interval: 10s
+      interval: 30s
       timeout: 3s
       retries: 3
+      start_period: 20s
+      start_interval: 2s
 
   # ---- one-off jobs (only with --profile jobs) ---------------------------------------------------
   # Equivalent of the K8s CronJob wca-import: downloads the WCA public export and loads it into

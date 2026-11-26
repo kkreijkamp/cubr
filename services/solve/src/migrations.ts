@@ -146,4 +146,19 @@ CREATE TABLE solve.push_subscriptions (
 CREATE INDEX push_subscriptions_user ON solve.push_subscriptions (user_id);
 `,
   },
+  {
+    id: '008_outbox_notify',
+    sql: `
+-- Wakes the outbox relay when events are written, instead of it asking Postgres four times a second
+-- around the clock: one NOTIFY per transaction that adds outbox rows, sent when it commits (Postgres
+-- folds the same notification within a transaction into one).
+CREATE FUNCTION solve.outbox_notify() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM pg_notify('solve_outbox', '');
+  RETURN NULL;
+END
+$$;
+CREATE TRIGGER outbox_notify AFTER INSERT ON solve.outbox FOR EACH STATEMENT EXECUTE FUNCTION solve.outbox_notify();
+`,
+  },
 ];

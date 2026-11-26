@@ -575,7 +575,7 @@ counts from its start (`POST /api/solves/daily/start`); starting it again after 
 tab makes it a DNF, and on the page Esc during inspection, or leaving for another event or day, is a
 DNF. Guests practise without any of this, and the five scrambles stay public.
 
-Outbox relay: every 250 ms each replica claims unpublished rows (`FOR UPDATE SKIP LOCKED`, LIMIT 500),
+Outbox relay: woken by the commit of new rows (a statement trigger's `pg_notify('solve_outbox')`, migration 008, on a connection that LISTENs; every 5 s as a safety net, every 250 ms while that connection is down), each replica claims unpublished rows (`FOR UPDATE SKIP LOCKED`, LIMIT 500),
 XADDs them, sets `published_at`. If Redis is down, solves still succeed and events are delivered later.
 Published rows older than a day are deleted.
 

@@ -33,7 +33,10 @@ export interface RelayOptions {
   pool: Pool;
   redis: Redis;
   log: FastifyBaseLogger;
+  /** between passes while the relay can't listen (and after a failure, the backoff's start) */
   intervalMs?: number;
+  /** between passes while it listens: only a safety net, as each commit of events wakes it */
+  idleMs?: number;
   batchSize?: number;
   maxBackoffMs?: number;
   /** Published rows older than this are deleted by the cleanup loop. */
@@ -47,6 +50,8 @@ export interface RelayInfo {
   lastPublishedAt: string | null;
   lastError: string | null;
   healthy: boolean;
+  /** woken by NOTIFY (migration 008); false = polling every intervalMs */
+  listening: boolean;
 }
 
 export interface Relay {
@@ -74,6 +79,7 @@ export function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise
 export function startOutboxRelay(opts: RelayOptions): Relay {
   const { pool, redis, log } = opts;
   const intervalMs = opts.intervalMs ?? 250;
+  const idleMs = opts.idleMs ?? 5_000;
   const batchSize = opts.batchSize ?? 500;
   const maxBackoffMs = opts.maxBackoffMs ?? 5000;
   const retentionMs = opts.retentionMs ?? 24 * 3600 * 1000;
@@ -86,6 +92,9 @@ export function startOutboxRelay(opts: RelayOptions): Relay {
   let healthy = true;
   let lastWarn = 0;
   let wake: (() => void) | null = null;
+  /** a notification came while a pass was running: the next one starts without a nap */
+  let pending = false;
+  let listener: PoolClient | null = null;
 
   /** Interruptible sleep so stop() does not wait for a 5 s backoff. */
   const nap = (ms: number) =>
@@ -140,6 +149,39 @@ export function startOutboxRelay(opts: RelayOptions): Relay {
     }
   }
 
+  // One connection LISTENs for the trigger's NOTIFY (migration 008), so a commit of events wakes the
+  // relay at once; if that connection drops, the relay polls every intervalMs until it's back.
+  async function listen(): Promise<void> {
+    while (running && !listener) {
+      let c: PoolClient | null = null;
+      try {
+        c = await pool.connect();
+        const conn = c;
+        conn.on('notification', () => {
+          if (wake) wake();
+          else pending = true;
+        });
+        conn.on('error', (err: Error) => {
+          if (listener !== conn) return;
+          listener = null;
+          conn.release(err);
+          if (running) {
+            log.warn({ err: err.message }, 'outbox relay stopped listening; polling until it can again');
+            setTimeout(() => void listen(), 1_000).unref();
+          }
+        });
+        await queryWithTimeout(conn, 'LISTEN solve_outbox', [], 10_000);
+        listener = conn;
+        wake?.(); // a pass now, for whatever came while it wasn't listening
+      } catch (err) {
+        c?.release(err as Error);
+        if (!running) return;
+        await sleep(2_000);
+      }
+    }
+  }
+  void listen();
+
   const relayLoop = (async () => {
     let backoff = intervalMs;
     while (running) {
@@ -150,7 +192,11 @@ export function startOutboxRelay(opts: RelayOptions): Relay {
         lastError = null;
         backoff = intervalMs;
         if (n === batchSize) continue; // backlog: drain without waiting
-        await nap(intervalMs);
+        if (pending) {
+          pending = false;
+          continue;
+        }
+        await nap(listener ? idleMs : intervalMs);
       } catch (err) {
         if (!running) break;
         healthy = false;
@@ -197,6 +243,10 @@ export function startOutboxRelay(opts: RelayOptions): Relay {
       running = false;
       clearInterval(cleanupTimer);
       wake?.();
+      // closed, not pooled: a session that still LISTENs must not serve other queries
+      const l = listener;
+      listener = null;
+      l?.release(true);
       // Let an in-flight pass finish (bounded by the Redis/Postgres timeouts above).
       await Promise.race([relayLoop, sleep(6000)]);
     },
@@ -207,6 +257,7 @@ export function startOutboxRelay(opts: RelayOptions): Relay {
         lastPublishedAt,
         lastError,
         healthy,
+        listening: listener !== null,
       };
     },
   };
