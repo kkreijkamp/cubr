@@ -690,9 +690,15 @@ way (`DrawnNet`, `lib/drawnNet`): its shapes are read from the SVG, stickers tha
 with a plate behind it (a jagged face, as a mirror block's, follows its outline), the faces are
 drawn closer, and csTimer's colours become the scheme's. Square-1's relatives are drawn flat, as
 square-1 is; a sliding puzzle is a board with its numbers; a clock's drawing is shown as csTimer
-draws it. The next scramble's drawing is fetched while the current one is up. A relay shows each
-puzzle's own preview under its label, as many to a row as make them biggest. "No preview for this
-puzzle (or scramble) yet" where csTimer can't draw it either.
+draws it; the icosamate's 20 colours are cubing.js's, as in 3D. The next scramble's drawing is
+fetched while the current one is up. A relay shows each puzzle's own preview under its label, as
+many to a row as make them biggest. The cuboids nothing else draws (floppy, tower, domino, 3x3x4 and
+3x3x6) are worked out in the browser (`lib/cuboid`): one model of a puzzle's stickers for any size,
+checked against cubing.js as a 3x3x3 and a 4x4x4 (face, wide and slice turns) and, for the tower and
+the domino, against a 3x3x3 turned the same way; the net (U above L F R B, D below) is drawn as
+csTimer's drawings are. 3x3x5 and 3x3x7 aren't drawn: their scrambles end in a 3x3 scramble after
+"/", which has no clear meaning on a cuboid whose sides only half-turn. "No preview for this puzzle
+(or scramble) yet" where nothing can draw it.
 
 In 3D the preview is cubing.js's `<twisty-player>`. Some puzzles have no cubing.js puzzle of their
 own, but cubing.js's puzzle geometry builds them from their shape and cuts (8x8 to 11x11,
@@ -702,12 +708,12 @@ csTimer's notation (all of gigaminx; megaminx carrot, old style and random state
 scramble is rewritten move by move in cubing.js's notation (`lib/cubing3d`, `preview3D`). Every
 translation is checked against csTimer's own drawings of real scrambles, sticker for sticker
 (`scripts/cstimer-fixtures.ts` writes them, the web tests compare). Two differences: cubing.js's
-curvy copter has a fixed centre on each face that the real puzzle hasn't, and the icosamate takes
-cubing.js's colours in 3D and csTimer's in 2D. Square-1, clock and redi cube have no 3D model in
-cubing.js, so it draws them flat; the other puzzles it has no model of keep their 2D net. A relay's
+curvy copter has a fixed centre on each face that the real puzzle hasn't. Square-1, clock and redi
+cube have no 3D model in cubing.js: square-1 and redi cube show cubr's 2D net, the clock cubing.js's
+drawing; the other puzzles it has no model of keep their 2D net. A relay's
 puzzles are in 3D too, each in a square box (a clock's two faces in a wide one). A 3D view draws
-once it is on screen, so a long scramble (gigaminx, Mini Guildford) can leave it below the window
-until you scroll.
+once it is on screen. A long scramble (relays, gigaminx) scrolls inside its box, capped just above a
+megaminx's seven lines, so the preview and the stats stay in view.
 
 On touch screens the timer pages (the timer, the daily challenge, a race) have no selectable text, so
 a long press meant to start the timer can't select the scramble or the averages; fields stay

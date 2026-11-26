@@ -27,6 +27,7 @@ import { PracticeBottle } from '../components/SessionName';
 import { TwistyPreview } from '../components/TwistyPreview';
 import { prefetchDrawnNet } from '../components/DrawnNet';
 import { preview3D } from '../lib/cubing3d';
+import { CUBOIDS } from '../lib/cuboid';
 import { ConfigBar } from '../components/timer/ConfigBar';
 import { ScrambleBar } from '../components/timer/ScrambleBar';
 import { StatsPanel } from '../components/timer/StatsPanel';
@@ -518,10 +519,10 @@ export default function TimerPage() {
   const shownScramble = useMemo(() => (scr.current?.text ? { event, type: scrambleType, text: scr.current.text } : null), [scr.current, event, scrambleType]);
   const preview = useDeferredValue(shownScramble);
   // csTimer draws the puzzles cubing.js can't: the next scramble's drawing is fetched while this one
-  // is up, so it shows at once (relays are drawn here, from their puzzles' own nets; in 3D, the
-  // puzzles cubing.js builds from their geometry show its model instead)
+  // is up, so it shows at once (relays and the cuboids are drawn here, relays from their puzzles' own
+  // nets; in 3D, the puzzles cubing.js builds from their geometry show its model instead)
   useEffect(() => {
-    if (!showPreview || eventInfo.puzzle !== null || RELAY_EVENTS.includes(event)) return;
+    if (!showPreview || eventInfo.puzzle !== null || RELAY_EVENTS.includes(event) || event in CUBOIDS) return;
     const next = peekScramble(event, scrambleType);
     if (!next || (settings.scramblePreview === '3D' && preview3D(event, scrambleType, next))) return;
     prefetchDrawnNet(scrambleImageUrl(event, next, scrambleType), event);

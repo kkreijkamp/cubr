@@ -4,6 +4,7 @@ import { ExperimentalPGNotation, getPuzzleDescriptionString, getPuzzleGeometryBy
 import { puzzles } from 'cubing/puzzles';
 import { randomMoveScramble } from '@cubr/cubestats';
 import { DESCRIPTIONS, PREVIEW_3D_TYPES, preview3D, type Puzzle3D } from '../cubing3d';
+import { ICOSAMATE_COLOURS } from '../drawnNet';
 import { stickerSources } from '../scrambleNet';
 import fixtures from './fixtures/cstimer/preview3d.json';
 
@@ -20,11 +21,8 @@ const DODECAHEDRON = {
 };
 const OCTAHEDRON = { '#ffffff': '#ffffff', '#ff0000': '#ff0000', '#880088': '#8800dd', '#00dd00': '#44ee00', '#ffff00': '#f4f400', '#ffaa00': '#ff8000', '#bbbbbb': '#888888', '#0000ff': '#2266ff' };
 const TETRAHEDRON = { '#00ff00': '#44ee00', '#ff0000': '#ff0000', '#0000ff': '#2266ff', '#ffff00': '#f4f400' };
-const ICOSAHEDRON = {
-  '#ffffff': '#ffffff', '#008844': '#008800', '#bb3366': '#0000ff', '#aa8855': '#ff8000', '#008888': '#ff66cc', '#881111': '#e8d0a0', '#ee7711': '#5ec4b6',
-  '#bb99bb': '#b9a1ff', '#0055aa': '#ff0000', '#eedd11': '#5c5c5c', '#888888': '#aaaaaa', '#66aa33': '#44ee00', '#ee88bb': '#3399ff', '#aa5522': '#7d3b11',
-  '#66ccbb': '#d41f69', '#cc1100': '#f4f400', '#ffaa00': '#007a89', '#553366': '#8800dd', '#4499cc': '#980000', '#eecc99': '#292929',
-};
+// the icosahedron: the map the 2D net draws in too, so this also checks that 2D and 3D colour it alike
+const ICOSAHEDRON = ICOSAMATE_COLOURS;
 const BY_FACES: Record<number, Record<string, string>> = { 4: TETRAHEDRON, 6: CUBE, 8: OCTAHEDRON, 12: DODECAHEDRON, 20: ICOSAHEDRON };
 
 /** cubing.js's puzzle and its net, as <twisty-player> loads it (a description: cubing.js's customPGPuzzleLoader) */

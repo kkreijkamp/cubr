@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildDrawnNet, drawnColour, drawnKind, hexColour, outline, parseDrawing, redrawable, relayColumns } from '../drawnNet';
+import { ICOSAMATE_COLOURS, buildDrawnNet, drawnColour, drawnKind, hexColour, outline, parseDrawing, redrawable, relayColumns } from '../drawnNet';
 import { schemeFor, SCHEMES, signedArea, stickerColour, type Point } from '../scrambleNet';
 import dino from './fixtures/cstimer/dino.svg?raw';
 import eight from './fixtures/cstimer/8p.svg?raw';
@@ -169,8 +169,10 @@ describe('drawnColour', () => {
     expect(drawnColour('#00ff00', 'sq2', { cube: [null, '#123456'] })).toBe(stickerColour('limegreen', schemeFor('square1')));
     expect(drawnColour('#dd0000', 'prc')).toBe(stickerColour('#ff0000', schemeFor('megaminx')));
     expect(drawnColour('#880088', 'dmd')).toBe(stickerColour('#8800dd', schemeFor('fto')));
-    // the icosamate keeps csTimer's twenty colours, and a colour no scheme knows stays as it is
-    expect(drawnColour('#553366', 'ctico')).toBe('#553366');
+    // the icosamate takes cubing.js's twenty colours, as in 3D (its map is checked in cubing3d.test.ts),
+    // and a colour no scheme knows stays as it is
+    expect(drawnColour('#553366', 'ctico')).toBe('#8800dd');
+    expect(new Set(Object.keys(ICOSAMATE_COLOURS).map((c) => drawnColour(c, 'ctico'))).size).toBe(20);
     expect(drawnColour('#123123', 'gear')).toBe('#123123');
     // a sliding puzzle's tiles: by the part of the solve they belong to, in cubr's colours
     expect(new Set(['#ff9999', '#99ff99', '#9999ff'].map((c) => drawnColour(c, '15p'))).size).toBe(3);

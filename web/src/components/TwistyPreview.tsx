@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import type { TwistyPlayer } from 'cubing/twisty';
 import { getEvent, splitRelay } from '@cubr/cubestats';
 import { preview3D, type Puzzle3D } from '../lib/cubing3d';
+import { cuboidDrawing } from '../lib/cuboid';
 import { redrawable, relayColumns } from '../lib/drawnNet';
-import { DrawnNet } from './DrawnNet';
+import { CuboidNet, DrawnNet } from './DrawnNet';
 import { ScrambleNet } from './ScrambleNet';
 
 interface Props {
@@ -27,7 +28,14 @@ interface Props {
 }
 
 /**
- * A scramble preview: in 2D cubr's own flat net (ScrambleNet), in 3D cubing.js's <twisty-player>.
+ * The cubing.js puzzles it has no 3D model of, which its player would only draw flat in its own look:
+ * 3D shows cubr's net, as 2D does. (The clock is cubing.js's drawing in both.)
+ */
+const NO_3D_MODEL: ReadonlySet<string> = new Set(['square1', 'redi_cube']);
+
+/**
+ * A scramble preview: in 2D cubr's own flat net (ScrambleNet), in 3D cubing.js's <twisty-player>
+ * (cubr's net for square-1 and the redi cube, which cubing.js has no 3D model of).
  * The clock's net is dials and hands rather than stickers, so cubing.js draws that too. A puzzle
  * cubing.js can't draw, or a scramble it can't read, is csTimer's drawing redrawn as a cubr net
  * (DrawnNet), and a relay is its puzzles' own previews. In 3D, a scramble in csTimer's notation of a
@@ -52,10 +60,13 @@ export function TwistyPreview(props: Props) {
   if (puzzle === null || unreadable === `${puzzle}\n${scramble}`) {
     const relay = puzzle === null && event ? splitRelay(event, scramble) : null;
     if (relay) return <RelayPreview parts={relay} height={height} visualization={visualization} />;
+    // a cuboid: worked out here, as nothing else draws it (in 3D too: there's no model of one)
+    const cuboid = puzzle === null && event ? cuboidDrawing(event, scramble) : null;
+    if (cuboid) return <CuboidNet drawing={cuboid} event={event!} height={height} />;
     const what = puzzle === null ? 'puzzle' : 'scramble';
     return imageUrl ? <Drawn key={imageUrl} url={imageUrl} event={event} what={what} height={height} /> : <NoPreview what={what} height={height} />;
   }
-  if (visualization === '2D' && puzzle !== 'clock' && netFailed !== puzzle) {
+  if ((visualization === '2D' || NO_3D_MODEL.has(puzzle)) && puzzle !== 'clock' && netFailed !== puzzle) {
     return <ScrambleNet puzzle={puzzle} scramble={scramble} height={height} fit={fit} onError={onNetError} onUnreadable={onUnreadable} />;
   }
   return <TwistyPlayerPreview puzzle={{ id: puzzle }} scramble={scramble} visualization={visualization} height={height} fit={fit} onUnreadable={onUnreadable} />;

@@ -341,9 +341,22 @@ export function buildDrawnNet(drawing: Drawing, kind: DrawnKind): DrawnNet | nul
 }
 
 /**
+ * The icosamate's twenty colours as cubing.js colours the same faces in 3D (csTimer's drawing has its
+ * own twenty), so its 2D net and its 3D puzzle match. The faces were lined up by their U and F faces;
+ * __tests__/cubing3d.test.ts checks this map against csTimer's drawings, sticker for sticker.
+ */
+export const ICOSAMATE_COLOURS: Readonly<Record<string, string>> = {
+  '#ffffff': '#ffffff', '#008844': '#008800', '#bb3366': '#0000ff', '#aa8855': '#ff8000', '#008888': '#ff66cc',
+  '#881111': '#e8d0a0', '#ee7711': '#5ec4b6', '#bb99bb': '#b9a1ff', '#0055aa': '#ff0000', '#eedd11': '#5c5c5c',
+  '#888888': '#aaaaaa', '#66aa33': '#44ee00', '#ee88bb': '#3399ff', '#aa5522': '#7d3b11', '#66ccbb': '#d41f69',
+  '#cc1100': '#f4f400', '#ffaa00': '#007a89', '#553366': '#8800dd', '#4499cc': '#980000', '#eecc99': '#292929',
+};
+
+/**
  * Which of cubr's colour schemes csTimer colours each puzzle's drawing in (lib/scrambleNet SCHEMES):
- * the cube's unless listed here, null for csTimer's own colours (the icosamate's twenty). The
- * puzzles cubing.js draws are here too, for the scramble types it can't read (csTimer's notation).
+ * the cube's unless listed here; null for the icosamate, which takes cubing.js's twenty colours
+ * (ICOSAMATE_COLOURS). The puzzles cubing.js draws are here too, for the scramble types it can't read
+ * (csTimer's notation).
  */
 const DRAWN_SCHEMES: Readonly<Record<string, Scheme['id'] | null>> = {
   sq1: 'square1',
@@ -374,10 +387,12 @@ export function redrawable(event: string): boolean {
 
 /**
  * A colour in csTimer's drawing of `event` as cubr draws it: its scheme's colour (yours where you
- * picked one: `custom`, settings customStickers), a sliding puzzle tile's, or csTimer's own.
+ * picked one: `custom`, settings customStickers), a sliding puzzle tile's, the icosamate's as in 3D,
+ * or csTimer's own.
  */
 export function drawnColour(fill: string, event: string, custom?: Readonly<Record<string, readonly unknown[] | undefined>>): string {
   if (drawnKind(event) === 'board') return SLIDING_COLOURS[fill] ?? fill;
+  if (event === 'ctico') return ICOSAMATE_COLOURS[fill] ?? fill;
   const id = event in DRAWN_SCHEMES ? DRAWN_SCHEMES[event] : 'cube';
   const scheme = id ? SCHEMES.find((s) => s.id === id) : undefined;
   return scheme ? stickerColour(fill, scheme, custom?.[scheme.id]) : fill;
