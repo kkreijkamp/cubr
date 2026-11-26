@@ -1356,6 +1356,119 @@ describe('signed in (cloud)', () => {
 
 // ================================================================ signing in and out
 
+describe('two tabs (the October review\'s #11)', () => {
+  let main: ServerSession;
+  const seed = (server: FakeServer) => {
+    main = server.seed({ userId: 'u1', name: '3x3', solves: [{ timeMs: 9000, at: T(1) }] });
+  };
+  const offline = (s: { ApiError: ApiErrorClass }) => new s.ApiError(0, 'NETWORK', 'Network error - is the server reachable?');
+  type Tab = Awaited<ReturnType<typeof start>>;
+  const add = (s: Tab, timeMs: number) => s.addSolve({ timeMs, penalty: 'OK', scramble: 'R' });
+  /** a browser delivers each write to localStorage to the other tabs as a 'storage' event */
+  const tell = (w: EventTarget, key: string) => w.dispatchEvent(Object.assign(new Event('storage'), { key }));
+  const timesQueued = () => queued().flatMap((q) => (q.op.kind === 'createSolve' ? [q.op.solve.timeMs] : []));
+
+  /** A second tab: the same browser storage and solve service, its own page and module instance. */
+  async function secondTab(server: FakeServer, opts: { offline?: boolean } = {}): Promise<{ tab: Tab; first: EventTarget; second: EventTarget }> {
+    const first = win;
+    vi.resetModules();
+    stubPage();
+    const tab = await start(U1, { server, before: opts.offline ? (ctx) => void h.api.solves.create.mockRejectedValue(offline(ctx)) : undefined });
+    return { tab, first, second: win };
+  }
+
+  /** navigator.locks for the tabs: one holder per name, ifAvailable answers null while it's held */
+  function stubLocks(): void {
+    const held = new Set<string>();
+    vi.stubGlobal('navigator', {
+      locks: {
+        request: async (name: string, _opts: unknown, fn: (lock: { name: string } | null) => Promise<void>) => {
+          if (held.has(name)) return fn(null);
+          held.add(name);
+          try {
+            return await fn({ name });
+          } finally {
+            held.delete(name);
+          }
+        },
+      },
+    });
+  }
+
+  it("keeps every tab's unsent changes, and sends them all once back online", async () => {
+    const a = await start(U1, { seed });
+    h.api.solves.create.mockRejectedValue(offline(a));
+    const one = await add(a, 1111);
+    await flush();
+    const { tab: b, first, second } = await secondTab(a.server, { offline: true });
+    const two = await add(b, 2222);
+    tell(first, QUEUE_KEY);
+    const three = await add(a, 3333); // tab A writes again: tab B's solve stays (it used to be overwritten)
+    tell(second, QUEUE_KEY);
+    expect(timesQueued()).toEqual([1111, 2222, 3333]);
+    b.reinstall(); // back online
+    first.dispatchEvent(new Event('online'));
+    second.dispatchEvent(new Event('online'));
+    await advance(5000);
+    expect(a.server.solvesOf(main.id).map((x) => x.id)).toEqual(expect.arrayContaining([one.id, two.id, three.id]));
+    expect(queued()).toEqual([]);
+  });
+
+  it('sends from one tab at a time', async () => {
+    stubLocks();
+    const a = await start(U1, { seed });
+    h.api.solves.create.mockRejectedValue(offline(a));
+    await add(a, 1111);
+    await add(a, 2222);
+    await flush();
+    const { tab: b, first, second } = await secondTab(a.server, { offline: true });
+    await add(b, 3333);
+    tell(first, QUEUE_KEY);
+    b.reinstall();
+    const real = h.api.solves.create.getMockImplementation()!;
+    let sending = 0;
+    let most = 0;
+    let calls = 0;
+    h.api.solves.create.mockImplementation(async (body: unknown) => {
+      calls++;
+      most = Math.max(most, ++sending);
+      await new Promise((r) => setTimeout(r, 100));
+      sending--;
+      return real(body);
+    });
+    first.dispatchEvent(new Event('online'));
+    second.dispatchEvent(new Event('online'));
+    await advance(5000);
+    expect(most).toBe(1);
+    expect(calls).toBe(3); // each once, back online
+    expect(queued()).toEqual([]);
+  });
+
+  it("never folds an edit into the solve another tab is sending, so the edit isn't lost", async () => {
+    stubLocks();
+    const a = await start(U1, { seed });
+    const gate = deferred();
+    const real = h.api.solves.create.getMockImplementation()!;
+    h.api.solves.create.mockImplementationOnce(async (body: unknown) => {
+      await gate.promise;
+      return real(body);
+    });
+    const solve = await add(a, 1111);
+    await flush(); // tab A is sending it
+    const { tab: b, first, second } = await secondTab(a.server);
+    const marking = b.setPenaltyIn(solve.id, 'DNF', main.id); // tab B marks it DNF meanwhile (it waits until that's sent)
+    await flush();
+    tell(first, QUEUE_KEY);
+    expect(queued().map((q) => q.op.kind)).toEqual(['createSolve', 'updateSolve']); // a separate edit, not folded in
+    gate.resolve();
+    await advance(5000); // tab A sends both
+    tell(second, QUEUE_KEY);
+    await marking; // tab B hears its edit went out
+    expect(a.server.solvesOf(main.id).find((x) => x.id === solve.id)?.penalty).toBe('DNF');
+    expect(queued()).toEqual([]);
+  });
+});
+
 describe('signing in and out', () => {
   it('switches to the account on login and back to the guest solves on logout, losing nothing', async () => {
     const s = await start();

@@ -690,6 +690,16 @@ Google, Apple or GitHub: signs in, or asks a new account for its username), `/re
 with an optimistic local store + retry queue (idempotent ids). Monkeytype-style theme system via CSS
 custom properties, command palette (Esc / Ctrl+K), focus mode while timing, toasts.
 
+**The retry queue** (`cubr.queue.v1`, `lib/solves.ts`) is shared by every tab: the stored copy is the
+truth, re-read before each change and followed through `storage` events, one tab sends at a time (the
+Web Lock `cubr.queue`), and the op being sent is marked (`cubr.queue.inflight`) so no tab folds an edit
+into it. A queued solve whose session is gone (merged or deleted on another device: "session not
+found") moves, with the session's other queued solves, to a new session "<name> (recovered)".
+**Settings** sync to the account 800 ms after a change; until it lands it is marked unsynced
+(`cubr.settings.unsynced`, with the account's id), retried with backoff and when back online, and at the
+next sign-in on that device the marked settings win over the account's. Every setting is checked as it
+loads, from either side.
+
 **Changing the password.** The account page's "password" row opens a dialog (`ChangePasswordModal`):
 the current password, then the new one, with a show button. An account made with a provider sets its
 first instead, after a fresh sign-in (the dialog offers one, as changing the email does).

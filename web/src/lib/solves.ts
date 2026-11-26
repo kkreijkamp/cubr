@@ -286,7 +286,33 @@ function writeLastSession(): void {
 
 // ================================================================ retry queue
 
-let queue: QueuedOp[] = browser ? decodeQueue(loadJson<unknown>(QUEUE_KEY, [])) : [];
+// Tabs share the queue (the October review's #11): the stored copy is the truth, re-read before every
+// change since another tab may have written it, and followed through 'storage' events. One tab sends at a
+// time (a Web Lock), and the op it is sending is shared too, so no tab folds an edit into it.
+let queue: QueuedOp[] = browser ? readQueue() : [];
+const INFLIGHT_KEY = 'cubr.queue.inflight';
+/** a tab that crashed mid-send leaves its marker: after this long it no longer counts */
+const INFLIGHT_STALE_MS = 60_000;
+const QUEUE_LOCK = 'cubr.queue';
+
+function readQueue(): QueuedOp[] {
+  return decodeQueue(loadJson<unknown>(QUEUE_KEY, []));
+}
+
+/** The op another tab is sending right now, if any. */
+function sharedInflight(): string | null {
+  const m = loadJson<{ opId?: unknown; at?: unknown } | null>(INFLIGHT_KEY, null);
+  return m && typeof m.opId === 'string' && typeof m.at === 'number' && Date.now() - m.at < INFLIGHT_STALE_MS ? m.opId : null;
+}
+
+function shareInflight(opId: string | null): void {
+  try {
+    if (opId) localStorage.setItem(INFLIGHT_KEY, JSON.stringify({ opId, at: Date.now() }));
+    else localStorage.removeItem(INFLIGHT_KEY);
+  } catch {
+    /* storage unavailable: this tab is the only one that can write anyway */
+  }
+}
 /** ops completed in the last minute - re-applied on reads to cover read-after-write races (each
  *  with its account: after switching accounts, the other account's ops must not show) */
 let recent: { op: SyncOp; at: number; userId: string }[] = [];
@@ -328,7 +354,7 @@ function enqueue(op: SyncOp): string {
   const uid = userId();
   if (!uid) throw new Error('not logged in');
   const item: QueuedOp = { opId: uuid(), userId: uid, op, attempts: 0, createdAt: Date.now() };
-  queue = coalesce(queue, item, inflight);
+  queue = coalesce(readQueue(), item, inflight ?? sharedInflight());
   saveQueue();
   // waiters of ops that were folded away (e.g. a solve deleted before it was sent) are done
   for (const id of Array.from(waiters.keys())) if (id !== inflight && !queue.some((q) => q.opId === id)) settle(id);
@@ -393,10 +419,37 @@ async function pump(): Promise<void> {
   const uid = userId();
   if (!uid || !getToken()) return;
   pumping = true;
+  let elsewhere = false;
+  try {
+    const locks = (globalThis.navigator as (Navigator & { locks?: LockManager }) | undefined)?.locks;
+    if (locks?.request) {
+      await locks.request(QUEUE_LOCK, { ifAvailable: true }, async (lock) => {
+        elsewhere = lock ? await pumpLoop(uid) : true;
+      });
+    } else elsewhere = await pumpLoop(uid);
+  } finally {
+    inflight = null;
+    pumping = false;
+  }
+  // another tab is sending: look again in a moment, in case it stops before reaching what's left
+  if (elsewhere && !retryTimer && pendingCount() > 0) {
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
+      void pump();
+    }, 1000);
+  }
+}
+
+/**
+ * Sends this account's queued ops in order, until the queue is empty or a send fails. True when it stopped
+ * at an op another tab is sending (without Web Locks two tabs can pump at once).
+ */
+async function pumpLoop(uid: string): Promise<boolean> {
   const g = gen;
   try {
     for (;;) {
       if (g !== gen) break;
+      queue = readQueue();
       const head = queue.find((q) => q.userId === uid);
       if (!head) {
         if (queueError) {
@@ -405,11 +458,14 @@ async function pump(): Promise<void> {
         }
         break;
       }
+      if (head.opId === sharedInflight()) return true;
       inflight = head.opId;
+      shareInflight(head.opId);
       try {
         await send(head.op);
         inflight = null;
-        queue = queue.filter((q) => q.opId !== head.opId);
+        shareInflight(null);
+        queue = afterSent(readQueue(), head);
         saveQueue();
         recent.push({ op: head.op, at: Date.now(), userId: head.userId });
         if (recent.length > 200) recent = recent.slice(-200);
@@ -421,6 +477,7 @@ async function pump(): Promise<void> {
         if (hadError && loadError) void refreshCloud();
       } catch (e) {
         inflight = null;
+        shareInflight(null);
         if (g !== gen) break;
         if (e instanceof ApiError && e.status === 401) {
           // token expired/revoked: the auth layer logs out; ops stay queued for the next login
@@ -428,7 +485,7 @@ async function pump(): Promise<void> {
           break;
         }
         if (isRetryable(e)) {
-          head.attempts++;
+          queue = readQueue().map((q) => (q.opId === head.opId ? { ...q, attempts: q.attempts + 1 } : q));
           saveQueue();
           queueError = errorMessage(e);
           settle(head.opId); // accepted locally, will sync later
@@ -442,7 +499,7 @@ async function pump(): Promise<void> {
           continue;
         }
         // permanent rejection (validation, conflict ...): drop it and re-sync to revert
-        queue = queue.filter((q) => q.opId !== head.opId);
+        queue = readQueue().filter((q) => q.opId !== head.opId);
         saveQueue();
         settle(head.opId, e as Error);
         toast.error(`Couldn't save your change: ${errorMessage(e)}`);
@@ -451,9 +508,25 @@ async function pump(): Promise<void> {
       }
     }
   } finally {
+    if (inflight) shareInflight(null);
     inflight = null;
-    pumping = false;
   }
+  return false;
+}
+
+/**
+ * The queue once `sent` went through. Normally that drops it; but if another tab changed it meanwhile (it
+ * read the in-flight marker too late), what changed still has to reach the server: a solve's create can't
+ * carry it any more (the server keeps the first create), so it goes as an edit; other ops are sent again.
+ */
+function afterSent(stored: QueuedOp[], sent: QueuedOp): QueuedOp[] {
+  const now = stored.find((q) => q.opId === sent.opId);
+  if (!now || JSON.stringify(now.op) === JSON.stringify(sent.op)) return stored.filter((q) => q.opId !== sent.opId);
+  if (now.op.kind === 'createSolve') {
+    const { id, sessionId, penalty, comment } = now.op.solve;
+    return stored.map((q) => (q.opId === sent.opId ? { ...q, op: { kind: 'updateSolve', id, sessionId, patch: { penalty, comment: comment ?? null } } } : q));
+  }
+  return stored;
 }
 
 /** The solve service's answer to a solve for a session that isn't there (services/solve/src/routes/solves.ts). */
@@ -478,7 +551,7 @@ function rehomeSolves(lost: string, uid: string, event: string): void {
   const session = { id: uuid(), name, event, ...(practice ? { practice: true } : {}), ...(old?.scramble ? { scramble: old.scramble } : {}), createdAt: new Date().toISOString() };
   rehomed.add(session.id);
   let moved = 0;
-  queue = queue.map((q) => {
+  queue = readQueue().map((q) => {
     if (q.userId !== uid) return q;
     if (q.op.kind === 'createSolve' && q.op.solve.sessionId === lost) {
       moved++;
@@ -752,8 +825,9 @@ if (browser) {
     void pump();
     if (loadError) void refreshCloud();
   });
-  // another tab changed the guest data
+  // another tab changed the guest data, or the queue
   window.addEventListener('storage', (e) => {
+    if (e.key === QUEUE_KEY || e.key === null) queueChangedElsewhere();
     if (e.key !== LOCAL_KEY || scope?.mode !== 'local' || localDirty) return;
     const current = model.current;
     localDb = readLocal(true);
@@ -765,6 +839,14 @@ if (browser) {
     }
     publish();
   });
+}
+
+/** Another tab wrote the queue: follow it; what this tab waited for may have gone through over there. */
+function queueChangedElsewhere(): void {
+  queue = readQueue();
+  for (const id of Array.from(waiters.keys())) if (id !== inflight && !queue.some((q) => q.opId === id)) settle(id);
+  publish();
+  if (userId() && pendingCount() > 0 && !retryTimer) void pump();
 }
 
 // ================================================================ mutations
@@ -1393,7 +1475,7 @@ export function localDataSummary(): { sessions: number; solves: number } {
 
 /** Forgets what this browser keeps for an account (after deleting it): its offline copy and unsent changes. */
 export function forgetUser(uid: string): void {
-  queue = queue.filter((q) => q.userId !== uid);
+  queue = readQueue().filter((q) => q.userId !== uid);
   saveQueue();
   if (loadJson<{ userId?: unknown } | null>(CLOUD_CACHE_KEY, null)?.userId === uid) {
     try {
