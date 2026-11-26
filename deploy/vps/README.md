@@ -119,6 +119,11 @@ curl -s https://cubr.dev/robots.txt; curl -s https://cubr.dev/.well-known/securi
   the date up to a year ahead and release.
 - **Outside checks** (paste the site into them): MDN HTTP Observatory, securityheaders.com and
   Google Search Console (the sitemap, and the 404s it finds).
+- **What crawlers that don't run JavaScript read** (AI search, link previews, Bing at times): each
+  public page's file has its title, description and a hidden summary, and since 2026-11-26 the page's
+  own content too, rendered while the web image is built (`web/scripts/prerender.mjs`, a headless
+  Chromium in the build stage; the build log says which pages it filled). People never see it: the app
+  replaces it as it starts. Check one: `curl -s https://cubr.dev/about | grep -c page-content` (1).
 
 ## The offline app (service worker)
 

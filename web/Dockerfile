@@ -4,6 +4,8 @@
 
 # ---- build stage (native arch; output is static files)
 FROM --platform=$BUILDPLATFORM node:22-alpine AS build
+# a headless Chromium for the prerender below (this stage only; the image itself is nginx)
+RUN apk add --no-cache chromium
 WORKDIR /repo
 # the root tsconfig too: esbuild compiles packages/cubestats with the nearest one, so without it the
 # image built class fields differently than a laptop does (assigned in the constructor, not defined)
@@ -20,6 +22,8 @@ COPY web web
 ARG VITE_SW=on
 # npm run build = typecheck (type errors fail the image build) + vite build
 RUN cd web && npm run build
+# each public page's content in its file, for crawlers that don't run JavaScript (scripts/prerender.mjs)
+RUN cd web && node scripts/prerender.mjs
 
 # ---- runtime stage: nginx as non-root (uid 101), listening on 8080
 FROM nginxinc/nginx-unprivileged:1.27-alpine
