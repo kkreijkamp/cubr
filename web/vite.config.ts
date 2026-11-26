@@ -39,7 +39,8 @@ export default defineConfig({
   worker: { format: 'es' },
   test: {
     environment: 'node',
-    include: ['src/**/__tests__/**/*.test.ts'],
+    // plugins' own tests need Node's modules, which src's type-check (and the image build) leaves out
+    include: ['src/**/__tests__/**/*.test.ts', 'plugins/**/__tests__/**/*.test.ts'],
     // CSS is left out of tests (an empty module) unless listed here; lib/__tests__/themes.test.ts reads
     // the stylesheet's first-paint colours as text (global.css?raw), and __tests__/hoverMedia.test.ts
     // every stylesheet (?raw)

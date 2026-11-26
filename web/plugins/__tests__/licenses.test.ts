@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { fileURLToPath } from 'node:url';
-import { FONT_PACKAGES, packageRoot, readPackage, renderLicenses } from '../../plugins/licenses';
+import { FONT_PACKAGES, packageRoot, readPackage, renderLicenses } from '../licenses';
 
 // dist/licenses.txt (plugins/licenses.ts): the licences of what the web app ships, from the bundle itself.
+// Here, not under src: it needs Node's own modules, and the image build type-checks src without Node's types.
 const NODE_MODULES = fileURLToPath(new URL('../../node_modules', import.meta.url));
 
 describe('licenses.txt', () => {
