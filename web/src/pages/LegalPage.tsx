@@ -236,7 +236,7 @@ export function PrivacyPage() {
             Password-reset links work for 1 hour, links that confirm your email for 7 days (1 hour for a change of address). Race rooms
             and their chat are kept until 2 hours after the room was last active, and rate-limit counters for up to a day.
           </li>
-          <li>Server logs, error reports included, are rotated automatically and overwritten as they fill up.</li>
+          <li>Server logs, error reports included: at most 14 days.</li>
           <li>Supporter entries: until you ask us to remove your name.</li>
           <li>Page-view statistics: only as totals, in Cloudflare&apos;s dashboard, for as long as Cloudflare keeps them.</li>
           <li>

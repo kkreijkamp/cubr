@@ -16,13 +16,13 @@
 # Needs Docker Compose >= 2.24 for !reset / !override.
 # =============================================================================================
 
-# Container logs (the gateway's access log holds visitors' IP addresses) are rotated by size, so they
-# are overwritten as they fill up instead of growing forever: at most 3 x 10 MB per container.
+# Container logs (the gateway's access log holds visitors' IP addresses) go to the VM's journal, which
+# keeps at most 14 days and 500 MB (deploy/vps/journald.conf): a time limit the privacy policy can
+# state, which size-rotated files can't give. `docker compose logs` reads them as before.
 x-logging: &logging
-  driver: json-file
+  driver: journald
   options:
-    max-size: 10m
-    max-file: "3"
+    tag: "{{.Name}}"
 
 x-prod-env: &prod-env
   DATABASE_URL: postgres://cubr:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/cubr

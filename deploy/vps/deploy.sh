@@ -48,12 +48,17 @@ echo "deploying cubr ${VERSION} (${TAG} on main) to ${VM}"
 # 1. compose files, gateway config, backup script and systemd timers from the release tag, laid out
 #    like the repo so relative paths keep working; (re)install the timers (backup, WCA import)
 git archive --format=tar "$TAG" docker-compose.yml deploy/vps/compose.prod.yml deploy/gateway/nginx.conf \
-    deploy/vps/backup.sh deploy/vps/systemd | gzip \
+    deploy/vps/backup.sh deploy/vps/watch.sh deploy/vps/journald.conf deploy/vps/systemd | gzip \
   | on_vm 'set -e; test -f /opt/cubr/.env || { echo "no /opt/cubr/.env: run deploy.sh init first" >&2; exit 1; }
       tar -xzf - -C /opt/cubr
       sudo install -m 644 /opt/cubr/deploy/vps/systemd/cubr-* /etc/systemd/system/
       sudo systemctl daemon-reload
-      sudo systemctl enable --now cubr-backup.timer cubr-wca-import.timer 2>/dev/null'
+      sudo systemctl enable --now cubr-backup.timer cubr-wca-import.timer cubr-watch.timer 2>/dev/null
+      # the journal keeps 14 days at most (the containers log there): only restarted when that changes
+      if ! sudo cmp -s /opt/cubr/deploy/vps/journald.conf /etc/systemd/journald.conf.d/cubr.conf; then
+        sudo install -D -m 644 /opt/cubr/deploy/vps/journald.conf /etc/systemd/journald.conf.d/cubr.conf
+        sudo systemctl restart systemd-journald
+      fi'
 
 # 2. registry login (VM service account), pull the new version (a shell variable beats .env), and
 #    only once that worked record it in .env and restart, then wait for health

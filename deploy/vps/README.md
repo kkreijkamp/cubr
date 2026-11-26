@@ -210,6 +210,25 @@ Restore: copy a dump to the VM, then
 `$C exec -T postgres pg_restore -U cubr -d cubr --clean --if-exists < cubr-<date>.dump`,
 and run the WCA import.
 
+## Alerts and logs
+
+- **Site down:** an uptime check emails you ("cubr.dev is down").
+- **Everything else** (since 2026-11-26): `cubr-watch.timer` runs `deploy/vps/watch.sh` every 15 minutes.
+  It checks the disk (80 % full), the services' containers (not running, unhealthy, restarted),
+  a burst of 5xx from the gateway (20 in 15 minutes), the nightly backup (none in 26 hours) and the
+  weekly WCA import (none in 8 days). A problem is written to Cloud Logging (log `cubr-watch`,
+  severity ERROR), and the alert policy "cubr: something on the VM needs you" emails you, at most
+  hourly; the same problems are written again only after 6 hours.
+  ```sh
+  sudo journalctl -u cubr-watch.service -n 20      # what it found (the VM)
+  sudo systemctl start cubr-watch.service          # check now
+  gcloud logging read 'logName="projects/cubr-app/logs/cubr-watch"' --configuration=cubr --limit 5
+  ```
+  It needs the VM's service account to hold `roles/logging.logWriter` (granted 2026-11-26).
+- **Logs** (visitors' IP addresses are in the gateway's): the VM's journal keeps at most 14 days and
+  500 MB (`deploy/vps/journald.conf`, installed by `deploy.sh`), and the containers log to it
+  (`compose.prod.yml`), so the same limit holds for them. `$C logs <service>` reads them as before.
+
 ## Moderation
 
 When someone reports a profile or a race room (an email to hello@cubr.dev from its flag link) or
