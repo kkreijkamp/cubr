@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # Build context = repo root:  docker build -f services/scramble/Dockerfile -t cubr/scramble:dev .
 # ---- build stage: runs natively on the build machine; output is architecture-independent JS
-FROM --platform=$BUILDPLATFORM node:22-alpine AS build
+FROM --platform=$BUILDPLATFORM node:26-alpine AS build
 WORKDIR /repo
 COPY . .
 RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
@@ -14,7 +14,7 @@ RUN node scripts/build-service.mjs services/scramble
 # three.js, @optique and the type packages (+ their own deps) serve <twisty-player>, the CLI and
 # TypeScript -> removed. csTimer's scramblers (cstimer_module, one file, no dependencies) are
 # loaded by path in their own worker thread (src/cstimer.ts), so they live here too.
-FROM --platform=$BUILDPLATFORM node:22-alpine AS cubing
+FROM --platform=$BUILDPLATFORM node:26-alpine AS cubing
 ARG CUBING_VERSION=0.65.1
 ARG CSTIMER_VERSION=0.1.5
 WORKDIR /app
@@ -25,7 +25,7 @@ RUN --mount=type=cache,target=/root/.npm \
            node_modules/@tweenjs node_modules/@webgpu node_modules/fflate node_modules/meshoptimizer node_modules/tagged-tag
 
 # ---- runtime stage: node + one bundled file + node_modules/cubing, runs as the unprivileged "node" user
-FROM node:22-alpine
+FROM node:26-alpine
 ARG APP_VERSION=dev
 ENV NODE_ENV=production SERVICE_NAME=scramble APP_VERSION=${APP_VERSION} PORT=8080
 WORKDIR /app

@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # Build context = repo root:  docker build -f services/auth/Dockerfile -t cubr/auth:dev .
 # ---- build stage: runs natively on the build machine; output is architecture-independent JS
-FROM --platform=$BUILDPLATFORM node:22-alpine AS build
+FROM --platform=$BUILDPLATFORM node:26-alpine AS build
 WORKDIR /repo
 COPY . .
 RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
@@ -13,7 +13,7 @@ RUN node scripts/build-service.mjs services/auth
 # both). Pinned to the repo's version in package-lock.json (test/avatarImage.test.ts checks they match).
 # Its WebAssembly fallback (9 MB, with its runtime) is removed: the native build has to load, which the
 # last step checks, so a bad install fails this build instead of the service.
-FROM node:22-alpine AS sharp
+FROM node:26-alpine AS sharp
 ARG SHARP_VERSION=0.35.5
 WORKDIR /app
 RUN --mount=type=cache,target=/root/.npm \
@@ -23,7 +23,7 @@ RUN --mount=type=cache,target=/root/.npm \
  && node -e "const s = require('sharp'); console.log('sharp', s.versions.sharp, 'libvips', s.versions.vips)"
 
 # ---- runtime stage: node + one bundled file + node_modules/sharp, runs as the unprivileged "node" user
-FROM node:22-alpine
+FROM node:26-alpine
 ARG APP_VERSION=dev
 ENV NODE_ENV=production SERVICE_NAME=auth APP_VERSION=${APP_VERSION} PORT=8080
 WORKDIR /app

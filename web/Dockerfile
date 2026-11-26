@@ -3,7 +3,7 @@
 # Build context: repository root (needs packages/cubestats for shared stats code).
 
 # ---- build stage (native arch; output is static files)
-FROM --platform=$BUILDPLATFORM node:22-alpine AS build
+FROM --platform=$BUILDPLATFORM node:26-alpine AS build
 # a headless Chromium for the prerender below (this stage only; the image itself is nginx)
 RUN apk add --no-cache chromium
 WORKDIR /repo
@@ -26,7 +26,7 @@ RUN cd web && npm run build
 RUN cd web && node scripts/prerender.mjs
 
 # ---- runtime stage: nginx as non-root (uid 101), listening on 8080
-FROM nginxinc/nginx-unprivileged:1.27-alpine
+FROM nginxinc/nginx-unprivileged:1.31-alpine
 ARG APP_VERSION=dev
 ENV APP_VERSION=${APP_VERSION} NODE_NAME=local
 COPY web/nginx/default.conf.template /etc/nginx/templates/default.conf.template
