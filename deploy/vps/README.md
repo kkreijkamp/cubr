@@ -79,8 +79,9 @@ cubr installs as an app and works offline: a service worker (`web/src/sw/`, docs
 caches the web app in each visitor's browser. What that means for releases:
 
 - **Browsers check `/sw.js` on every page load.** The web container sends it with
-  `Cache-Control: no-cache`, which Cloudflare respects. Check it with
-  `curl -sI https://cubr.dev/sw.js`.
+  `Cache-Control: no-cache`, which Cloudflare passes on because the zone's Browser Cache TTL is
+  "Respect Existing Headers" (since 2026-11-26; Cloudflare's default, 4 hours, turned it into
+  `max-age=14400`). Check it with `curl -sI https://cubr.dev/sw.js`.
 - **After a release that changes the web app,** open pages show "update ready". The new version
   applies when the notice is clicked or on the next link click inside the app, never by itself.
   A tab that's never reloaded keeps running the previous version, so **keep API changes backward
@@ -182,7 +183,10 @@ and run the WCA import.
   try again in a few seconds"). It stops bursts before they reach the VM; the auth service's own
   limit (10 a minute per IP) still applies behind it.
 - **Zone settings** (Cloudflare, SSL/TLS and Security > Settings): Always Use HTTPS, minimum TLS 1.2,
-  TLS 1.3, Automatic HTTPS Rewrites and Browser Integrity Check are on. Check the TLS floor with
+  TLS 1.3, Automatic HTTPS Rewrites and Browser Integrity Check are on; Browser Cache TTL is "Respect
+  Existing Headers" (Caching > Configuration). Web Analytics' automatic setup is on (since 2026-11-26):
+  Cloudflare injects the beacon into pages it serves, and the app adds its own only for loads from the
+  installed app's cache (docs/SPEC.md 10.3). Check the TLS floor with
   `curl -sSI --tlsv1.1 --tls-max 1.1 https://cubr.dev/`, which must fail with "alert protocol version".
 - **Bot Fight Mode stays off.** The free plan can't exempt anything from it, so it may challenge
   Google Cloud's uptime check (`/healthz`), Ko-fi's webhook (`/api/supporters/kofi`) and

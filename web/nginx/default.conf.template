@@ -4,7 +4,8 @@
 #
 # Headers: every response gets the same security headers, set once at server level. No location may
 # use add_header: nginx would then drop every inherited header for that location. What differs by path
-# (Cache-Control, X-Robots-Tag) comes from the two maps instead. web/src/__tests__/site.test.ts checks
+# (Cache-Control, X-Robots-Tag) comes from maps instead, and so does what differs by request (the analytics
+# beacon's hosts in the CSP). web/src/__tests__/site.test.ts checks
 # this, the CSP hash and the routes below.
 
 # Cache-Control by status and path ($uri is the file nginx ended up serving: index.html for the app's
@@ -16,6 +17,22 @@ map "$status:$uri" $cubr_cache_control {
   ~^\d+:/(?:_info|healthz|readyz)$          "no-store";
   ~^(?:200|304):/(?:robots\.txt|sitemap\.xml)$  "public, max-age=3600";
   ~^(?:200|304):/\.well-known/              "public, max-age=3600";
+}
+
+# Cloudflare Web Analytics only for browsers that don't ask not to be tracked. Cloudflare injects its
+# beacon into every page it serves (automatic setup), and the beacon checks neither Global Privacy
+# Control (Sec-GPC: 1) nor Do Not Track (DNT: 1), so for a browser that sends either the CSP leaves the
+# beacon's hosts out and the browser refuses to load it (the app's own beacon, src/lib/analytics.ts,
+# already stays away). The key is "<Sec-GPC>:<DNT>".
+map "$http_sec_gpc:$http_dnt" $cubr_beacon_script {
+  default  "https://static.cloudflareinsights.com";
+  "~^1:"   "";
+  "~:1$"   "";
+}
+map "$http_sec_gpc:$http_dnt" $cubr_beacon_reports {
+  default  "https://cloudflareinsights.com";
+  "~^1:"   "";
+  "~:1$"   "";
 }
 
 # Pages search engines shouldn't list: personal and one-off pages (an empty value sends no header).
@@ -83,8 +100,9 @@ server {
   # scramble net reads cubing.js's puzzle drawings, whose stickers carry style="fill:..."; React sets
   # styles through the CSSOM, which needs nothing. One outside script: Cloudflare Web Analytics' beacon
   # (static.cloudflareinsights.com), which reports to cloudflareinsights.com when the app loads it, or
-  # to cubr.dev's own /cdn-cgi/rum when Cloudflare injects it (web/src/lib/analytics.ts).
-  add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-kbWrCQcY5deeZriU+oYxYkCG4RR147XA28tK/0GtqOI=' https://static.cloudflareinsights.com; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' wss://$host https://cloudflareinsights.com; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
+  # to cubr.dev's own /cdn-cgi/rum when Cloudflare injects it (web/src/lib/analytics.ts); left out for a
+  # browser that sends Global Privacy Control or Do Not Track ($cubr_beacon_script, $cubr_beacon_reports).
+  add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-kbWrCQcY5deeZriU+oYxYkCG4RR147XA28tK/0GtqOI=' $cubr_beacon_script; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' wss://$host $cubr_beacon_reports; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
   add_header X-Content-Type-Options "nosniff" always;
   add_header X-Frame-Options "DENY" always;
   add_header Referrer-Policy "strict-origin-when-cross-origin" always;

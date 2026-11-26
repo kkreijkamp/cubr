@@ -940,11 +940,15 @@ The web container's nginx (`web/nginx/default.conf.template`) serves the app and
   - **Never when the browser sends Global Privacy Control or Do Not Track.**
   - **Never twice:** not if the page already has the beacon.
   - The beacon follows the router's page changes itself and reports to `cloudflareinsights.com`.
-- **Why the app adds it:** Cloudflare can inject the beacon into the pages it serves ("automatic setup",
-  which Cloudflare switched on by default when the zone was created). But the offline app opens from
-  its cached `index.html`, which never passes through Cloudflare. Automatic setup should be off, so the
-  app's rules (no Global Privacy Control, no Do Not Track) hold for every page. The CSP allows both
-  ways: the script host, and the injected beacon's same-origin `/cdn-cgi/rum`.
+- **Why the app adds it:** Cloudflare injects the beacon into the pages it serves ("automatic setup",
+  on since 2026-11-26), but the offline app opens from its cached `index.html`, which never passes
+  through Cloudflare; the app adds its own only where the page has none. The CSP allows both ways: the
+  script host, and the injected beacon's same-origin `/cdn-cgi/rum`.
+- **Global Privacy Control and Do Not Track:** the injected beacon checks neither (Cloudflare injects
+  it for every request, and its script has no check). So for a browser that sends `Sec-GPC: 1` or
+  `DNT: 1`, the web server's CSP leaves the beacon's hosts out (`$cubr_beacon_script` and
+  `$cubr_beacon_reports` in `web/nginx/default.conf.template`) and the browser refuses to load it, as
+  the privacy policy says. `web/src/__tests__/site.test.ts` checks both CSPs.
 
 ### 10.4 Themes, light and dark mode
 

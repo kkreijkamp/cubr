@@ -123,12 +123,20 @@ function mapLookup(name: string, key: string): string {
 const serverHeaders = Object.fromEntries(
   [...inServer.rest.matchAll(/add_header\s+(\S+)\s+("[^"]*"|\S+)\s+always;/g)].map((m) => [m[1], m[2].replace(/^"|"$/g, '')]),
 );
-const csp = Object.fromEntries(
-  serverHeaders['Content-Security-Policy']
-    .split(';')
-    .map((d) => d.trim().split(/\s+/))
-    .map(([name, ...values]) => [name, values]),
-);
+/**
+ * The CSP a browser gets, its analytics hosts filled in from their maps: `signals` is the request's
+ * "<Sec-GPC>:<DNT>" (":" sends neither).
+ */
+function cspFor(signals: string): Record<string, string[]> {
+  const header = serverHeaders['Content-Security-Policy'].replace(/\$cubr_beacon_(script|reports)\b/g, (v) => mapLookup(v, signals));
+  return Object.fromEntries(
+    header
+      .split(';')
+      .map((d) => d.trim().split(/\s+/).filter(Boolean))
+      .map(([name, ...values]) => [name, values]),
+  );
+}
+const csp = cspFor(':');
 
 // ---- the app's pages and real 404s ------------------------------------------------------------------
 /** Every route of the router (src/App.tsx), with sample values for its parameters. */
@@ -255,6 +263,16 @@ describe('security headers', () => {
 
   it('allow exactly the analytics beacon the app loads (lib/analytics.ts)', () => {
     expect(csp['script-src']).toContain(new URL(BEACON_SRC).origin);
+  });
+
+  it("keep Cloudflare's beacon out for a browser that sends Global Privacy Control or Do Not Track", () => {
+    // Cloudflare injects its beacon into every page, and the beacon checks neither: the browser refuses it
+    for (const signals of ['1:', ':1', '1:1']) {
+      const strict = cspFor(signals);
+      expect(strict['script-src'], signals).toEqual(csp['script-src'].filter((v) => !v.includes('cloudflareinsights')));
+      expect(strict['connect-src'], signals).toEqual(["'self'", 'wss://$host']);
+    }
+    for (const signals of [':', '0:', ':0', '0:0']) expect(cspFor(signals), signals).toEqual(csp);
   });
 
   it('take stylesheets only from cubr.dev (no injected <style>), allowing inline style attributes alone', () => {
