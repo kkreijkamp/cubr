@@ -36,5 +36,14 @@ describe('reserved usernames', () => {
   it("are the site's and its staff's, whatever the case, underscores or trailing digits", () => {
     for (const u of ['admin', 'Admin_1', 'cubr', 'CUBR_official', 'support2', 'moderator_99', 'wca', 'no_reply']) expect(isReservedUsername(u), u).toBe(true);
     for (const u of ['koen', 'adminx', 'cubrfan', 'feliks_z', 'helpful_cuber']) expect(isReservedUsername(u), u).toBe(false);
+    for (const u of ['123', '_1', '']) expect(isReservedUsername(u), u).toBe(false);
+  });
+
+  it('takes time in step with the name, however long its run of digits', () => {
+    // /\d+$/ took about 1.2 s for 40,000 digits and a letter (and minutes for a 1 MB request body)
+    const t = performance.now();
+    expect(isReservedUsername('1'.repeat(1_000_000) + 'a')).toBe(false);
+    expect(isReservedUsername('admin' + '9'.repeat(1_000_000))).toBe(true);
+    expect(performance.now() - t).toBeLessThan(500);
   });
 });

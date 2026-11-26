@@ -62,6 +62,18 @@ describe('names and bios cubr does not allow', () => {
     expect(patchMeSchema.safeParse({ displayName: 'Feliks Z', bio: 'sub-10 goal, learning zbll' }).success).toBe(true);
     expect(patchMeSchema.safeParse({ displayName: null, bio: '' }).success).toBe(true);
   });
+  it("checks words only within the length, so a request body's worth of text is refused at once", () => {
+    // before, a 40,000-digit username kept auth busy 1.2 s in the reserved-name check (minutes at 1 MB)
+    const t = performance.now();
+    const huge = '1'.repeat(1_000_000) + 'a';
+    expect(reg(huge).error?.issues.map((i) => i.message)).toEqual(['must be 3-20 characters: letters, digits or _']);
+    expect(patchMeSchema.safeParse({ bio: 'shit '.repeat(200_000) }).error?.issues.map((i) => i.code)).toEqual(['too_big']);
+    expect(patchMeSchema.safeParse({ displayName: 'x'.repeat(1_000_000) }).error?.issues.map((i) => i.code)).toEqual(['too_big']);
+    expect(registerSchema.safeParse({ username: 'feliks_z', email: 'a'.repeat(1_000_000), password: 'password1' }).error?.issues.map((i) => i.code)).toEqual([
+      'too_big',
+    ]);
+    expect(performance.now() - t).toBeLessThan(500);
+  });
 });
 
 describe('deleteMeSchema', () => {

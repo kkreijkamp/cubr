@@ -50,5 +50,10 @@ export const RESERVED_USERNAMES: ReadonlySet<string> = new Set([
 ]);
 
 export function isReservedUsername(name: string): boolean {
-  return RESERVED_USERNAMES.has(name.toLowerCase().replace(/_/g, '').replace(/\d+$/, ''));
+  const s = name.toLowerCase().replace(/_/g, '');
+  // trailing digits off by a loop: /\d+$/ takes time in the square of a long run of digits followed
+  // by anything else (CodeQL), and this can see what someone typed before any length check
+  let end = s.length;
+  while (end > 0 && s.charCodeAt(end - 1) >= 48 && s.charCodeAt(end - 1) <= 57) end--;
+  return RESERVED_USERNAMES.has(s.slice(0, end));
 }
