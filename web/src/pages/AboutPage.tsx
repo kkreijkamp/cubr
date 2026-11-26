@@ -6,6 +6,7 @@ import {
   ChartBarIcon,
   ClockIcon,
   CommandLineIcon,
+  EyeIcon,
   FlagIcon,
   GiftIcon,
   GlobeAltIcon,
@@ -216,6 +217,37 @@ export default function AboutPage() {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* the accessibility statement (the AHRC recommends one): what cubr does, how it was checked, what's
+          missing, and how to report a problem */}
+      <section aria-labelledby="ab-a11y" id="accessibility">
+        <h2 className="ab-h" id="ab-a11y">
+          <EyeIcon /> accessibility
+        </h2>
+        <p className="ab-p">
+          cubr aims for WCAG 2.2 at level AA, so you can time your solves however you use a computer or phone: with a keyboard, a screen reader,
+          touch or a smart cube.
+        </p>
+        <p className="ab-p">
+          Every page has a skip link and headings in order. Everything works from the keyboard, menus and dialogs included (Tab, the arrow keys,
+          Esc), and the timer with space. A screen reader hears each solve&apos;s time once it ends, and nothing while it runs. The high-contrast
+          setting brings labels and links to 4.5:1 in any theme, Windows high contrast mode keeps focus and your choices visible, pages reflow
+          down to 320 px wide, and motion follows your reduced-motion setting.
+        </p>
+        <p className="ab-p">
+          Checked in November 2026: every main page in Chrome, Firefox and Safari&apos;s engine, with the keyboard alone, at 200 % zoom, with
+          wider text spacing, in high contrast mode and with reduced motion. Not yet with every screen reader on every device.
+        </p>
+        <p className="ab-p">
+          Not there yet: the charts on profiles are pictures (their numbers are in the summaries and tables beside them); some themes have
+          low-contrast text (turn on high contrast, or pick a high-contrast theme); smart cubes need Bluetooth, which only Chrome and Edge have;
+          the 3D previews are visual, and the scramble is always there as text.
+        </p>
+        <p className="ab-p">
+          Something in your way? Tell us with the feedback form at the bottom of every page, or at <a href="mailto:hello@cubr.dev">hello@cubr.dev</a>.
+          We answer within a week, and fix what we can.
+        </p>
       </section>
 
       <Supporters />
