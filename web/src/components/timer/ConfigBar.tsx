@@ -130,7 +130,19 @@ export function ConfigBar(p: Props) {
 }
 
 /** Closes a dropdown on a click outside `ref` or on Escape. */
+/** The menu's items, in order (disabled ones left out). */
+const menuItems = (el: HTMLElement) => Array.from(el.querySelectorAll<HTMLElement>('[role^="menuitem"]:not([disabled])'));
+
+/**
+ * A config-bar menu's behaviour, `ref` wrapping its button and the menu: a click outside or Esc closes it
+ * (focus back on the button if it was inside), and the keyboard works as a menu should: Down or Up on the
+ * button opens it at the chosen item (or the last), Down, Up, Home and End move between the items, and
+ * choosing one with Enter or Space puts focus back on the button.
+ */
 function useDismiss(open: boolean, setOpen: (o: boolean) => void, ref: RefObject<HTMLElement | null>) {
+  const focusOnOpen = useRef<'chosen' | 'last' | null>(null);
+  const trigger = () => ref.current?.querySelector<HTMLElement>('[aria-haspopup]') ?? null;
+
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
@@ -140,7 +152,9 @@ function useDismiss(open: boolean, setOpen: (o: boolean) => void, ref: RefObject
       if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
+        const wasInside = ref.current?.contains(document.activeElement) ?? false;
         setOpen(false);
+        if (wasInside) trigger()?.focus();
       }
     };
     window.addEventListener('mousedown', onDown);
@@ -149,7 +163,51 @@ function useDismiss(open: boolean, setOpen: (o: boolean) => void, ref: RefObject
       window.removeEventListener('mousedown', onDown);
       window.removeEventListener('keydown', onKey, true);
     };
-  }, [open, setOpen, ref]);
+  }, [open, setOpen, ref]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const onKey = (e: KeyboardEvent) => {
+      const list = menuItems(el);
+      const active = document.activeElement as HTMLElement | null;
+      const at = active ? list.indexOf(active) : -1;
+      if ((e.key === 'Enter' || e.key === ' ') && at >= 0) {
+        requestAnimationFrame(() => trigger()?.focus()); // after the item's click has closed the menu
+        return;
+      }
+      if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
+      e.preventDefault(); // also keeps the timer page's shortcuts out of it
+      if (!list.length) {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          focusOnOpen.current = e.key === 'ArrowUp' ? 'last' : 'chosen';
+          setOpen(true);
+        }
+        return;
+      }
+      const chosen = Math.max(0, list.findIndex((x) => x.getAttribute('aria-checked') === 'true'));
+      const next =
+        e.key === 'Home' ? 0
+        : e.key === 'End' ? list.length - 1
+        : e.key === 'ArrowDown' ? (at < 0 ? chosen : (at + 1) % list.length)
+        : at < 0 ? list.length - 1 : (at - 1 + list.length) % list.length;
+      list[next].focus();
+    };
+    el.addEventListener('keydown', onKey);
+    return () => el.removeEventListener('keydown', onKey);
+  }, [ref, setOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // opened with an arrow key: focus goes to the chosen item (or the first), or the last
+  useEffect(() => {
+    const el = ref.current;
+    if (!open || !el || !focusOnOpen.current) return;
+    const list = menuItems(el);
+    const where = focusOnOpen.current;
+    focusOnOpen.current = null;
+    if (!list.length) return;
+    const chosen = Math.max(0, list.findIndex((x) => x.getAttribute('aria-checked') === 'true'));
+    list[where === 'last' ? list.length - 1 : chosen].focus();
+  }, [open, ref]);
 }
 
 interface EventMenuProps {

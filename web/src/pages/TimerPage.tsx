@@ -121,6 +121,15 @@ function isTyping(el: EventTarget | null): boolean {
   return el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName);
 }
 
+/** A control that has keyboard focus (it matches :focus-visible): Tab moves on from it instead of giving a new scramble. */
+function isKeyboardOnControl(el: Element | null): boolean {
+  return (
+    el instanceof HTMLElement &&
+    el.matches('a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])') &&
+    el.matches(':focus-visible')
+  );
+}
+
 export default function TimerPage() {
   useCanonical('/'); // the home page, without any query (/?v=1 is the same page)
   usePageMeta(HOME);
@@ -335,6 +344,9 @@ export default function TimerPage() {
       // in the typing box, alt / ctrl+alt shortcuts and ctrl+1/2/3 still work (ctrl+z stays undo there)
       if (isTyping(e.target) && !(inManualInput && (e.altKey || (e.ctrlKey && /^Digit[123]$/.test(e.code))))) return;
       if (e.key === 'Tab' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+        // someone moving through the controls with the keyboard (the focused one wears its ring) keeps Tab;
+        // anywhere else (nothing focused, the heading, a control clicked with the mouse) it's a new scramble
+        if (isKeyboardOnControl(document.activeElement)) return;
         e.preventDefault();
         scrRef.current.next();
         return;

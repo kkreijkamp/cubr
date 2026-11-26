@@ -49,7 +49,7 @@ const FEATURES: { icon: typeof ClockIcon; t: string; d: string; to?: string }[] 
 const KEYS: [string[], string][] = [
   [['esc'], 'command line (or ctrl + k)'],
   [['space'], 'hold, release to start - press to stop'],
-  [['tab'], 'new scramble'],
+  [['tab'], 'new scramble (on a control you reached with the keyboard, the next control)'],
   [['alt', '1-7'], 'switch event: square-1, 2x2 ... 7x7 (alt + p / m / c / s for the others)'],
   [['ctrl', '1'], 'mark the last solve ok'],
   [['ctrl', '2'], 'add a +2 to the last solve'],
