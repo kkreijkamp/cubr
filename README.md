@@ -63,6 +63,7 @@ page (locally in the installed Google Chrome).
 - [`docs/SPEC.md`](docs/SPEC.md): the system specification (APIs, schemas and events)
 - [`deploy/README.md`](deploy/README.md): the local stack, the WCA data and demo users, and Kubernetes
 - [`deploy/vps/README.md`](deploy/vps/README.md): production
+- [`CONTRIBUTING.md`](CONTRIBUTING.md): running it, and making a change; [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)
 - [`SECURITY.md`](SECURITY.md): reporting a vulnerability
 
 ## Acknowledgements

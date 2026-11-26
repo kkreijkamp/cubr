@@ -1,0 +1,40 @@
+name: Bug report
+description: Something on cubr.dev, or in this code, doesn't work as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting it. For a security problem, please don't open an issue; SECURITY.md says how to report it privately.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: And what you expected to happen instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen
+      placeholder: |
+        1. Open the timer
+        2. ...
+  - type: input
+    id: version
+    attributes:
+      label: cubr's version
+      description: It's at the bottom of every page, e.g. v1.6.2.
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and device
+      placeholder: e.g. Safari 18 on an iPhone 15, or Chrome 131 on Windows 11
+    validations:
+      required: true
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: A screenshot, how you time (keyboard, touch, Stackmat, a Bluetooth timer or smart cube), the settings that matter.
