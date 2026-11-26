@@ -449,8 +449,29 @@ kbd {
 a:focus-visible,
 input[type='checkbox']:focus-visible,
 input[type='radio']:focus-visible {
-  outline: none;
+  /* the ring is a shadow; the outline is transparent, so it shows only where the browser forces its own
+     colours (Windows high contrast), which drop shadows */
+  outline: 2px solid transparent;
+  outline-offset: 2px;
   box-shadow: 0 0 0 0.1rem var(--bg-color), 0 0 0 0.2rem var(--text-color);
+}
+
+/* Windows high contrast (forced colours): the theme's colours give way to the system's, so whatever only
+   colour told apart gets an outline: the chosen option, a pressed or checked item, the page you're on,
+   and the timer when it's ready to start (its green) */
+@media (forced-colors: active) {
+  .active,
+  [aria-pressed='true'],
+  [aria-checked='true'],
+  [aria-current='page'],
+  [aria-selected='true'] {
+    outline: 2px solid Highlight;
+    outline-offset: 1px;
+  }
+  .timer-display.ready {
+    outline: 3px solid Highlight;
+    outline-offset: 0.15em;
+  }
 }
 .btn svg,
 .btn-text svg {
