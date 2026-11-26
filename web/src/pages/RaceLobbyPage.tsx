@@ -51,9 +51,9 @@ function RoomsTable({ onJoin }: { onJoin: (id: string) => void }) {
   return (
     <section className="card race-rooms" aria-labelledby="rooms-title">
       <div className="live-section-title">
-        <h3 className="h3" id="rooms-title">
+        <h2 className="h3" id="rooms-title">
           <FlagIcon /> public rooms
-        </h3>
+        </h2>
         <button className="btn-text small race-refresh" onClick={load} aria-label="refresh">
           {loading ? <Spinner size={14} /> : <ArrowPathIcon width={14} height={14} />} {rooms ? `${rooms.length} open` : ''}
         </button>
@@ -178,9 +178,9 @@ export default function RaceLobbyPage() {
         <div className="stack">
           <section className="card race-card" aria-labelledby="you-title">
             <div className="live-section-title">
-              <h3 className="h3" id="you-title">
+              <h2 className="h3" id="you-title">
                 <UserIcon /> you
-              </h3>
+              </h2>
             </div>
             {status === 'authed' && user ? (
               <div className="small">
@@ -204,9 +204,9 @@ export default function RaceLobbyPage() {
 
           <section className="card race-card" aria-labelledby="create-title">
             <div className="live-section-title">
-              <h3 className="h3" id="create-title">
+              <h2 className="h3" id="create-title">
                 <PlusIcon /> create room
-              </h3>
+              </h2>
             </div>
             <form
               className="stack race-form"
@@ -242,9 +242,9 @@ export default function RaceLobbyPage() {
 
           <section className="card race-card" aria-labelledby="join-title">
             <div className="live-section-title">
-              <h3 className="h3" id="join-title">
+              <h2 className="h3" id="join-title">
                 <HashtagIcon /> join by code
-              </h3>
+              </h2>
             </div>
             <form
               className="row race-join"

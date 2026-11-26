@@ -45,9 +45,9 @@ export function DailyBoard({
   return (
     <section className="card daily-board" aria-labelledby="dboard-title">
       <div className="live-section-title">
-        <h3 className="h3" id="dboard-title">
+        <h2 className="h3" id="dboard-title">
           <TrophyIcon /> leaderboard
-        </h3>
+        </h2>
         <span className="meta">
           {lb.loading && data ? <Spinner size={12} /> : null} {data ? `${formatNumber(data.total)} ranked` : ''}
         </span>

@@ -218,9 +218,9 @@ export function RankCalculator({ params, onChange, onPerson }: { params: RankPar
       {!importing && (
         <section className="card wca-dist" aria-labelledby="dist-title">
           <div className="live-section-title">
-            <h3 className="h3" id="dist-title">
+            <h2 className="h3" id="dist-title">
               {ev?.name ?? event} {kind === 'average' ? (fmc ? 'mean' : 'average') : 'single'} - all competitors
-            </h3>
+            </h2>
             <span className="meta">{dist.data ? `${formatNumber(dist.data.total)} people` : dist.loading ? <Spinner size={12} /> : ''}</span>
           </div>
           {dist.error ? (

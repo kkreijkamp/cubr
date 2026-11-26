@@ -38,9 +38,9 @@ export function PlayersCard({ room, playerId, precision }: { room: LiveRoomState
   return (
     <section className="card race-card" aria-labelledby="players-title">
       <div className="live-section-title">
-        <h3 className="h3" id="players-title">
+        <h2 className="h3" id="players-title">
           <UsersIcon /> players
-        </h3>
+        </h2>
         <span className="meta">
           {connected}/{room.players.length} online
         </span>
@@ -112,9 +112,9 @@ export function ResultsGrid({ room, playerId, precision }: { room: LiveRoomState
   return (
     <section className="race-results" aria-labelledby="results-title">
       <div className="live-section-title">
-        <h3 className="h3" id="results-title">
+        <h2 className="h3" id="results-title">
           <TrophyIcon /> results
-        </h3>
+        </h2>
         <span className="meta">
           {/* a room keeps its last 25 rounds (services/race room.ts ROUNDS_KEPT); the standings count them all */}
           {total} round{total === 1 ? '' : 's'}
@@ -223,9 +223,9 @@ export function RaceChat({
   return (
     <section className="card race-card race-chat" aria-labelledby="chat-title">
       <div className="live-section-title">
-        <h3 className="h3" id="chat-title">
+        <h2 className="h3" id="chat-title">
           <ChatBubbleLeftIcon /> chat
-        </h3>
+        </h2>
         <span className="chat-tools">
           {mutedHere.size > 0 && (
             <button className="btn-text" onClick={unmuteHere} data-tip="show their messages again">

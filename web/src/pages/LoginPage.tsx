@@ -665,6 +665,8 @@ export default function LoginPage() {
 
   return (
     <div className="lg-page">
+      {/* the tabs are the page's visible title; the heading names the one chosen (like the timer page's) */}
+      <h1 className="sr-only">{tab.label}</h1>
       <div className="lg-tabs" role="tablist" aria-label="account">
         {TABS.map((t) => (
           <button
