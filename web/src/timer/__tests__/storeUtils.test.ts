@@ -253,6 +253,14 @@ describe('import chunking', () => {
     expect(huge.flatMap((c) => c.sessions[0].solves)).toHaveLength(25);
     for (const c of huge) expect(c.sessions[0].name.length).toBeLessThanOrEqual(40);
   });
+
+  it('sends at most the server\'s 1,000 sessions in one request (the October review\'s #9)', () => {
+    const many = Array.from({ length: 2_500 }, (_, i) => sess(`s${i}`, 1));
+    const chunks = planImportChunks(many);
+    expect(chunks.map((c) => c.sessions.length)).toEqual([1_000, 1_000, 500]);
+    expect(chunks.flatMap((c) => c.sessions.map((s) => s.name))).toEqual(many.map((s) => s.name));
+    expect(planImportChunks(many.slice(0, 5), 20_000, 100_000, 2).map((c) => c.sessions.length)).toEqual([2, 2, 1]);
+  });
 });
 
 describe('default sessions', () => {

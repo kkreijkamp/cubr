@@ -78,7 +78,8 @@ describe('csTimer', () => {
     expect(s[1].comment).toBe('two; parts');
     expect(s[2].scramble).toBe('D2\nL2');
     expect(s[0].createdAt).toBe(local(2015, 3, 1, 10, 20, 30));
-    expect(s[3].createdAt).toBe(iso(0)); // csTimer writes N/A for a missing date
+    // csTimer writes N/A for a missing date: the solve lands just after the one before
+    expect(s[3].createdAt).toBe(iso(Date.parse(s[2].createdAt) + 1));
   });
 });
 

@@ -65,14 +65,36 @@ const text = (v: unknown): string => (typeof v === 'string' ? v : typeof v === '
 /** The first moment of the year 10000: from then on toISOString() writes "+010000-...", which the server's date check refuses. */
 const MAX_DATE_MS = Date.UTC(10000, 0, 1);
 
+/** A usable date: a number of ms after the epoch and before the year 10000 (later ones, e.g. a csTimer
+ *  timestamp written in ms instead of s, would make the server refuse the whole import). */
+const validAt = (at: number | null | undefined): at is number => typeof at === 'number' && Number.isFinite(at) && at > 0 && at < MAX_DATE_MS;
+
 /**
- * ISO date, or the epoch for a missing or invalid date (sorts before everything else). A date past
- * the year 9999 is invalid too (e.g. a csTimer timestamp written in ms instead of s): one such
- * date would otherwise make the server refuse the whole import.
+ * Each solve's date, keeping the session's own order (the October review's #9). The server reads a
+ * session by date and breaks ties by random ids, which shuffled a quick session's solves (csTimer
+ * counts whole seconds), and with them its averages and PBs. So:
+ * - a timestamp in order with the one before (or equal to it) comes at least a millisecond after the
+ *   solve before; one that goes backwards (a clock change) is kept as it is;
+ * - a missing or invalid date comes a millisecond after the solve before (at the start: just before the
+ *   first dated solve), so it lands where it was solved rather than in 1970. A session with no date at
+ *   all stays at the epoch, a millisecond apart, which keeps undated old solves off the daily and weekly
+ *   boards.
  */
-function isoDate(at: number | null | undefined): string {
-  if (typeof at === 'number' && Number.isFinite(at) && at > 0 && at < MAX_DATE_MS) return new Date(at).toISOString();
-  return new Date(0).toISOString();
+export function sessionDates(ats: (number | null | undefined)[]): string[] {
+  const ms: number[] = [];
+  let prevRaw: number | null = null; // the last valid timestamp, as given
+  for (const at of ats) {
+    const prev = ms.length ? ms[ms.length - 1] : NaN;
+    if (validAt(at)) {
+      ms.push(prevRaw !== null && at >= prevRaw ? Math.max(at, prev + 1) : at);
+      prevRaw = at;
+    } else {
+      ms.push(prevRaw !== null ? prev + 1 : NaN); // NaN: before the first dated solve, filled in below
+    }
+  }
+  const first = ms.findIndex((v) => !Number.isNaN(v));
+  for (let i = 0; i < (first === -1 ? ms.length : first); i++) ms[i] = first === -1 ? i : Math.max(0, ms[first] - (first - i));
+  return ms.map((v) => new Date(Math.min(v, MAX_DATE_MS - 1)).toISOString());
 }
 
 /** Applies the server's limits, drops empty sessions and sorts by rank (stable). */
@@ -88,7 +110,8 @@ export function finishImport(raw: RawSession[]): { sessions: ImportedSession[]; 
       continue;
     }
     const solves: ImportedSolve[] = [];
-    for (const s of session.solves) {
+    const dates = sessionDates(session.solves.map((s) => s.at));
+    for (const [i, s] of session.solves.entries()) {
       const timeMs = Math.round(s.timeMs);
       if (!Number.isFinite(timeMs) || timeMs < 1 || timeMs > MAX_TIME_MS) {
         skipped.invalid++;
@@ -100,7 +123,7 @@ export function finishImport(raw: RawSession[]): { sessions: ImportedSession[]; 
         penalty: s.penalty,
         scramble: text(s.scramble).slice(0, MAX_SCRAMBLE),
         comment: comment ? comment.slice(0, MAX_COMMENT) : null,
-        createdAt: isoDate(s.at),
+        createdAt: dates[i],
       });
     }
     if (!solves.length) continue;

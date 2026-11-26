@@ -388,11 +388,12 @@ export function overlaySolves(sessionId: string, server: Solve[], ops: SyncOp[])
 type ImportSession = ImportPayload['sessions'][number];
 
 /**
- * Packs sessions into request bodies of at most `max` solves. A session is never split across
- * requests (the import endpoint creates one server session per entry) unless it alone exceeds the
- * server's hard limit, in which case it is split into "name (2)", "name (3)" ... parts.
+ * Packs sessions into request bodies of at most `max` solves and `maxSessions` sessions (the server's
+ * limit per request: services/solve/src/schemas.ts MAX_IMPORT_SESSIONS). A session is never split
+ * across requests (the import endpoint creates one server session per entry) unless it alone exceeds
+ * the server's hard limit, in which case it is split into "name (2)", "name (3)" ... parts.
  */
-export function planImportChunks(sessions: ImportSession[], max = 20_000, hardMax = 100_000): ImportPayload[] {
+export function planImportChunks(sessions: ImportSession[], max = 20_000, hardMax = 100_000, maxSessions = 1_000): ImportPayload[] {
   const parts: ImportSession[] = [];
   for (const s of sessions) {
     if (s.solves.length === 0) continue;
@@ -409,7 +410,7 @@ export function planImportChunks(sessions: ImportSession[], max = 20_000, hardMa
   let cur: ImportSession[] = [];
   let count = 0;
   for (const p of parts) {
-    if (cur.length && count + p.solves.length > max) {
+    if (cur.length && (count + p.solves.length > max || cur.length >= maxSessions)) {
       out.push({ sessions: cur });
       cur = [];
       count = 0;

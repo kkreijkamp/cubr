@@ -685,9 +685,13 @@ describe('guest mode (localStorage)', () => {
   it('exports every session with its solves, as a file the importer reads back the same', async () => {
     const s = await start();
     const [, practice] = s.state().sessions;
+    // a second apart, as real solves are (the importer spreads solves of the same millisecond apart)
     await s.addSolve({ timeMs: 9000, penalty: 'OK', scramble: "R U R'", comment: 'first' });
+    vi.setSystemTime(new Date(Date.parse(NOW) + 1000));
     await s.addSolve({ timeMs: 9500, penalty: 'DNF', scramble: 'F2' });
+    vi.setSystemTime(new Date(Date.parse(NOW) + 2000));
     await s.addSolve({ timeMs: 7000, penalty: '+2', scramble: 'U', sessionId: practice.id });
+    vi.setSystemTime(new Date(NOW));
     const data = await s.exportAll();
     expect(data.exportedAt).toBe(NOW);
     expect(data.sessions.map((x) => [x.name, x.solves.length])).toEqual([['3x3', 2], ['3x3 practice', 1]]);

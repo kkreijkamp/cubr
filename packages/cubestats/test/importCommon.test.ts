@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { escapeHtml, finishImport, unescapeHtml, type RawSession, type RawSolve } from '../src/importCommon.js';
+import { escapeHtml, finishImport, sessionDates, unescapeHtml, type RawSession, type RawSolve } from '../src/importCommon.js';
 
 const EPOCH = new Date(0).toISOString();
 const solve = (extra: Partial<RawSolve> = {}): RawSolve => ({ timeMs: 10_000, penalty: 'OK', scramble: 'R U', comment: null, at: 1_700_000_000_000, ...extra });
@@ -58,6 +58,46 @@ describe('finishImport: text fields', () => {
       session({ name: 12 }),
     ]);
     expect(r.sessions.map((s) => s.name)).toEqual(['padded', 'n'.repeat(40), 'import 3', 'import 4', '12']);
+  });
+});
+
+describe('sessionDates: the session keeps its order (the October review\'s #9)', () => {
+  const T = Date.UTC(2020, 0, 1);
+  const iso = (...ms: number[]) => ms.map((v) => new Date(v).toISOString());
+
+  it('keeps distinct dates as they are', () => {
+    expect(sessionDates([T, T + 1000, T + 5000])).toEqual(iso(T, T + 1000, T + 5000));
+  });
+
+  it('spreads solves of the same second a millisecond apart, in order', () => {
+    expect(sessionDates([T, T, T, T + 1000])).toEqual(iso(T, T + 1, T + 2, T + 1000));
+  });
+
+  it('never lets a spread tie meet the next timestamp (millisecond sources)', () => {
+    expect(sessionDates([T, T, T + 1, T + 1])).toEqual(iso(T, T + 1, T + 2, T + 3));
+  });
+
+  it('keeps a timestamp that goes backwards (a clock change) as it is', () => {
+    expect(sessionDates([T + 5000, T, T])).toEqual(iso(T + 5000, T, T + 1));
+  });
+
+  it('puts an undated solve just after the one before, not in 1970', () => {
+    expect(sessionDates([T, null, NaN, T])).toEqual(iso(T, T + 1, T + 2, T + 3));
+    expect(sessionDates([T, 0, T + 1000])).toEqual(iso(T, T + 1, T + 1000));
+  });
+
+  it('puts undated solves at the start just before the first dated one', () => {
+    expect(sessionDates([undefined, -5, T])).toEqual(iso(T - 2, T - 1, T));
+  });
+
+  it('keeps a session with no date at all at the epoch, a millisecond apart', () => {
+    expect(sessionDates([null, undefined, 0])).toEqual(iso(0, 1, 2));
+    expect(sessionDates([])).toEqual([]);
+  });
+
+  it('gives finishImport strictly rising dates for a quick csTimer session, skipped times included', () => {
+    const r = finishImport([session({ solves: [solve({ at: T }), solve({ at: T, timeMs: 0 }), solve({ at: T }), solve({ at: undefined })] })]);
+    expect(r.sessions[0].solves.map((x) => x.createdAt)).toEqual(iso(T, T + 2, T + 3));
   });
 });
 

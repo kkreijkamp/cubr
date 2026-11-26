@@ -110,7 +110,7 @@ describe('csTimer export (JSON)', () => {
     expect(s.solves.map((x) => x.comment)).toEqual([null, 'nice', null, '2 phases', null]);
     expect(s.solves[1].scramble).toBe("F R U'");
     expect(s.solves[0].createdAt).toBe(iso(1760400000 * 1000));
-    expect(s.solves[4].createdAt).toBe(EPOCH); // no timestamp
+    expect(s.solves[4].createdAt).toBe(iso(1760400300 * 1000 + 1)); // no timestamp: just after the solve before
   });
 
   it.each([
@@ -284,7 +284,7 @@ describe('Block Keeper', () => {
       ['c', iso(1600000000000)],
       [null, iso(1600000001000)],
       [null, iso(1600000002000)],
-      [null, EPOCH],
+      [null, iso(1600000002001)], // no date: just after the solve before
     ]);
   });
 });
