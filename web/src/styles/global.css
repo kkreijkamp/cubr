@@ -599,6 +599,28 @@ input[type='checkbox'] {
 .mono-nums {
   font-variant-numeric: tabular-nums;
 }
+/* "skip to content": the first stop for the keyboard, shown only while it has focus */
+.skip-link {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 1000;
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--roundness);
+  background: var(--sub-alt-color);
+  color: var(--text-color);
+  transform: translateY(-200%);
+}
+.skip-link:focus {
+  transform: none;
+}
+/* the page and its heading take focus from a script (a new page, the skip link): they aren't controls,
+   so no ring */
+main[tabindex='-1']:focus,
+main h1[tabindex='-1']:focus {
+  outline: none;
+}
+
 /* read by screen readers and search engines, not shown: the timer page's heading */
 .sr-only {
   position: absolute;

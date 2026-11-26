@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   CalendarDaysIcon,
@@ -132,18 +132,51 @@ function Footer() {
   );
 }
 
+/** Focuses the page's heading (or, without one, the page): where a screen reader starts reading. */
+function focusPage(heading: HTMLElement | null): void {
+  const target = heading ?? document.querySelector<HTMLElement>('main');
+  if (!target) return;
+  if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '-1');
+  target.focus({ preventScroll: true });
+}
+
 export function Layout() {
   usePaletteHotkeys();
   useLaunchQueue();
   const location = useLocation();
+  const firstPage = useRef(true);
   useEffect(() => {
     window.scrollTo(0, 0);
     document.body.classList.remove('focus');
+    if (firstPage.current) {
+      firstPage.current = false; // the first page: the browser starts at the top, as it should
+      return;
+    }
+    // a new page: its heading takes focus, so a screen reader announces the page (a page loaded on
+    // demand renders a moment later, so look for a little while)
+    let tries = 0;
+    const timer = setInterval(() => {
+      const heading = document.querySelector<HTMLElement>('main h1');
+      if (!heading && ++tries < 30) return;
+      clearInterval(timer);
+      focusPage(heading);
+    }, 50);
+    return () => clearInterval(timer);
   }, [location.pathname]);
   return (
     <div className="app">
+      <a
+        className="skip-link"
+        href="#main"
+        onClick={(e) => {
+          e.preventDefault();
+          focusPage(document.querySelector<HTMLElement>('main h1'));
+        }}
+      >
+        skip to content
+      </a>
       <Header />
-      <main key={location.pathname} className="page">
+      <main key={location.pathname} id="main" className="page" tabIndex={-1}>
         <Outlet />
       </main>
       <Footer />
