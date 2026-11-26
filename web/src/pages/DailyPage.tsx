@@ -238,7 +238,42 @@ export default function DailyPage() {
     [setLocalAttempt, progress, rerank],
   );
 
+  // ---------------------------------------------------------------- one try per scramble (the October review's #18)
+  // An official attempt counts from the moment its inspection (or, without inspection, its solve) starts:
+  // the server notes it, and starting it again later (after a reload or a closed tab) makes it a DNF.
+  // Esc during inspection, or leaving for another event or day, is a DNF here and now.
+  const begun = useRef<{ key: string; event: string; date: string; index: number; scramble: string; at: number } | null>(null);
+  const beginAttempt = () => {
+    if (!authed || !isToday || nextIndex === null || !scramble) return;
+    if (begun.current && begun.current.key === key && begun.current.index === nextIndex) return; // inspection already began it
+    const b = { key, event, date, index: nextIndex, scramble, at: Date.now() };
+    begun.current = b;
+    api.solves
+      .dailyStart({ date: b.date, event: b.event, index: b.index })
+      .then((res) => {
+        if (!res.abandoned) return;
+        if (begun.current === b) begun.current = null; // the server made it a DNF already
+        cancel();
+        toast.notice(`attempt ${b.index + 1} counts as a DNF: it was started before`);
+        progress.reload();
+      })
+      .catch((e) => {
+        if (!(e instanceof ApiError) || e.status !== 409) return; // offline: the attempt goes on, the rule waits
+        if (begun.current === b) begun.current = null;
+        cancel();
+        progress.reload();
+      });
+  };
+  const abandonAttempt = () => {
+    const b = begun.current;
+    begun.current = null;
+    if (!b) return;
+    send(b.key, b.event, b.date, { index: b.index, timeMs: Math.max(1, Date.now() - b.at), penalty: 'DNF', state: 'saving', solveId: uuid() }, b.scramble);
+    toast.notice(`attempt ${b.index + 1} counts as a DNF: it was started`);
+  };
+
   const onSolve = (r: TimerResult) => {
+    begun.current = null;
     if (nextIndex === null || !scramble) return;
     setPicked(null);
     const a: Attempt = { index: nextIndex, timeMs: r.timeMs, penalty: r.penalty, state: authed ? 'saving' : 'practice', ...(authed ? { solveId: uuid() } : {}) };
@@ -253,7 +288,14 @@ export default function DailyPage() {
     send(key, event, date, a, scramble);
   };
 
-  const engine = useLiveTimer({ canStart, inspection: settings.inspection && ev.inspection, onSolve });
+  const engine = useLiveTimer({
+    canStart,
+    inspection: settings.inspection && ev.inspection,
+    onSolve,
+    onInspectionStart: beginAttempt,
+    onStart: beginAttempt,
+    onCancel: abandonAttempt,
+  });
   const { cancel, clearResult } = engine;
   useEffect(() => {
     cancel();
@@ -535,7 +577,7 @@ export default function DailyPage() {
               />
               <div className="live-keytips fade-on-focus">
                 {touch ? (
-                  `${settings.inspection && ev.inspection ? 'tap the timer to inspect, then hold it and release to start' : 'hold the timer, release to start'} - tap to stop - one try per scramble`
+                  `${settings.inspection && ev.inspection ? 'tap the timer to inspect, then hold it and release to start' : 'hold the timer, release to start'} - tap to stop - one try per scramble: it counts once you start`
                 ) : (
                   <>
                     {settings.inspection && ev.inspection ? (
@@ -547,7 +589,7 @@ export default function DailyPage() {
                         hold <kbd>space</kbd>, release to start
                       </>
                     )}{' '}
-                    - <kbd>esc</kbd> while solving = DNF - one try per scramble
+                    - <kbd>esc</kbd> = DNF - one try per scramble: it counts once you start
                   </>
                 )}
               </div>

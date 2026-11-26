@@ -7,7 +7,7 @@ import { SOLVE_COLUMNS, toSolve, type Solve, type SolveRow } from '../mapping.js
 import { enqueue } from '../outbox.js';
 import { sessionRolling, solveDeletedPayload, solveEventPayload } from '../repo.js';
 import { dailyOverview, dailyResult, type Rolling } from '../rolling.js';
-import { assertDailyAllowed, createSolveBody, dailyQuery, idParams, isDailyOpen, patchSolveBody, resolveCreatedAt, utcDay } from '../schemas.js';
+import { MAX_TIME_MS, assertDailyAllowed, createSolveBody, dailyQuery, dailyStartBody, idParams, isDailyOpen, patchSolveBody, resolveCreatedAt, utcDay } from '../schemas.js';
 
 /** Translates constraint violations raised inside a solve transaction into API errors. */
 function mapPgError(err: unknown): never {
@@ -189,6 +189,48 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
       await enqueue(client, 'solve.deleted', solveDeletedPayload(user, rows[0], tz));
     });
     return reply.code(204).send();
+  });
+
+  // An official daily attempt starts (inspection, or the solve without it): the October review's #18,
+  // decided 2026-11-26. Starting an index again before its result arrived (a reload, a closed tab, a
+  // second try) makes it a DNF instead of a fresh chance: 200 {abandoned: true}. An index that has its
+  // result already: 409. Esc during inspection is the page's own DNF (it submits one).
+  app.post('/api/solves/daily/start', authed, async (req, reply) => {
+    const user = currentUser(req);
+    const { date, event, index } = parse(dailyStartBody, req.body ?? {});
+    assertDailyAllowed(date, event);
+    const tz = tzFrom(req);
+    const res = await withTx(pool, async (client) => {
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`solve:daily:${user.id}:${date}:${event}`]);
+      const key = [user.id, date, event, index];
+      const done = await client.query('SELECT 1 FROM solve.daily_attempts WHERE user_id = $1 AND daily_date = $2 AND event = $3 AND daily_index = $4', key);
+      if (done.rowCount) throw conflict('daily attempt already recorded');
+      const started = await client.query<{ ms: number }>(
+        `SELECT (extract(epoch from now() - started_at) * 1000)::int AS ms FROM solve.daily_starts
+          WHERE user_id = $1 AND daily_date = $2 AND event = $3 AND daily_index = $4`,
+        key,
+      );
+      if (!started.rows[0]) {
+        await client.query('INSERT INTO solve.daily_starts (user_id, daily_date, event, daily_index) VALUES ($1, $2, $3, $4)', key);
+        // this user's starts of days long closed go (a handful of rows a day at most)
+        await client.query(`DELETE FROM solve.daily_starts WHERE user_id = $1 AND daily_date < $2::date - 7`, [user.id, date]);
+        return { abandoned: false as const };
+      }
+      // started before and never finished: a DNF, with the time since it started
+      const timeMs = Math.min(Math.max(1, started.rows[0].ms), MAX_TIME_MS);
+      await client.query(
+        `INSERT INTO solve.daily_attempts (user_id, daily_date, event, daily_index, solve_id, time_ms, penalty)
+         VALUES ($1, $2, $3, $4, $5, $6, 'DNF')`,
+        [...key, randomUUID(), timeMs],
+      );
+      const { rows } = await client.query<{ n: number }>(
+        'SELECT count(*)::int AS n FROM solve.daily_attempts WHERE user_id = $1 AND daily_date = $2 AND event = $3',
+        [user.id, date, event],
+      );
+      if (rows[0].n === 5) await queueDailyResult(client, user, date, event, tz, 'daily.completed');
+      return { abandoned: true as const, attempt: { index, timeMs, penalty: 'DNF' as const } };
+    });
+    return reply.code(res.abandoned ? 200 : 201).send(res);
   });
 
   // The user's daily-challenge solves for one UTC day, grouped by event, with the official ao5.

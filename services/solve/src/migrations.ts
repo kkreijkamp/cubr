@@ -111,4 +111,19 @@ SELECT gen_random_uuid(), u.user_id, coalesce(n.name, u.event || ' practice'), u
 ALTER TABLE solve.sessions ADD COLUMN scramble text;
 `,
   },
+  {
+    id: '006_daily_starts',
+    sql: `
+-- When each official daily attempt started (inspection, or the solve without it): starting an index
+-- again before its result arrived (a reload, a closed tab) makes it a DNF (POST /api/solves/daily/start).
+CREATE TABLE solve.daily_starts (
+  user_id     uuid NOT NULL,
+  daily_date  date NOT NULL,
+  event       text NOT NULL,
+  daily_index smallint NOT NULL,
+  started_at  timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, daily_date, event, daily_index)
+);
+`,
+  },
 ];

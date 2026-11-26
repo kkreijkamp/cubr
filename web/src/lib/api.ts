@@ -320,6 +320,9 @@ export const api = {
       get<{ date: string; events: Record<string, { solves: Solve[]; attempts?: { index: number; timeMs: number; penalty: Penalty; solveId: string }[]; ao5: number | null }> }>(
         `/api/solves/daily${qs({ date })}`,
       ),
+    /** an official daily attempt starts: `abandoned` = it had started before, so it's a DNF now */
+    dailyStart: (body: { date: string; event: string; index: number }) =>
+      request<{ abandoned: boolean; attempt?: { index: number; timeMs: number; penalty: Penalty } }>('POST', '/api/solves/daily/start', body),
   },
   stats: {
     summary: (userId: string, signal?: AbortSignal) => get<StatsSummary>(`/api/stats/users/${enc(userId)}/summary`, signal),

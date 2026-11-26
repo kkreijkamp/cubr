@@ -353,6 +353,46 @@ describeIntegration('solve API', () => {
       expect(overview.events['333']).toMatchObject({ solves: [], attempts: [{ index: 0, timeMs: 10_000, penalty: 'OK', solveId: id }] });
     });
 
+    it('records when an attempt starts, and makes a second start of it a DNF (the October review\'s #18)', async () => {
+      const u = await newUser();
+      const sess = await newSession(u);
+      const start = (index: number, event = '333', date = today()) => as(u).post('/api/solves/daily/start', { date, event, index });
+      expect((await start(0)).statusCode).toBe(201);
+      // a reload, a closed tab or a second try: the same index again
+      const again = await start(0);
+      expect(again.statusCode).toBe(200);
+      expect(again.json()).toMatchObject({ abandoned: true, attempt: { index: 0, penalty: 'DNF' } });
+      expect(again.json().attempt.timeMs).toBeGreaterThanOrEqual(1);
+      expect((await attempt(u, sess.id, 0, 8_000)).statusCode).toBe(409); // its result can't come after all
+      const overview = (await as(u).get('/api/solves/daily')).json();
+      expect(overview.events['333'].attempts).toEqual([expect.objectContaining({ index: 0, penalty: 'DNF' })]);
+      // a finished attempt can't be started again
+      expect((await start(1)).statusCode).toBe(201);
+      expect((await attempt(u, sess.id, 1, 9_000)).statusCode).toBe(201);
+      expect((await start(1)).statusCode).toBe(409);
+    });
+
+    it('completes the day when the fifth attempt is a DNF from a second start', async () => {
+      const u = await newUser();
+      const sess = await newSession(u);
+      for (const [i, ms] of [10_000, 12_000, 11_000, 9_000].entries()) expect((await attempt(u, sess.id, i, ms)).statusCode).toBe(201);
+      const start = () => as(u).post('/api/solves/daily/start', { date: today(), event: '333', index: 4 });
+      expect((await start()).statusCode).toBe(201);
+      expect((await start()).statusCode).toBe(200);
+      const done = await outbox('daily.completed', u.id);
+      expect(done).toHaveLength(1);
+      expect(done[0].payload).toMatchObject({ event: '333', ao5: 11_000 }); // 9, 10, 11, 12, DNF: 9 and the DNF trimmed
+    });
+
+    it('refuses starts for a closed day, a non-daily event, an index out of range, or without signing in', async () => {
+      const u = await newUser();
+      const start = (body: Record<string, unknown>) => as(u).post('/api/solves/daily/start', { date: today(), event: '333', index: 0, ...body });
+      expect((await start({ date: utcDay(Date.now(), -3) })).statusCode).toBe(400);
+      expect((await start({ event: '333fm' })).statusCode).toBe(400);
+      expect((await start({ index: 5 })).statusCode).toBe(400);
+      expect((await s.app.inject({ method: 'POST', url: '/api/solves/daily/start', payload: { date: today(), event: '333', index: 0 } })).statusCode).toBe(401);
+    });
+
     it('is open only while the day is today somewhere, and only for the daily events', async () => {
       const u = await newUser();
       const sess = await newSession(u);
@@ -487,19 +527,20 @@ describeIntegration('solve API', () => {
   });
 
   describe('a deleted account', () => {
-    it('loses its sessions, solves, daily attempts and unsent events, and nobody else does', async () => {
+    it('loses its sessions, solves, daily attempts and starts, and unsent events, and nobody else does', async () => {
       const [gone, stays] = [await newUser(), await newUser()];
       for (const u of [gone, stays]) {
         const sess = await newSession(u);
         await addSolve(u, sess.id, 10_000);
         await as(u).post('/api/solves', { sessionId: sess.id, timeMs: 10_000, daily: { date: utcDay(Date.now()), index: 0 } });
+        await as(u).post('/api/solves/daily/start', { date: utcDay(Date.now()), event: '333', index: 1 });
       }
       const purge = makeUserPurge({ pool: s.pool, log: s.app.log });
       const evt: EventEnvelope = { id: '1-0', type: 'user.deleted', data: { userId: gone.id, username: gone.username, eventId: 'auth-x', occurredAt: new Date().toISOString() } };
       await purge(evt);
       await purge(evt); // a redelivery finds nothing left
       const count = async (table: string, userId: string) => Number((await s.pool.query(`SELECT count(*) FROM solve.${table} WHERE user_id = $1`, [userId])).rows[0].count);
-      for (const table of ['sessions', 'solves', 'daily_attempts']) {
+      for (const table of ['sessions', 'solves', 'daily_attempts', 'daily_starts']) {
         expect(await count(table, gone.id), table).toBe(0);
         expect(await count(table, stays.id), table).toBeGreaterThan(0);
       }

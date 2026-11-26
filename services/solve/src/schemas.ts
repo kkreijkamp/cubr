@@ -108,6 +108,7 @@ export const importBody = z
 export type ImportBody = z.infer<typeof importBody>;
 
 export const dailyQuery = z.object({ date: ymd.optional() });
+export const dailyStartBody = z.object({ date: ymd, event: eventId, index: z.number().int().min(0).max(4) });
 
 export const internalParams = z.object({ userId: uuid });
 export const internalQuery = z.object({ event: eventId.optional() });

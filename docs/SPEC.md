@@ -307,6 +307,12 @@ CREATE TABLE solve.daily_attempts (
   created_at  timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (user_id, daily_date, event, daily_index)
 );
+-- when each official daily attempt started (migration 006): a second start of it is a DNF
+CREATE TABLE solve.daily_starts (
+  user_id uuid NOT NULL, daily_date date NOT NULL, event text NOT NULL, daily_index smallint NOT NULL,
+  started_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, daily_date, event, daily_index)
+);
 ```
 
 ### 7.3 `stats` schema (stats-service, read model built from events)
@@ -534,6 +540,7 @@ Pool: keep `scramble:pool:<event>` topped up (333/222/pyram/skewb: 200; 444/sq1/
 | DELETE `/api/solves/:id` | - | 204 (+ `solve.deleted`) |
 | POST `/api/sessions/import` | `{sessions: [{name, event, practice?, scramble?, solves: [{timeMs, penalty, scramble, comment?, createdAt}]}]}` (<= 1 000 sessions, <= 100 000 solves, body <= 25 MB) | `{imported: {sessions, solves}}` (+ one `solves.imported`) - bulk insert in batches inside a transaction; 10 imports/h per user (429, checked before the body is read); an account holds at most 250 000 solves (400 if the import would pass it; one import per account at a time) |
 | GET `/api/solves/export` | - | `{exportedAt, sessions: [Session & {solves: Solve[]}]}`, streamed from one read-only snapshot in pages of 2 000 solves (memory stays flat; 200k solves = 52 MB in ~2.5 s locally); 10 exports/h per user (429) |
+| POST `/api/solves/daily/start` | `{date, event, index}` | an official attempt starts (inspection, or the solve without it): 201 `{abandoned: false}`; started before and never finished (a reload, a closed tab) -> it becomes a DNF (time since that start) and 200 `{abandoned: true, attempt}`; already has its result -> 409 |
 | GET `/api/solves/daily?date=` | - | `{date, events: {"333": {solves: Solve[], ao5: number\|-1\|null}, ...}}` (only events with >=1 attempt; ao5 = the official result of the five attempts: times as submitted, penalties as last set while the day was open) |
 | GET `/api/solves/_info`, `/api/sessions/_info` | - | info (+ outbox backlog and relay state) |
 | GET `/internal/users/:userId/solves?event=` | - | `{solves: [{id, sessionId, timeMs, penalty, createdAt, practice?}]}` ordered by session_id, created_at (for stats recompute; `practice: true` on a practice session's solves) |
@@ -547,7 +554,10 @@ same transaction, and a second attempt for that index -> 409, even after the fir
 is emitted with the ao5 of the attempts. A penalty marked after the solve (`PATCH` ok / +2 / DNF on a
 daily solve) also changes its attempt while the day is still open (same window), and a finished
 day's result is re-sent as `daily.updated`. Deletes, and penalty changes after the day has closed,
-change neither the result nor the board.
+change neither the result nor the board. One try per scramble (decided 2026-11-26): an attempt
+counts from its start (`POST /api/solves/daily/start`); starting it again after a reload or a closed
+tab makes it a DNF, and on the page Esc during inspection, or leaving for another event or day, is a
+DNF. Guests practise without any of this, and the five scrambles stay public.
 
 Outbox relay: every 250 ms each replica claims unpublished rows (`FOR UPDATE SKIP LOCKED`, LIMIT 500),
 XADDs them, sets `published_at`. If Redis is down, solves still succeed and events are delivered later.
