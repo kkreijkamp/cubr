@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowDownTrayIcon, ArrowPathIcon, ArrowUpRightIcon, ArrowUpTrayIcon, ArrowUturnLeftIcon, ArrowsRightLeftIcon, MagnifyingGlassIcon, PlayIcon } from '@heroicons/react/24/outline';
 import { CsTimerFormatError, getEvent, parseTimerFile, toCsTimerExport, type TimerImport } from '@cubr/cubestats';
 import { Modal } from '../components/Modal';
-import { csTimerFileName, skippedNotes } from '../components/social/util';
+import { csTimerFileName, prefersReducedMotion, skippedNotes } from '../components/social/util';
 import { ConfirmModal } from '../components/timer/Dialogs';
 import { playPbSound } from '../components/timer/feedback';
 import { AVG_CHOICES, parseAvgKey } from '../components/timer/statsUtil';
@@ -304,7 +304,7 @@ export default function SettingsPage() {
     const rail = railRef.current;
     const item = rail?.querySelector<HTMLElement>('.st-rail-item.active');
     if (!rail || !item || rail.scrollWidth <= rail.clientWidth) return;
-    rail.scrollTo({ left: item.offsetLeft - (rail.clientWidth - item.offsetWidth) / 2, behavior: 'smooth' });
+    rail.scrollTo({ left: item.offsetLeft - (rail.clientWidth - item.offsetWidth) / 2, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
   }, [active]);
 
   return (

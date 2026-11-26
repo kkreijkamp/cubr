@@ -20,7 +20,7 @@ import { Avatar } from '../components/Avatar';
 import { Modal } from '../components/Modal';
 import { ErrorState, Loading, Spinner } from '../components/Spinner';
 import { countryName } from '../components/social/countries';
-import { addDaysKey, eventLabel, formatDayKey, friendlyError } from '../components/social/util';
+import { addDaysKey, eventLabel, formatDayKey, friendlyError, prefersReducedMotion } from '../components/social/util';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useRegisterCommands, type Command } from '../lib/commands';
@@ -601,7 +601,7 @@ export default function LeaderboardsPage() {
 function scrollToMyRow() {
   const row = document.querySelector<HTMLTableRowElement>('table.lb-table tr.me');
   if (!row) return;
-  row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  row.scrollIntoView({ block: 'center', behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
   row.classList.remove('flash');
   void row.offsetWidth; // restart the animation
   row.classList.add('flash');
