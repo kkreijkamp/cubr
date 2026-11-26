@@ -896,6 +896,45 @@ describe('signed in (cloud)', () => {
     expect(queued()).toEqual([]);
   });
 
+  it('moves queued solves whose session was merged away on another device into a new session, with one notice', async () => {
+    const s = await start(U1, { seed: seedU1 });
+    h.api.solves.create.mockRejectedValueOnce(offline(s));
+    const a = await add(s, 1111);
+    vi.setSystemTime(new Date(Date.parse(NOW) + 1000));
+    const b = await add(s, 2222);
+    await flush();
+    expect(queued().map((q) => q.op.kind)).toEqual(['createSolve', 'createSolve']);
+    // meanwhile 3x3 was merged into another session on another device: it's gone from the account
+    s.server.sessions = s.server.sessions.filter((x) => x.id !== main.id);
+    await advance(2000);
+    await flush();
+    const rec = s.server.sessions.find((x) => x.name === '3x3 (recovered)');
+    expect(rec).toMatchObject({ userId: 'u1', event: '333', practice: false }); // this device still knew 3x3: a normal session
+    expect(s.server.solvesOf(rec!.id).map((x) => x.id)).toEqual([a.id, b.id]);
+    expect(queued()).toEqual([]);
+    expect(s.toasts()).toEqual([['notice', '2 solves from a session merged or deleted on another device are in a new session, "3x3 (recovered)"']]);
+    expect(s.state().sessions.map((x) => x.name)).toContain('3x3 (recovered)');
+  });
+
+  it('drops, with an error, a solve that cannot go into the session it was moved to either', async () => {
+    const s = await start(U1, { seed: seedU1 });
+    h.api.solves.create.mockRejectedValueOnce(offline(s));
+    await add(s, 1111);
+    await flush();
+    s.server.sessions = s.server.sessions.filter((x) => x.id !== main.id);
+    const real = h.api.sessions.create.getMockImplementation()!;
+    // the new session is made, then removed again before the solve arrives
+    h.api.sessions.create.mockImplementationOnce(async (body: { id: string }) => {
+      const res = await real(body);
+      s.server.sessions = s.server.sessions.filter((x) => x.id !== body.id);
+      return res;
+    });
+    await advance(2000);
+    await flush();
+    expect(queued()).toEqual([]);
+    expect(s.toasts().map(([type]) => type)).toEqual(['notice', 'error']); // moved once, then given up: no loop
+  });
+
   it('retries at once when the browser comes back online', async () => {
     const s = await start(U1, { seed: seedU1 });
     h.api.solves.create.mockRejectedValueOnce(offline(s)).mockRejectedValueOnce(offline(s));

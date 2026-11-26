@@ -436,6 +436,11 @@ async function pump(): Promise<void> {
           scheduleRetry();
           break;
         }
+        // a solve whose session is gone (merged away or deleted on another device): its solves move to a new session
+        if (head.op.kind === 'createSolve' && isSessionGone(e) && !rehomed.has(head.op.solve.sessionId)) {
+          rehomeSolves(head.op.solve.sessionId, head.userId, head.op.solve.event);
+          continue;
+        }
         // permanent rejection (validation, conflict ...): drop it and re-sync to revert
         queue = queue.filter((q) => q.opId !== head.opId);
         saveQueue();
@@ -449,6 +454,45 @@ async function pump(): Promise<void> {
     inflight = null;
     pumping = false;
   }
+}
+
+/** The solve service's answer to a solve for a session that isn't there (services/solve/src/routes/solves.ts). */
+const isSessionGone = (e: unknown) => e instanceof ApiError && e.status === 404 && e.message === 'session not found';
+
+/** sessions made by rehomeSolves: a solve that can't go into one of these is dropped, not moved again */
+const rehomed = new Set<string>();
+const RECOVERED = ' (recovered)';
+
+/**
+ * The queued solves of a session that's gone from the account (merged into another, or deleted, on another
+ * device: their creates get 404) move to a new session, "<name> (recovered)", sent before them, with one
+ * notice, instead of being dropped with an error each (the October review's #11). It keeps the old session's
+ * practice and scramble type when this device still knows them; else it's a practice session, so solves of
+ * a scramble type that doesn't count can't reach the boards (turning practice off counts them).
+ */
+function rehomeSolves(lost: string, uid: string, event: string): void {
+  const old = sessionById(lost);
+  const base = old?.name ?? 'session';
+  const name = `${base.slice(0, 40 - RECOVERED.length).trimEnd()}${RECOVERED}`;
+  const practice = old ? old.practice === true : true;
+  const session = { id: uuid(), name, event, ...(practice ? { practice: true } : {}), ...(old?.scramble ? { scramble: old.scramble } : {}), createdAt: new Date().toISOString() };
+  rehomed.add(session.id);
+  let moved = 0;
+  queue = queue.map((q) => {
+    if (q.userId !== uid) return q;
+    if (q.op.kind === 'createSolve' && q.op.solve.sessionId === lost) {
+      moved++;
+      return { ...q, op: { ...q.op, solve: { ...q.op.solve, sessionId: session.id } } };
+    }
+    if ((q.op.kind === 'updateSolve' || q.op.kind === 'deleteSolve') && q.op.sessionId === lost) return { ...q, op: { ...q.op, sessionId: session.id } };
+    return q;
+  });
+  const item: QueuedOp = { opId: uuid(), userId: uid, op: { kind: 'createSession', session }, attempts: 0, createdAt: Date.now() };
+  const first = queue.findIndex((q) => q.userId === uid && q.op.kind === 'createSolve' && q.op.solve.sessionId === session.id);
+  queue = first < 0 ? [...queue, item] : [...queue.slice(0, first), item, ...queue.slice(first)];
+  saveQueue();
+  toast.notice(`${moved} ${moved === 1 ? 'solve' : 'solves'} from a session merged or deleted on another device ${moved === 1 ? 'is' : 'are'} in a new session, "${name}"`);
+  void refreshCloud();
 }
 
 /**
