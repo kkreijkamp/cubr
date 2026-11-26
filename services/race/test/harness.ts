@@ -70,7 +70,7 @@ export async function startPod(base: Redis, name: string, jwtSecret: string): Pr
   const presence = new PodPresence(redis, store, name, app.log);
   const scrambles = fakeScrambles();
   const sockets = registerSocketHandlers({ io, store, scrambles, redis, jwtSecret, pod: name, log: app.log });
-  registerRoutes(app, { store, redis, auth: makeAuth(jwtSecret, redis) });
+  registerRoutes(app, { store, redis, auth: makeAuth(jwtSecret, redis), internalToken: config.internalToken, onChatCleared: (roomId) => io.to(roomId).emit('chat:cleared', {}) });
   app.addHook('preClose', async () => {
     await sockets.drain();
     await presence.stop();
@@ -129,6 +129,8 @@ export interface Player {
   /** every room:state received, plus the room from each join ack */
   states: RoomState[];
   chats: ChatMessage[];
+  /** how many times a moderator cleared the room's chat (chat:cleared) */
+  clears: number;
   /** why the socket disconnected, once it has */
   disconnectReason: string | null;
   /** playerId / name from the last successful join */
@@ -160,6 +162,7 @@ export async function connect(pod: Pod, auth: Record<string, unknown> = {}): Pro
     socket,
     states: [],
     chats: [],
+    clears: 0,
     disconnectReason: null,
     playerId: '',
     name: '',
@@ -204,6 +207,10 @@ export async function connect(pod: Pod, auth: Record<string, unknown> = {}): Pro
   };
   socket.on('room:state', (s: RoomState) => player.states.push(s));
   socket.on('chat:message', (m: ChatMessage) => player.chats.push(m));
+  socket.on('chat:cleared', () => {
+    player.chats = [];
+    player.clears++;
+  });
   socket.on('disconnect', (reason) => {
     player.disconnectReason = reason;
   });

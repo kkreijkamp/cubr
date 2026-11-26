@@ -47,7 +47,7 @@ const sockets = registerSocketHandlers({
   pod: config.podName,
   log: app.log,
 });
-registerRoutes(app, { store, redis, auth });
+registerRoutes(app, { store, redis, auth, internalToken: config.internalToken, onChatCleared: (roomId) => io.to(roomId).emit('chat:cleared', {}) });
 
 // Shutdown order: preClose runs before Fastify closes the HTTP server - drop our websockets
 // (clients reconnect to another pod) and finish their Redis cleanup while Redis is still open.

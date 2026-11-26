@@ -134,4 +134,12 @@ export const migrations: Migration[] = [
        WHERE i.user_id = u.id AND i.email = lower(u.email) AND u.email_verified_at IS NULL;
     `,
   },
+  {
+    id: '009_suspension',
+    sql: `
+      -- a moderator's suspension (routes/moderation.ts): no sign-in while it's set, a note on why
+      ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS suspended_at timestamptz;
+      ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS suspended_note text;
+    `,
+  },
 ];

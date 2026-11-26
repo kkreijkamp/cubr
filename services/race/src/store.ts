@@ -305,6 +305,11 @@ export class RoomStore {
       .exec();
   }
 
+  /** Removes a room's chat history (moderation: routes.ts). */
+  async clearChat(id: string): Promise<void> {
+    await this.redis.del(keys.chat(id));
+  }
+
   async recentChat(id: string): Promise<ChatMessage[]> {
     const items = await this.redis.lrange(keys.chat(id), 0, CHAT_HISTORY - 1);
     return items.reverse().map((s) => JSON.parse(s) as ChatMessage);

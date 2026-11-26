@@ -163,6 +163,28 @@ Restore: copy a dump to the VM, then
 `$C exec -T postgres pg_restore -U cubr -d cubr --clean --if-exists < cubr-<date>.dump`,
 and run the WCA import.
 
+## Moderation
+
+When someone reports a profile or a race room (an email to hello@cubr.dev from its flag link) or
+eSafety sends a removal notice (they usually expect action **within 24 hours**), act from the Mac with
+`deploy/vps/moderate.sh` (docs/SPEC.md "Moderation"). Each command is one call to a service's
+`/internal/moderation` route, made inside that service's container on the VM with its own internal
+token; `/internal` is never routed publicly. Look before acting:
+
+```sh
+deploy/vps/moderate.sh show <username>                  # name, bio, picture, private, suspended (email masked)
+deploy/vps/moderate.sh rename <username> <new-username>  # an abusive username
+deploy/vps/moderate.sh clear-profile <username>         # its display name and bio
+deploy/vps/moderate.sh remove-picture <username>
+deploy/vps/moderate.sh clear-chat <room-id>             # a race room's chat, for the players in it too
+deploy/vps/moderate.sh suspend <username> [note]        # every session ends, sign-in refused, profile private
+deploy/vps/moderate.sh unsuspend <username>             # it can sign in again (the profile stays private)
+```
+
+A suspended account keeps its times. Its owner is told "This account is suspended. Questions:
+hello@cubr.dev" when signing in. Every action is in the auth or race log with the account's id
+(`$C logs auth | grep moderation`). `--local` first runs a command on the local stack.
+
 ## How the pieces fit
 
 - **Secrets** live only in `/opt/cubr/.env` (mode 600): `deploy.sh init` generated the Postgres

@@ -47,6 +47,8 @@ export function ssoErrorMessage(error: string | null, provider: string | null): 
       return `your account is already connected to a different ${name} account. disconnect it first.`;
     case 'busy':
       return 'too many sign-in attempts. please wait a few minutes.';
+    case 'suspended':
+      return 'this account is suspended. questions: hello@cubr.dev';
     default:
       return `sign-in with ${name} didn't work. please try again.`;
   }

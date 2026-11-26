@@ -202,6 +202,8 @@ export class RaceConnection {
 
     socket.on('room:state', (state: LiveRoomState) => this.applyState(state));
     socket.on('chat:message', (msg: ChatMessage) => this.addChat([msg]));
+    // a moderator cleared the room's chat
+    socket.on('chat:cleared', () => this.patch({ chat: [] }));
   }
 
   /** Reconnect with a fresh handshake (e.g. after changing the guest nickname). */

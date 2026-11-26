@@ -14,6 +14,8 @@ import type { ChatMessage, Identity, RoomState } from './types.js';
 interface ServerToClientEvents {
   'room:state': (state: RoomState) => void;
   'chat:message': (msg: ChatMessage) => void;
+  /** a moderator cleared the room's chat (routes.ts) */
+  'chat:cleared': (payload: Record<string, never>) => void;
 }
 
 interface SocketData {

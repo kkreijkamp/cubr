@@ -641,6 +641,19 @@ refuses slurs only, so cubers can still swear at a bad solve. Reserved usernames
 app a player can mute another in race chat for themselves (remembered on the device, `lib/moderation`),
 and a profile or a race room can be reported by email to hello@cubr.dev.
 
+Whoever runs cubr acts with `deploy/vps/moderate.sh` (the runbook's "Moderation"), which calls internal
+routes from inside the service's container with its internal token: auth's `GET
+/internal/moderation/users/:username` (the account, email masked) and `POST .../suspend {note?}`,
+`.../unsuspend`, `.../rename {to}`, `.../clear-profile` (display name and bio), `.../remove-picture`, each
+answering `{user}` and publishing `user.updated`; race's `POST /internal/moderation/rooms/:id/clear-chat`
+(204: the history goes, and the room's players get `chat:cleared`). **Suspension** (`auth.users.suspended_at`
+and `suspended_note`, migration 009): every token of the account is revoked, the profile turns private
+(the Redis set too, or nothing changes: 503), pending reset links go, and nothing signs in while it lasts:
+the password (403 `This account is suspended. Questions: hello@cubr.dev`, only after a right password),
+a reset link (403, the link kept), Google, Apple or GitHub (`#error=suspended`, and the code exchange
+checks again). The times stay. Lifting it lets the account sign in; the profile stays private until its
+owner changes that.
+
 ### 9.7 wca (`/api/wca`) - values converted to ms (WCA centiseconds x 10); 333fm kept as moves (`unit:"moves"`, averages x100 in export -> divide); 333mbf excluded
 | Method & path | Response |
 |---|---|

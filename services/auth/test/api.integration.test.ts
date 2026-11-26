@@ -683,6 +683,75 @@ describeIntegration('auth API', () => {
     });
   });
 
+  describe('moderation (the internal routes deploy/vps/moderate.sh calls)', () => {
+    const mod = (method: 'GET' | 'POST', path: string, body?: unknown) =>
+      s.request(method, `/internal/moderation${path}`, { headers: { 'x-internal-token': s.config.internalToken }, ...(body === undefined ? {} : { body }) });
+
+    it('answers only with the internal token', async () => {
+      const { user } = await signUp();
+      expect((await s.request('GET', `/internal/moderation/users/${user.username}`)).statusCode).toBe(403);
+      expect((await s.request('POST', `/internal/moderation/users/${user.username}/suspend`, { headers: { 'x-internal-token': 'wrong-token-wrong-token' } })).statusCode).toBe(403);
+      expect((await mod('GET', `/users/${user.username}`)).json().user.username).toBe(user.username);
+    });
+
+    it('suspends: every session ends, sign-in is refused, the profile turns private, no reset link goes out; lifting it lets it sign in', async () => {
+      const { token, user } = await signUp();
+      await confirmEmailOf(user.id);
+      const res = await mod('POST', `/users/${user.username}/suspend`, { note: 'spam in race chat' });
+      expect(res.statusCode, res.body).toBe(200);
+      expect(res.json().user).toMatchObject({ username: user.username, private: true, suspendedNote: 'spam in race chat', email: expect.stringMatching(/^c\*\*\*@example\.com$/) });
+      expect((await me(token)).statusCode).toBe(401);
+      const refused = await login(user.username);
+      expect(refused.statusCode).toBe(403);
+      expect(refused.json().error.message).toBe('This account is suspended. Questions: hello@cubr.dev');
+      // a wrong password gets the usual answer: a stranger can't tell a suspended account apart
+      expect((await login(user.username, 'not the password 1')).statusCode).toBe(401);
+      expect((await s.request('GET', `/api/users/${user.username}`)).json().user.private).toBe(true);
+      const sent = outbox.length;
+      expect((await s.request('POST', '/api/auth/password/forgot', { body: { email: user.email }, ip: freshIp() })).statusCode).toBe(202);
+      await new Promise((r) => setTimeout(r, 300));
+      expect(outbox.slice(sent).filter((m) => m.to === user.email)).toHaveLength(0);
+      const lifted = await mod('POST', `/users/${user.username}/unsuspend`);
+      expect(lifted.json().user).toMatchObject({ suspendedAt: null, private: true });
+      expect((await login(user.username)).statusCode).toBe(200);
+    });
+
+    it('refuses a reset link opened after the suspension, and keeps the link', async () => {
+      const { user } = await signUp();
+      const { token, hash } = newResetToken();
+      await s.pool.query("insert into auth.password_resets (token_hash, user_id, expires_at) values ($1, $2, now() + interval '1 hour')", [hash, user.id]);
+      // suspended in between: the suspension removes pending links, so put one back as if it raced
+      await mod('POST', `/users/${user.username}/suspend`);
+      await s.pool.query("insert into auth.password_resets (token_hash, user_id, expires_at) values ($1, $2, now() + interval '1 hour') on conflict do nothing", [hash, user.id]);
+      const res = await s.request('POST', '/api/auth/password/reset', { body: { token, password: 'a brand new one 1' }, ip: freshIp() });
+      expect(res.statusCode).toBe(403);
+      expect((await s.pool.query('select 1 from auth.password_resets where token_hash = $1', [hash])).rowCount).toBe(1);
+    });
+
+    it('renames, clears the display name and bio, and removes the picture, each told to the other services', async () => {
+      const { token, user } = await signUp();
+      await s.request('PATCH', '/api/auth/me', { token, body: { displayName: 'Loud Name', bio: 'a bio to remove' } });
+      await s.request('PUT', '/api/auth/me/avatar', { token, body: PNG, headers: { 'content-type': 'image/png' } });
+      const renamed = await mod('POST', `/users/${user.username}/rename`, { to: `${user.username}_x` });
+      expect(renamed.statusCode, renamed.body).toBe(200);
+      expect((await s.request('GET', `/api/users/${user.username}`)).statusCode).toBe(404);
+      expect((await mod('POST', `/users/${user.username}_x/clear-profile`)).json().user).toMatchObject({ displayName: null, bio: null });
+      expect((await mod('POST', `/users/${user.username}_x/remove-picture`)).json().user.picture).toBe(false);
+      const profile = (await s.request('GET', `/api/users/${user.username}_x`)).json().user;
+      expect(profile).toMatchObject({ username: `${user.username}_x`, displayName: null, bio: null, avatarUrl: null });
+      const updates = (await s.events('user.updated')).filter((e) => e.data.userId === user.id);
+      expect(updates.at(-1)!.data).toMatchObject({ username: `${user.username}_x` });
+    });
+
+    it('says when there is no such account, and refuses a reserved or taken new name', async () => {
+      expect((await mod('GET', '/users/nobody_here_9')).statusCode).toBe(404);
+      const a = await signUp();
+      const b = await signUp();
+      expect((await mod('POST', `/users/${a.user.username}/rename`, { to: 'admin_2' })).json().error.message).toBe('to: is reserved, choose another');
+      expect((await mod('POST', `/users/${a.user.username}/rename`, { to: b.user.username.toUpperCase() })).statusCode).toBe(409);
+    });
+  });
+
   describe('changing the password', () => {
     const changePassword = (token: string, body: Record<string, unknown>) => s.request('POST', '/api/auth/me/password', { token, body, ip: freshIp() });
 

@@ -549,6 +549,21 @@ describeIntegration('race socket protocol', () => {
       expect((await late.join(roomId)).chat).toEqual([msg]);
     });
 
+    it("lets a moderator clear a room's chat: its history goes, and its players are told", async () => {
+      const roomId = await createRoom(pod);
+      const alice = await guest('Alice');
+      await alice.join(roomId);
+      expect((await alice.emit('chat:send', { text: 'something to remove' })).ok).toBe(true);
+      await settle(() => expect(alice.chats).toHaveLength(1));
+      const res = await pod.inject({ method: 'POST', url: `/internal/moderation/rooms/${roomId}/clear-chat` });
+      expect(res.statusCode).toBe(204);
+      await settle(() => expect(alice.clears).toBe(1));
+      expect(alice.chats).toEqual([]);
+      const late = await guest('Late');
+      expect((await late.join(roomId)).chat).toEqual([]);
+      expect((await pod.inject({ method: 'POST', url: '/internal/moderation/rooms/no!/clear-chat' })).statusCode).toBe(404);
+    });
+
     it('refuses a slur, and takes ordinary swearing', async () => {
       const p = await guest();
       await p.join(await createRoom(pod));

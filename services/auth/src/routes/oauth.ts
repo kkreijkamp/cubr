@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { conflict, notFound, parse, rateLimited, signToken, unauthorized, unavailable, withTx } from '@cubr/common';
+import { conflict, forbidden, notFound, parse, rateLimited, signToken, unauthorized, unavailable, withTx } from '@cubr/common';
 import type { Deps } from './index.js';
 import { allow, publishSafely, withTimeout } from '../safe.js';
 import { loadMailConfig } from '../mail.js';
@@ -22,6 +22,7 @@ import {
 } from '../oauth.js';
 import { USER_COLUMNS, UUID_RE, conflictMessage, toPrivateUser, toPublicUser, userEventData, usernameSchema, type UserRow } from '../users.js';
 import { HOLDS_EMAIL, releaseUnconfirmed } from '../unconfirmed.js';
+import { SUSPENDED_MESSAGE, isSuspended } from '../suspension.js';
 
 /**
  * Sign-in with Google, Apple and GitHub (OAuth 2 authorization code flow; the providers in oauth.ts).
@@ -74,7 +75,7 @@ interface PendingSignup {
 }
 
 /** Why a sign-in didn't work; the SPA turns these into messages (pages/SsoPage.tsx). */
-type Failure = 'cancelled' | 'expired' | 'failed' | 'no_email' | 'email_taken' | 'linked_elsewhere' | 'already_linked' | 'busy';
+type Failure = 'cancelled' | 'expired' | 'failed' | 'no_email' | 'email_taken' | 'linked_elsewhere' | 'already_linked' | 'busy' | 'suspended';
 
 const startBody = z.object({ mode: z.enum(['signin', 'link']).default('signin'), next: z.string().max(300).optional() });
 const exchangeBody = z.object({ code: z.string().min(16).max(100) });
@@ -199,6 +200,7 @@ export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, 
     }
 
     if (linked) {
+      if (await isSuspended(pool, linked.user_id)) return fail(reply, flow, provider, 'suspended');
       await pool.query('update auth.user_identities set last_used_at = now() where provider = $1 and subject = $2', [provider, identity.subject]);
       await confirmByProvider(linked.user_id, identity.email);
       const code = randomToken();
@@ -249,6 +251,8 @@ export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, 
     reply.header('set-cookie', clearCookie);
     const login = await take<{ userId: string }>(redis, loginKey(code));
     if (!login) throw notFound('This sign-in link has expired, please sign in again');
+    // suspended in the two minutes since the code was made
+    if (await isSuspended(pool, login.userId)) throw forbidden(SUSPENDED_MESSAGE);
     const { rows } = await pool.query<UserRow>(`update auth.users set last_login_at = now() where id = $1 returning ${USER_COLUMNS}`, [login.userId]);
     if (!rows[0]) throw notFound('Account no longer exists');
     return signedIn(rows[0]);

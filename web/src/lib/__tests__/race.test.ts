@@ -205,6 +205,14 @@ describe('RaceConnection', () => {
     expect(state().chat.at(-1)!.text).toBe('m159');
   });
 
+  it("empties the chat when a moderator clears the room's", async () => {
+    const { socket, state } = await joined();
+    socket.fire('chat:message', chat('2026-11-16T10:00:01.000Z', 'something to remove'));
+    expect(state().chat).toHaveLength(1);
+    socket.fire('chat:cleared', {});
+    expect(state().chat).toEqual([]);
+  });
+
   it('refuses calls at once while disconnected, so nothing is sent twice after a reconnect', async () => {
     const { RaceConnection } = await load();
     const conn = new RaceConnection('room42');

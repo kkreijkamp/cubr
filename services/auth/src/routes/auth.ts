@@ -56,6 +56,7 @@ import {
 } from '../emailChange.js';
 import { changePasswordSchema, passwordChangedNotice, signInUrl } from '../passwordChange.js';
 import { HOLDS_EMAIL, isReleasedEmail, releaseUnconfirmed } from '../unconfirmed.js';
+import { SUSPENDED_MESSAGE, isSuspended } from '../suspension.js';
 
 const BCRYPT_COST = 10;
 
@@ -164,6 +165,8 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
     // an account made with Google, Apple or GitHub has no password: the same answer, the same timing
     const ok = await bcrypt.compare(body.password, found?.password_hash ?? (await DUMMY_HASH));
     if (!found?.password_hash || !ok) throw unauthorized('Invalid username/email or password');
+    // only after the password: a stranger can't tell a suspended account apart
+    if (await isSuspended(pool, found.id)) throw forbidden(SUSPENDED_MESSAGE);
 
     const updated = await pool.query<UserRow>(
       `update auth.users set last_login_at = now() where id = $1 returning ${USER_COLUMNS}`,
@@ -188,6 +191,10 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
     );
     const user = rows[0];
     if (!user) return;
+    if (await isSuspended(pool, user.id)) {
+      log.info({ userId: user.id }, 'password reset: no link, the account is suspended');
+      return;
+    }
     if (!user.trusted) {
       log.info({ userId: user.id }, 'password reset: no link, the email is not confirmed');
       return;
@@ -231,6 +238,8 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
       );
       if (!used.rows[0]) throw badRequest('This reset link is invalid or has expired');
       const userId = used.rows[0].user_id;
+      // suspended since the link was sent: nothing changes (the transaction rolls back, the link stays)
+      if (await isSuspended(c, userId)) throw forbidden(SUSPENDED_MESSAGE);
       await c.query('delete from auth.password_resets where user_id = $1', [userId]);
       // the link reached the address (and links end when the address changes): that confirms it
       const { rows } = await c.query<UserRow>(

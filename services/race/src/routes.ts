@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { conflict, forbidden, notFound, parse, rateLimit, rateLimited, type Redis, type makeAuth } from '@cubr/common';
+import { conflict, forbidden, notFound, parse, rateLimit, rateLimited, requireInternal, type Redis, type makeAuth } from '@cubr/common';
 import { isWcaEvent } from '@cubr/cubestats';
 import { ROOM_ID_RE, sanitizeText } from './sanitize.js';
 import type { RoomStore } from './store.js';
@@ -21,9 +21,24 @@ export interface RouteDeps {
   store: RoomStore;
   redis: Redis;
   auth: ReturnType<typeof makeAuth>;
+  /** the shared token for /internal routes (moderation) */
+  internalToken?: string;
+  /** tells a room's players its chat was cleared (Socket.IO, every pod) */
+  onChatCleared?: (roomId: string) => void;
 }
 
-export function registerRoutes(app: FastifyInstance, { store, redis, auth }: RouteDeps): void {
+export function registerRoutes(app: FastifyInstance, { store, redis, auth, internalToken = '', onChatCleared }: RouteDeps): void {
+  // Moderation (deploy/vps/moderate.sh, from inside the container with its internal token; /internal is
+  // never routed publicly): a room's chat history goes, and its players' chat empties.
+  app.post<{ Params: { id: string } }>('/internal/moderation/rooms/:id/clear-chat', { preHandler: requireInternal(internalToken, app.log) }, async (req, reply) => {
+    const id = req.params.id.toLowerCase();
+    if (!ROOM_ID_RE.test(id)) throw notFound('Room not found');
+    await store.clearChat(id);
+    onChatCleared?.(id);
+    req.log.warn({ roomId: id }, 'moderation: race chat cleared');
+    return reply.status(204).send();
+  });
+
   // Public lobby: rooms with recent activity, newest first; players = currently connected.
   app.get('/api/race/rooms', async () => ({ rooms: await store.listPublic(50) }));
 
