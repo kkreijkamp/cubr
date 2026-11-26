@@ -146,12 +146,16 @@ systemd timers on the VM (installed by `deploy.sh`):
   except the WCA schemas, checked with `pg_restore --list`, then copied to
   `gs://cubr-app-backups/postgres/` (Melbourne). Copies are deleted after 30 days. The VM can
   add and read backups but not delete them.
-- **`cubr-wca-import.timer`, Mondays 04:00 Brisbane.** Refreshes the WCA export (~3 min).
+- **`cubr-wca-import.timer`, Mondays 04:00 Brisbane.** Refreshes the WCA export (about a minute).
+  It runs as root, which has no registry login, so it uses the `wca-import` image already on the VM:
+  `deploy.sh` pulls it with every release (it failed on 15 and 22 November 2026, before it did).
+  `https://cubr.dev/api/wca/meta` shows the export loaded (`exportDate`, `importedAt`).
 
 ```sh
 systemctl list-timers 'cubr-*'                         # next runs
 sudo systemctl start cubr-backup.service               # back up now
-journalctl -u cubr-backup.service -n 20                # last result
+sudo systemctl start cubr-wca-import.service           # refresh the WCA data now
+sudo journalctl -u cubr-backup.service -n 20           # last result (sudo: the journal is root's)
 gcloud storage ls -l gs://cubr-app-backups/postgres/   # what's stored
 ```
 

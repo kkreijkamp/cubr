@@ -61,6 +61,10 @@ on_vm "set -e; cd /opt/cubr
   grep -q '^CLOUDFLARE_TUNNEL_TOKEN=.\\+' .env || { echo 'CLOUDFLARE_TUNNEL_TOKEN is empty in .env' >&2; exit 1; }
   gcloud auth configure-docker ${REGISTRY_HOST} --quiet >/dev/null 2>&1
   CUBR_VERSION=${VERSION} ${COMPOSE} pull --quiet
+  # The weekly WCA import's image too (profile jobs, which a plain pull skips): its timer runs as root,
+  # which has no registry login, so it only works with the image already here (it failed on 15 and 22
+  # November 2026 trying to pull it).
+  CUBR_VERSION=${VERSION} ${COMPOSE} --profile jobs pull --quiet wca-import
   grep -q '^CUBR_VERSION=' .env && sed -i 's/^CUBR_VERSION=.*/CUBR_VERSION=${VERSION}/' .env || echo 'CUBR_VERSION=${VERSION}' >> .env
   ${COMPOSE} up -d --remove-orphans
   # The gateway's nginx.conf is a single-file mount: the release's copy is a new file (a new inode),
