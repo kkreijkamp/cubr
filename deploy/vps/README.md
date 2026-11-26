@@ -220,6 +220,20 @@ gcloud compute ssh cubr-1 --zone australia-southeast1-a --configuration=cubr --t
   restored in 1 s, no errors; users, sign-in links and sessions equal to live, solves and daily
   attempts short by exactly those made since. Next: about 2027-02-26.
 
+## Daily reminders (Web Push)
+
+People who turn them on (settings, signed in) get a notification for the daily challenge at the hour
+they pick (10:00 their time unless changed), unless they've already played that day. The solve service
+sends them through each browser's own push service (Google's for Chrome and Edge, Mozilla's for Firefox,
+Apple's for Safari and installed iPhone apps); the message is encrypted for that browser.
+- **Keys:** `deploy.sh` makes the VAPID pair on the VM the first time (`deploy/vps/vapid-keys.mjs`,
+  `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` in `/opt/cubr/.env`). New keys end every subscription:
+  people would have to turn reminders on again, so keep them unless the private key leaked (then delete
+  both lines and deploy).
+- **Watching it:** `$C logs solve --since 24h | grep 'daily reminders'` (a line per pass that sent
+  something: sent, played, gone, failed). `SELECT count(*) FROM solve.push_subscriptions;` counts the
+  browsers that have them on.
+
 ## Alerts and logs
 
 - **Site down:** an uptime check emails you ("cubr.dev is down").

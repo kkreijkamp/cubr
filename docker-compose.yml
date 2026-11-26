@@ -110,6 +110,12 @@ services:
     <<: *service
     image: cubr/solve:dev
     build: { context: ., dockerfile: services/solve/Dockerfile, args: *build-args }
+    environment:
+      <<: *service-env
+      # daily-challenge reminders (Web Push) are off without these; for a local try, put a pair from
+      # `node deploy/vps/vapid-keys.mjs` in .env
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
 
   stats:
     <<: *service

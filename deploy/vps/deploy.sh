@@ -52,7 +52,7 @@ echo "deploying cubr ${VERSION} (${TAG} on main) to ${VM}"
 present=()
 while IFS= read -r f; do present+=("$f"); done < <(git ls-tree -r --name-only "$TAG" -- docker-compose.yml \
   deploy/vps/compose.prod.yml deploy/gateway/nginx.conf deploy/vps/backup.sh deploy/vps/watch.sh \
-  deploy/vps/journald.conf deploy/vps/systemd)
+  deploy/vps/journald.conf deploy/vps/vapid-keys.mjs deploy/vps/systemd)
 git archive --format=tar "$TAG" "${present[@]}" | gzip \
   | on_vm 'set -e; test -f /opt/cubr/.env || { echo "no /opt/cubr/.env: run deploy.sh init first" >&2; exit 1; }
       tar -xzf - -C /opt/cubr
@@ -79,6 +79,12 @@ on_vm "set -e; cd /opt/cubr
   # November 2026 trying to pull it).
   CUBR_VERSION=${VERSION} ${COMPOSE} --profile jobs pull --quiet wca-import
   grep -q '^CUBR_VERSION=' .env && sed -i 's/^CUBR_VERSION=.*/CUBR_VERSION=${VERSION}/' .env || echo 'CUBR_VERSION=${VERSION}' >> .env
+  # The daily reminders' VAPID keys, made here the first time with the solve image's Node, so the
+  # private key never leaves the VM (deploy/vps/vapid-keys.mjs; an older release has no such file)
+  if [ -f deploy/vps/vapid-keys.mjs ] && ! grep -q '^VAPID_PRIVATE_KEY=.\\+' .env; then
+    ${COMPOSE} run --rm --no-deps -T --entrypoint node solve --input-type=module - < deploy/vps/vapid-keys.mjs >> .env
+    echo 'made the daily reminders VAPID keys (in .env)'
+  fi
   ${COMPOSE} up -d --remove-orphans
   # The gateway's nginx.conf is a single-file mount: the release's copy is a new file (a new inode),
   # which the running container never sees, and up -d sees nothing to change. So when the config the

@@ -126,4 +126,24 @@ CREATE TABLE solve.daily_starts (
 );
 `,
   },
+  {
+    id: '007_push_subscriptions',
+    sql: `
+-- Daily-challenge reminders: one row per browser that turned them on (its Web Push subscription), with
+-- the minute of the day it wants them, in its own time zone. Removed when turned off, when the push
+-- service says the subscription is gone, or with the account (purge.ts).
+CREATE TABLE solve.push_subscriptions (
+  endpoint      text PRIMARY KEY,
+  user_id       uuid NOT NULL,
+  p256dh        text NOT NULL,
+  auth          text NOT NULL,
+  remind_minute smallint NOT NULL DEFAULT 600 CHECK (remind_minute BETWEEN 0 AND 1439),
+  tz            text NOT NULL,
+  last_day      date,          -- the local day it was last reminded, or found the person had played
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX push_subscriptions_user ON solve.push_subscriptions (user_id);
+`,
+  },
 ];

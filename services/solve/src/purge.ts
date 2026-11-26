@@ -21,6 +21,7 @@ export function makeUserPurge({ pool, log }: { pool: Pool; log: FastifyBaseLogge
     const deleted = await withTx(pool, async (c) => {
       const attempts = await c.query('DELETE FROM solve.daily_attempts WHERE user_id = $1', [userId]);
       await c.query('DELETE FROM solve.daily_starts WHERE user_id = $1', [userId]);
+      await c.query('DELETE FROM solve.push_subscriptions WHERE user_id = $1', [userId]);
       const solves = await c.query('DELETE FROM solve.solves WHERE user_id = $1', [userId]);
       const sessions = await c.query('DELETE FROM solve.sessions WHERE user_id = $1', [userId]);
       const outbox = await c.query(`DELETE FROM solve.outbox WHERE published_at IS NULL AND payload->>'userId' = $1`, [userId]);

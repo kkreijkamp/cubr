@@ -15,6 +15,7 @@ import {
 import { migrations } from './migrations.js';
 import { startOutboxRelay, type Relay } from './outbox.js';
 import { makeUserPurge, PURGE_TYPES } from './purge.js';
+import { startReminders, vapidFromEnv } from './reminders.js';
 import { registerRoutes } from './routes/index.js';
 
 const config = loadConfig('solve');
@@ -24,6 +25,8 @@ const redis = createRedis(config.redisUrl);
 let migrated = false;
 let relay: Relay | undefined;
 let consumer: Consumer | undefined;
+let reminders: { stop(): void } | undefined;
+const vapid = vapidFromEnv();
 
 const server = createServer(config, {
   infoPrefixes: ['/api/solves', '/api/sessions'],
@@ -40,15 +43,17 @@ const server = createServer(config, {
 const { app } = server;
 const auth = makeAuth(config.jwtSecret, redis, config.jwtSecretPrevious);
 
-await registerRoutes(app, { config, pool, redis, auth });
+await registerRoutes(app, { config, pool, redis, auth }, vapid);
 registerDeadLetterRoutes(app, { redis, group: 'solve', internalToken: config.internalToken });
 
 // Listen first so liveness passes while Postgres boots; readiness stays 503 until migrated.
 // Shutdown order: stop the relay and the consumer (they hold pool clients), then close Postgres and Redis.
-await start(server, config, [() => relay?.stop(), () => consumer?.stop(), () => pool.end(), () => redis.quit()]);
+await start(server, config, [() => reminders?.stop(), () => relay?.stop(), () => consumer?.stop(), () => pool.end(), () => redis.quit()]);
 await waitForPostgres(pool, app.log);
 await migrate(pool, 'solve', migrations, app.log);
 migrated = true;
 relay = startOutboxRelay({ pool, redis, log: app.log });
+// daily-challenge reminders, once a minute (off without VAPID keys)
+reminders = startReminders({ pool, redis, vapid, log: app.log });
 // The only event solve consumes: user.deleted (delete the account's sessions and solves).
 consumer = consumeEvents(redis, { group: 'solve', consumer: config.podName, types: PURGE_TYPES, handler: makeUserPurge({ pool, log: app.log }), log: app.log });

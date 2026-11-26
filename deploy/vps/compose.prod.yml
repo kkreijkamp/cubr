@@ -73,7 +73,10 @@ services:
     logging: *logging
     image: australia-southeast1-docker.pkg.dev/cubr-app/cubr/solve:${CUBR_VERSION:?set CUBR_VERSION in .env}
     build: !reset null
-    environment: *prod-env
+    environment:
+      <<: *prod-env
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}     # daily reminders: deploy.sh makes the pair on the VM the first time
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
 
   stats:
     logging: *logging

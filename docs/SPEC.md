@@ -109,6 +109,8 @@ JSON 404 instead of the SPA's `index.html`.
 | `REDIS_URL` | `redis://redis:6379` | |
 | `JWT_SECRET` | `dev-secret-change-me` | shared by all services (K8s Secret) |
 | `JWT_SECRET_PREVIOUS` | (empty) | the key before a rotation: tokens it signed still verify until they expire (30 days; the runbook's "Rotating keys"); new tokens use `JWT_SECRET` |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | (empty) | solve: the daily reminders' Web Push key pair (`deploy/vps/vapid-keys.mjs` makes one; deploy.sh does on the VM the first time). Empty = no reminders (the key route answers null, turning them on 503) |
+| `VAPID_SUBJECT` | `mailto:hello@cubr.dev` | solve: the contact the push services see with each reminder |
 | `AUTH_URL` `SCRAMBLE_URL` `SOLVE_URL` `STATS_URL` `LEADERBOARD_URL` `WCA_URL` `RACE_URL` | `http://<name>:8080` | internal base URLs |
 | `LOG_LEVEL` | `info` | |
 | `INTERNAL_API_TOKEN` | empty | shared secret for service-to-service calls (K8s Secret): `/internal/*` routes require it in `X-Internal-Token` (403 otherwise) and callers send it; auth also exempts such callers (the seed job) from its per-IP rate limits. Empty = not enforced, with a warning at startup (local development). |
@@ -313,6 +315,15 @@ CREATE TABLE solve.daily_starts (
   user_id uuid NOT NULL, daily_date date NOT NULL, event text NOT NULL, daily_index smallint NOT NULL,
   started_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (user_id, daily_date, event, daily_index)
+);-- daily-challenge reminders (migration 007): one row per browser that turned them on (its Web Push
+-- subscription), the minute of its local day it wants one, and the local day it last got one. Once a
+-- minute the solve service (one instance, a Redis lock) sends those due, unless the person already has an
+-- attempt or a started one at today's challenge (UTC's day, any event); at most 3 h late; the push
+-- service's 404/410 deletes the row, other failures give up for the day. Deleted with the account.
+CREATE TABLE solve.push_subscriptions (
+  endpoint text PRIMARY KEY, user_id uuid NOT NULL, p256dh text NOT NULL, auth text NOT NULL,
+  remind_minute smallint NOT NULL DEFAULT 600, tz text NOT NULL, last_day date,
+  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
 );
 ```
 
@@ -543,6 +554,9 @@ Pool: keep `scramble:pool:<event>` topped up (333/222/pyram/skewb: 200; 444/sq1/
 | POST `/api/sessions/import` | `{sessions: [{name, event, practice?, scramble?, solves: [{timeMs, penalty, scramble, comment?, createdAt}]}]}` (<= 1 000 sessions, <= 100 000 solves, body <= 25 MB) | `{imported: {sessions, solves}, skipped, continued}` (+ one `solves.imported` when it added any) - bulk insert in batches inside a transaction; solves the account already has (same event, time, penalty and `createdAt` to the ms) are left out (`skipped`), and a session whose solves are already in one of the account's sessions adds the rest to that one (`continued` counts them) instead of becoming a new session; 10 imports/h per user (429, checked before the body is read); an account holds at most 250 000 solves (400 if the import would pass it; one import per account at a time) |
 | GET `/api/solves/export` | - | `{exportedAt, sessions: [Session & {solves: Solve[]}]}`, streamed from one read-only snapshot in pages of 2 000 solves (memory stays flat; 200k solves = 52 MB in ~2.5 s locally); 10 exports/h per user (429) |
 | POST `/api/solves/daily/start` | `{date, event, index}` | an official attempt starts (inspection, or the solve without it): 201 `{abandoned: false}`; started before and never finished (a reload, a closed tab) -> it becomes a DNF (time since that start) and 200 `{abandoned: true, attempt}`; already has its result -> 409 |
+| GET `/api/solves/daily/reminders/key` | - (no auth) | `{publicKey}`: the VAPID public key a browser subscribes with (null when reminders aren't set up) |
+| PUT `/api/solves/daily/reminders` | `{endpoint, keys: {p256dh, auth}, remindMinute, tz}` (the browser's PushSubscription.toJSON(), the minute of the local day 0-1439, an IANA zone Postgres knows) | 200 `{reminder: {remindMinute, tz}}`: this browser gets a daily-challenge reminder at that local time (one row per endpoint; it moves to the caller's account); 503 without VAPID keys; 30 changes/h per account. The endpoint travels in bodies only (it's a capability URL), never in a logged query string |
+| DELETE `/api/solves/daily/reminders` | `{endpoint}` | 204: that browser's reminders off (only the caller's own) |
 | GET `/api/solves/daily?date=` | - | `{date, events: {"333": {solves: Solve[], ao5: number\|-1\|null}, ...}}` (only events with >=1 attempt; ao5 = the official result of the five attempts: times as submitted, penalties as last set while the day was open) |
 | GET `/api/solves/_info`, `/api/sessions/_info` | - | info (+ outbox backlog and relay state) |
 | GET `/internal/users/:userId/solves?event=` | - | `{solves: [{id, sessionId, timeMs, penalty, createdAt, practice?}]}` ordered by session_id, created_at (for stats recompute; `practice: true` on a practice session's solves) |
