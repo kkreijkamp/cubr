@@ -154,10 +154,21 @@ function send(report: ErrorReport): void {
   fetch(ERROR_REPORT_URL, { method: 'POST', body, headers: { 'Content-Type': 'application/json' }, keepalive: true }).catch(() => {});
 }
 
+let reporter: ReturnType<typeof createReporter> | null = null;
+
+/**
+ * Reports an error the app caught itself (RouteError, the router's error boundary: React doesn't pass on
+ * what a boundary catches), with the same limits as the rest. Nothing happens before startErrorReports.
+ */
+export function reportCaught(error: unknown): void {
+  const message = error instanceof Error ? error.message : String(error);
+  reporter?.onError({ message, error, filename: '', lineno: 0, colno: 0 });
+}
+
 /** Starts reporting (production builds only: in development the console shows errors). */
 export function startErrorReports(): void {
   if (!import.meta.env.PROD) return;
-  const reporter = createReporter({
+  reporter = createReporter({
     origin: location.origin,
     pathname: () => location.pathname,
     userAgent: navigator.userAgent,
@@ -166,6 +177,7 @@ export function startErrorReports(): void {
     build: new URL(import.meta.url).pathname.split('/').pop(),
     send,
   });
-  window.addEventListener('error', (e) => reporter.onError(e));
-  window.addEventListener('unhandledrejection', (e) => reporter.onRejection(e));
+  const r = reporter;
+  window.addEventListener('error', (e) => r.onError(e));
+  window.addEventListener('unhandledrejection', (e) => r.onRejection(e));
 }

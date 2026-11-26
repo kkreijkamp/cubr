@@ -67,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     rememberUser(u);
     setUserState(u);
     setStatus(u ? 'authed' : 'guest');
-    setSettingsServerSync(u ? (s) => api.auth.saveSettings(s as unknown as Record<string, unknown>) : null);
+    setSettingsServerSync(u ? (s) => api.auth.saveSettings(s as unknown as Record<string, unknown>) : null, u?.id);
     listeners.forEach((l) => l(u));
   }, []);
 
@@ -86,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .me(c.signal)
         .then(({ user: u, settings }) => {
           window.removeEventListener('online', check);
-          mergeServerSettings(settings);
+          mergeServerSettings(settings, u.id);
           applyUser(u);
         })
         .catch((err) => {
@@ -143,7 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(res.token);
         try {
           const me = await api.auth.me();
-          mergeServerSettings(me.settings);
+          mergeServerSettings(me.settings, me.user.id);
         } catch {
           /* settings are optional */
         }
@@ -159,7 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(res.token);
         try {
           const me = await api.auth.me();
-          mergeServerSettings(me.settings);
+          mergeServerSettings(me.settings, me.user.id);
         } catch {
           /* settings are optional */
         }
@@ -183,7 +183,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(token);
         try {
           const me = await api.auth.me();
-          mergeServerSettings(me.settings);
+          mergeServerSettings(me.settings, me.user.id);
         } catch {
           /* settings are optional */
         }

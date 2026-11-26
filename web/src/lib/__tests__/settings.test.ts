@@ -277,6 +277,124 @@ describe('server settings at sign-in', () => {
   });
 });
 
+describe('settings from anywhere, made safe (the October review\'s #11)', () => {
+  it('gives a value of the wrong type its default, so a bad statsShown no longer breaks the timer', async () => {
+    const s = await load({ statsShown: 'ao5', precision: '3', inspection: 'yes', holdMs: 'long', customStickers: [], lastEvent: 42, confirmDelete: null });
+    expect(s.get()).toMatchObject({
+      statsShown: s.DEFAULT_SETTINGS.statsShown,
+      precision: 2,
+      inspection: false,
+      holdMs: 300,
+      customStickers: {},
+      lastEvent: '333',
+      confirmDelete: true,
+    });
+  });
+
+  it('keeps only the averages the stats panel knows, once each', async () => {
+    const s = await load({ statsShown: ['ao5', 'ao5', 'ao3', 'mo5', 'ao05', 'ao12', 7, null, 'ao100000', 'ao1000', '<b>'] });
+    expect(s.get().statsShown).toEqual(['ao5', 'ao12', 'ao1000']);
+    vi.resetModules();
+    const t = await load({ statsShown: [] });
+    expect(t.get().statsShown).toEqual([]); // none shown is a choice
+  });
+
+  it('falls back from choices that do not exist and clamps numbers out of range', async () => {
+    const s = await load({ timerUpdate: 'sometimes', scramblePreview: '4D', stickerColours: 'neon', inspectionAlerts: 'scream', font: 'Comic Sans', timerSize: 99, holdMs: -5 });
+    expect(s.get()).toMatchObject({ timerUpdate: 'realtime', scramblePreview: '2D', stickerColours: 'default', inspectionAlerts: 'beep', font: 'Lexend Deca', timerSize: 14, holdMs: 0 });
+    vi.resetModules();
+    const t = await load({ timerSize: 8.6, holdMs: Number.NaN });
+    expect(t.get()).toMatchObject({ timerSize: 9, holdMs: 300 });
+  });
+
+  it('cleans the account\'s settings the same way at sign-in', async () => {
+    const s = await load();
+    s.mergeServerSettings({ statsShown: { ao5: true }, precision: 3, font: 'Georgia' }, 'u1');
+    expect(s.get()).toMatchObject({ statsShown: s.DEFAULT_SETTINGS.statsShown, precision: 3, font: 'Georgia' });
+  });
+});
+
+describe('syncing to the account (the October review\'s #11)', () => {
+  const UNSYNCED = 'cubr.settings.unsynced';
+
+  it('marks a change unsynced until it lands, retrying a failed push with backoff', async () => {
+    const s = await load();
+    let fail = 2;
+    const push = vi.fn(async () => {
+      if (fail-- > 0) throw new Error('offline');
+      return {};
+    });
+    s.setSettingsServerSync(push, 'u1');
+    s.updateSettings({ precision: 3 });
+    expect(local.getItem(UNSYNCED)).toBe('u1'); // marked at once: closing the tab now loses nothing
+    await vi.advanceTimersByTimeAsync(800);
+    expect(push).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(4_999);
+    expect(push).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1); // 5 s after the first failure
+    expect(push).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(15_000); // 15 s after the second
+    expect(push).toHaveBeenCalledTimes(3);
+    expect(push).toHaveBeenLastCalledWith(expect.objectContaining({ precision: 3 }));
+    expect(local.getItem(UNSYNCED)).toBeNull();
+    await vi.advanceTimersByTimeAsync(600_000);
+    expect(push).toHaveBeenCalledTimes(3); // landed: no more retries
+  });
+
+  it('tries again at once when the browser comes back online', async () => {
+    const s = await load();
+    const push = vi.fn(async () => Promise.reject(new Error('offline')));
+    s.setSettingsServerSync(push, 'u1');
+    s.updateSettings({ timerSize: 9 });
+    await vi.advanceTimersByTimeAsync(800);
+    expect(push).toHaveBeenCalledTimes(1);
+    (window as unknown as EventTarget).dispatchEvent(new Event('online'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(push).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps an unsynced change at the next sign-in on this device, and pushes it then', async () => {
+    const s = await load();
+    s.setSettingsServerSync(vi.fn(async () => Promise.reject(new Error('offline'))), 'u1');
+    s.updateSettings({ precision: 3, holdMs: 550 });
+    s.setSettingsServerSync(null); // the tab closes before it lands
+    vi.resetModules();
+    const next = await load();
+    next.mergeServerSettings({ precision: 2, holdMs: 0 }, 'u1'); // the account's older copy
+    expect(next.get()).toMatchObject({ precision: 3, holdMs: 550 });
+    const push = vi.fn(async () => ({}));
+    next.setSettingsServerSync(push, 'u1');
+    expect(push).toHaveBeenCalledWith(expect.objectContaining({ precision: 3, holdMs: 550 }));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(local.getItem(UNSYNCED)).toBeNull();
+  });
+
+  it("lets another account's settings replace a change marked for someone else", async () => {
+    const s = await load();
+    s.setSettingsServerSync(vi.fn(async () => Promise.reject(new Error('offline'))), 'u1');
+    s.updateSettings({ precision: 3 });
+    s.setSettingsServerSync(null);
+    s.mergeServerSettings({ precision: 2 }, 'u2');
+    expect(s.get().precision).toBe(2);
+    expect(local.getItem(UNSYNCED)).toBeNull();
+    const push = vi.fn(async () => ({}));
+    s.setSettingsServerSync(push, 'u1'); // u1 signs in again later: nothing of theirs is pending now
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('stops retrying when signed out, keeping the mark for that account', async () => {
+    const s = await load();
+    const push = vi.fn(async () => Promise.reject(new Error('offline')));
+    s.setSettingsServerSync(push, 'u1');
+    s.updateSettings({ precision: 3 });
+    await vi.advanceTimersByTimeAsync(800);
+    s.setSettingsServerSync(null);
+    await vi.advanceTimersByTimeAsync(600_000);
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(local.getItem(UNSYNCED)).toBe('u1');
+  });
+});
+
 describe("following the device's light or dark mode", () => {
   it('shows white cross in light mode and white cross dark in dark mode, switching with the device', async () => {
     const s = await load();

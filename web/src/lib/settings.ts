@@ -140,13 +140,45 @@ function themeOfKind(name: unknown, light: boolean): string {
   return t && isLightTheme(t) === light ? t.name : light ? DEFAULT_SETTINGS.themeLight : DEFAULT_SETTINGS.themeDark;
 }
 
-function sanitize(raw: Partial<Settings> | null | undefined): Settings {
-  const saved: Partial<Settings> = raw && typeof raw === 'object' ? raw : {};
+/** A stats panel average: mo3, or ao5 and up (components/timer/statsUtil.ts parseAvgKey). */
+const isStatKey = (k: unknown): k is string => typeof k === 'string' && (k === 'mo3' || /^ao([5-9]|[1-9]\d{1,4})$/.test(k));
+
+/** A finite number in [min, max] (rounded), else the default. */
+function clampNumber(v: unknown, min: number, max: number, fallback: number): number {
+  return typeof v === 'number' && Number.isFinite(v) ? Math.round(Math.max(min, Math.min(max, v))) : fallback;
+}
+
+/**
+ * Settings as stored on this device or on the account (which accepts any object), made safe to use:
+ * a value of the wrong type, a choice that doesn't exist (another version, a hand-edited store) or a
+ * number out of range falls back to the default (the October review's #11: a bad statsShown crashed the
+ * timer page).
+ */
+export function sanitize(raw: Partial<Settings> | null | undefined): Settings {
+  const saved: Partial<Settings> = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
   const s = { ...DEFAULT_SETTINGS, ...saved };
+  const loose = s as unknown as Record<string, unknown>;
+  // each field has its default's type (arrays and plain objects included)
+  for (const key of Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[]) {
+    const d: unknown = DEFAULT_SETTINGS[key];
+    const v = loose[key];
+    const ok = Array.isArray(d) ? Array.isArray(v) : d !== null && typeof d === 'object' ? v !== null && typeof v === 'object' && !Array.isArray(v) : typeof v === typeof d;
+    if (!ok) loose[key] = d;
+  }
   // choices from another version (or a hand-edited store) fall back to the default
   const oneOf = <K extends keyof Settings>(key: K, allowed: readonly Settings[K][]) => {
     if (!allowed.includes(s[key])) s[key] = DEFAULT_SETTINGS[key];
   };
+  oneOf('inspectionAlerts', ['off', 'beep', 'voice']);
+  oneOf('timerUpdate', ['realtime', 'tenths', 'seconds', 'hidden']);
+  oneOf('precision', [2, 3]);
+  oneOf('scramblePreview', ['off', '2D', '3D']);
+  oneOf('stickerColours', ['default', 'custom']);
+  if (!FONTS.some((f) => f.name === s.font)) s.font = DEFAULT_SETTINGS.font;
+  s.holdMs = clampNumber(s.holdMs, 0, 2000, DEFAULT_SETTINGS.holdMs);
+  s.timerSize = clampNumber(s.timerSize, 3, 14, DEFAULT_SETTINGS.timerSize);
+  s.statsShown = Array.from(new Set(s.statsShown.filter(isStatKey))).slice(0, 20);
+  if (!s.lastEvent) s.lastEvent = DEFAULT_SETTINGS.lastEvent;
   // a theme that no longer exists (the Monkeytype palettes were removed in 1.1.9) -> the default
   s.theme = getTheme(s.theme).name;
   if (typeof saved.autoSwitchTheme !== 'boolean') s.autoSwitchTheme = followsDeviceByDefault(saved);
@@ -224,12 +256,83 @@ export function applyVisualSettings(): void {
   followDevice();
 }
 
-let serverSync: ((s: Settings) => Promise<unknown>) | null = null;
-let syncTimer: ReturnType<typeof setTimeout> | null = null;
+// ---- syncing to the account ----------------------------------------------------------------------
+// A change goes to the account 800 ms after the last one. Until it lands, this device marks it unsynced
+// (with the account's id), and a failed push is tried again with backoff and when the browser comes back
+// online. At the next sign-in on this device, marked settings win over the account's and are pushed, so
+// a change made offline, or just before the tab closed, isn't reverted (the October review's #11).
+const UNSYNCED_KEY = 'cubr.settings.unsynced';
+/** ms before each retry of a failed push (the last one repeats) */
+const SYNC_RETRY_MS = [5_000, 15_000, 30_000, 60_000, 120_000, 300_000];
 
-/** The auth layer installs a function that pushes settings to the server (or null when logged out). */
-export function setSettingsServerSync(fn: ((s: Settings) => Promise<unknown>) | null): void {
+let serverSync: ((s: Settings) => Promise<unknown>) | null = null;
+let syncUser: string | null = null;
+let syncTimer: ReturnType<typeof setTimeout> | null = null;
+let syncFailures = 0;
+/** counts changes to sync, so a push that lands after a newer change doesn't clear its mark */
+let changes = 0;
+
+function unsyncedFor(): string | null {
+  try {
+    return localStorage.getItem(UNSYNCED_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function markUnsynced(user: string | null): void {
+  try {
+    if (user) localStorage.setItem(UNSYNCED_KEY, user);
+    else localStorage.removeItem(UNSYNCED_KEY);
+  } catch {
+    /* storage unavailable: the push still runs */
+  }
+}
+
+function clearSyncTimer(): void {
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = null;
+}
+
+/** Pushes the settings to the account now; a failure tries again later, until it lands or sync stops. */
+function pushNow(): void {
+  const fn = serverSync;
+  if (!fn) return;
+  clearSyncTimer();
+  const user = syncUser;
+  const version = changes;
+  fn(settingsStore.get()).then(
+    () => {
+      syncFailures = 0;
+      if (user && version === changes && serverSync === fn && unsyncedFor() === user) markUnsynced(null);
+    },
+    () => {
+      if (serverSync !== fn || syncTimer) return; // signed out meanwhile (the mark waits for the next sign-in), or a newer push is due
+      const delay = SYNC_RETRY_MS[Math.min(syncFailures++, SYNC_RETRY_MS.length - 1)];
+      syncTimer = setTimeout(pushNow, delay);
+    },
+  );
+}
+
+/**
+ * The auth layer installs a function that pushes settings to the account (or null when signed out),
+ * with the account's id. A change this device hadn't synced to that account goes now.
+ */
+export function setSettingsServerSync(fn: ((s: Settings) => Promise<unknown>) | null, userId?: string | null): void {
   serverSync = fn;
+  syncUser = fn ? (userId ?? null) : null;
+  clearSyncTimer();
+  syncFailures = 0;
+  if (fn && syncUser && unsyncedFor() === syncUser) pushNow();
+}
+
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('online', () => {
+    if (serverSync && syncUser && unsyncedFor() === syncUser) {
+      syncFailures = 0;
+      pushNow();
+    }
+  });
 }
 
 export function updateSettings(patch: Partial<Settings>, opts: { sync?: boolean } = {}): void {
@@ -240,18 +343,25 @@ export function updateSettings(patch: Partial<Settings>, opts: { sync?: boolean 
   if (THEME_KEYS.some((k) => k in patch && patch[k] !== prev[k])) showTheme(next);
   if (patch.font && patch.font !== prev.font) applyFont(next.font);
   if (opts.sync !== false && serverSync) {
-    if (syncTimer) clearTimeout(syncTimer);
-    const fn = serverSync;
-    syncTimer = setTimeout(() => {
-      fn(settingsStore.get()).catch(() => {
-        /* offline - local copy is still saved */
-      });
-    }, 800);
+    changes++;
+    if (syncUser) markUnsynced(syncUser);
+    clearSyncTimer();
+    syncFailures = 0;
+    syncTimer = setTimeout(pushNow, 800);
   }
 }
 
-/** Server settings win over local ones when you log in. */
-export function mergeServerSettings(remote: Record<string, unknown> | null | undefined): void {
+/**
+ * The account's settings at sign-in: they win over this device's, unless this device has a change for
+ * the same account that never reached it (then this device's stay, and are pushed once sync is on). A
+ * change marked for another account gives way.
+ */
+export function mergeServerSettings(remote: Record<string, unknown> | null | undefined, userId?: string): void {
+  const pending = unsyncedFor();
+  if (userId && pending) {
+    if (pending === userId) return;
+    markUnsynced(null);
+  }
   if (!remote || Object.keys(remote).length === 0) return;
   const r = remote as Partial<Settings>;
   // an account's settings from before 1.4.14: its theme decides, as for settings saved on a device
