@@ -66,7 +66,8 @@ export function PrivacyPage() {
             read it.
           </li>
           <li>
-            <b>Sign-in with Google, Apple or GitHub</b> (if you choose it): your account&apos;s id there and its verified email address.
+            <b>Sign-in with Google or GitHub</b> (and Apple, once it&apos;s available; if you choose it): your account&apos;s id there and
+            its verified email address.
             When you sign up this way, your name there suggests a username and isn&apos;t kept. We never see your password for that
             account. An account made this way has no password until you set one.
           </li>
@@ -74,11 +75,12 @@ export function PrivacyPage() {
             <b>Profile</b> (all optional): display name, bio, country, WCA ID and profile picture.
           </li>
           <li>
-            <b>Your cubing:</b> solves (times, penalties, scrambles, comments and dates), sessions, daily-challenge attempts and your
-            settings.
+            <b>Your cubing:</b> solves (times, penalties, scrambles, comments and dates), sessions, daily-challenge attempts (and when
+            each started, so each scramble gets one try) and your settings.
           </li>
           <li>
-            <b>Race rooms:</b> the name you race under and the chat messages you send, kept for 2 hours.
+            <b>Race rooms:</b> the name you race under and the chat messages you send (the room keeps its last 50), until 2 hours after
+            the room was last active.
           </li>
           <li>
             <b>Technical data:</b> your IP address, used for the rate limits that protect sign-in and the rest of the service, and in our
@@ -97,12 +99,16 @@ export function PrivacyPage() {
             taken out first. Reports aren&apos;t linked to your account, and we don&apos;t keep your IP address with them.
           </li>
           <li>
-            <b>Emails</b> you send to <Mail />.
+            <b>Emails</b> you send to <Mail />, reports of a profile or a race room included.
+          </li>
+          <li>
+            <b>Moderation:</b> when we act on an account (a rename, a cleared display name, bio or picture, a suspension), a record of
+            what we did, when, and why. A suspended account keeps a short note on why while the suspension lasts.
           </li>
           <li>
             <b>Feedback</b> you send with the form in the footer: what it&apos;s about, your message, the email address you give (if
             any, so we can reply), and the line the form shows it adds: your cubr version, browser, window size and the page you were
-            on. It&apos;s emailed to our inbox, and cubr&apos;s servers don&apos;t keep a copy. It isn&apos;t linked to your account,
+            on. It&apos;s emailed to our inbox through Resend, which keeps a copy for 30 days; cubr&apos;s servers don&apos;t keep one. It isn&apos;t linked to your account,
             and we don&apos;t keep your IP address with it.
           </li>
           <li>
@@ -145,13 +151,25 @@ export function PrivacyPage() {
           </li>
           <li>
             To keep cubr safe, fair and working: rate limits, server logs, error reports, anti-cheat checks that compare times with WCA
-            records, and backups. (Legal basis: our legitimate interest in running a secure service.)
+            records, moderation (acting on reports and on what breaks the terms) and backups. (Legal basis: our legitimate interest in
+            running a secure service that is safe to use.)
           </li>
           <li>
             To see which pages are used and how fast they load, so we know what to improve: page-view totals from Cloudflare Web
             Analytics. (Legal basis: our legitimate interest in improving cubr.)
           </li>
-          <li>To answer you when you contact us or send feedback, and to fix what you report.</li>
+          <li>
+            To answer you when you contact us or send feedback, and to fix what you report. (Legal basis: our legitimate interest in
+            answering you and improving cubr.)
+          </li>
+          <li>
+            To thank supporters by name on the about page, when they made their support public on Ko-fi. (Legal basis: our legitimate
+            interest in recognising support, as you chose to share it.)
+          </li>
+          <li>
+            To compare your times with official results: the WCA&apos;s public competition results (below). (Legal basis: our
+            legitimate interest in showing cubers where they stand, using results the WCA publishes.)
+          </li>
         </ul>
         <p>We don&apos;t sell your data, use it for advertising, or build profiles of you.</p>
       </Section>
@@ -168,7 +186,7 @@ export function PrivacyPage() {
           </li>
           <li>
             <b>Resend:</b> sends password-reset emails and the emails that confirm an email address, and brings feedback from the
-            form to our inbox.
+            form to our inbox. It sends from Japan, and keeps each email for 30 days.
           </li>
           <li>
             <b>Apple iCloud:</b> hosts our contact inbox, <Mail />.
@@ -177,11 +195,14 @@ export function PrivacyPage() {
             <b>Ko-fi:</b> takes donations. The payment itself is between you and Ko-fi, under Ko-fi&apos;s own terms and privacy policy.
           </li>
           <li>
-            <b>Google, Apple and GitHub:</b> if you sign in with one of them, it confirms who you are, under its own terms and privacy
-            policy. We only receive what is listed above.
+            <b>Google and GitHub</b> (and Apple, once it&apos;s available): if you sign in with one of them, it confirms who you are,
+            under its own terms and privacy policy. We only receive what is listed above.
           </li>
         </ul>
-        <p>Some of them are based in, or process data in, other countries, including the United States, under their own data processing terms.</p>
+        <p>
+          Some of them are based in, or process data in, other countries, including the United States and Japan, under their own data
+          processing terms.
+        </p>
       </Section>
 
       <Section title="wca results">
@@ -198,7 +219,7 @@ export function PrivacyPage() {
 
       <Section title="cookies and local storage">
         <p>
-          cubr sets one cookie of its own, and only while you sign in with Google, Apple or GitHub: it ties that sign-in to your browser
+          cubr sets one cookie of its own, and only while you sign in with Google or GitHub (or Apple, once available): it ties that sign-in to your browser
           and expires within minutes. Your browser&apos;s local storage keeps you signed in and holds your settings, your offline solves and the players you muted in race chat,
           so the site works. None of it is used for tracking or advertising, which is why there is no cookie banner. Cloudflare may set a
           strictly necessary security cookie. Cloudflare Web Analytics sets none.
@@ -212,15 +233,17 @@ export function PrivacyPage() {
             backups within 30 days.
           </li>
           <li>
-            Password-reset links work for 1 hour, links that confirm your email for 7 days (1 hour for a change of address). Race chat is
-            kept for 2 hours, and rate-limit counters for up to a day.
+            Password-reset links work for 1 hour, links that confirm your email for 7 days (1 hour for a change of address). Race rooms
+            and their chat are kept until 2 hours after the room was last active, and rate-limit counters for up to a day.
           </li>
           <li>Server logs, error reports included, are rotated automatically and overwritten as they fill up.</li>
           <li>Supporter entries: until you ask us to remove your name.</li>
           <li>Page-view statistics: only as totals, in Cloudflare&apos;s dashboard, for as long as Cloudflare keeps them.</li>
           <li>
-            Emails to <Mail />, feedback from the form included: as long as needed to deal with them.
+            Emails to <Mail />, feedback from the form and reports included: up to 12 months, then deleted. Resend&apos;s copies of what
+            it sent: 30 days.
           </li>
+          <li>Moderation records: 2 years. A suspension&apos;s note: until the suspension ends.</li>
         </ul>
       </Section>
 
@@ -233,7 +256,8 @@ export function PrivacyPage() {
             Download all your solves: <Link to="/settings#data">settings &gt; data</Link> &gt; export.
           </li>
           <li>
-            Delete your account and solves: <Link to="/settings#danger">settings &gt; danger zone</Link>.
+            Delete your account and solves: <Link to="/settings#danger">settings &gt; danger zone</Link>. A suspended account can&apos;t
+            sign in: email <Mail /> and we delete it.
           </li>
           <li>
             For anything else (a copy of your data, a correction, deletion, or an objection to how we use it), email <Mail />. We reply
