@@ -38,6 +38,14 @@ map "$http_sec_gpc:$http_dnt" $cubr_beacon_reports {
 # Pages search engines shouldn't list: personal and one-off pages (an empty value sends no header).
 # Matched on the request as sent, since $uri is index.html by the time headers go out. Crawlers may
 # still fetch them (robots.txt doesn't block them), or they couldn't see this.
+# The CSP: the site's policy, except for an SVG file, which is a document of its own when opened or used
+# as the favicon. Safari applies that response's CSP inside it, and the favicon's dark-mode <style> was
+# refused under style-src 'self'. An SVG gets no scripts, nothing from elsewhere, and its own styles.
+map $uri $cubr_csp {
+  "~*\.svg$"  "default-src 'none'; style-src 'unsafe-inline'; img-src data:; frame-ancestors 'none'";
+  default     "default-src 'self'; script-src 'self' 'sha256-kbWrCQcY5deeZriU+oYxYkCG4RR147XA28tK/0GtqOI=' $cubr_beacon_script; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' wss://$host $cubr_beacon_reports; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+}
+
 map $request_uri $cubr_robots {
   default                                                 "";
   ~^/(?:api|internal)(?:/|$)                              "noindex";   # data, not pages (the services say the same)
@@ -103,7 +111,7 @@ server {
   # (static.cloudflareinsights.com), which reports to cloudflareinsights.com when the app loads it, or
   # to cubr.dev's own /cdn-cgi/rum when Cloudflare injects it (web/src/lib/analytics.ts); left out for a
   # browser that sends Global Privacy Control or Do Not Track ($cubr_beacon_script, $cubr_beacon_reports).
-  add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-kbWrCQcY5deeZriU+oYxYkCG4RR147XA28tK/0GtqOI=' $cubr_beacon_script; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' wss://$host $cubr_beacon_reports; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
+  add_header Content-Security-Policy $cubr_csp always;
   add_header X-Content-Type-Options "nosniff" always;
   add_header X-Frame-Options "DENY" always;
   add_header Referrer-Policy "strict-origin-when-cross-origin" always;

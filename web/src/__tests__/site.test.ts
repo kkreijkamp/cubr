@@ -127,8 +127,8 @@ const serverHeaders = Object.fromEntries(
  * The CSP a browser gets, its analytics hosts filled in from their maps: `signals` is the request's
  * "<Sec-GPC>:<DNT>" (":" sends neither).
  */
-function cspFor(signals: string): Record<string, string[]> {
-  const header = serverHeaders['Content-Security-Policy'].replace(/\$cubr_beacon_(script|reports)\b/g, (v) => mapLookup(v, signals));
+function cspFor(signals: string, uri = '/'): Record<string, string[]> {
+  const header = mapLookup(serverHeaders['Content-Security-Policy'], uri).replace(/\$cubr_beacon_(script|reports)\b/g, (v) => mapLookup(v, signals));
   return Object.fromEntries(
     header
       .split(';')
@@ -248,6 +248,19 @@ describe('security headers', () => {
     );
     // a changed inline script needs its new hash here, or browsers block it (and the theme flashes)
     expect(csp['script-src']).toEqual(["'self'", ...hashes, 'https://static.cloudflareinsights.com']);
+  });
+
+  it("gives an SVG file a policy of its own: no scripts or outside loads, but its own styles (the favicon's dark mode, in Safari)", () => {
+    expect(serverHeaders['Content-Security-Policy']).toBe('$cubr_csp');
+    for (const uri of ['/favicon.svg', '/icons/x.SVG']) {
+      const svg = cspFor(':', uri);
+      expect(svg['default-src']).toEqual(["'none'"]);
+      expect(svg['style-src']).toEqual(["'unsafe-inline'"]);
+      expect(svg['script-src']).toBeUndefined(); // default-src 'none' covers scripts
+      expect(svg['frame-ancestors']).toEqual(["'none'"]);
+    }
+    expect(cspFor(':', '/about')['style-src']).toEqual(["'self'"]); // the pages keep the strict one
+    expect(cspFor(':', '/assets/index-abc.svg.js')['default-src']).toEqual(["'self'"]);
   });
 
   it('shut out plugins, <base>, framing and other sites\' forms', () => {

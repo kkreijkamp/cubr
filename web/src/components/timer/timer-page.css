@@ -480,6 +480,9 @@
 .tp-hint {
   color: var(--sub-color);
   font-size: 0.9rem;
+  /* the touch hint wraps on a phone: its lines stay centred under the time, like the one-line hint */
+  text-align: center;
+  text-wrap: balance;
   animation: fadeIn 0.3s ease-out;
 }
 .tp-hint kbd {
