@@ -450,6 +450,24 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
       if (!ok) throw unavailable('Could not revoke the token right now, please retry');
       return reply.status(204).send();
     });
+
+    // ---- POST /api/auth/logout/everywhere ---------------------------------------------------------
+    // Signs out every other browser and device: every token issued so far is revoked (as a password
+    // change does), and this session carries on with a fresh one.
+    scope.post('/api/auth/logout/everywhere', { preHandler: auth.requireAuth }, async (req) => {
+      const me = req.user!;
+      if (!UUID_RE.test(me.id)) throw unauthorized();
+      if (!(await allow(redis, `logout-everywhere:${me.id}`, 5, 3600))) throw rateLimited('Too many attempts, try again later');
+      const { rows } = await pool.query<UserRow>(`select ${USER_COLUMNS} from auth.users where id = $1`, [me.id]);
+      if (!rows[0]) throw unauthorized('Account no longer exists');
+      const at = Math.floor(Date.now() / 1000);
+      const revoked = await withTimeout(redis.set(revokedUserKey(me.id), String(at), 'EX', TOKEN_TTL_SEC).then(() => true), 2000, false);
+      if (!revoked) throw unavailable('Could not sign out the other devices right now, please retry');
+      req.log.info({ userId: me.id }, 'signed out everywhere');
+      const user = toPrivateUser(rows[0]);
+      const { token } = await signToken(config.jwtSecret, user, TOKEN_TTL_SEC, at + 1);
+      return { token, user };
+    });
   });
 
   // ---- DELETE /api/auth/me --------------------------------------------------------------------

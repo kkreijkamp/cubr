@@ -179,6 +179,19 @@ describeIntegration('auth API', () => {
       expect((await me(other)).statusCode).toBe(200);
     });
 
+    it('signs out everywhere else: every other session ends, this one carries on with a fresh token', async () => {
+      const { token: here, user } = await signUp();
+      const there = (await login(user.username)).json().token as string; // another device
+      const res = await s.request('POST', '/api/auth/logout/everywhere', { token: here });
+      expect(res.statusCode, res.body).toBe(200);
+      const fresh = res.json().token as string;
+      expect(res.json().user).toMatchObject({ id: user.id, username: user.username });
+      expect((await me(there)).statusCode).toBe(401);
+      expect((await me(here)).statusCode).toBe(401); // the old token of this device too: it has the new one
+      expect((await me(fresh)).statusCode).toBe(200);
+      expect((await s.request('POST', '/api/auth/logout/everywhere', { token: there })).statusCode).toBe(401);
+    });
+
     it('logs out with an empty JSON body (what fetch sends with a JSON content type)', async () => {
       const { token } = await signUp();
       const res = await s.request('POST', '/api/auth/logout', { token, headers: { 'content-type': 'application/json' }, body: '' });

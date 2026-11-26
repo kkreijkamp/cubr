@@ -230,6 +230,8 @@ export const api = {
       request<{ token: string; user: PrivateUser }>('POST', '/api/auth/register', body),
     login: (body: { login: string; password: string }) => request<{ token: string; user: PrivateUser }>('POST', '/api/auth/login', body),
     logout: () => request<void>('POST', '/api/auth/logout'),
+    /** every other session ends; this one gets a fresh token */
+    logoutEverywhere: () => request<{ token: string; user: PrivateUser }>('POST', '/api/auth/logout/everywhere'),
     /** Always 202: the answer doesn't say whether an account uses the address. */
     forgotPassword: (email: string) => request<{ ok: true }>('POST', '/api/auth/password/forgot', { email }),
     /** Uses a reset link's token once; signs out every other session and returns a fresh one. */

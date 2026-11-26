@@ -18,6 +18,8 @@ interface AuthContextValue {
    *  sets its first). Every other session ends; this one carries on with a fresh token. */
   changePassword(newPassword: string, password?: string): Promise<void>;
   logout(): Promise<void>;
+  /** Signs out every other browser and device; this one carries on with a fresh token (other tabs here follow it). */
+  logoutEverywhere(): Promise<void>;
   /** Deletes the account for good (after checking the password, or the username for an account
    *  without one), then signs out. */
   deleteAccount(proof: { password: string } | { confirm: string }): Promise<void>;
@@ -178,6 +180,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         setToken(null);
         applyUser(null);
+      },
+      async logoutEverywhere() {
+        const res = await api.auth.logoutEverywhere();
+        setToken(res.token);
+        applyUser(res.user);
       },
       async signInWithToken(token, signedIn) {
         setToken(token);

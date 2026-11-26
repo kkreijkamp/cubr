@@ -4,6 +4,7 @@ import {
   ArrowDownTrayIcon,
   ArrowRightStartOnRectangleIcon,
   ArrowUpTrayIcon,
+  ComputerDesktopIcon,
   DocumentArrowUpIcon,
   EnvelopeIcon,
   LockClosedIcon,
@@ -147,7 +148,8 @@ function ImportPreview({ fileName, parsed, onClose }: { fileName: string; parsed
 
 /** Account-only section: import (cubr and every format csTimer imports), JSON and csTimer export, profile + logout. */
 export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: () => void }) {
-  const { logout, setUser } = useAuth();
+  const { logout, logoutEverywhere, setUser } = useAuth();
+  const [signingOutElsewhere, setSigningOutElsewhere] = useState(false);
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<{ fileName: string; parsed: TimerImport } | null>(null);
@@ -238,6 +240,20 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
     navigate('/');
   };
 
+  /** Every other browser and device signs out; this one stays signed in. */
+  const doLogoutElsewhere = async () => {
+    if (signingOutElsewhere) return;
+    setSigningOutElsewhere(true);
+    try {
+      await logoutEverywhere();
+      toast.success('every other browser and device is signed out. this one stays signed in.', { title: 'signed out everywhere else' });
+    } catch (err) {
+      toast.error(friendlyError(err, 'the account service'), { title: "couldn't sign out the other devices" });
+    } finally {
+      setSigningOutElsewhere(false);
+    }
+  };
+
   useRegisterCommands(
     'account',
     () => [
@@ -252,6 +268,13 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
         icon: <LockClosedIcon />,
         keywords: ['password', 'security', 'account'],
         run: () => setChangingPassword(true),
+      },
+      {
+        id: 'account-logout-everywhere',
+        label: 'Sign out everywhere else',
+        icon: <ArrowRightStartOnRectangleIcon />,
+        keywords: ['devices', 'sessions', 'security', 'log out', 'sign out'],
+        run: () => void doLogoutElsewhere(),
       },
       ...(unconfirmed
         ? [{ id: 'account-email-confirm', label: 'Send email confirmation link', icon: <PaperAirplaneIcon />, keywords: ['confirm', 'verify', 'address'], run: () => void sendConfirmation() }]
@@ -358,6 +381,19 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
             )}
             <button className="btn" onClick={() => setChangingEmail(true)}>
               <EnvelopeIcon /> {released ? 'add email' : 'change email'}
+            </button>
+          </div>
+        </div>
+        <div className="ac-row">
+          <div>
+            <div className="t">
+              <ComputerDesktopIcon /> devices
+            </div>
+            <div className="d">signed in somewhere you shouldn&apos;t be, or on a shared computer? sign out every other browser and device. this one stays signed in.</div>
+          </div>
+          <div className="ac-actions">
+            <button className="btn" onClick={() => void doLogoutElsewhere()} disabled={signingOutElsewhere}>
+              <ArrowRightStartOnRectangleIcon /> sign out everywhere else
             </button>
           </div>
         </div>
