@@ -252,13 +252,14 @@ export default function AboutPage() {
         </p>
         <p className="ab-p">
           Every page has a skip link and headings in order. Everything works from the keyboard, menus and dialogs included (Tab, the arrow keys, Esc), and the
-          timer with space. A screen reader hears each solve&apos;s time once it ends, and nothing while it runs. The high-contrast setting brings labels and
-          links to 4.5:1 in any theme, Windows high contrast mode keeps focus and your choices visible, pages reflow down to 320 px wide, and motion follows
-          your reduced-motion setting.
+          timer with space. A screen reader hears each solve&apos;s time once it ends, and nothing while it runs. The high-contrast setting brings labels, links
+          and errors to 4.5:1 in any theme and underlines links in text, Windows high contrast mode keeps focus and your choices visible, pages reflow down to
+          320 px wide, and motion follows your reduced-motion setting.
         </p>
         <p className="ab-p">
           Checked in November 2026: every main page in Chrome, Firefox and Safari&apos;s engine, with the keyboard alone, at 200 % zoom, with wider text
-          spacing, in high contrast mode and with reduced motion. Not yet with every screen reader on every device.
+          spacing, in high contrast mode and with reduced motion; automated checks (axe) test every main page with each change. Not yet with every screen reader
+          on every device.
         </p>
         <p className="ab-p">
           Not there yet: the charts on profiles are pictures (their numbers are in the summaries and tables beside them); some themes have low-contrast text
