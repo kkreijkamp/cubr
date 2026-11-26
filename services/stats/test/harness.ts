@@ -123,8 +123,17 @@ export class FakeSolveService {
     }
     const solves = /^\/internal\/users\/([^/]+)\/solves$/.exec(url.pathname);
     if (solves) {
-      const list = this.list(decodeURIComponent(solves[1]), url.searchParams.get('event'));
-      send(200, { solves: this.onList ? this.onList(list) : list });
+      const all = this.list(decodeURIComponent(solves[1]), url.searchParams.get('event'));
+      const list = this.onList ? this.onList(all) : all;
+      // in pages when asked, as solve-service does (the cursor here is just the next offset)
+      const limit = Number(url.searchParams.get('limit') ?? 0);
+      if (!limit) {
+        send(200, { solves: list });
+        return;
+      }
+      const from = Number(url.searchParams.get('after') ?? 0);
+      const page = list.slice(from, from + limit);
+      send(200, { solves: page, next: from + limit < list.length ? String(from + limit) : null });
       return;
     }
     const sessions = /^\/internal\/users\/([^/]+)\/sessions$/.exec(url.pathname);

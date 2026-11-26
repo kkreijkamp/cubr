@@ -123,7 +123,15 @@ export const dailyQuery = z.object({ date: ymd.optional() });
 export const dailyStartBody = z.object({ date: ymd, event: eventId, index: z.number().int().min(0).max(4) });
 
 export const internalParams = z.object({ userId: uuid });
-export const internalQuery = z.object({ event: eventId.optional() });
+/** At most this many solves per page of GET /internal/users/:id/solves (stats asks for pages; without `limit`, everything). */
+export const INTERNAL_SOLVES_PAGE = 50_000;
+/** A page's place: the last row's session, exact created_at (microseconds, UTC) and id, as the next page's `after`. */
+export const SOLVES_CURSOR_RE = /^([0-9a-f-]{36})_(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6})_([0-9a-f-]{36})$/;
+export const internalQuery = z.object({
+  event: eventId.optional(),
+  limit: z.coerce.number().int().min(1).max(INTERNAL_SOLVES_PAGE).optional(),
+  after: z.string().regex(SOLVES_CURSOR_RE).optional(),
+});
 
 function isRealDate(s: string): boolean {
   const d = new Date(`${s}T00:00:00Z`);

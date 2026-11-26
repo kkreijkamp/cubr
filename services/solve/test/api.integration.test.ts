@@ -511,6 +511,42 @@ describeIntegration('solve API', () => {
       expect((await s.request('GET', `/internal/users/${id}/sessions`, { headers: { 'x-internal-token': 'wrong' } })).statusCode).toBe(403);
     });
 
+    it("list a user's solves in pages that neither repeat nor skip a solve, down to the microsecond", async () => {
+      const u = await newUser();
+      const a = await newSession(u);
+      const b = await newSession(u);
+      // created_at keeps microseconds: these differ only there, the cursor must too
+      for (const [session, at] of [
+        [a, '2026-03-01T10:00:00.123456Z'],
+        [a, '2026-03-01T10:00:00.123457Z'],
+        [a, '2026-03-01T10:00:00.123458Z'],
+        [b, '2026-03-01T09:00:00.000001Z'],
+        [b, '2026-03-01T11:00:00Z'],
+      ] as const)
+        await s.pool.query(
+          `INSERT INTO solve.solves (id, user_id, session_id, event, time_ms, penalty, scramble, source, created_at) VALUES ($1, $2, $3, '333', 9000, 'OK', '', 'timer', $4)`,
+          [randomUUID(), u.id, session.id, at],
+        );
+      const headers = { 'x-internal-token': s.config.internalToken };
+      const url = `/internal/users/${u.id}/solves?event=333`;
+      const whole = (await s.request('GET', url, { headers })).json();
+      expect(whole.solves).toHaveLength(5);
+      expect(whole.next).toBeNull();
+      for (const limit of [1, 2]) {
+        const paged: { id: string }[] = [];
+        let after: string | null = null;
+        do {
+          const res = await s.request('GET', `${url}&limit=${limit}${after ? `&after=${encodeURIComponent(after)}` : ''}`, { headers });
+          expect(res.statusCode, res.body).toBe(200);
+          const page = res.json();
+          paged.push(...page.solves);
+          after = page.next;
+        } while (after);
+        expect(paged, `pages of ${limit}`).toEqual(whole.solves);
+      }
+      expect((await s.request('GET', `${url}&limit=2&after=not-a-cursor`, { headers })).statusCode).toBe(400);
+    });
+
     it("list a user's solves (practice marked) and sessions for the stats service", async () => {
       const u = await newUser();
       const normal = await newSession(u);

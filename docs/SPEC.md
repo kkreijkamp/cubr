@@ -559,7 +559,7 @@ Pool: keep `scramble:pool:<event>` topped up (333/222/pyram/skewb: 200; 444/sq1/
 | DELETE `/api/solves/daily/reminders` | `{endpoint}` | 204: that browser's reminders off (only the caller's own) |
 | GET `/api/solves/daily?date=` | - | `{date, events: {"333": {solves: Solve[], ao5: number\|-1\|null}, ...}}` (only events with >=1 attempt; ao5 = the official result of the five attempts: times as submitted, penalties as last set while the day was open) |
 | GET `/api/solves/_info`, `/api/sessions/_info` | - | info (+ outbox backlog and relay state) |
-| GET `/internal/users/:userId/solves?event=` | - | `{solves: [{id, sessionId, timeMs, penalty, createdAt, practice?}]}` ordered by session_id, created_at (for stats recompute; `practice: true` on a practice session's solves) |
+| GET `/internal/users/:userId/solves?event=&limit=&after=` | - | `{solves: [{id, sessionId, timeMs, penalty, createdAt, practice?}], next}` ordered by session_id, created_at, id (for stats recompute; `practice: true` on a practice session's solves). With `limit` (at most 50 000) it answers a page, and `next` is the cursor of its last row (session, created_at to the microsecond, id) to pass as `after`, null on the last page; without, everything at once (`next` null). Stats reads in pages: the whole 250k-solve cap in one answer ran its 192 MB heap out |
 | GET `/internal/users/:userId/sessions` | - | `{sessions: [{id, name, event, practice}]}` (stats backfills session display names) |
 
 Daily challenge: a `daily: {date, index 0..4}` solve gets `source: 'daily'`; its session's event must

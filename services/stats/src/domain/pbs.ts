@@ -104,35 +104,42 @@ export function computePbs(solves: ListSolve[]): PbSet {
  * recompute / import.
  */
 export function replayHistory(solves: ListSolve[]): HistoryEntry[] {
-  interface Candidate {
-    at: number;
-    order: number;
-    kind: PbKind;
-    value: number;
-  }
-  const candidates: Candidate[] = [];
-  for (const session of groupBySession(countsForPbs(solves))) {
-    const times = session.map((p) => p.eff);
-    session.forEach((p) => {
-      if (Number.isFinite(p.eff)) candidates.push({ at: p.at, order: p.order, kind: 'single', value: p.eff });
-    });
-    for (const kind of ROLLING_KINDS) {
-      const rolling = rollingAverage(times, ROLLING_N[kind]);
-      rolling.forEach((v, i) => {
-        if (v !== null && Number.isFinite(v)) candidates.push({ at: session[i].at, order: session[i].order, kind, value: v });
+  // Each kind's PBs depend only on that kind's values in time order: so the solves are put in time order
+  // once (an index), and each kind is scanned in turn. (One candidate object per solve and kind, all sorted
+  // together, ran a 192 MB heap out at the 250k-solve cap: six per solve. Measured 2026-11-26.)
+  const sessions = groupBySession(countsForPbs(solves));
+  const flat = sessions.flat();
+  const n = flat.length;
+  const chrono = Uint32Array.from({ length: n }, (_, i) => i).sort((a, b) => flat[a].at - flat[b].at || flat[a].order - flat[b].order);
+  const found: { kind: PbKind; k: number; value: number; p: Prepared }[] = [];
+  const scan = (kind: PbKind, values: Float64Array) => {
+    let best: number | undefined;
+    for (const i of chrono) {
+      const value = values[i];
+      if (!isImprovement(value, best)) continue; // NaN (no value) and DNF never are
+      best = value;
+      found.push({ kind, k: PB_KINDS.indexOf(kind), value, p: flat[i] });
+    }
+  };
+  scan(
+    'single',
+    Float64Array.from(flat, (p) => p.eff),
+  );
+  const times = sessions.map((session) => session.map((p) => p.eff));
+  for (const kind of ROLLING_KINDS) {
+    const values = new Float64Array(n).fill(NaN);
+    let offset = 0;
+    sessions.forEach((session, j) => {
+      rollingAverage(times[j], ROLLING_N[kind]).forEach((v, i) => {
+        if (v !== null) values[offset + i] = v;
       });
-    }
+      offset += session.length;
+    });
+    scan(kind, values);
   }
-  candidates.sort((a, b) => a.at - b.at || a.order - b.order || PB_KINDS.indexOf(a.kind) - PB_KINDS.indexOf(b.kind));
-  const best: Partial<Record<PbKind, number>> = {};
-  const history: HistoryEntry[] = [];
-  for (const c of candidates) {
-    if (isImprovement(c.value, best[c.kind])) {
-      best[c.kind] = c.value;
-      history.push({ kind: c.kind, valueMs: c.value, achievedAt: new Date(c.at).toISOString() });
-    }
-  }
-  return history;
+  // in the order they happened (same moment: the list's order, then the kinds')
+  found.sort((a, b) => a.p.at - b.p.at || a.p.order - b.p.order || a.k - b.k);
+  return found.map((f) => ({ kind: f.kind, valueMs: f.value, achievedAt: new Date(f.p.at).toISOString() }));
 }
 
 /**

@@ -115,7 +115,7 @@ describeIntegration('stats projector', () => {
       expect(s.solve.recomputes(u.id)).toEqual([]);
       await s.feed(a.event);
       expect(s.solve.requests.filter((r) => r.path.includes(u.id))).toEqual([
-        { path: `/internal/users/${u.id}/solves?event=333`, token: s.config.internalToken },
+        { path: `/internal/users/${u.id}/solves?event=333&limit=50000`, token: s.config.internalToken },
       ]);
       // the mo3 needs the back-dated solve, so only the rebuild can find it
       expect(await pbs(u)).toEqual({ single: 10_000, mo3: 11_000 });
@@ -275,7 +275,10 @@ describeIntegration('stats projector', () => {
       s.solve.solve(u, s.solve.session(u, '333'), 10_000, '2026-01-01T10:00:00Z');
       s.solve.solve(u, s.solve.session(u, '444'), 60_000, '2026-01-01T11:00:00Z');
       await s.feed(s.solve.imported(u, ['333', '444', '333']));
-      expect(s.solve.recomputes(u.id)).toEqual([`/internal/users/${u.id}/solves?event=333`, `/internal/users/${u.id}/solves?event=444`]);
+      expect(s.solve.recomputes(u.id)).toEqual([
+        `/internal/users/${u.id}/solves?event=333&limit=50000`,
+        `/internal/users/${u.id}/solves?event=444&limit=50000`,
+      ]);
       expect(await pbs(u, '333')).toEqual({ single: 10_000 });
       expect(await pbs(u, '444')).toEqual({ single: 60_000 });
       expect(await totals(u)).toMatchObject({ solves: 2, total_ms: 70_000 });
@@ -290,7 +293,10 @@ describeIntegration('stats projector', () => {
       );
       s.solve.solve(u, cube, 9_000, '2026-01-02T10:10:00Z'); // came in with the import
       await s.feed(s.solve.imported(u, null));
-      expect(s.solve.recomputes(u.id).sort()).toEqual([`/internal/users/${u.id}/solves?event=333`, `/internal/users/${u.id}/solves?event=pyram`]);
+      expect(s.solve.recomputes(u.id).sort()).toEqual([
+        `/internal/users/${u.id}/solves?event=333&limit=50000`,
+        `/internal/users/${u.id}/solves?event=pyram&limit=50000`,
+      ]);
       expect(await pbs(u, '333')).toEqual({ single: 9_000 });
       expect(await totals(u)).toMatchObject({ solves: 3 });
     });

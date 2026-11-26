@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { computePbs, isImprovement, replayHistory, rollingFromPayload, tailAverages, type ListSolve } from '../src/domain/pbs.js';
+import { effectiveMs, rollingAverage } from '@cubr/cubestats';
+import {
+  computePbs,
+  isImprovement,
+  PB_KINDS,
+  replayHistory,
+  rollingFromPayload,
+  ROLLING_KINDS,
+  ROLLING_N,
+  tailAverages,
+  type ListSolve,
+} from '../src/domain/pbs.js';
 
 const S1 = '11111111-1111-4111-8111-111111111111';
 const S2 = '22222222-2222-4222-8222-222222222222';
@@ -157,5 +168,63 @@ describe('incremental helpers', () => {
     const tail = [10000, 11000, 9000, 12000, 10000];
     expect(tailAverages(tail)).toEqual({ mo3: Math.round((9000 + 12000 + 10000) / 3), ao5: 10333 });
     expect(tailAverages([1, 2])).toEqual({});
+  });
+});
+
+describe('replayHistory, as it was before 2026-11-26', () => {
+  // the old replay (a candidate object per solve and kind, all sorted together), kept to check the
+  // lean one gives the same history on lists of every shape
+  function reference(solves: ListSolve[]) {
+    const counted = solves.some((x) => x.practice) ? solves.filter((x) => !x.practice) : solves;
+    const bySession = new Map<string, { at: number; order: number; eff: number }[]>();
+    counted.forEach((x, order) => {
+      const arr = bySession.get(x.sessionId) ?? [];
+      arr.push({ at: Date.parse(x.createdAt), order, eff: effectiveMs(x) });
+      bySession.set(x.sessionId, arr);
+    });
+    const candidates: { at: number; order: number; kind: (typeof PB_KINDS)[number]; value: number }[] = [];
+    for (const session of bySession.values()) {
+      session.sort((a, b) => a.at - b.at || a.order - b.order);
+      const times = session.map((p) => p.eff);
+      session.forEach((p) => {
+        if (Number.isFinite(p.eff)) candidates.push({ at: p.at, order: p.order, kind: 'single', value: p.eff });
+      });
+      for (const kind of ROLLING_KINDS)
+        rollingAverage(times, ROLLING_N[kind]).forEach((v, i) => {
+          if (v !== null && Number.isFinite(v)) candidates.push({ at: session[i].at, order: session[i].order, kind, value: v });
+        });
+    }
+    candidates.sort((a, b) => a.at - b.at || a.order - b.order || PB_KINDS.indexOf(a.kind) - PB_KINDS.indexOf(b.kind));
+    const best: Record<string, number> = {};
+    const history: { kind: string; valueMs: number; achievedAt: string }[] = [];
+    for (const c of candidates)
+      if (isImprovement(c.value, best[c.kind])) {
+        best[c.kind] = c.value;
+        history.push({ kind: c.kind, valueMs: c.value, achievedAt: new Date(c.at).toISOString() });
+      }
+    return history;
+  }
+
+  it('gives the same history on 200 random lists (sessions, DNFs, +2s, practice, equal moments)', () => {
+    let seed = 42;
+    const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+    for (let round = 0; round < 200; round++) {
+      const sessions = Array.from({ length: 1 + Math.floor(rnd() * 4) }, (_, i) => `00000000-0000-4000-8000-00000000000${i}`);
+      const practice = new Set(sessions.filter(() => rnd() < 0.2));
+      const t0 = Date.parse('2026-01-01T00:00:00Z');
+      const solves: ListSolve[] = Array.from({ length: Math.floor(rnd() * 400) }, (_, i) => {
+        const sessionId = sessions[Math.floor(rnd() * sessions.length)];
+        return {
+          id: `10000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
+          sessionId,
+          timeMs: 5000 + Math.floor(rnd() * 20000),
+          penalty: rnd() < 0.05 ? 'DNF' : rnd() < 0.08 ? '+2' : 'OK',
+          // whole minutes, often the same one: ties between solves and sessions
+          createdAt: new Date(t0 + Math.floor(rnd() * 300) * 60_000).toISOString(),
+          ...(practice.has(sessionId) ? { practice: true } : {}),
+        };
+      });
+      expect(replayHistory(solves), `round ${round}`).toEqual(reference(solves));
+    }
   });
 });

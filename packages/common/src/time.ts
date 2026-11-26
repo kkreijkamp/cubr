@@ -1,20 +1,35 @@
+/**
+ * The formatters per zone, made once: each new Intl.DateTimeFormat holds ICU memory outside the JS heap,
+ * which the garbage collector barely sees, so making two per call ran a recompute of a big account up to
+ * 3 GB of memory (2026-11-26). A zone the runtime doesn't know is remembered as null. Kept for at most
+ * MAX_ZONES zones (the oldest goes first); the world has a few hundred.
+ */
+const MAX_ZONES = 600;
+const dayFormats = new Map<string, Intl.DateTimeFormat | null>();
+const hourFormats = new Map<string, Intl.DateTimeFormat | null>();
+function formatFor(cache: Map<string, Intl.DateTimeFormat | null>, tz: string, make: () => Intl.DateTimeFormat): Intl.DateTimeFormat | null {
+  if (cache.has(tz)) return cache.get(tz)!;
+  let f: Intl.DateTimeFormat | null;
+  try {
+    f = make();
+  } catch {
+    f = null;
+  }
+  if (cache.size >= MAX_ZONES) cache.delete(cache.keys().next().value!);
+  cache.set(tz, f);
+  return f;
+}
+
 /** 'YYYY-MM-DD' of `date` in the IANA timezone `tz` (falls back to UTC for invalid tz). */
 export function dayKey(date: Date, tz = 'UTC'): string {
-  try {
-    return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
-  } catch {
-    return date.toISOString().slice(0, 10);
-  }
+  const f = formatFor(dayFormats, tz, () => new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }));
+  return f ? f.format(date) : date.toISOString().slice(0, 10);
 }
 
 /** Hour of day 0-23 of `date` in timezone `tz`. */
 export function hourIn(date: Date, tz = 'UTC'): number {
-  try {
-    const h = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', hourCycle: 'h23' }).format(date);
-    return Number.parseInt(h, 10) % 24;
-  } catch {
-    return date.getUTCHours();
-  }
+  const f = formatFor(hourFormats, tz, () => new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', hourCycle: 'h23' }));
+  return f ? Number.parseInt(f.format(date), 10) % 24 : date.getUTCHours();
 }
 
 /** ISO-8601 week key, e.g. '2026-W42', for the calendar day of `date` in `tz`. */

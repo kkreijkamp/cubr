@@ -1,13 +1,14 @@
-import { fetchJson, internalHeaders, parse, type PoolClient } from '@cubr/common';
+import { fetchJson, internalHeaders, type PoolClient } from '@cubr/common';
 import { effectiveMs } from '@cubr/cubestats';
 import type { FastifyBaseLogger } from 'fastify';
 import { bucketSolves } from './domain/buckets.js';
 import { computePbs, PB_KINDS, replayHistory, type ListSolve } from './domain/pbs.js';
-import { solveListSchema } from './eventSchemas.js';
 import { loadPbs, queuePbUpdated, queuePeriodsChanged, upsertPb } from './store.js';
 
 export interface RecomputeDeps {
   solveUrl: string;
+  /** solves per page from solve-service (SOLVE_PAGE; smaller in tests) */
+  pageSize?: number;
   /** sent as X-Internal-Token to solve-service's /internal routes */
   internalToken: string;
   log: FastifyBaseLogger;
@@ -21,10 +22,59 @@ export interface RecomputeDeps {
  * and treating it as "no solves" would wipe the user's stats for the event.
  */
 export async function fetchSolveList(deps: RecomputeDeps, userId: string, event: string): Promise<ListSolve[]> {
-  const url = `${deps.solveUrl}/internal/users/${encodeURIComponent(userId)}/solves?event=${encodeURIComponent(event)}`;
-  const body = await fetchJson<unknown>(url, { timeoutMs: 15_000, retries: 1, headers: internalHeaders(deps.internalToken) });
-  return parse(solveListSchema, body).solves;
+  // In pages, kept as they come: the whole list as one answer, read through the schema (which copies
+  // every solve), ran a 192 MB heap out at 200k solves; this way the 250k cap fits (measured 2026-11-26).
+  const out: ListSolve[] = [];
+  const sessions = new Map<string, string>();
+  let after: string | null = null;
+  do {
+    const url: string =
+      `${deps.solveUrl}/internal/users/${encodeURIComponent(userId)}/solves?event=${encodeURIComponent(event)}&limit=${deps.pageSize ?? SOLVE_PAGE}` +
+      (after ? `&after=${encodeURIComponent(after)}` : '');
+    const body = await fetchJson<unknown>(url, { timeoutMs: 15_000, retries: 1, headers: internalHeaders(deps.internalToken) });
+    after = readSolvePage(body, out, sessions);
+  } while (after);
+  return out;
 }
+
+/** Solves per page from solve-service (its INTERNAL_SOLVES_PAGE). */
+export const SOLVE_PAGE = 50_000;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const PENALTIES = new Set(['OK', '+2', 'DNF']);
+
+/**
+ * Checks one page of solve-service's list (the same rules as solveListSchema) and appends its solves to
+ * `out` as they are, without copies; every solve of a session shares one copy of its id (`sessions`).
+ * Returns the next page's cursor, null after the last (or from a solve-service that answers in one go).
+ */
+export function readSolvePage(body: unknown, out: ListSolve[], sessions: Map<string, string>): string | null {
+  const page = body as { solves?: unknown; next?: unknown } | null;
+  if (!page || !Array.isArray(page.solves)) throw new Error('solve list: no solves array');
+  for (const s of page.solves as Record<string, unknown>[]) {
+    if (
+      !s ||
+      typeof s.id !== 'string' ||
+      !UUID.test(s.id) ||
+      typeof s.sessionId !== 'string' ||
+      !UUID.test(s.sessionId) ||
+      !Number.isInteger(s.timeMs) ||
+      (s.timeMs as number) <= 0 ||
+      !PENALTIES.has(s.penalty as string) ||
+      typeof s.createdAt !== 'string' ||
+      Number.isNaN(Date.parse(s.createdAt)) ||
+      (s.practice !== undefined && typeof s.practice !== 'boolean')
+    )
+      throw new Error(`solve list: a malformed solve (${JSON.stringify(s).slice(0, 200)})`);
+    const sid = sessions.get(s.sessionId) ?? (sessions.set(s.sessionId, s.sessionId), s.sessionId);
+    s.sessionId = sid;
+    out.push(s as unknown as ListSolve);
+  }
+  if (page.next !== undefined && page.next !== null && typeof page.next !== 'string') throw new Error('solve list: a malformed cursor');
+  return (page.next as string | null | undefined) || null;
+}
+
+/** Ledger rows per INSERT in a recompute. */
+const LEDGER_BATCH = 20_000;
 
 export interface RecomputeArgs {
   userId: string;
@@ -51,7 +101,9 @@ export async function recomputeEvent(c: PoolClient, deps: RecomputeDeps, args: R
 
   // 1. solve ledger for this event = exactly the current list
   await c.query('DELETE FROM stats.solve_ledger WHERE user_id = $1 AND event = $2 AND NOT deleted', [userId, event]);
-  if (solves.length) {
+  // in batches: one statement's parameters for 250k solves are tens of MB of text
+  for (let i = 0; i < solves.length; i += LEDGER_BATCH) {
+    const part = solves.slice(i, i + LEDGER_BATCH);
     await c.query(
       `INSERT INTO stats.solve_ledger (solve_id, user_id, event, session_id, time_ms, effective_ms, created_at)
        SELECT u.id, $1, $2, u.sid, u.t, u.e, u.c
@@ -64,14 +116,14 @@ export async function recomputeEvent(c: PoolClient, deps: RecomputeDeps, args: R
       [
         userId,
         event,
-        solves.map((s) => s.id),
-        solves.map((s) => s.sessionId),
-        solves.map((s) => s.timeMs),
-        solves.map((s) => {
+        part.map((s) => s.id),
+        part.map((s) => s.sessionId),
+        part.map((s) => s.timeMs),
+        part.map((s) => {
           const e = effectiveMs(s);
           return Number.isFinite(e) ? e : null;
         }),
-        solves.map((s) => s.createdAt),
+        part.map((s) => s.createdAt),
       ],
     );
   }
