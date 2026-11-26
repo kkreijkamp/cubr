@@ -301,6 +301,12 @@ describe('security headers', () => {
     expect(cache(200, '/healthz')).toBe('no-store');
   });
 
+  it('keeps idle connections open longer than cloudflared does (90 s), so it never sends into one nginx is closing', () => {
+    const http = blocks(gatewayConf).blocks.find((b) => b.head[0] === 'http')!;
+    const timeout = /keepalive_timeout\s+(\d+)s;/.exec(http.body)?.[1];
+    expect(Number(timeout)).toBeGreaterThan(90);
+  });
+
   it('never say which container, version or internal address answered (web or gateway)', () => {
     for (const conf of [webConf, gatewayConf]) expect(conf).not.toMatch(/add_header\s+X-(?:Served-By|Service|Upstream)/i);
   });
