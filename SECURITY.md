@@ -4,7 +4,7 @@ cubr is run by one person. Reports about https://cubr.dev or this code are very 
 
 ## Reporting a problem
 
-Email **hello@cubr.dev** with "security" in the subject. Please don't open a public issue, pull request or discussion for anything that could put people's accounts or data at risk.
+Email **hello@cubr.dev** with "security" in the subject, or use GitHub's private form: [report a vulnerability](https://github.com/kkreijkamp/cubr/security/advisories/new) (the repository's Security tab). Please don't open a public issue, pull request or discussion for anything that could put people's accounts or data at risk.
 
 A good report has:
 - **What's affected:** the page, the API route or the file and line;
