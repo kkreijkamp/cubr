@@ -338,11 +338,12 @@ export function WcaComparison({ summary, event, wcaId, country, own, onEdit, pre
             <a href="https://www.worldcubeassociation.org/results" target="_blank" rel="noreferrer noopener">
               worldcubeassociation.org/results
             </a>{' '}
+            {/* "as of <date>", as the WCA asks (the /wca page and About say it the same way) */}
             {meta.data ? (
-              `(${formatDate(meta.data.exportDate)})`
+              `as of ${formatDate(meta.data.exportDate)}`
             ) : (
               <span className="reserve" aria-hidden="true">
-                (00 Sep 2026)
+                as of 00 Sep 2026
               </span>
             )}
           </p>
