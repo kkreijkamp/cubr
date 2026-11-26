@@ -25,8 +25,9 @@ const PrivacyPage = lazy(() => import('./pages/LegalPage').then((m) => ({ defaul
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 const s = (el: JSX.Element) => <Suspense fallback={<Loading />}>{el}</Suspense>;
-// a page that ends up taller than the screen: its loading state holds a screen's height, so the footer
-// isn't pushed off the screen when the page arrives (see PageLoading)
+// a page that always ends up taller than the screen: its loading state holds a screen's height, so the
+// footer isn't pushed off the screen when the page arrives (see PageLoading). Not for pages that can end
+// up shorter (the leaderboards with few entries, a race lobby with no rooms): their footer would rise.
 const tall = (el: JSX.Element) => <Suspense fallback={<PageLoading />}>{el}</Suspense>;
 
 const router = createBrowserRouter([
@@ -40,21 +41,21 @@ const router = createBrowserRouter([
         children: [
           { path: '/', element: <TimerPage /> },
           { path: '/leaderboards', element: s(<LeaderboardsPage />) },
-          { path: '/daily', element: s(<DailyPage />) },
+          { path: '/daily', element: tall(<DailyPage />) },
           { path: '/race', element: s(<RaceLobbyPage />) },
           { path: '/race/:roomId', element: s(<RaceRoomPage />) },
           { path: '/profile/:username', element: tall(<ProfilePage />) },
           { path: '/account', element: tall(<AccountPage />) },
-          { path: '/settings', element: s(<SettingsPage />) },
+          { path: '/settings', element: tall(<SettingsPage />) },
           { path: '/wca', element: s(<WcaPage />) },
-          { path: '/about', element: s(<AboutPage />) },
+          { path: '/about', element: tall(<AboutPage />) },
           { path: '/login', element: s(<LoginPage />) },
           // sign-in with Google, Apple or GitHub lands here
           { path: '/login/sso', element: s(<SsoPage />) },
           { path: '/reset', element: s(<ResetPasswordPage />) },
           { path: '/confirm-email', element: s(<ConfirmEmailPage />) },
-          { path: '/terms', element: s(<TermsPage />) },
-          { path: '/privacy', element: s(<PrivacyPage />) },
+          { path: '/terms', element: tall(<TermsPage />) },
+          { path: '/privacy', element: tall(<PrivacyPage />) },
           { path: '*', element: s(<NotFoundPage />) },
         ],
       },

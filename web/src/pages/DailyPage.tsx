@@ -28,6 +28,19 @@ import type { TimerResult } from '../timer/useTimerEngine';
 import '../components/live/live.css';
 import '../components/live/daily/daily.css';
 
+/** The scramble preview's height on this page. */
+const PREVIEW_HEIGHT = 160;
+/**
+ * While today's scrambles load: one of a typical length for each daily event, drawn invisibly, so the
+ * scramble's box (its text size and lines follow the length) takes the room the real one will.
+ */
+const SCRAMBLE_STAND_IN: Record<string, string> = {
+  '333': "D2 R2 B2 U' L2 D' F2 U B2 R2 U' F' R D' L' B U2 R' F' U'",
+  '222': "R U2 F' R2 U' F2 R' U F2 R'",
+  '444': "Rw2 U2 B' R2 F' U2 L2 B D2 F' R2 U' L' D R' U2 B' F2 Uw2 L' Uw2 F2 Rw2 B' Uw2 L2 Fw2 U2 R' D' Rw2 F U' Fw' L' D2 Rw' Uw' F' Uw R2 Fw' L2 U",
+  pyram: "U' L' B R' U B L U' l' r b'",
+  skewb: "R U' L B' U L' R B' U L'",
+};
 const ATTEMPTS = 5;
 const PRACTICE_KEY = 'cubr.daily.practice';
 
@@ -529,13 +542,13 @@ export default function DailyPage() {
               error={new Error(unavailable ? 'the scramble service is unavailable - the daily challenge needs its official scrambles' : scr.error!.message)}
               onRetry={scr.reload}
             />
-          ) : !scrambles ? (
+          ) : !scrambles && !(scr.loading && isToday) ? (
             scr.loading ? (
               <Loading label="loading scrambles..." />
             ) : (
               <div className="empty">no daily scrambles for {ev.name} on this day.</div>
             )
-          ) : done ? (
+          ) : done && scrambles ? (
             <div className="daily-result">
               {isToday && (
                 <QuickActions className="daily-quick" last={selected ?? null} onPenalty={changePenalty} label={`attempt ${(selected?.index ?? 0) + 1}`} />
@@ -582,12 +595,25 @@ export default function DailyPage() {
               {isToday && <div className="sub small center">come back in {formatCountdown(nextMidnight - now)} for new scrambles.</div>}
             </div>
           ) : isToday ? (
+            // while today's scrambles load, this view stands as it will be (an invisible scramble of a
+            // typical length, an empty preview box), so nothing below it moves when they come
             <>
+              {!scrambles && (
+                <span className="sr-only" role="status">
+                  loading scrambles...
+                </span>
+              )}
               <div className="daily-scramble-label fade-on-focus">
                 scramble <span className="main">{(nextIndex ?? 0) + 1}</span>/{ATTEMPTS}
               </div>
               <div className="fade-on-focus">
-                <ScrambleText scramble={scramble} event={event} />
+                {scrambles ? (
+                  <ScrambleText scramble={scramble} event={event} />
+                ) : (
+                  <div className="reserve" aria-hidden="true">
+                    <ScrambleText scramble={SCRAMBLE_STAND_IN[event] ?? null} event={event} />
+                  </div>
+                )}
               </div>
               <TimerArea
                 engine={engine}
@@ -618,9 +644,19 @@ export default function DailyPage() {
                   </>
                 )}
               </div>
+              {settings.scramblePreview !== 'off' && !scrambles && (
+                <div className="daily-preview fade-on-focus">
+                  <div className="twisty-host twisty-none" style={{ minHeight: PREVIEW_HEIGHT }} />
+                </div>
+              )}
               {settings.scramblePreview !== 'off' && scramble && (
                 <div className="daily-preview fade-on-focus">
-                  <TwistyPreview puzzle={ev.puzzle} scramble={scramble} visualization={settings.scramblePreview === '3D' ? '3D' : '2D'} height={160} />
+                  <TwistyPreview
+                    puzzle={ev.puzzle}
+                    scramble={scramble}
+                    visualization={settings.scramblePreview === '3D' ? '3D' : '2D'}
+                    height={PREVIEW_HEIGHT}
+                  />
                 </div>
               )}
             </>
@@ -628,7 +664,7 @@ export default function DailyPage() {
             <details className="daily-scrambles card">
               <summary className="sub small">show this day's scrambles</summary>
               <ol>
-                {scrambles.map((s, i) => (
+                {scrambles?.map((s, i) => (
                   <li key={i}>
                     <span className="sub">{i + 1}.</span> {s}
                   </li>
