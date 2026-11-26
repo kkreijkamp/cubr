@@ -5,6 +5,9 @@
 # ---- build stage (native arch; output is static files)
 FROM --platform=$BUILDPLATFORM node:22-alpine AS build
 WORKDIR /repo
+# the root tsconfig too: esbuild compiles packages/cubestats with the nearest one, so without it the
+# image built class fields differently than a laptop does (assigned in the constructor, not defined)
+COPY tsconfig.json tsconfig.base.json ./
 COPY packages/cubestats packages/cubestats
 COPY web/package.json web/package-lock.json web/
 RUN --mount=type=cache,target=/root/.npm cd web && npm ci --no-audit --no-fund
