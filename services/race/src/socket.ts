@@ -3,7 +3,7 @@ import { Server, type DefaultEventsMap, type Socket } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { z, ZodError } from 'zod';
 import type { FastifyBaseLogger } from 'fastify';
-import { HttpError, badRequest, forbidden, notFound, rateLimit, rateLimited, unavailable, type Redis } from '@cubr/common';
+import { HttpError, badRequest, forbidden, hasSlur, notFound, rateLimit, rateLimited, unavailable, type Redis } from '@cubr/common';
 import { resolveIdentity } from './identity.js';
 import { MAX_RESULT_MS, addPlayer, removePlayer, setStatus, startRound, submitResult } from './room.js';
 import { ROOM_ID_RE, sanitizeText } from './sanitize.js';
@@ -238,6 +238,8 @@ export function registerSocketHandlers(deps: SocketDeps) {
       const roomId = currentRoom(socket);
       const clean = sanitizeText(text, 200);
       if (!clean) throw badRequest('text: message is empty');
+      // slurs are refused; guests chat too (packages/common moderation.ts)
+      if (hasSlur(clean)) throw badRequest("text: that message has a word cubr doesn't allow");
       // Without Redis a message can neither be stored nor reach players on other pods (and the
       // rate limit below fails open): refuse it instead of delivering it after the outage.
       if (redis.status !== 'ready') throw unavailable('Chat is unavailable while the server reconnects');

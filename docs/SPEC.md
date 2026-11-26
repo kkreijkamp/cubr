@@ -612,7 +612,7 @@ client -> server (with ack callbacks `{ok:true,...}|{ok:false,error,code}`):
 - `round:next {}` (host only; fetches 1 scramble from scramble-service, falling back to a local random-move scramble, and starts round n+1) -> ack `{ok, round}`
 - `player:status {status: "idle"|"inspecting"|"solving"|"done"}`
 - `player:result {round, timeMs, penalty}` (current round only, once per player)
-- `chat:send {text}` (<= 200 chars, 5 per 10 s)
+- `chat:send {text}` (<= 200 chars, 5 per 10 s; a slur is refused, `text: that message has a word cubr doesn't allow`: see Moderation below)
 
 server -> client: `room:state RoomState` (full state after every change), `chat:message {playerId, name, text, at}`.
 
@@ -630,6 +630,16 @@ playerId = userId for logged-in users, else a stable guest id derived from the s
 after 2 h without activity and hold at most 16 players. Host leaves -> oldest connected player
 becomes host. Socket.IO does not keep room membership across reconnects, so the client re-emits
 `room:join` on every `connect`.
+
+**Moderation** (`packages/common/src/moderation.ts`, decided 2026-11-26): words cubr doesn't allow come from
+obscenity's English list (npm `obscenity` 0.4.6, MIT), which catches spelling tricks and leaves innocent
+words alone. Usernames (sign-up and sign-up with a provider, whose suggestion skips them), display
+names and bios refuse the whole list (400: `is reserved, choose another`, `isn't allowed, choose
+another`, `has a word cubr doesn't allow`); a guest's race name falls back to `guest-xxxx`. Race chat
+refuses slurs only, so cubers can still swear at a bad solve. Reserved usernames (`admin`, `cubr`,
+`support`, `wca`, `official`...) are compared without case, underscores or trailing digits. In the web
+app a player can mute another in race chat for themselves (remembered on the device, `lib/moderation`),
+and a profile or a race room can be reported by email to hello@cubr.dev.
 
 ### 9.7 wca (`/api/wca`) - values converted to ms (WCA centiseconds x 10); 333fm kept as moves (`unit:"moves"`, averages x100 in export -> divide); 333mbf excluded
 | Method & path | Response |

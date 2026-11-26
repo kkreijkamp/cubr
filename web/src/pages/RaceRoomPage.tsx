@@ -9,6 +9,7 @@ import { usePageMeta } from '../lib/usePageMeta';
 import { useSettings } from '../lib/settings';
 import { useRegisterCommands } from '../lib/commands';
 import { toast } from '../lib/toast';
+import { reportMailto } from '../lib/moderation';
 import { addSolve, ensureSession } from '../lib/solves';
 import { defaultGuestName, getGuestName, inviteLink, RaceError, setGuestName, useRace } from '../lib/race';
 import { Loading, Spinner } from '../components/Spinner';
@@ -409,6 +410,7 @@ export default function RaceRoomPage() {
             chat={state.chat}
             playerId={state.playerId}
             disabled={!connected}
+            reportHref={reportMailto('race room', id, `/race/${id}`)}
             onSend={async (text) => {
               try {
                 await conn?.sendChat(text);

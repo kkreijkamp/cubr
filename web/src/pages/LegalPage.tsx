@@ -199,7 +199,7 @@ export function PrivacyPage() {
       <Section title="cookies and local storage">
         <p>
           cubr sets one cookie of its own, and only while you sign in with Google, Apple or GitHub: it ties that sign-in to your browser
-          and expires within minutes. Your browser&apos;s local storage keeps you signed in and holds your settings and offline solves,
+          and expires within minutes. Your browser&apos;s local storage keeps you signed in and holds your settings, your offline solves and the players you muted in race chat,
           so the site works. None of it is used for tracking or advertising, which is why there is no cookie banner. Cloudflare may set a
           strictly necessary security cookie. Cloudflare Web Analytics sets none.
         </p>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChatBubbleLeftIcon, PaperAirplaneIcon, StarIcon, TrophyIcon, UsersIcon } from '@heroicons/react/24/outline';
+import { ChatBubbleLeftIcon, FlagIcon, PaperAirplaneIcon, SpeakerXMarkIcon, StarIcon, TrophyIcon, UsersIcon } from '@heroicons/react/24/outline';
+import { mutedPlayers, setMutedPlayers } from '../../../lib/moderation';
 import { effectiveMs, formatTime, fromApiValue, type Penalty, type Precision } from '@cubr/cubestats';
 import type { ChatMessage, LivePlayer, LiveRoomState } from '../../../lib/race';
 import { Dot, type DotState } from '../ui';
@@ -169,13 +170,30 @@ export function RaceChat({
   playerId,
   disabled,
   onSend,
+  reportHref,
 }: {
   chat: ChatMessage[];
   playerId: string | null;
   disabled: boolean;
   onSend: (text: string) => Promise<void>;
+  /** an email reporting the room (lib/moderation reportMailto) */
+  reportHref?: string;
 }) {
   const [text, setText] = useState('');
+  // players muted on this device: their messages show nowhere here (lib/moderation)
+  const [muted, setMuted] = useState<string[]>(mutedPlayers);
+  const mute = (id: string) => {
+    const next = [...muted.filter((x) => x !== id), id];
+    setMuted(next);
+    setMutedPlayers(next);
+  };
+  const mutedHere = new Set(chat.filter((m) => !m.system && muted.includes(m.playerId)).map((m) => m.playerId));
+  const unmuteHere = () => {
+    const next = muted.filter((x) => !mutedHere.has(x));
+    setMuted(next);
+    setMutedPlayers(next);
+  };
+  const shown = chat.filter((m) => m.system || !mutedHere.has(m.playerId));
   const [sending, setSending] = useState(false);
   const listRef = useRef<HTMLOListElement>(null);
   const stick = useRef(true);
@@ -205,6 +223,18 @@ export function RaceChat({
         <h3 className="h3" id="chat-title">
           <ChatBubbleLeftIcon /> chat
         </h3>
+        <span className="chat-tools">
+          {mutedHere.size > 0 && (
+            <button className="btn-text" onClick={unmuteHere} data-tip="show their messages again">
+              {mutedHere.size} muted - unmute
+            </button>
+          )}
+          {reportHref && (
+            <a className="btn-text" href={reportHref} data-tip="report this room by email" aria-label="report this room">
+              <FlagIcon width={14} height={14} />
+            </a>
+          )}
+        </span>
       </div>
       <ol
         className="chat-list"
@@ -215,8 +245,8 @@ export function RaceChat({
         }}
         aria-live="polite"
       >
-        {chat.length === 0 && <li className="chat-empty">no messages yet - say hi</li>}
-        {chat.map((m, i) =>
+        {shown.length === 0 && <li className="chat-empty">no messages yet - say hi</li>}
+        {shown.map((m, i) =>
           m.system ? (
             <li key={`${m.at}-${i}`} className="sys">
               {m.text}
@@ -226,6 +256,11 @@ export function RaceChat({
               <span className="t">{hhmm(m.at)}</span>
               <span className="n">{m.name}</span>
               <span className="m">{m.text}</span>
+              {m.playerId !== playerId && (
+                <button className="btn-text chat-mute" onClick={() => mute(m.playerId)} data-tip={`mute ${m.name} for you`} aria-label={`mute ${m.name}`}>
+                  <SpeakerXMarkIcon width={12} height={12} />
+                </button>
+              )}
             </li>
           ),
         )}

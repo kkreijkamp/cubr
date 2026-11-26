@@ -20,7 +20,7 @@ import {
   type ProviderConfig,
   type ProviderIdentity,
 } from '../oauth.js';
-import { USERNAME_RE, USER_COLUMNS, UUID_RE, conflictMessage, toPrivateUser, toPublicUser, userEventData, type UserRow } from '../users.js';
+import { USER_COLUMNS, UUID_RE, conflictMessage, toPrivateUser, toPublicUser, userEventData, usernameSchema, type UserRow } from '../users.js';
 import { HOLDS_EMAIL, releaseUnconfirmed } from '../unconfirmed.js';
 
 /**
@@ -80,7 +80,7 @@ const startBody = z.object({ mode: z.enum(['signin', 'link']).default('signin'),
 const exchangeBody = z.object({ code: z.string().min(16).max(100) });
 const signupBody = z.object({
   id: z.string().min(16).max(100),
-  username: z.string().trim().regex(USERNAME_RE, 'must be 3-20 characters: letters, digits or _'),
+  username: usernameSchema,
 });
 const tokenString = z.string().min(16).max(100);
 
@@ -130,9 +130,9 @@ export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, 
     await pool.query('update auth.users set email_verified_at = now() where id = $1 and email_verified_at is null and lower(email) = lower($2)', [userId, email]);
   };
 
-  /** A free username close to the provider's (null if 50 tries are all taken). */
+  /** A free username close to the provider's (null if 50 tries are all taken); never a reserved or refused one. */
   async function freeUsername(identity: Pick<ProviderIdentity, 'login' | 'name' | 'email'>): Promise<string | null> {
-    const candidates = usernameCandidates(suggestUsername(identity));
+    const candidates = usernameCandidates(suggestUsername(identity)).filter((c) => usernameSchema.safeParse(c).success);
     const { rows } = await pool.query<{ u: string }>('select lower(username) as u from auth.users where lower(username) = any($1)', [candidates.map((c) => c.toLowerCase())]);
     const taken = new Set(rows.map((r) => r.u));
     return candidates.find((c) => !taken.has(c.toLowerCase())) ?? null;

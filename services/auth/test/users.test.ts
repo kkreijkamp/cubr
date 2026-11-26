@@ -48,6 +48,22 @@ describe('registerSchema', () => {
   });
 });
 
+describe('names and bios cubr does not allow', () => {
+  const reg = (username: string) => registerSchema.safeParse({ username, email: 'a@b.co', password: 'password1' });
+  it('refuses a reserved username or one with a word cubr does not allow, with a reason', () => {
+    expect(reg('Admin_1').error?.issues[0].message).toBe('is reserved, choose another');
+    expect(reg('cubr_official').success).toBe(false);
+    expect(reg('xX_fuck_Xx').error?.issues[0].message).toBe("isn't allowed, choose another");
+    expect(reg('feliks_z').success).toBe(true);
+  });
+  it('refuses such a display name or bio, and lets the rest through (and clearing)', () => {
+    expect(patchMeSchema.safeParse({ displayName: 'shithead' }).error?.issues[0].message).toBe("has a word cubr doesn't allow");
+    expect(patchMeSchema.safeParse({ bio: 'main: gan 12, fvck oll' }).success).toBe(false);
+    expect(patchMeSchema.safeParse({ displayName: 'Feliks Z', bio: 'sub-10 goal, learning zbll' }).success).toBe(true);
+    expect(patchMeSchema.safeParse({ displayName: null, bio: '' }).success).toBe(true);
+  });
+});
+
 describe('deleteMeSchema', () => {
   it('needs the password (any non-empty one: it is checked against the hash)', () => {
     expect(deleteMeSchema.safeParse({ password: 'hunter22' }).success).toBe(true);

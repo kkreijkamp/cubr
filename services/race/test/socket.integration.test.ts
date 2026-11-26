@@ -549,6 +549,13 @@ describeIntegration('race socket protocol', () => {
       expect((await late.join(roomId)).chat).toEqual([msg]);
     });
 
+    it('refuses a slur, and takes ordinary swearing', async () => {
+      const p = await guest();
+      await p.join(await createRoom(pod));
+      expectRefused(await p.emit('chat:send', { text: 'you are a r3tard' }), 'BAD_REQUEST', "text: that message has a word cubr doesn't allow");
+      expect((await p.emit('chat:send', { text: 'what a shit solve' })).ok).toBe(true);
+    });
+
     it('accepts a message of exactly 200 characters', async () => {
       const p = await guest();
       await p.join(await createRoom(pod));

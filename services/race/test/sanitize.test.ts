@@ -60,6 +60,13 @@ describe('sanitizeText / sanitizeName', () => {
     expect(sanitizeName('a'.repeat(50), 'x')).toBe('a'.repeat(20));
   });
 
+  it("falls back for a name posing as the site's or with a word cubr doesn't allow", () => {
+    expect(sanitizeName('admin', 'guest-ab12')).toBe('guest-ab12');
+    expect(sanitizeName('Cubr Official', 'guest-ab12')).toBe('guest-ab12');
+    expect(sanitizeName('xX fuck Xx', 'guest-ab12')).toBe('guest-ab12');
+    expect(sanitizeName('helpful cuber', 'guest-ab12')).toBe('helpful cuber');
+  });
+
   it("keeps html as plain text (escaping is the renderer's job)", () => {
     expect(sanitizeName('<b>hi</b>', 'x')).toBe('<b>hi</b>');
   });

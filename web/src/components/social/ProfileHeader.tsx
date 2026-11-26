@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CameraIcon, LinkIcon, PencilIcon } from '@heroicons/react/24/outline';
+import { CameraIcon, FlagIcon, LinkIcon, PencilIcon } from '@heroicons/react/24/outline';
+import { reportMailto } from '../../lib/moderation';
 import { formatDuration } from '@cubr/cubestats';
 import { AvatarEditor } from './AvatarEditor';
 import { EventDonut } from './EventDonut';
@@ -117,6 +118,16 @@ export function ProfileHeader({ user, summary, own, onEdit, event, onEvent }: Pr
               <button className="btn-text" onClick={() => copyProfileLink(user.username)} data-tip="copy profile link" aria-label="copy profile link">
                 <LinkIcon />
               </button>
+              {!own && (
+                <a
+                  className="btn-text"
+                  href={reportMailto('profile', user.username, `/profile/${encodeURIComponent(user.username)}`)}
+                  data-tip="report this profile by email"
+                  aria-label="report this profile"
+                >
+                  <FlagIcon />
+                </a>
+              )}
             </span>
           </div>
           {user.bio ? (

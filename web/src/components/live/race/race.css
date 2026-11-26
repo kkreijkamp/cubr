@@ -389,6 +389,27 @@ table.table.race-grid {
   font-size: 0.72rem;
   text-align: center;
 }
+/* mute a player for yourself: on hover or focus, always on touch screens */
+.chat-list .chat-mute {
+  padding: 0 0.3rem;
+  vertical-align: -0.1em;
+  opacity: 0;
+}
+.chat-list li:hover .chat-mute,
+.chat-list .chat-mute:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .chat-list .chat-mute {
+    opacity: 0.7;
+  }
+}
+.chat-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+}
 .chat-list .chat-empty {
   color: var(--sub-color);
   text-align: center;

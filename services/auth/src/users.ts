@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { hasBlockedWord, isReservedUsername } from '@cubr/common';
 import { isReleasedEmail } from './unconfirmed.js';
 
 // ---------------------------------------------------------------------------------------------
@@ -16,8 +17,20 @@ export const SETTINGS_MAX_BYTES = 16 * 1024;
 /** Max ids accepted by GET /api/users?ids=... */
 export const MAX_IDS = 100;
 
+/** A username: its shape, not one of the site's (packages/common moderation.ts), and no word cubr doesn't allow. */
+export const usernameSchema = z
+  .string()
+  .trim()
+  .regex(USERNAME_RE, 'must be 3-20 characters: letters, digits or _')
+  .refine((u) => !isReservedUsername(u), 'is reserved, choose another')
+  .refine((u) => !hasBlockedWord(u), "isn't allowed, choose another");
+
+/** Display names and bios: no word cubr doesn't allow (they show to everyone). */
+const allowedText = (v: string | null) => v === null || !hasBlockedWord(v);
+const ALLOWED_MESSAGE = "has a word cubr doesn't allow";
+
 export const registerSchema = z.object({
-  username: z.string().trim().regex(USERNAME_RE, 'must be 3-20 characters: letters, digits or _'),
+  username: usernameSchema,
   email: z.string().trim().max(254).email(),
   password: z.string().min(8).max(128),
 });
@@ -31,8 +44,8 @@ export const loginSchema = z.object({
 const blankToNull = (v: unknown) => (typeof v === 'string' && v.trim() === '' ? null : v);
 
 export const patchMeSchema = z.object({
-  displayName: z.preprocess(blankToNull, z.string().trim().max(40).nullable()).optional(),
-  bio: z.preprocess(blankToNull, z.string().trim().max(280).nullable()).optional(),
+  displayName: z.preprocess(blankToNull, z.string().trim().max(40).nullable().refine(allowedText, ALLOWED_MESSAGE)).optional(),
+  bio: z.preprocess(blankToNull, z.string().trim().max(280).nullable().refine(allowedText, ALLOWED_MESSAGE)).optional(),
   country: z
     .preprocess(blankToNull, z.string().trim().toUpperCase().regex(COUNTRY_RE, 'must be an ISO 3166-1 alpha-2 code').nullable())
     .optional(),
