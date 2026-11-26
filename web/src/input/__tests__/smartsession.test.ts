@@ -167,6 +167,8 @@ describe("the scramble line (csTimer's scrHinter)", () => {
     expect(h.matches(scrambleCube("R U2 F' D")!, false)).toBe(true);
   });
 
+  // movesBetween builds the two-phase solver's tables on first use (seconds; more with the whole suite
+  // running), so this test gets the solver tests' allowance
   it('off the scramble, asks once for a way back and then follows it', () => {
     const h = new ScrambleHinter();
     h.setScramble("R U2 F' D");
@@ -186,7 +188,7 @@ describe("the scramble line (csTimer's scrHinter)", () => {
     for (const m of steps.slice(1)) c.move(m.length === 1 ? m + ' ' : m);
     // back on the scramble: the scramble shows done
     expect(hint(h, c).hint).toMatchObject({ fix: false, done: 4 });
-  });
+  }, 30_000);
 
   it("has nothing to say for a scramble with turns a smart cube can't check", () => {
     const h = new ScrambleHinter();
