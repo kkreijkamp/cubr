@@ -26,6 +26,22 @@ export function allow(redis: Redis, key: string, limit: number, windowSec: numbe
   return withTimeout(rateLimit(redis, key, limit, windowSec), 500, true);
 }
 
+/**
+ * Rate limit that fails closed (refused) if Redis is slow or down: for a limit that guards something
+ * worth more than the request, such as the feedback form's daily cap, which keeps a flood from using up
+ * the emails that password resets need. The same counter as rateLimit's (`rl:<key>`, a fixed window
+ * from its first hit).
+ */
+export function allowIfCounted(redis: Redis, key: string, limit: number, windowSec: number): Promise<boolean> {
+  const k = `rl:${key}`;
+  const counted = (async () => {
+    const res = await redis.multi().incrby(k, 1).expire(k, windowSec, 'NX').exec();
+    const [err, n] = res?.[0] ?? [];
+    return !err && typeof n === 'number' && n <= limit;
+  })();
+  return withTimeout(counted, 500, false);
+}
+
 /** Publishes a domain event; Redis problems are logged, never thrown (the request still succeeds). */
 export async function publishSafely(
   redis: Redis,

@@ -105,7 +105,7 @@ function Footer() {
           <CodeBracketIcon width={14} height={14} /> github
         </a>
         {/* where "contact" was: its popup has the same email, and on phones a fifth link would take a third row */}
-        <button className="btn-text" onClick={() => setFeedbackOpen(true)} data-tip="email or github issue" aria-haspopup="dialog">
+        <button className="btn-text" onClick={() => setFeedbackOpen(true)} data-tip="a message, email or github issue" aria-haspopup="dialog">
           <ChatBubbleLeftEllipsisIcon width={14} height={14} /> feedback
         </button>
         <a href={DONATE_URL} className="btn-text" target="_blank" rel="noreferrer noopener" data-tip={DONATE_URL.replace(/^https:[/][/]/, '')}>

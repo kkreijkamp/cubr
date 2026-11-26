@@ -141,6 +141,12 @@ describe('sending', () => {
     const refused = vi.fn().mockResolvedValue(new Response('{"message":"domain not verified"}', { status: 403 }));
     await expect(sendMail(cfg, { to: 'a@b.co', subject: 's', text: 't', html: 'h' }, log(), refused as never)).rejects.toThrow(/403/);
   });
+  it("lets an email name its own reply-to (the feedback form's: the sender's address)", async () => {
+    const cfg = loadMailConfig({ RESEND_API_KEY: 're_test' });
+    const ok = vi.fn().mockImplementation(async () => new Response('{"id":"1"}', { status: 200 }));
+    await sendMail(cfg, { to: 'hello@cubr.dev', replyTo: 'jo@example.com', subject: 's', text: 't', html: 'h' }, log(), ok as never);
+    expect(JSON.parse((ok.mock.calls[0] as [string, RequestInit])[1].body as string)).toMatchObject({ to: ['hello@cubr.dev'], reply_to: 'jo@example.com' });
+  });
   it("gives every email its own X-Entity-Ref-ID, so Gmail doesn't fold a second reset link into the first one's thread", async () => {
     const cfg = loadMailConfig({ RESEND_API_KEY: 're_test' });
     const ok = vi.fn().mockImplementation(async () => new Response('{"id":"1"}', { status: 200 }));

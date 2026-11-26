@@ -45,6 +45,7 @@ cd /opt/cubr && C="docker compose -f docker-compose.yml -f deploy/vps/compose.pr
 $C ps            # health of every service
 $C logs -f gateway                         # access log with real visitor IPs
 $C logs auth | grep '"client error"'       # errors in visitors' browsers (SPEC 10.5; no IPs)
+$C logs auth | grep '"feedback'            # the feedback form: sent, or why not (SPEC 10.6; the messages are in hello@cubr.dev)
 $C exec postgres psql -U cubr -d cubr      # database shell
 $C --profile jobs run --rm wca-import      # refresh the WCA data now (~3 min)
 ```
@@ -163,7 +164,8 @@ and run the WCA import.
   password, JWT secret and internal token on the VM; the tunnel token comes from Cloudflare's API.
   Changing `JWT_SECRET` signs everyone out. `RESEND_API_KEY` (only the auth container gets it)
   sends the account emails (password resets, email confirmations, change notices) from
-  `cubr <no-reply@cubr.dev>`, with replies going to `hello@cubr.dev`; without it they are only logged.
+  `cubr <no-reply@cubr.dev>`, with replies going to `hello@cubr.dev`, and the feedback form's messages
+  to `hello@cubr.dev`, with replies going to the sender; without it they are only logged.
   To score one, open mail-tester.com and send the reset email to the address it shows, from the repo:
   `RESEND_API_KEY="$(security find-generic-password -s cubr-resend-api -w)" npx tsx scripts/test-email.ts <address>`.
   The sign-in providers' client secrets and Apple's key are there too ("Sign-in providers").

@@ -788,4 +788,33 @@ describeIntegration('auth API', () => {
       expect((await post(report, ip)).statusCode).toBe(429);
     });
   });
+
+  // what is logged, the daily cap, and that nothing ties a message to an IP address: feedback.route.test.ts
+  describe('the feedback form', () => {
+    const feedback = { kind: 'idea', message: 'a dark stackmat theme, please', email: 'fan@example.com', details: 'cubr v1.6.9 · Firefox 145 on Windows · 1280×800 · /' };
+    const post = (body: unknown, ip = freshIp()) => s.request('POST', '/api/feedback', { body, ip });
+
+    it("emails the message to cubr's inbox, without signing in, a reply going to the sender", async () => {
+      const res = await post(feedback);
+      expect(res.statusCode, res.body).toBe(204);
+      expect(res.body).toBe('');
+      const mails = outbox.filter((m) => m.subject === 'cubr feedback (idea): a dark stackmat theme, please');
+      expect(mails).toHaveLength(1);
+      expect(mails[0]).toMatchObject({ to: 'hello@cubr.dev', replyTo: 'fan@example.com' });
+      expect(mails[0].text).toContain('sent from: cubr v1.6.9 · Firefox 145 on Windows · 1280×800 · /');
+    });
+
+    it('refuses a bad email, no message, other fields and a body over 32 KB', async () => {
+      expect((await post({ ...feedback, email: 'fan@' })).statusCode).toBe(400);
+      expect((await post({ ...feedback, message: '' })).statusCode).toBe(400);
+      expect((await post({ ...feedback, userId: 'someone' })).statusCode).toBe(400);
+      expect((await post({ ...feedback, message: 'x'.repeat(33 * 1024) })).statusCode).toBe(413);
+    });
+
+    it('limits one address to 3 per 10 minutes', async () => {
+      const ip = freshIp();
+      for (let i = 0; i < 3; i++) expect((await post(feedback, ip)).statusCode).toBe(204);
+      expect((await post(feedback, ip)).statusCode).toBe(429);
+    });
+  });
 });

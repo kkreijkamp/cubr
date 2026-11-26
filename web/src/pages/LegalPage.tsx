@@ -11,7 +11,9 @@ import { usePageMeta } from '../lib/usePageMeta';
 
 // when each page last changed
 const TERMS_EFFECTIVE = '16 November 2026';
-const PRIVACY_EFFECTIVE = '18 November 2026'; // v1.5.0: sign-in with Google, Apple and GitHub; Cloudflare Web Analytics; error reports; the emails that confirm an address
+// v1.5.0 (18 November): sign-in with Google, Apple and GitHub; Cloudflare Web Analytics; error reports; the emails that confirm an address.
+// v1.6.9: the feedback form (set this to the day it's released)
+const PRIVACY_EFFECTIVE = '26 November 2026';
 const CONTACT = 'hello@cubr.dev';
 
 const Mail = () => <a href={`mailto:${CONTACT}`}>{CONTACT}</a>;
@@ -97,6 +99,12 @@ export function PrivacyPage() {
             <b>Emails</b> you send to <Mail />.
           </li>
           <li>
+            <b>Feedback</b> you send with the form in the footer: what it&apos;s about, your message, the email address you give (if
+            any, so we can reply), and the line the form shows it adds: your cubr version, browser, window size and the page you were
+            on. It&apos;s emailed to our inbox, and cubr&apos;s servers don&apos;t keep a copy. It isn&apos;t linked to your account,
+            and we don&apos;t keep your IP address with it.
+          </li>
+          <li>
             <b>Supporters:</b> if you support cubr on Ko-fi, Ko-fi tells us the kind of support, when, and your name if you made your
             support public. We keep only that; not your email, message, amount or payment details.
           </li>
@@ -141,7 +149,7 @@ export function PrivacyPage() {
             To see which pages are used and how fast they load, so we know what to improve: page-view totals from Cloudflare Web
             Analytics. (Legal basis: our legitimate interest in improving cubr.)
           </li>
-          <li>To answer you when you contact us.</li>
+          <li>To answer you when you contact us or send feedback, and to fix what you report.</li>
         </ul>
         <p>We don&apos;t sell your data, use it for advertising, or build profiles of you.</p>
       </Section>
@@ -157,7 +165,8 @@ export function PrivacyPage() {
             decrypted to be protected and routed. Cloudflare also counts our page views (Web Analytics, above).
           </li>
           <li>
-            <b>Resend:</b> sends password-reset emails and the emails that confirm an email address.
+            <b>Resend:</b> sends password-reset emails and the emails that confirm an email address, and brings feedback from the
+            form to our inbox.
           </li>
           <li>
             <b>Apple iCloud:</b> hosts our contact inbox, <Mail />.
@@ -208,7 +217,7 @@ export function PrivacyPage() {
           <li>Supporter entries: until you ask us to remove your name.</li>
           <li>Page-view statistics: only as totals, in Cloudflare&apos;s dashboard, for as long as Cloudflare keeps them.</li>
           <li>
-            Emails to <Mail />: as long as needed to deal with them.
+            Emails to <Mail />, feedback from the form included: as long as needed to deal with them.
           </li>
         </ul>
       </Section>

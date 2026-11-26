@@ -352,6 +352,13 @@ export const api = {
     /** public Ko-fi supporters, most recent first (member = a membership payment in the last 35 days) */
     list: (signal?: AbortSignal) => get<{ supporters: { name: string; member: boolean }[] }>('/api/supporters', signal),
   },
+  feedback: {
+    /** The footer's feedback form (lib/feedbackForm.ts): emailed to cubr's inbox, a reply going to `email`.
+     *  204; 400 a bad email or no message; 429 after 3 in 10 minutes or 10 a day from one address; 503
+     *  it can't be emailed right now. */
+    send: (body: { kind: string; message: string; email?: string; details?: string }) =>
+      request<void>('POST', '/api/feedback', body, { timeoutMs: 20_000 }),
+  },
   race: {
     rooms: (signal?: AbortSignal) => get<{ rooms: RaceRoomSummary[] }>('/api/race/rooms', signal),
     createRoom: (body: { name: string; event: string; isPrivate?: boolean }) =>

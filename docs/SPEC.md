@@ -77,7 +77,7 @@ logger (JSON to stdout). No pino transports (they break bundling).
 | Service | K8s/compose DNS name | Public route prefixes (Ingress) | Owns schema | Purpose |
 |---|---|---|---|---|
 | web | `web` | `/` | - | nginx serving the SPA |
-| auth | `auth` | `/api/auth`, `/api/users`, `/api/supporters`, `/api/errors` | `auth` | accounts, JWT, settings, profiles, profile pictures, Ko-fi supporters, front-end error reports |
+| auth | `auth` | `/api/auth`, `/api/users`, `/api/supporters`, `/api/errors`, `/api/feedback` | `auth` | accounts, JWT, settings, profiles, profile pictures, Ko-fi supporters, front-end error reports, the feedback form |
 | scramble | `scramble` | `/api/scrambles` | `scramble` | WCA random-state scrambles (CPU-bound, pooled in Redis), daily challenge |
 | solve | `solve` | `/api/sessions`, `/api/solves` | `solve` | sessions & solves CRUD, csTimer import/export, transactional outbox -> events |
 | stats | `stats` | `/api/stats` | `stats` | event-driven read model: PBs, activity heatmap, streaks, time-of-day, global stats |
@@ -436,7 +436,7 @@ type Solve = { id: string; sessionId: string; event: string; timeMs: number; pen
 type PB = { valueMs: number; solveId: string|null; achievedAt: string };
 ```
 
-### 9.1 auth (`/api/auth`, `/api/users`, `/api/supporters`, `/api/errors`)
+### 9.1 auth (`/api/auth`, `/api/users`, `/api/supporters`, `/api/errors`, `/api/feedback`)
 | Method & path | Auth | Body / query | Response |
 |---|---|---|---|
 | POST `/api/auth/register` | - | `{username, email, password}` | 201 `{token, user: PrivateUser}` (`emailVerified: false`); the address gets a link `<PUBLIC_URL>/confirm-email#<token>` that confirms it (valid 7 days, single use; emailed after the reply, and dropped if the email fails; none for internal-token callers, the seed job); 409 CONFLICT (username/email taken); 429 after 20 registrations/h/IP |
@@ -468,6 +468,7 @@ type PB = { valueMs: number; solveId: string|null; achievedAt: string };
 | POST `/api/supporters/kofi` | Ko-fi verification token in the payload | form-encoded `data` = Ko-fi's payment JSON (body <= 64 KB) | 200 `{ok: true}` (a repeated `message_id` is ignored); 400 not Ko-fi JSON; 403 wrong token (constant-time check against `KOFI_VERIFICATION_TOKEN`); 503 token not configured; 60/min/IP. Stores only message_id, type, the name if `is_public`, subscription flag, tier and time - never email, amount, message or payment ids |
 | GET `/api/supporters` | - | - | `{supporters: [{name, member}]}`: public, not hidden, one per name (case-insensitive), most recent first, <= 200; member = a subscription payment in the last 35 days; cached 60 s |
 | POST `/api/errors` | - | JSON `{kind: 'error' or 'unhandledrejection', message, stack?, source?, route, build?, browser?, installed?}`, no other fields, body <= 16 KB (10.5) | 204, logged once as `client error` (warn), scrubbed again (emails, tokens, query strings, usernames in paths, long ids), nothing stored; 400 anything else; 413 over 16 KB; 429 after 30 per 10 min per IP; past 600 an hour in total, accepted and dropped unlogged. Never logged with an IP: the route logs no request lines and the gateway doesn't log it |
+| POST `/api/feedback` | - | JSON `{kind: 'bug' or 'idea' or 'question' or 'account' or 'other', message, email?, details?}` (message: 1-5,000 characters once trimmed, line breaks kept, other control characters taken out; email: for a reply, `''` = none; details: the app's line, <= 300 characters, put on one line), no other fields, body <= 32 KB (10.6) | 204: emailed through Resend to the contact inbox (`MAIL_REPLY_TO`, hello@cubr.dev), subject `cubr feedback (<type>): <first line>`, with reply-to the sender's address if given; nothing stored, not linked to an account (a token is ignored); 400 anything else; 413 over 32 KB; 429 after 3 per 10 min or 10 a day per IP; 503 past 25 emails a day from everyone together, while Redis can't count them (this cap fails closed), or when Resend refuses. Never logged with an IP: the route logs no request lines and the gateway doesn't log it; the log says `feedback sent` with the type, or why not |
 | GET `/api/auth/_info`, `/api/users/_info` | - | - | info |
 
 An account made with a provider has no password: it signs in with the provider, and "forgot password?"
@@ -476,7 +477,8 @@ signed in (mode `link`, from the account page), so owning an email at a provider
 account. Each provider is configured by environment variables on the auth service (services/auth/README.md);
 the redirect URI to register with it is `<PUBLIC_URL>/api/auth/oauth/<provider>/callback`.
 
-**Emails** (password resets, email confirmations, and the notices after an email or password change) go
+**Emails** (password resets, email confirmations, the notices after an email or password change, and the
+feedback form's messages to `hello@cubr.dev`, answered to the sender) go
 through Resend from `cubr <no-reply@cubr.dev>`, with replies to `hello@cubr.dev`, each in plain text
 and HTML. The HTML is one page for all of them (`page()` in services/auth/src/mail.ts): the "cubr"
 wordmark, the message, a button with its address printed under it, and the small print, in white cross,
@@ -1007,6 +1009,34 @@ The web container's nginx (`web/nginx/default.conf.template`) serves the app and
   - aborted requests and ResizeObserver's loop warning.
 - **Sending:** `navigator.sendBeacon` (it survives the page closing), else `fetch` with `keepalive`.
   The CSP's `connect-src 'self'` covers it. The privacy policy describes it.
+
+### 10.6 Feedback
+
+- **Where:** "feedback" in the footer opens a popup (`web/src/components/FeedbackModal.tsx`) with three
+  ways to send it: the form, an email to hello@cubr.dev (a `mailto:` link with the subject "cubr
+  feedback"), or a public GitHub issue (GitHub's new-issue form, in a new tab).
+- **The form** (`lib/feedbackForm.ts`), for feedback without leaving cubr:
+  - an email address (optional, for a reply), the type (bug, idea, question, account help, something
+    else) and the message (up to 5,000 characters), whose placeholder asks a question for the type;
+  - "send" posts it to POST `/api/feedback` (auth, 9.1), which emails it to the contact inbox through
+    Resend, with reply-to the sender's address, so answering is "reply". Nothing is stored, and it isn't
+    linked to the account;
+  - sent: the popup closes with "feedback sent, thanks". Not sent: the text stays, with the reason (no
+    connection, too many, can't send right now, check the email) and a pointer to the email button;
+  - what's typed stays while the popup is closed (Esc, a click outside), until it's sent; in memory only,
+    so a reload starts empty.
+- **Details:** all three add one line, `lib/feedbackLinks.ts`'s `feedbackDetails`: the version, the
+  browser and system, whether it's the installed app, the window size and the page's path (never its
+  query or hash, where reset, confirmation and sign-in tokens travel), e.g. `cubr v1.6.9 · Chrome 142 on
+  macOS · 1280×800 · /daily`. The popup shows it under the buttons; in the email and the issue it's at
+  the end, where it can be edited before sending.
+- **Limits:** 3 messages per 10 minutes and 10 a day per IP (429), then 25 emails a day from everyone
+  together, past which the form answers 503. That cap fails closed: while Redis can't count, nothing is
+  emailed, so a flood can't use up the emails password resets need.
+- **Logs:** no IP address with a message: the route logs no request lines and the gateway's `location =
+  /api/feedback` has its access log off. The auth log says `feedback sent` with the type and whether
+  there's an address to reply to (never the message or the address), or why it wasn't sent. The privacy
+  policy describes it.
 
 ## 11. Kubernetes overview (deploy/k8s)
 
