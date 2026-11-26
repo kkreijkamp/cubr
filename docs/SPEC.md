@@ -689,7 +689,7 @@ owner changes that.
 | GET `/api/wca/rank?event=333&kind=single\|average&value=12345&country=AU` | `{event, kind, value, world: {rank, total, percentile}, country: {rank, total, percentile, countryId}\|null, neighbours: [{personId, name, countryId, value, worldRank}]}` - rank = 1 + number of people strictly faster; percentile = % of people you beat; neighbours = 3 just faster + 3 just slower |
 | GET `/api/wca/distribution?event=333&kind=single&buckets=50` | `{event, kind, total, p10, p25, p50, p75, p90, p99, min, buckets: [{from, to, count}], below, above}` (equal-width buckets between ~p0.5 and ~p99; `below`/`above` count the results outside them) |
 | GET `/api/wca/persons?q=&limit=20` | `{persons: [{wcaId, name, countryId}]}` (name substring or exact WCA id; `limit` <= 50) |
-| GET `/api/wca/persons/:wcaId` | `{person: {wcaId, name, countryId, gender}, pbs: [{event, single: {value, worldRank, continentRank, countryRank}\|null, average: {...}\|null}]}` |
+| GET `/api/wca/persons/:wcaId` | `{person: {wcaId, name, countryId, countryIso2}, pbs: [{event, single: {value, worldRank, continentRank, countryRank}\|null, average: {...}\|null}]}` |
 | GET `/api/wca/countries` | `{countries: [{id, iso2, name, continentId, continentName, persons}]}` |
 | GET `/api/wca/_info` | info (deps include postgres and whether wca data is loaded) |
 | GET `/internal/records` | `{records: {[event]: {single: number\|null, average: number\|null}}}` (ms) |

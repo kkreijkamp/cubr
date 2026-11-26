@@ -237,7 +237,7 @@ export interface WcaRankValue {
   countryRank: number;
 }
 export interface WcaPerson {
-  person: { wcaId: string; name: string; countryId: string; countryIso2: string | null; gender: string | null };
+  person: { wcaId: string; name: string; countryId: string; countryIso2: string | null };
   pbs: { event: string; single: WcaRankValue | null; average: WcaRankValue | null }[];
 }
 

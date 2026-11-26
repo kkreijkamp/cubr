@@ -233,7 +233,7 @@ describeIntegration('wca API', () => {
   describe('person', () => {
     it('shows a person with their current country and a PB line for each cubr event they have results in', async () => {
       expect(await get('/api/wca/persons/2010aaaa01')).toEqual({
-        person: { wcaId: '2010AAAA01', name: 'Ada Fast', gender: 'f', countryId: 'Australia', countryIso2: 'AU', countryName: 'Australia', continentId: '_Oceania', continentName: 'Oceania' },
+        person: { wcaId: '2010AAAA01', name: 'Ada Fast', countryId: 'Australia', countryIso2: 'AU', countryName: 'Australia', continentId: '_Oceania', continentName: 'Oceania' },
         // cubr's event order; the multi-blind and retired-event results are left out
         pbs: [
           { event: '333', eventName: '3x3x3 Cube', unit: 'time', single: { value: 4_000, worldRank: 1, continentRank: 1, countryRank: 1 }, average: { value: 5_000, worldRank: 1, continentRank: 1, countryRank: 1 } },

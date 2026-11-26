@@ -168,10 +168,10 @@ export function createRepo(pool: Pool) {
 
   async function person(wcaId: string) {
     const { rows } = await pool.query<{
-      wcaId: string; name: string; gender: string | null; countryId: string; countryIso2: string | null;
+      wcaId: string; name: string; countryId: string; countryIso2: string | null;
       countryName: string; continentId: string; continentName: string;
     }>(
-      `SELECT p.wca_id AS "wcaId", p.name, p.gender, p.country_id AS "countryId", c.iso2 AS "countryIso2",
+      `SELECT p.wca_id AS "wcaId", p.name, p.country_id AS "countryId", c.iso2 AS "countryIso2",
               c.name AS "countryName", c.continent_id AS "continentId", ct.name AS "continentName"
        FROM wca.persons p
        JOIN wca.countries c ON c.id = p.country_id
