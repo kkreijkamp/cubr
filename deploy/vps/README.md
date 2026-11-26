@@ -185,6 +185,23 @@ A suspended account keeps its times. Its owner is told "This account is suspende
 hello@cubr.dev" when signing in. Every action is in the auth or race log with the account's id
 (`$C logs auth | grep moderation`). `--local` first runs a command on the local stack.
 
+## Dead letters (events a service couldn't handle)
+
+The services pass events over one Redis stream (docs/SPEC.md section 8). An event a service fails to
+handle is retried on its own schedule (a minute, then doubling to every 10 minutes), so an outage of
+the service it depends on loses nothing. One that still fails a day after the first failure moves to
+the dead-letter stream, with an `event moved to dead-letter stream` error in that service's log
+(`$C logs stats | grep dead-letter`). Find the cause in the log, fix it (a release, or the dependency
+back up), then put them back for that service alone:
+
+```sh
+deploy/vps/dead-letters.sh list stats                   # its dead letters: type, error, attempts, first failure, data
+deploy/vps/dead-letters.sh replay stats [id...]         # back on the stream for stats only: all, or those ids
+```
+
+The services are `stats`, `leaderboard` and `solve`. A replayed event that fails again starts a new
+day of retries. `--local` first runs a command on the local stack.
+
 ## How the pieces fit
 
 - **Secrets** live only in `/opt/cubr/.env` (mode 600): `deploy.sh init` generated the Postgres

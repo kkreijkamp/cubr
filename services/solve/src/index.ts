@@ -1,6 +1,6 @@
 import {
   loadConfig, createServer, start, createPool, pingPostgres, waitForPostgres, migrate, createRedis, makeAuth, consumeEvents,
-  type Consumer,
+  registerDeadLetterRoutes, type Consumer,
 } from '@cubr/common';
 import { migrations } from './migrations.js';
 import { startOutboxRelay, type Relay } from './outbox.js';
@@ -31,6 +31,7 @@ const { app } = server;
 const auth = makeAuth(config.jwtSecret, redis);
 
 await registerRoutes(app, { config, pool, redis, auth });
+registerDeadLetterRoutes(app, { redis, group: 'solve', internalToken: config.internalToken });
 
 // Listen first so liveness passes while Postgres boots; readiness stays 503 until migrated.
 // Shutdown order: stop the relay and the consumer (they hold pool clients), then close Postgres and Redis.

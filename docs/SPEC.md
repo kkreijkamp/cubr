@@ -372,6 +372,7 @@ trigram/lower index on person name for search.
 |---|---|---|---|
 | `cubr:events` | Stream (MAXLEN ~200000) | solve/auth/stats publish | domain event bus, consumer groups `stats`, `leaderboard`, `solve` (user.deleted only) |
 | `cubr:events:dlq` | Stream | consumers | dead letters: entries a consumer group could not handle |
+| `cubr:events:attempts:<group>` | Hash | consumers | retry state of a group's failed pending entries: failures, first failure, next try |
 | `auth:revoked:<jti>` | string, TTL = token remaining life | auth | logout / revocation |
 | `auth:revoked-user:<userId>` | string (unix seconds), TTL 30 d | auth | account deleted: every token issued at or before then is revoked |
 | `auth:oauth:flow:<state>` / `:login:<code>` / `:signup:<id>` | string JSON, TTL 10 min / 2 min / 15 min | auth | sign-in with a provider: the flow (provider, PKCE verifier, nonce, mode, next), a one-time login code, a new account waiting for its username; each read once (GETDEL, the sign-up when it completes) |
@@ -397,9 +398,16 @@ trigram/lower index on person name for search.
 Each stream entry has fields `type` and `data` (JSON string). Every `data` contains `eventId`
 (globally unique string - solve outbox uses `solve-<outboxId>`, others use `<svc>-<uuid>`) and
 `occurredAt` (ISO). Consumers use consumer groups, ack after successful handling, reclaim stale
-pending entries (XAUTOCLAIM, idle > 60 s), and are idempotent (stats keeps `processed_events`).
-An entry that still fails after 5 attempts (20 for stats, whose recomputes depend on solve) is moved
-to `cubr:events:dlq`. Use `publishEvent()` / `consumeEvents()` from common.
+pending entries (XAUTOCLAIM, idle > 60 s; a backlog drains batch after batch while handling
+succeeds), stop between entries when shutting down, and are idempotent (stats keeps
+`processed_events`). A failed entry is retried on its own schedule: a minute after the first failure,
+doubling to at most 10 minutes (its state is in `cubr:events:attempts:<group>`, cleared by whichever
+replica handles it). It moves to `cubr:events:dlq` only once it has failed 5 times and its first
+failure is a day old, so an outage of a dependency (stats behind solve, the leaderboard behind stats)
+loses nothing. A dead letter keeps its group, type, data, error, attempts and first failure.
+`deploy/vps/dead-letters.sh` lists a service's dead letters and replays them, through that service's
+`/internal/events/dead-letters` routes: a replayed entry carries a `group` field, and the other groups
+acknowledge it without handling it. Use `publishEvent()` / `consumeEvents()` from common.
 
 | type | publisher | data fields (besides eventId, occurredAt) |
 |---|---|---|

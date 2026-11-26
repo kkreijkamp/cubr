@@ -5,6 +5,7 @@ import {
   createRedis,
   makeAuth,
   consumeEvents,
+  registerDeadLetterRoutes,
   type Consumer,
 } from '@cubr/common';
 import { FloorProvider } from './floors.js';
@@ -37,6 +38,7 @@ const floors = new FloorProvider(config.urls.wca, config.internalToken, app.log)
 const periods = statsPeriodSource(config.urls.stats, config.internalToken);
 
 await registerRoutes(app, { redis, auth });
+registerDeadLetterRoutes(app, { redis, group: 'leaderboard', internalToken: config.internalToken });
 
 await start(server, config, [
   async () => {

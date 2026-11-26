@@ -1,5 +1,5 @@
 import {
-  consumeEvents, createPool, createRedis, createServer, loadConfig, makeAuth, migrate, pingPostgres, start, waitForPostgres,
+  consumeEvents, createPool, createRedis, createServer, loadConfig, makeAuth, migrate, pingPostgres, registerDeadLetterRoutes, start, waitForPostgres,
   type Consumer,
 } from '@cubr/common';
 import { CONSUMED_TYPES } from './eventSchemas.js';
@@ -34,6 +34,7 @@ const { app } = server;
 const relay = createPbRelay(pool, redis, app.log);
 
 await registerRoutes(app, { pool, redis, internalToken: config.internalToken, auth: makeAuth(config.jwtSecret, redis) });
+registerDeadLetterRoutes(app, { redis, group: 'stats', internalToken: config.internalToken });
 
 // Listen first so liveness passes while Postgres boots; readiness stays 503 until migrated.
 await start(server, config, [
@@ -63,8 +64,6 @@ consumer = consumeEvents(redis, {
   types: [...CONSUMED_TYPES],
   handler: handle,
   log: app.log,
-  // recomputes depend on solve-service: tolerate ~20 min of outage before dead-lettering
-  maxAttempts: 20,
 });
 relay.start();
 stopMaintenance = startMaintenance(pool, app.log);
