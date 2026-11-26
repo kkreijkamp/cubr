@@ -34,3 +34,18 @@ export function passwordChangedNotice(o: { username: string; first: boolean; sig
 export function signInUrl(publicUrl: string): string {
   return `${publicUrl.replace(/\/+$/, '')}/login`;
 }
+
+/**
+ * To the account's email when a sign-in method (Google, Apple, GitHub) is connected or disconnected
+ * (routes/oauth.ts): a heads-up, in case it wasn't the owner, with where to look and the way back.
+ */
+export function signInMethodNotice(o: { username: string; provider: string; connected: boolean; signInUrl: string }): Email {
+  const subject = o.connected ? `${o.provider} was connected to your cubr account` : `${o.provider} was disconnected from your cubr account`;
+  const what = o.connected
+    ? `${o.provider} was connected to your cubr account, so it can be used to sign in to it now.`
+    : `${o.provider} was disconnected from your cubr account, so it can't be used to sign in to it any more.`;
+  const back = `If you didn't do this, sign in and check your sign-in methods on the account page, and choose a new password with "forgot password?" on the sign-in page (${o.signInUrl}); or reply to this email and we'll help you get the account back.`;
+  const text = [`Hi ${o.username},`, '', what, '', back, '', '- cubr'].join('\n');
+  const html = page({ title: subject, paragraphs: [`Hi ${escapeHtml(o.username)},`, escapeHtml(what), escapeHtml(back)] });
+  return { subject, text, html };
+}

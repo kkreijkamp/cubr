@@ -25,6 +25,19 @@ function cookieOf(res: { headers: Record<string, unknown> }): string | null {
   return line ? (line as string).slice('cubr_oauth='.length).split(';')[0] : null;
 }
 
+/** Every email the service sends (without an API key it only logs them), oldest first. */
+const outbox = vi.hoisted(() => [] as { to: string; subject: string; text: string }[]);
+vi.mock('../src/mail.js', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../src/mail.js')>();
+  return {
+    ...real,
+    sendMail: (...args: Parameters<typeof real.sendMail>) => {
+      outbox.push(args[1]);
+      return real.sendMail(...args);
+    },
+  };
+});
+
 describeIntegration('sign-in with Google, Apple and GitHub', () => {
   let s: TestServer;
   let fake: FakeProviders;
@@ -315,6 +328,23 @@ describeIntegration('sign-in with Google, Apple and GitHub', () => {
       const who = person({ email: acct.user.email.toUpperCase() });
       await back('apple', await begin('apple', { mode: 'link', token: acct.token }), who);
       expect(await confirmed()).toBe(true);
+    });
+
+    it('tells a confirmed address when a provider is connected or disconnected, and an unconfirmed one nothing', async () => {
+      const acct = await passwordAccount();
+      await s.pool.query('update auth.users set email_verified_at = now() where id = $1', [acct.user.id]);
+      const since = outbox.length; // the sign-up's own confirmation email came before
+      const mails = () => outbox.slice(since).filter((m) => m.to === acct.user.email).map((m) => m.subject);
+      await back('github', await begin('github', { mode: 'link', token: acct.token }), person());
+      await vi.waitFor(() => expect(mails()).toEqual(['GitHub was connected to your cubr account']));
+      expect((await s.request('DELETE', '/api/auth/me/identities/github', { token: acct.token })).statusCode).toBe(204);
+      await vi.waitFor(() => expect(mails()).toEqual(['GitHub was connected to your cubr account', 'GitHub was disconnected from your cubr account']));
+      // an unconfirmed address may be a stranger's: nothing goes there
+      const other = await passwordAccount();
+      const before = outbox.length;
+      await back('google', await begin('google', { mode: 'link', token: other.token }), person({ email: 'elsewhere@example.com' }));
+      await new Promise((r) => setTimeout(r, 200));
+      expect(outbox.slice(before).filter((m) => m.to === other.user.email)).toEqual([]);
     });
 
     it('disconnects a provider, but never the last way to sign in', async () => {

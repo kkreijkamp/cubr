@@ -3,7 +3,8 @@ import { z } from 'zod';
 import { conflict, forbidden, notFound, parse, rateLimited, signToken, unauthorized, unavailable, withTx } from '@cubr/common';
 import type { Deps } from './index.js';
 import { allow, publishSafely, withTimeout } from '../safe.js';
-import { loadMailConfig } from '../mail.js';
+import { loadMailConfig, sendMail } from '../mail.js';
+import { signInMethodNotice, signInUrl } from '../passwordChange.js';
 import {
   authorizeUrl,
   fetchIdentity,
@@ -16,6 +17,7 @@ import {
   safeNext,
   suggestUsername,
   usernameCandidates,
+  PROVIDER_NAMES,
   type Provider,
   type ProviderConfig,
   type ProviderIdentity,
@@ -98,7 +100,27 @@ async function take<T>(redis: Deps['redis'], key: string): Promise<T | null> {
 
 export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, redis, auth }: Deps): Promise<void> {
   const providers = loadOAuthConfig();
-  const publicUrl = loadMailConfig().publicUrl.replace(/\/$/, '');
+  const mail = loadMailConfig();
+  const publicUrl = mail.publicUrl.replace(/\/$/, '');
+
+  /**
+   * Tells the account's email that a sign-in method was connected or disconnected, if the address is
+   * confirmed (an unconfirmed one may be a stranger's), as for a password change. Never fails the request.
+   */
+  const noticeOfMethod = async (userId: string, provider: Provider, connected: boolean, log: FastifyRequest['log']) => {
+    try {
+      const { rows } = await pool.query<{ username: string; email: string; trusted: boolean }>(
+        `select username, email, (email_verified_at is not null or predates_email_confirmation) as trusted from auth.users where id = $1`,
+        [userId],
+      );
+      const u = rows[0];
+      if (!u?.trusted) return;
+      const notice = signInMethodNotice({ username: u.username, provider: PROVIDER_NAMES[provider], connected, signInUrl: signInUrl(mail.publicUrl) });
+      await sendMail(mail, { to: u.email, ...notice }, log);
+    } catch (err) {
+      log.error({ err: (err as Error).message, provider }, 'sign-in method notice failed');
+    }
+  };
   const redirectUri = (p: Provider) => `${publicUrl}/api/auth/oauth/${p}/callback`;
   const enabled = Object.keys(providers) as Provider[];
   if (enabled.length) app.log.info({ providers: enabled }, 'sign-in with providers enabled');
@@ -194,6 +216,10 @@ export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, 
           throw err;
         }
         req.log.info({ provider, userId: flow.userId }, 'provider connected');
+        // after confirmByProvider: connecting a provider that vouches for the address confirms it first
+        await confirmByProvider(flow.userId!, identity.email);
+        void noticeOfMethod(flow.userId!, provider, true, req.log);
+        return toSpa(reply, '/account', { linked: provider });
       }
       await confirmByProvider(flow.userId!, identity.email);
       return toSpa(reply, '/account', { linked: provider });
@@ -336,6 +362,7 @@ export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, 
       if (!del.rowCount) throw notFound('Not connected');
     });
     req.log.info({ provider, userId }, 'provider disconnected');
+    void noticeOfMethod(userId, provider, false, req.log);
     return reply.status(204).send();
   });
 }
