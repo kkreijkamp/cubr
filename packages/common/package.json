@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "fastify": "^5.12.7",
-    "ioredis": "^5.11.1",
+    "ioredis": "^6.0.0",
     "jose": "^6.2.12",
     "obscenity": "0.4.6",
     "pg": "^8.23.1",
