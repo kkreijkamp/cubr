@@ -39,7 +39,7 @@ import { shortcutFor, type ShortcutAction } from '../timer/shortcuts';
 import { PracticeBottle } from '../components/SessionName';
 import { TwistyPreview } from '../components/TwistyPreview';
 import { prefetchDrawnNet } from '../components/DrawnNet';
-import { preview3D } from '../lib/cubing3d';
+import { inCsTimerNotation, preview3D } from '../lib/cubing3d';
 import { CUBOIDS } from '../lib/cuboid';
 import { ConfigBar } from '../components/timer/ConfigBar';
 import { ScrambleBar } from '../components/timer/ScrambleBar';
@@ -584,7 +584,7 @@ export default function TimerPage() {
   // is up, so it shows at once (relays and the cuboids are drawn here, relays from their puzzles' own
   // nets; in 3D, the puzzles cubing.js builds from their geometry show its model instead)
   useEffect(() => {
-    if (!showPreview || eventInfo.puzzle !== null || RELAY_EVENTS.includes(event) || event in CUBOIDS) return;
+    if (!showPreview || (eventInfo.puzzle !== null && !inCsTimerNotation(event, scrambleType)) || RELAY_EVENTS.includes(event) || event in CUBOIDS) return;
     const next = peekScramble(event, scrambleType);
     if (!next || (settings.scramblePreview === '3D' && preview3D(event, scrambleType, next))) return;
     prefetchDrawnNet(scrambleImageUrl(event, next, scrambleType), event);

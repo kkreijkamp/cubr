@@ -1,8 +1,10 @@
 // How each event's scramble types are made (packages/cubestats/src/scrambleTypes.ts lists them):
 // a WCA event's default comes from the pool or cubing.js; the 3x3 and 2x2 practice types from a
 // pinned random state (practice.ts); csTimer's random-move types from its move tables
-// (randomMoves.ts); relays and cuboids from WCA scrambles; a few other puzzles from cubing.js; and
-// everything else from csTimer's own scramblers (cstimer.ts). Pending types throw.
+// (randomMoves.ts); relays and cuboids from WCA scrambles; and everything else from csTimer's own
+// scramblers (cstimer.ts), kilominx, redi cube and master pyraminx included: cubing.js's random-state
+// kilominx needed about 800 MB of tables and 14 s, csTimer's makes one in under half a second in
+// under 40 MB (measured 2026-11-26; it crashed production's scramble service). Pending types throw.
 import {
   ALL_EVENTS,
   cuboidPrefix,
@@ -41,13 +43,6 @@ export const CSTIMER_LENGTHS: Readonly<Record<string, number>> = {
   heli2x2g: 5, sq2: 20, ssq1t: 20, bsq: 25, ctico: 60, bic: 30, '15p': 80, '15pat': 80, '15pm': 80, easyxc: 4,
 };
 
-/** other puzzles cubing.js scrambles random-state (its event ids) */
-const CUBING: Readonly<Record<string, string>> = {
-  klmso: 'kilominx',
-  rediso: 'redi_cube',
-  mpyrso: 'master_tetraminx',
-};
-
 /** a relay's own (only) scramble type: one WCA scramble per puzzle (cubestats RELAY_PARTS) */
 const isRelay = (event: string, id: string) => RELAY_PARTS[event] !== undefined && defaultScrambleType(event)?.id === id;
 
@@ -74,7 +69,6 @@ export async function makeScramble(event: string, typeId: string | undefined, de
       if (moveCount(solution) >= 2 || attempt >= 4) return job.suffix ? `${solution} ${job.suffix}` : solution;
     }
   }
-  if (CUBING[id]) return deps.generate(CUBING[id]);
   if (id === 'mrbl') return deps.wca('333');
   if (id === '335' || id === '337') return `${cuboidPrefix(id)} / ${await deps.wca('333')}`;
   const relay = isRelay(event, id) ? RELAY_PARTS[event] : undefined;
@@ -90,7 +84,7 @@ function ownMaker(event: string, id: string): boolean {
   const def = defaultScrambleType(event);
   if (def?.id === id && isWcaEvent(event)) return true;
   if (CSTIMER_RANDOM_STATE.has(id)) return false;
-  return RANDOM_MOVE_TYPES.has(id) || PRACTICE_STATE_TYPES.has(id) || id in CUBING || id === 'mrbl' || id === '335' || id === '337' || isRelay(event, id);
+  return RANDOM_MOVE_TYPES.has(id) || PRACTICE_STATE_TYPES.has(id) || id === 'mrbl' || id === '335' || id === '337' || isRelay(event, id);
 }
 
 /** The types csTimer's scramblers make: every listed, non-pending type cubr has no maker of its own for. */

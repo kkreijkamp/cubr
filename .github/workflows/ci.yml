@@ -183,6 +183,29 @@ jobs:
         run: docker build -f services/scramble/Dockerfile -t cubr/scramble:ci .
       - name: cubing.js resolves inside the image
         run: docker run --rm cubr/scramble:ci node -e "import('cubing/scramble').then(() => console.log('cubing ok'))"
+      - name: Warms up and serves under production's heap cap
+        # Production caps every service's heap at 192 MB (deploy/vps/compose.prod.yml), which the local
+        # stack and the tests don't. cubing.js keeps all its search tables in one worker: the v1.7.1
+        # deploy (2026-11-26) crash-looped there on kilominx's ~800 MB while every test passed.
+        run: |
+          docker network create scr
+          docker run -d --name pg --network scr -e POSTGRES_USER=cubr -e POSTGRES_PASSWORD=cubr -e POSTGRES_DB=cubr postgres:17-alpine
+          docker run -d --name redis --network scr redis:7-alpine
+          for i in $(seq 1 30); do docker exec pg pg_isready -U cubr -d cubr >/dev/null 2>&1 && break; sleep 1; done
+          docker run -d --name scramble --network scr -p 8080:8080 -e NODE_OPTIONS=--max-old-space-size=192 \
+            -e DATABASE_URL=postgres://cubr:cubr@pg:5432/cubr -e REDIS_URL=redis://redis:6379 cubr/scramble:ci
+          for i in $(seq 1 120); do curl -fsS -o /dev/null http://127.0.0.1:8080/readyz 2>/dev/null && break; sleep 2; done
+          curl -fsS http://127.0.0.1:8080/api/scrambles/_info | jq -e '.warmup.done and (.warmup.failures | length == 0)' \
+            || { curl -sS http://127.0.0.1:8080/api/scrambles/_info; docker logs scramble 2>&1 | tail -40; exit 1; }
+          # the WCA events from cubing.js and the pool, and csTimer's kilominx, redi cube and master pyraminx
+          for p in 333 444 sq1 fto minx 'klm?type=klmso' 'redi?type=rediso' 'mpyr?type=mpyrso' 'minx?type=mgmso'; do
+            curl -fsS "http://127.0.0.1:8080/api/scrambles/$p" | jq -e '.scrambles[0] | length > 0' >/dev/null || { echo "no scramble: $p"; exit 1; }
+          done
+          docker stats --no-stream --format 'scramble memory: {{.MemUsage}}' scramble
+          test "$(docker inspect scramble --format '{{.State.Running}} {{.RestartCount}}')" = 'true 0'
+          # read into a file first: under pipefail, grep -q stopping early could pass a log that has it
+          docker logs scramble > scramble.log 2>&1
+          if grep -q OUT_OF_MEMORY scramble.log; then echo 'the scramble service ran out of memory'; exit 1; fi
       - name: Vulnerabilities in the image (Trivy; reports, doesn't block yet)
         # node:22-alpine plus the bundle is what every service image is, so this covers their base too.
         # It turns blocking (drop continue-on-error) once its first reports are clean.

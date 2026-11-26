@@ -139,6 +139,8 @@ const TYPES: Readonly<Record<string, { puzzle: Puzzle3D; move: Translate }>> = {
   dmdso: { puzzle: pg('skewb diamond'), move: diamond },
   ctico: { puzzle: pg('icosamate'), move: icosamate },
   mpyr: { puzzle: pg('master pyraminx'), move: masterPyraminx },
+  mpyrso: { puzzle: pg('master pyraminx'), move: masterPyraminx },
+  klmso: { puzzle: { id: 'kilominx' }, move: minxFaces },
   giga: { puzzle: { id: 'gigaminx' }, move: gigaminx },
   mgmc: { puzzle: { id: 'megaminx' }, move: carrot },
   mgmo: { puzzle: { id: 'megaminx' }, move: minxFaces },
@@ -147,6 +149,20 @@ const TYPES: Readonly<Record<string, { puzzle: Puzzle3D; move: Translate }>> = {
 
 /** the scramble types translated here (for the tests) */
 export const PREVIEW_3D_TYPES: readonly string[] = Object.keys(TYPES);
+
+/** csTimer's notation, on a puzzle with no translation here: csTimer's redi cube (cubing.js has no 3D model of it) */
+const CSTIMER_ONLY: ReadonlySet<string> = new Set(['rediso', 'redim', 'redi']);
+
+/**
+ * Whether a scramble of `event`'s `type` (the default when absent) is in csTimer's notation for a
+ * puzzle cubing.js names differently. cubing.js must never read one as it is: most fail (csTimer's
+ * DBR and DBL, Uw, f'), but some only use names both have, and cubing.js would turn other faces (its
+ * DR and DL are csTimer's DBR and DBL). In 2D they're csTimer's own drawing; in 3D, translated.
+ */
+export function inCsTimerNotation(event: string, type: string | undefined): boolean {
+  const id = type ?? defaultScrambleType(event)?.id;
+  return id !== undefined && getScrambleType(event, id) !== undefined && (id in TYPES || CSTIMER_ONLY.has(id));
+}
 
 /**
  * The 3D preview of a scramble of `event` (its `type`, the default when absent) that cubing.js can

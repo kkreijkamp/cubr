@@ -36,8 +36,8 @@ describe('cubing.js scrambles', () => {
     expect(s).toMatch(/^[ULRB' ]+( [ulrb]'?)*$/);
   }, 60_000);
 
-  it('scrambles FTO and the other puzzles cubing.js knows', async () => {
-    for (const event of ['fto', 'master_tetraminx', 'redi_cube', 'kilominx']) {
+  it('scrambles FTO', async () => {
+    for (const event of ['fto']) {
       const s = await gen.generate(event);
       expect(s.split(/\s+/).length, event).toBeGreaterThan(5);
     }

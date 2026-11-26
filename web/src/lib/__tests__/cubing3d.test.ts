@@ -3,7 +3,7 @@ import { KPuzzle } from 'cubing/kpuzzle';
 import { ExperimentalPGNotation, getPuzzleDescriptionString, getPuzzleGeometryByDesc } from 'cubing/puzzle-geometry';
 import { puzzles } from 'cubing/puzzles';
 import { randomMoveScramble } from '@cubr/cubestats';
-import { DESCRIPTIONS, PREVIEW_3D_TYPES, preview3D, type Puzzle3D } from '../cubing3d';
+import { DESCRIPTIONS, PREVIEW_3D_TYPES, inCsTimerNotation, preview3D, type Puzzle3D } from '../cubing3d';
 import { ICOSAMATE_COLOURS } from '../drawnNet';
 import { stickerSources } from '../scrambleNet';
 import fixtures from './fixtures/cstimer/preview3d.json';
@@ -29,6 +29,8 @@ const DODECAHEDRON = {
   '#ffffbb': '#e8d0a0',
   '#ff99ff': '#ff66cc',
 };
+// cubing.js's kilominx spells four of its megaminx's colours differently (lib/scrambleNet SCHEMES)
+const KILOMINX: Record<string, string> = { ...DODECAHEDRON, '#ffcc00': '#ffff00', '#ffffbb': '#ffffd0', '#ff8833': '#ff6633', '#999999': '#999999' };
 const OCTAHEDRON = {
   '#ffffff': '#ffffff',
   '#ff0000': '#ff0000',
@@ -100,7 +102,7 @@ function pair(cstimer: string[][], cubing: string[][]): { missing: number; left:
 /** the type's drawings, csTimer's and cubing.js's colours, with the moves `tweak`ed (a wrong translation, for the test of the test) */
 async function compare(type: string, tweak: (alg: string) => string = (a) => a) {
   const { event, palette, drawings } = FIXTURES[type];
-  const colours = BY_FACES[palette.length];
+  const colours = type === 'klmso' ? KILOMINX : BY_FACES[palette.length];
   const puzzle = preview3D(event, type, drawings[1][0])!.puzzle;
   const cstimer = drawings.map(([, c]) => [...c].map((d) => colours[palette[parseInt(d, 36)]]));
   const cubing = await Promise.all(drawings.map(([s]) => cubingColours(puzzle, s ? tweak(preview3D(event, type, s)!.alg) : '')));
@@ -119,9 +121,12 @@ describe('preview3D', () => {
     expect(preview3D('dino', undefined, "F l'")).toEqual({ puzzle: { description: DESCRIPTIONS.dino }, alg: "UFR DFL'" });
     expect(preview3D('mpyr', 'mpyr', "u' U Bw'")).toEqual({ puzzle: { description: DESCRIPTIONS['master pyraminx'] }, alg: "U' 1-2U 1-3B'" });
     expect(preview3D('ctico', undefined, "UrUl2 LBl'")?.alg).toBe("UGJMQ2' JGEIS");
+    // kilominx and master pyraminx random state are csTimer's since v1.7.3 (cubing.js's kilominx took ~800 MB)
+    expect(preview3D('klm', undefined, "DBR2' DL BL")).toEqual({ puzzle: { id: 'kilominx' }, alg: "DR2' FL BL" });
+    expect(preview3D('mpyr', undefined, 'U L')).toEqual({ puzzle: { description: DESCRIPTIONS['master pyraminx'] }, alg: '1-2U 1-2L' });
     // what cubing.js reads as it is, or has no model of
     expect(preview3D('minx', undefined, 'R++ D-- U')).toBeNull();
-    expect(preview3D('mpyr', undefined, 'U L')).toBeNull();
+    expect(preview3D('klm', 'klmp', 'R++ D-- U')).toBeNull();
     expect(preview3D('333', undefined, 'R U')).toBeNull();
     expect(preview3D('gear', undefined, 'R U')).toBeNull();
     expect(preview3D('r234', undefined, '2x2: R U')).toBeNull();
@@ -171,4 +176,36 @@ describe('preview3D', () => {
       }
     }
   }, 60_000);
+});
+
+describe('inCsTimerNotation', () => {
+  it("knows the scrambles cubing.js mustn't read as they are, which are csTimer's drawing in 2D", () => {
+    const yes: [string, string | undefined][] = [
+      ['klm', undefined],
+      ['mpyr', undefined],
+      ['mpyr', 'mpyr'],
+      ['redi', undefined],
+      ['redi', 'redim'],
+      ['minx', 'mgmso'],
+      ['giga', undefined],
+    ];
+    for (const [event, type] of yes) expect(inCsTimerNotation(event, type), `${event} ${type}`).toBe(true);
+    const no: [string, string | undefined][] = [
+      ['333', undefined],
+      ['minx', undefined],
+      ['pyram', undefined],
+      ['333', 'pll'],
+      ['redi', 'nope'],
+      ['mpyr', 'mgmso'],
+    ];
+    for (const [event, type] of no) expect(inCsTimerNotation(event, type), `${event} ${type}`).toBe(false);
+  });
+
+  it('would have drawn some csTimer kilominx scrambles wrong in cubing.js, which reads them without an error', async () => {
+    // csTimer's DR and DL are cubing.js's FR and FL: a scramble with neither DBR nor DBL parses, as other turns
+    const { kpuzzle } = await load({ id: 'kilominx' });
+    const raw = kpuzzle.defaultPattern().applyAlg('DR DL');
+    const translated = kpuzzle.defaultPattern().applyAlg(preview3D('klm', undefined, 'DR DL')!.alg);
+    expect(raw.isIdentical(translated)).toBe(false);
+  });
 });
