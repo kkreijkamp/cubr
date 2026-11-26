@@ -962,6 +962,10 @@ body.focus .toast:not(.important) {
 .modal-backdrop.previewing {
   background: transparent;
 }
+/* a dialog takes focus itself when nothing in it asks for it (Modal.tsx): it isn't a control, so no ring */
+.modal:focus {
+  outline: none;
+}
 .modal {
   background: var(--bg-color);
   border-radius: calc(var(--roundness) * 2);

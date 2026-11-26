@@ -109,10 +109,22 @@ export function TimerDisplay({ state, precision, timerUpdate, sizeRem = 7, pb, c
     if (textRef.current) setTimerText(textRef.current, text);
   });
 
+  // read out once when a solve ends (and nothing while it runs: the display itself is aria-live off); it
+  // empties when the next one starts, and a time already there when the page opens isn't read
+  const spoken =
+    result && (phase === 'idle' || phase === 'stopped')
+      ? `${result.penalty === 'DNF' ? 'DNF' : `${text}${penaltyMark ? ', plus 2' : ''}`}${pb ? ', a personal best' : ''}`
+      : '';
+
   return (
-    <div className={`timer-display ${cls} ${className ?? ''}`} style={{ ['--timer-size' as string]: `${sizeRem}rem` }} aria-live="off">
-      <span ref={textRef} />
-      {penaltyMark && <span className="penalty">{penaltyMark}</span>}
-    </div>
+    <>
+      <div className={`timer-display ${cls} ${className ?? ''}`} style={{ ['--timer-size' as string]: `${sizeRem}rem` }} aria-live="off">
+        <span ref={textRef} />
+        {penaltyMark && <span className="penalty">{penaltyMark}</span>}
+      </div>
+      <span className="sr-only" role="status">
+        {spoken}
+      </span>
+    </>
   );
 }
