@@ -1,0 +1,14 @@
+{
+  "name": "cubr-e2e",
+  "private": true,
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "description": "End-to-end and accessibility tests of the running stack (Playwright, axe)",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "@playwright/test": "1.65.1"
+  }
+}

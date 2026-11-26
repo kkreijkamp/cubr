@@ -53,7 +53,10 @@ npm install && npm test                 # services and packages
 cd web && npm install && npm run dev    # the web app, with hot reload
 ```
 
-`npm run test:integration` adds the database suites.
+`npm run test:integration` adds the database suites, `npm run lint` and `npm run format:check` check the
+code. With the stack running, `cd e2e && npm install && npm test` runs the end-to-end tests in a browser:
+sign-up, a solve that reaches the leaderboards, a daily attempt, a two-player race, and axe on every main
+page (locally in the installed Google Chrome).
 
 ## Documentation
 

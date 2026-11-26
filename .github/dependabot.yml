@@ -4,7 +4,7 @@
 version: 2
 updates:
   - package-ecosystem: npm
-    directories: ["/", "/web"]
+    directories: ["/", "/web", "/e2e"]
     target-branch: dev
     schedule:
       interval: weekly

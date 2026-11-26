@@ -10,7 +10,7 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig(
-  globalIgnores(['**/dist/', '**/coverage/', 'web/public/', 'deploy/cloudflare/down-page/font.ts']),
+  globalIgnores(['**/dist/', '**/coverage/', 'web/public/', 'deploy/cloudflare/down-page/font.ts', 'e2e/playwright-report/', 'e2e/test-results/']),
   { linterOptions: { reportUnusedDisableDirectives: 'error' } },
   js.configs.recommended,
   tseslint.configs.recommended,
