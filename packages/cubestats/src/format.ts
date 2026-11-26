@@ -22,6 +22,25 @@ export function formatTime(ms: number | null | undefined, precision: Precision =
   return `${s}.${frac}`;
 }
 
+/**
+ * Formats an average or mean (ms): rounded to the precision, half up (WCA 9f1: averages are rounded,
+ * singles truncated). cubr's averages are whole milliseconds wherever they're stored or ranked
+ * (cubestats rounds the mean once, to the ms), and every page formats them with this, so an average
+ * reads the same on the timer, the profile and the boards (the October review's #16).
+ * Infinity / -1 -> "DNF", null/undefined -> "-".
+ */
+export function formatAverage(ms: number | null | undefined, precision: Precision = 2): string {
+  if (ms === null || ms === undefined || Number.isNaN(ms)) return '-';
+  if (ms === DNF || ms === -1 || !Number.isFinite(ms)) return 'DNF';
+  const unit = precision === 3 ? 1 : 10;
+  return formatTime(Math.round(ms / unit) * unit, precision);
+}
+
+/** A result of a kind: a 'single' is truncated (formatTime), anything else (ao5, mean...) rounded (formatAverage). */
+export function formatResult(ms: number | null | undefined, kind: string, precision: Precision = 2): string {
+  return kind === 'single' ? formatTime(ms, precision) : formatAverage(ms, precision);
+}
+
 /** Formats a raw solve with its penalty: "12.34", "14.34+", "DNF(12.34)". */
 export function formatSolve(timeMs: number, penalty: Penalty, precision: Precision = 2): string {
   if (penalty === 'DNF') return `DNF(${formatTime(timeMs, precision)})`;

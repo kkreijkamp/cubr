@@ -6,7 +6,7 @@ import { countryName } from './countries';
 import { Section, WidgetEmpty, WidgetError } from './Widget';
 import { eventLabel, isWcaComparable, isWcaNotLoaded, wcaAverageKind } from './util';
 import { api } from '../../lib/api';
-import { flagEmoji, formatDate, formatNumber, formatPercent, formatTime } from '../../lib/format';
+import { flagEmoji, formatDate, formatNumber, formatPercent, formatResult, formatTime } from '../../lib/format';
 import type { StatsSummary, WcaDistribution, WcaRank } from '../../lib/types';
 import { useAsync, type AsyncState } from '../../lib/useAsync';
 import { Loading, Spinner } from '../Spinner';
@@ -71,6 +71,7 @@ interface ChartProps {
   dist: WcaDistribution;
   value: number;
   official: number | null;
+  kind: WcaKind;
   precision: 2 | 3;
 }
 
@@ -78,7 +79,8 @@ interface ChartProps {
 const DIST_H = 210;
 
 /** Histogram of every official competitor's PB with your PB (and your official PB) marked. */
-function DistributionChart({ dist, value, official, precision }: ChartProps) {
+function DistributionChart({ dist, value, official, kind, precision }: ChartProps) {
+  const show = (v: number) => formatResult(v, kind, precision);
   const ref = useRef<HTMLDivElement>(null);
   const width = useElementWidth(ref) || 640;
   const [hover, setHover] = useState<number | null>(null);
@@ -106,8 +108,8 @@ function DistributionChart({ dist, value, official, precision }: ChartProps) {
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => x0 + (x1 - x0) * f);
   // markers: lines first, then labels on top (so a line never cuts through the other label)
   const markers = [
-    ...(official !== null ? [{ v: official, row: 1, cls: 'official', text: `official ${formatTime(official, precision)}` }] : []),
-    { v: value, row: 0, cls: 'you', text: `you ${formatTime(value, precision)}${value > x1 ? ' ->' : value < x0 ? ' <-' : ''}` },
+    ...(official !== null ? [{ v: official, row: 1, cls: 'official', text: `official ${show(official)}` }] : []),
+    { v: value, row: 0, cls: 'you', text: `you ${show(value)}${value > x1 ? ' ->' : value < x0 ? ' <-' : ''}` },
   ].map((m) => {
     const x = Math.min(Math.max(sx(m.v), pad.l + 1), width - pad.r - 1);
     const labelW = m.text.length * 6.7 + 14;
@@ -129,7 +131,7 @@ function DistributionChart({ dist, value, official, precision }: ChartProps) {
         width={width}
         height={H}
         role="img"
-        aria-label={`distribution of ${formatNumber(dist.total)} official results, your result ${formatTime(value, precision)} marked`}
+        aria-label={`distribution of ${formatNumber(dist.total)} official results, your result ${show(value)} marked`}
         onMouseMove={onMove}
         onMouseLeave={() => setHover(null)}
       >
@@ -258,7 +260,7 @@ function Placement({
           <WidgetEmpty compact>no official results for this event yet</WidgetEmpty>
         ) : (
           <>
-            <DistributionChart dist={dist.data} value={value} official={official} precision={precision} />
+            <DistributionChart dist={dist.data} value={value} official={official} kind={kind} precision={precision} />
             <div className="wc-legend" aria-hidden="true">
               <span>
                 <i className="beat" /> cubers you beat
@@ -266,7 +268,7 @@ function Placement({
               <span>
                 <i className="faster" /> faster than you
               </span>
-              <span>median {formatTime(dist.data.p50, precision)}</span>
+              <span>median {formatResult(dist.data.p50, kind, precision)}</span>
             </div>
           </>
         )}
@@ -322,12 +324,12 @@ export function WcaComparison({ summary, event, wcaId, country, own, onEdit, pre
         precision={precision}
         intro={
           <p className="wc-sub">
-            where {own ? 'your' : 'this'} {kindLabel} of <span className="text">{formatTime((kind === 'single' ? row.single : row.average)!, precision)}</span>{' '}
+            where {own ? 'your' : 'this'} {kindLabel} of <span className="text">{formatResult((kind === 'single' ? row.single : row.average)!, kind, precision)}</span>{' '}
             would place among official {eventLabel(event)} {kind === 'single' ? 'singles' : 'averages'}
             {officialPb && (
               <>
                 {' '}
-                - official pb <span className="text">{formatTime(officialPb.value, precision)}</span> (wr #{formatNumber(officialPb.worldRank)})
+                - official pb <span className="text">{formatResult(officialPb.value, kind, precision)}</span> (wr #{formatNumber(officialPb.worldRank)})
               </>
             )}
           </p>

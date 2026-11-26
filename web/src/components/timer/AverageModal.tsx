@@ -1,10 +1,10 @@
 import { Square2StackIcon } from '@heroicons/react/24/outline';
-import type { Precision } from '@cubr/cubestats';
+import { formatAverage, type Precision } from '@cubr/cubestats';
 import { Modal } from '../Modal';
 import { toast } from '../../lib/toast';
 import { formatDateTime } from '../../lib/format';
 import { copyText } from './feedback';
-import { averageReport, fmtAvg, fmtSolveShort, type AverageWindow } from './statsUtil';
+import { averageReport, fmtSolveShort, type AverageWindow } from './statsUtil';
 
 interface Props {
   label: string;
@@ -26,7 +26,7 @@ export function AverageModal({ label, window: w, precision, onOpenSolve, onClose
     <Modal title={label} onClose={onClose} wide>
       <div className="tp-avg-head">
         <div className="stat lg">
-          <div className="value">{fmtAvg(w.value, precision)}</div>
+          <div className="value">{formatAverage(w.value, precision)}</div>
         </div>
         <div className="tp-avg-meta">
           <span>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DNF } from '../src/averages.js';
-import { formatDuration, formatSolve, formatTime, parseTimeInput } from '../src/format.js';
+import { formatAverage, formatDuration, formatResult, formatSolve, formatTime, parseTimeInput } from '../src/format.js';
 
 describe('formatTime', () => {
   it.each([
@@ -24,6 +24,42 @@ describe('formatTime', () => {
     expect(formatTime(DNF, 3)).toBe('DNF');
     expect(formatTime(-1)).toBe('DNF');
     for (const v of [null, undefined, NaN]) expect(formatTime(v)).toBe('-');
+  });
+});
+
+describe('formatAverage (every mean and average, on every page: the October review\'s #16)', () => {
+  it.each([
+    [12_345, 2, '12.35'], // x.xx5 rounds up
+    [12_344, 2, '12.34'],
+    [12_349, 2, '12.35'], // where formatTime truncates to 12.34
+    [59_995, 2, '1:00.00'], // rounding carries into the minutes
+    [3_599_995, 2, '1:00:00.00'],
+    [12_345, 3, '12.345'], // whole ms already: unchanged
+    [0, 2, '0.00'],
+  ] as const)('formats %s ms at precision %s as %s', (ms, precision, text) => {
+    expect(formatAverage(ms, precision)).toBe(text);
+  });
+
+  it.each([
+    [DNF, 'DNF'],
+    [-1, 'DNF'], // the API's DNF
+    [null, '-'],
+    [undefined, '-'],
+    [NaN, '-'],
+  ])('formats %s as %s', (ms, text) => {
+    expect(formatAverage(ms, 2)).toBe(text);
+  });
+
+  it('defaults to two decimals, like formatTime', () => {
+    expect(formatAverage(12_345)).toBe('12.35');
+  });
+});
+
+describe('formatResult', () => {
+  it('truncates a single and rounds every other kind', () => {
+    expect(formatResult(12_349, 'single', 2)).toBe('12.34');
+    for (const kind of ['ao5', 'ao12', 'ao100', 'mo3', 'mean']) expect(formatResult(12_349, kind, 2)).toBe('12.35');
+    expect(formatResult(-1, 'ao5', 2)).toBe('DNF');
   });
 });
 

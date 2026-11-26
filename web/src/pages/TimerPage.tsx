@@ -17,7 +17,7 @@ import {
   TrophyIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
-import { ALL_EVENTS, EVENTS, RELAY_EVENTS, effectiveMs, formatTime, getEvent, isEventReady, rollingAverage, scrambleSessionName, sessionStats, type Penalty } from '@cubr/cubestats';
+import { ALL_EVENTS, EVENTS, RELAY_EVENTS, effectiveMs, formatAverage, formatResult, getEvent, isEventReady, rollingAverage, scrambleSessionName, sessionStats, type Penalty } from '@cubr/cubestats';
 import { TimerDisplay } from '../timer/TimerDisplay';
 import { useTimerEngine, type TimerResult, type TimerState } from '../timer/useTimerEngine';
 import { peekScramble, useScrambleQueue } from '../timer/useScrambleQueue';
@@ -45,7 +45,7 @@ import { AVAILABLE_INPUTS, INPUT_MODES, modeInfo, updateInput, useInputState, ty
 import { ConfirmModal, PromptModal } from '../components/timer/Dialogs';
 import { MergeSessionsModal } from '../components/timer/MergeSessionsModal';
 import { copyText, isTouchDevice, playPbSound } from '../components/timer/feedback';
-import { averageWindow, detectPbs, fmtAvg, fmtSolveShort, pbFlags, statNs } from '../components/timer/statsUtil';
+import { averageWindow, detectPbs, fmtSolveShort, pbFlags, statNs } from '../components/timer/statsUtil';
 import { noFocus } from '../components/timer/ConfigBar';
 import '../components/timer/timer-page.css';
 import { useAuth } from '../lib/auth';
@@ -228,7 +228,7 @@ export default function TimerPage() {
     const pbs = detectPbs(prev.stats, stats);
     const newest = solves[solves.length - 1];
     if (!pbs.length || !newest) return;
-    const text = pbs.map((p) => `${p.kind} ${p.kind === 'single' ? formatTime(p.value, settings.precision) : fmtAvg(p.value, settings.precision)}`).join(' - ');
+    const text = pbs.map((p) => `${p.kind} ${formatResult(p.value, p.kind, settings.precision)}`).join(' - ');
     toast.pb(`new pb! ${text}`);
     setPbSolveId(newest.id);
     setPbKey((k) => k + 1);
@@ -689,10 +689,10 @@ export default function TimerPage() {
                 </span>
               )}
               <span>
-                ao5<b>{fmtAvg(stats.averages.ao5?.current, settings.precision)}</b>
+                ao5<b>{formatAverage(stats.averages.ao5?.current, settings.precision)}</b>
               </span>
               <span>
-                ao12<b>{fmtAvg(stats.averages.ao12?.current, settings.precision)}</b>
+                ao12<b>{formatAverage(stats.averages.ao12?.current, settings.precision)}</b>
               </span>
             </div>
           )}

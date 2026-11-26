@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChatBubbleLeftIcon, FlagIcon, PaperAirplaneIcon, SpeakerXMarkIcon, StarIcon, TrophyIcon, UsersIcon } from '@heroicons/react/24/outline';
 import { mutedPlayers, setMutedPlayers } from '../../../lib/moderation';
-import { effectiveMs, formatTime, fromApiValue, type Penalty, type Precision } from '@cubr/cubestats';
+import { effectiveMs, formatAverage, formatTime, fromApiValue, type Penalty, type Precision } from '@cubr/cubestats';
 import type { ChatMessage, LivePlayer, LiveRoomState } from '../../../lib/race';
 import { Dot, type DotState } from '../ui';
 
@@ -80,8 +80,8 @@ export function PlayersCard({ room, playerId, precision }: { room: LiveRoomState
                   </div>
                 </td>
                 <td>{wins}</td>
-                <td>{formatTime(fromApiValue(meanMs), precision)}</td>
-                <td>{formatTime(fromApiValue(ao5), precision)}</td>
+                <td>{formatAverage(fromApiValue(meanMs), precision)}</td>
+                <td>{formatAverage(fromApiValue(ao5), precision)}</td>
               </tr>
             );
           })}

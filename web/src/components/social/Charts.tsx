@@ -3,7 +3,7 @@ import type { ChartConfiguration } from 'chart.js';
 import { Section, WidgetError } from './Widget';
 import { eventLabel, plural } from './util';
 import { api } from '../../lib/api';
-import { formatTime } from '../../lib/format';
+import { formatAverage, formatTime } from '../../lib/format';
 import { useAsync } from '../../lib/useAsync';
 import { ChartCanvas, themedScales, useThemeColors, type ThemeColors } from '../ChartCanvas';
 import { Loading, Spinner } from '../Spinner';
@@ -92,7 +92,7 @@ export function HourlyChart({ userId, event, precision }: { userId: string; even
               label: (item) => {
                 const h = hours[item.dataIndex];
                 const lines = [plural(h.solves, 'solve')];
-                if (h.meanMs && h.meanMs > 0) lines.push(`mean ${formatTime(h.meanMs, precision)}`);
+                if (h.meanMs && h.meanMs > 0) lines.push(`mean ${formatAverage(h.meanMs, precision)}`);
                 return lines;
               },
             },
@@ -155,7 +155,7 @@ export function HourlyChart({ userId, event, precision }: { userId: string; even
               {insight.fastest && (
                 <>
                   {' '}
-                  - fastest <b>{hh(insight.fastest.hour)}</b> (mean {formatTime(insight.fastest.meanMs!, precision)})
+                  - fastest <b>{hh(insight.fastest.hour)}</b> (mean {formatAverage(insight.fastest.meanMs!, precision)})
                 </>
               )}
             </div>

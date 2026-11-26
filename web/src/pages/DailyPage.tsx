@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRightEndOnRectangleIcon, ArrowUturnLeftIcon, CalendarDaysIcon, ClockIcon, SignalSlashIcon } from '@heroicons/react/24/outline';
-import { averageOfN, DAILY_EVENTS, effectiveMs, formatSolve, formatTime, getEvent, type Penalty } from '@cubr/cubestats';
+import { averageOfN, DAILY_EVENTS, effectiveMs, formatAverage, formatSolve, formatTime, getEvent, type Penalty } from '@cubr/cubestats';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useSettings } from '../lib/settings';
@@ -475,12 +475,12 @@ export default function DailyPage() {
               {isToday && <QuickActions className="daily-quick" last={selected ?? null} onPenalty={changePenalty} label={`attempt ${(selected?.index ?? 0) + 1}`} />}
               <div className="stat lg">
                 <span className="label">ao5</span>
-                <span className="value">{formatTime(ao5, settings.precision)}</span>
+                <span className="value">{formatAverage(ao5, settings.precision)}</span>
               </div>
               <div className="daily-result-stats">
                 <div className="stat">
                   <span className="label">mean</span>
-                  <span className="value text">{formatTime(mean, settings.precision)}</span>
+                  <span className="value text">{formatAverage(mean, settings.precision)}</span>
                 </div>
                 <div className="stat">
                   <span className="label">best</span>

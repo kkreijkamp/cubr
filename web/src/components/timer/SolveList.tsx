@@ -1,8 +1,8 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { ChatBubbleLeftEllipsisIcon, ListBulletIcon } from '@heroicons/react/24/outline';
-import type { Precision } from '@cubr/cubestats';
+import { formatAverage, type Precision } from '@cubr/cubestats';
 import type { Solve } from '../../lib/types';
-import { fmtAvg, fmtSolveShort } from './statsUtil';
+import { fmtSolveShort } from './statsUtil';
 import { Loading } from '../Spinner';
 
 const ROW = 30;
@@ -80,8 +80,8 @@ export const SolveList = memo(function SolveList({ solves, ao5, ao12, pbs, bestI
           {fmtSolveShort(s, precision)}
           {s.comment && <ChatBubbleLeftEllipsisIcon width={11} height={11} className="tp-comment-mark" aria-label="has comment" aria-hidden={false} />}
         </span>
-        <span className={pbs.ao5[i] ? 'pb' : undefined}>{fmtAvg(ao5[i], precision)}</span>
-        <span className={pbs.ao12[i] ? 'pb' : undefined}>{fmtAvg(ao12[i], precision)}</span>
+        <span className={pbs.ao5[i] ? 'pb' : undefined}>{formatAverage(ao5[i], precision)}</span>
+        <span className={pbs.ao12[i] ? 'pb' : undefined}>{formatAverage(ao12[i], precision)}</span>
       </div>,
     );
   }

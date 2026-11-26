@@ -39,6 +39,12 @@ describe('missingNote (why you are not on a board)', () => {
 
 describe('hiddenNote (a faster time of yours was left off)', () => {
   it('names the time and why', () => {
-    expect(hiddenNote({ valueMs: 300, floorMs: 2_510, achievedAt: at }, 3)).toBe("your 0.300 on 16 Nov 2026 isn't counted: it's faster than the world record, so it's taken for a mis-tap.");
+    expect(hiddenNote({ valueMs: 300, floorMs: 2_510, achievedAt: at }, 'single', 3)).toBe("your 0.300 on 16 Nov 2026 isn't counted: it's faster than the world record, so it's taken for a mis-tap.");
+  });
+
+  it('rounds an average, as every page does, and truncates a single', () => {
+    expect(hiddenNote({ valueMs: 2_345, floorMs: 3_000, achievedAt: null }, 'ao5', 2)).toMatch(/^your 2\.35 isn't counted/);
+    expect(hiddenNote({ valueMs: 2_345, floorMs: 3_000, achievedAt: null }, 'single', 2)).toMatch(/^your 2\.34 isn't counted/);
+    expect(missingNote({ valueMs: 1_005, floorMs: 2_605, achievedAt: null }, 'challenge', 'ao5', 2)).toContain('your ao5, 1.01,');
   });
 });

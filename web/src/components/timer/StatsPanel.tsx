@@ -1,8 +1,8 @@
 import { memo } from 'react';
 import { ChartBarIcon } from '@heroicons/react/24/outline';
-import { avgKey, formatTime, type Precision, type SessionStats } from '@cubr/cubestats';
+import { avgKey, formatAverage, formatTime, type Precision, type SessionStats } from '@cubr/cubestats';
 import type { Solve } from '../../lib/types';
-import { fmtAvg, fmtSolveShort } from './statsUtil';
+import { fmtSolveShort } from './statsUtil';
 import { formatNumber } from '../../lib/format';
 
 interface Props {
@@ -64,8 +64,8 @@ export const StatsPanel = memo(function StatsPanel({ stats, ns, solves, precisio
             return (
               <tr key={key}>
                 <th scope="row">{key}</th>
-                <Cell value={fmtAvg(line?.current, precision)} onClick={() => onOpenAverage(n, 'current')} label={`current ${key} details`} />
-                <Cell best value={fmtAvg(line?.best, precision)} onClick={() => onOpenAverage(n, 'best')} label={`best ${key} details`} />
+                <Cell value={formatAverage(line?.current, precision)} onClick={() => onOpenAverage(n, 'current')} label={`current ${key} details`} />
+                <Cell best value={formatAverage(line?.best, precision)} onClick={() => onOpenAverage(n, 'best')} label={`best ${key} details`} />
               </tr>
             );
           })}
@@ -77,7 +77,7 @@ export const StatsPanel = memo(function StatsPanel({ stats, ns, solves, precisio
           {stats.count !== stats.solved && <span className="tp-of">/{formatNumber(stats.count)}</span>}
         </span>
         <span>
-          mean <b>{fmtAvg(stats.mean, precision)}</b>
+          mean <b>{formatAverage(stats.mean, precision)}</b>
         </span>
         <span>
           {'\u03c3'} <b>{sigma}</b>

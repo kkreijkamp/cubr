@@ -24,7 +24,7 @@ import { addDaysKey, eventLabel, formatDayKey, friendlyError } from '../componen
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useRegisterCommands, type Command } from '../lib/commands';
-import { flagEmoji, formatDate, formatDuration, formatNumber, formatPercent, formatTime, timeAgo, utcDateKey } from '../lib/format';
+import { flagEmoji, formatDate, formatDuration, formatNumber, formatPercent, formatResult, timeAgo, utcDateKey } from '../lib/format';
 import { useSettings } from '../lib/settings';
 import type { LbKind, Leaderboard } from '../lib/types';
 import { hiddenNote, missingNote } from '../lib/antiCheat';
@@ -264,11 +264,11 @@ function MeCard({ board, sel, precision, onJump }: { board: Leaderboard | undefi
         {flagged && (
           <span className="lb-me-flag-note" role="note">
             <ShieldExclamationIcon width={14} height={14} />
-            {hiddenNote(flagged, precision)}
+            {hiddenNote(flagged, board.kind, precision)}
           </span>
         )}
       </div>
-      <div className="lb-me-value">{formatTime(me.valueMs, precision)}</div>
+      <div className="lb-me-value">{formatResult(me.valueMs, board.kind, precision)}</div>
       <button className="btn small lb-me-jump" onClick={onJump} data-tip="jump to my rank">
         <UserIcon /> my rank
       </button>
@@ -574,7 +574,7 @@ export default function LeaderboardsPage() {
                             </span>
                           )}
                         </td>
-                        <td className="value">{formatTime(e.valueMs, precision)}</td>
+                        <td className="value">{formatResult(e.valueMs, data.kind, precision)}</td>
                         <td className="date" title={e.achievedAt ? timeAgo(e.achievedAt) : undefined}>
                           {formatDate(e.achievedAt)}
                           {e.achievedAt && (

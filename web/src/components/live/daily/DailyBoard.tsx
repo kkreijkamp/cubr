@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { TrophyIcon } from '@heroicons/react/24/outline';
-import { formatTime, fromApiValue, type Precision } from '@cubr/cubestats';
+import { formatAverage, fromApiValue, type Precision } from '@cubr/cubestats';
 import { api, ApiError } from '../../../lib/api';
 import { flagEmoji, formatNumber } from '../../../lib/format';
 import { useAsync } from '../../../lib/useAsync';
@@ -79,7 +79,7 @@ export function DailyBoard({
                     {e.country && <span className="flag">{flagEmoji(e.country)}</span>}
                     <Link to={`/profile/${encodeURIComponent(e.username)}`}>{e.username}</Link>
                   </td>
-                  <td>{formatTime(fromApiValue(e.valueMs), precision)}</td>
+                  <td>{formatAverage(fromApiValue(e.valueMs), precision)}</td>
                 </tr>
               ))}
               {me && !meVisible && (
@@ -90,7 +90,7 @@ export function DailyBoard({
                   <tr className="me">
                     <td className="center">{me.rank}</td>
                     <td className="left name">{username ?? 'you'}</td>
-                    <td>{formatTime(fromApiValue(me.valueMs), precision)}</td>
+                    <td>{formatAverage(fromApiValue(me.valueMs), precision)}</td>
                   </tr>
                 </>
               )}

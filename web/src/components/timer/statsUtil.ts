@@ -1,5 +1,5 @@
 // Small pure helpers for the timer page's stats panel, average detail modal and charts.
-import { effectiveMs, formatSolve, formatTime, trimFor, type Precision, type SessionStats } from '@cubr/cubestats';
+import { effectiveMs, formatAverage, formatSolve, formatTime, trimFor, type Precision, type SessionStats } from '@cubr/cubestats';
 import type { Solve } from '../../lib/types';
 
 /** "mo3" -> 3, "ao12" -> 12, anything else -> null */
@@ -22,14 +22,6 @@ export function statNs(keys: string[]): number[] {
     if (n) ns.add(n);
   }
   return Array.from(ns).sort((a, b) => a - b);
-}
-
-/** Averages are rounded to the display unit (WCA 9f1), singles are truncated (formatTime). */
-export function fmtAvg(v: number | null | undefined, precision: Precision): string {
-  if (v === null || v === undefined) return '-';
-  if (!Number.isFinite(v)) return 'DNF';
-  const unit = precision === 3 ? 1 : 10;
-  return formatTime(Math.round(v / unit) * unit, precision);
 }
 
 /** List/compact form of a solve: "12.34", "14.34+", "DNF". */
@@ -70,7 +62,7 @@ export function averageWindow(all: Solve[], end: number, n: number, value: numbe
 
 /** csTimer-style plain-text report (copied to the clipboard from the average modal). */
 export function averageReport(label: string, w: AverageWindow, precision: Precision): string {
-  const lines = [`cubr - ${new Date().toISOString().slice(0, 10)}`, `${label}: ${fmtAvg(w.value, precision)}`, '', 'Time List:'];
+  const lines = [`cubr - ${new Date().toISOString().slice(0, 10)}`, `${label}: ${formatAverage(w.value, precision)}`, '', 'Time List:'];
   w.solves.forEach((s, i) => {
     const t = fmtSolveShort(s, precision);
     lines.push(`${i + 1}. ${w.trimmed.has(i) ? `(${t})` : t}   ${s.scramble.replace(/\n/g, ' ')}`);

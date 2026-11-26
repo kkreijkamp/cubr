@@ -4,7 +4,7 @@ import { rollingAverage } from '@cubr/cubestats';
 import { Section, WidgetError } from './Widget';
 import { eventLabel } from './util';
 import { api } from '../../lib/api';
-import { formatDateTime, formatNumber, formatTime, practiceMarker } from '../../lib/format';
+import { formatAverage, formatDateTime, formatNumber, formatResult, formatTime, practiceMarker } from '../../lib/format';
 import { useAsync } from '../../lib/useAsync';
 import { ChartCanvas, themedScales, useThemeColors, type ThemeColors } from '../ChartCanvas';
 import { Loading, Spinner } from '../Spinner';
@@ -323,7 +323,7 @@ export function SolveHistoryChart({ userId, event, precision, solves }: { userId
                   .map((l) => {
                     const v = valueAt(l.key, i);
                     if (v === null) return null;
-                    return `${l.key.padEnd(6)} ${Number.isFinite(v) ? formatTime(v, precision) : 'DNF'}`;
+                    return `${l.key.padEnd(6)} ${Number.isFinite(v) ? formatResult(v, l.n === 1 ? 'single' : l.key, precision) : 'DNF'}`;
                   })
                   .filter(Boolean) as string[];
               },
@@ -488,7 +488,7 @@ export function SolveHistoryChart({ userId, event, precision, solves }: { userId
           <div className="pv-insight">
             {view && view.best !== null && (
               <>
-                best {formatTime(view.best, precision)} - mean {view.mean !== null ? formatTime(view.mean, precision) : '-'}
+                best {formatTime(view.best, precision)} - mean {view.mean !== null ? formatAverage(view.mean, precision) : '-'}
                 {view.dnfs > 0 && ` - ${view.dnfs} dnf`}
                 {insight && ` - ${insight}`}
                 {view.hidden > 0 && ` - ${view.hidden} slow outlier${view.hidden === 1 ? '' : 's'} above ${formatTime(view.hi, 2)} not shown`}

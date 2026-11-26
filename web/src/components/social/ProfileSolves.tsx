@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { rollingAverage, type Penalty } from '@cubr/cubestats';
+import { formatAverage, rollingAverage, type Penalty } from '@cubr/cubestats';
 import { Section, WidgetEmpty, WidgetError } from './Widget';
 import { eventLabel } from './util';
-import { fmtAvg, fmtSolveLong } from '../timer/statsUtil';
+import { fmtSolveLong } from '../timer/statsUtil';
 import { api } from '../../lib/api';
 import { formatDate, formatDateTime, formatNumber, timeAgo } from '../../lib/format';
 import { useAsync } from '../../lib/useAsync';
@@ -102,10 +102,10 @@ export function ProfileSolves({ userId, event, precision, solves }: { userId: st
         at: new Date(t * 1000).toISOString(),
         time: fmtSolveLong({ timeMs, penalty }, precision),
         dnf: penalty === 'DNF',
-        ao5: fmtAvg(ao5[i], precision),
-        ao12: fmtAvg(ao12[i], precision),
-        ao100: fmtAvg(ao100[i], precision),
-        ao1000: fmtAvg(ao1000[i], precision),
+        ao5: formatAverage(ao5[i], precision),
+        ao12: formatAverage(ao12[i], precision),
+        ao100: formatAverage(ao100[i], precision),
+        ao1000: formatAverage(ao1000[i], precision),
         session: s ? (s.name ?? `session ${session + 1}`) : '-',
         practice: s?.practice === true,
       });

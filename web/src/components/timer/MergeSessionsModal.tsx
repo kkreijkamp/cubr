@@ -1,6 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { ArrowsPointingInIcon, CheckIcon, Square3Stack3DIcon } from '@heroicons/react/24/outline';
-import { formatTime, getEvent, sessionStats, type Penalty, type Precision } from '@cubr/cubestats';
+import { formatAverage, formatTime, getEvent, sessionStats, type Penalty, type Precision } from '@cubr/cubestats';
 import { Modal } from '../Modal';
 import { SessionName } from '../SessionName';
 import { Spinner } from '../Spinner';
@@ -9,7 +9,6 @@ import { formatDate, formatNumber } from '../../lib/format';
 import { getLoadedSolves, mergeSessions } from '../../lib/solves';
 import { toast } from '../../lib/toast';
 import type { Session, Solve } from '../../lib/types';
-import { fmtAvg } from './statsUtil';
 import './dialogs.css';
 import './merge-sessions.css';
 
@@ -330,8 +329,8 @@ export function MergeSessionsModal({ sessions, currentSessionId, event, mode, us
             <div className="merge-label merge-preview-title">after merging</div>
             <PreviewStat label="solves" now={formatNumber(preview.count)} />
             <PreviewStat label="best single" now={formatTime(preview.single.now, precision)} was={preview.hadSolves ? formatTime(preview.single.was, precision) : undefined} />
-            <PreviewStat label="best ao5" now={fmtAvg(preview.ao5.now, precision)} was={preview.hadSolves ? fmtAvg(preview.ao5.was, precision) : undefined} />
-            <PreviewStat label="best ao12" now={fmtAvg(preview.ao12.now, precision)} was={preview.hadSolves ? fmtAvg(preview.ao12.was, precision) : undefined} />
+            <PreviewStat label="best ao5" now={formatAverage(preview.ao5.now, precision)} was={preview.hadSolves ? formatAverage(preview.ao5.was, precision) : undefined} />
+            <PreviewStat label="best ao12" now={formatAverage(preview.ao12.now, precision)} was={preview.hadSolves ? formatAverage(preview.ao12.was, precision) : undefined} />
           </div>
         )}
 
