@@ -1,5 +1,5 @@
 // Small pure helpers for the timer page's stats panel, average detail modal and charts.
-import { effectiveMs, formatAverage, formatSolve, formatTime, trimFor, type Precision, type SessionStats } from '@cubr/cubestats';
+import { effectiveMs, formatAverage, formatSolve, trimFor, type Precision, type SessionStats } from '@cubr/cubestats';
 import type { Solve } from '../../lib/types';
 
 /** "mo3" -> 3, "ao12" -> 12, anything else -> null */

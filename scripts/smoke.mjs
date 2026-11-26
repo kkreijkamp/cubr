@@ -32,7 +32,7 @@ async function req(method, path, body) {
     signal: AbortSignal.timeout(20_000),
   });
   const text = await res.text();
-  let data = null;
+  let data;
   try {
     data = text ? JSON.parse(text) : null;
   } catch {

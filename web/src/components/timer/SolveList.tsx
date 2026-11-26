@@ -66,6 +66,7 @@ export const SolveList = memo(function SolveList({ solves, ao5, ao12, pbs, bestI
     const i = n - 1 - r;
     const s = solves[i];
     rows.push(
+      // eslint-disable-next-line jsx-a11y/click-events-have-key-events -- TEMPORARY: keyboard access to the rows comes next
       <div
         key={s.id}
         className={`tp-solve-row${r % 2 === 0 ? ' odd' : ''}${i === bestIndex ? ' best' : ''}`}

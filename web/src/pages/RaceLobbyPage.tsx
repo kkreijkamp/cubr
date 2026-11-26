@@ -45,7 +45,7 @@ function RoomsTable({ onJoin }: { onJoin: (id: string) => void }) {
   useEffect(() => {
     load();
     return () => inFlight.current?.abort();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
   useInterval(load, visible ? 5000 : null);
 
   return (

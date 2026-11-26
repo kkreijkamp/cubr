@@ -347,7 +347,10 @@ describe('limits and errors', () => {
     expect(parseTimerFile(new Uint8Array([0xef, 0xbb, 0xbf, ...new TextEncoder().encode(csv)])).sessions[0].name).toBe('333-Caf\u00e9');
     const utf16 = new Uint8Array(2 + csv.length * 2);
     utf16.set([0xff, 0xfe]);
-    for (let i = 0; i < csv.length; i++) ((utf16[2 + i * 2] = csv.charCodeAt(i) & 0xff), (utf16[3 + i * 2] = csv.charCodeAt(i) >> 8));
+    for (let i = 0; i < csv.length; i++) {
+      utf16[2 + i * 2] = csv.charCodeAt(i) & 0xff;
+      utf16[3 + i * 2] = csv.charCodeAt(i) >> 8;
+    }
     expect(parseTimerFile(utf16).sessions[0].name).toBe('333-Caf\u00e9');
   });
 });

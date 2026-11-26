@@ -158,6 +158,8 @@ export default function TimerPage() {
   /** the session's practice scramble type: its scrambles, and its solves count for no pbs */
   const scrambleType = session?.event === event ? session.scramble : undefined;
   const scr = useScrambleQueue(event, scrambleType);
+  /** the scramble up now (the queue's state, not a ref) */
+  const currentScramble = scr.current;
 
   const device = useInputState();
   const input: InputMode = AVAILABLE.includes(device.mode) ? device.mode : 'timer';
@@ -573,7 +575,10 @@ export default function TimerPage() {
   const showPreview = settings.scramblePreview !== 'off';
   // deferred with the event and type it belongs to: the text alone would pair, for a render, the
   // event just picked with the last event's scramble
-  const shownScramble = useMemo(() => (scr.current?.text ? { event, type: scrambleType, text: scr.current.text } : null), [scr.current, event, scrambleType]);
+  const shownScramble = useMemo(
+    () => (currentScramble?.text ? { event, type: scrambleType, text: currentScramble.text } : null),
+    [currentScramble, event, scrambleType],
+  );
   const preview = useDeferredValue(shownScramble);
   // csTimer draws the puzzles cubing.js can't: the next scramble's drawing is fetched while this one
   // is up, so it shows at once (relays and the cuboids are drawn here, relays from their puzzles' own
@@ -583,7 +588,7 @@ export default function TimerPage() {
     const next = peekScramble(event, scrambleType);
     if (!next || (settings.scramblePreview === '3D' && preview3D(event, scrambleType, next))) return;
     prefetchDrawnNet(scrambleImageUrl(event, next, scrambleType), event);
-  }, [scr.current, showPreview, settings.scramblePreview, eventInfo.puzzle, event, scrambleType]);
+  }, [currentScramble, showPreview, settings.scramblePreview, eventInfo.puzzle, event, scrambleType]);
   const previewBoxRef = useRef<HTMLDivElement>(null);
   const previewHeight = usePreviewHeight(previewBoxRef, showPreview);
   const cols = 1 + (showPreview ? 1 : 0) + (settings.showSolveList ? 1 : 0);

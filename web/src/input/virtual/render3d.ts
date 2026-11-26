@@ -349,7 +349,11 @@ export function drawSq1(
   const depth = (f: Sq1Face[]) => {
     let c: Vec = [0, 0, 0];
     let k = 0;
-    for (const face of f) for (const v of face.poly) ((c = [c[0] + v[0], c[1] + v[1], c[2] + v[2]]), k++);
+    for (const face of f)
+      for (const v of face.poly) {
+        c = [c[0] + v[0], c[1] + v[1], c[2] + v[2]];
+        k++;
+      }
     c = [c[0] / k, c[1] / k, c[2] / k];
     return -dot(sub(c, pc.eye), sub(c, pc.eye));
   };

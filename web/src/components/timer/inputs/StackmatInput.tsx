@@ -47,15 +47,16 @@ export function StackmatInput(p: Props) {
   const signalSince = useRef<number | null>(null);
   timer.inspection = p.inspection;
 
-  const clearAlerts = () => {
+  // the inspection's 8 s / 12 s calls: these read only refs, so they never change
+  const clearAlerts = useCallback(() => {
     alertTimers.current.forEach(clearTimeout);
     alertTimers.current = [];
-  };
-  const startAlerts = () => {
+  }, []);
+  const startAlerts = useCallback(() => {
     clearAlerts();
     const mode = props.current.alerts;
     if (mode !== 'off') alertTimers.current = [setTimeout(() => alertAt(8, mode), 8000), setTimeout(() => alertAt(12, mode), 12000)];
-  };
+  }, [clearAlerts]);
 
   const connect = useCallback(
     async (fromClick: boolean) => {
@@ -96,7 +97,7 @@ export function StackmatInput(p: Props) {
       mic.current = null;
       clearAlerts();
     };
-  }, [connect, p.kind]);
+  }, [connect, p.kind, clearAlerts]);
 
   // space starts inspection (with the timer at zero), esc stops it
   useEffect(() => {
@@ -127,7 +128,7 @@ export function StackmatInput(p: Props) {
       window.removeEventListener('keydown', down, true);
       window.removeEventListener('keyup', up, true);
     };
-  }, [p.enabled, timer]);
+  }, [p.enabled, timer, clearAlerts, startAlerts]);
 
   // the timer page's view of it (by value: `last` is a fresh object each render)
   const lastMs = p.last?.timeMs;

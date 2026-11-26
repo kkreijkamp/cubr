@@ -145,8 +145,6 @@ export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, 
   const fail = (reply: FastifyReply, flow: Pick<Flow, 'mode' | 'next'> | null, provider: Provider, error: Failure) =>
     toSpa(reply, flow?.mode === 'link' ? '/account' : '/login/sso', { error, provider, ...(flow?.mode === 'link' ? {} : { next: flow?.next ?? '/' }) });
 
-  const userById = async (id: string) => (await pool.query<UserRow>(`select ${USER_COLUMNS} from auth.users where id = $1`, [id])).rows[0] ?? null;
-
   /** The provider vouches for `email`: if it's the account's email, it's confirmed. */
   const confirmByProvider = async (userId: string, email: string | null) => {
     if (!email) return;

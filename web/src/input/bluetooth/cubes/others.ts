@@ -440,16 +440,16 @@ function moyu32(): CubeModel & { debug: Record<string, unknown> } {
       read.addEventListener('characteristicvaluechanged', onChange);
       await read.startNotifications();
       const suggested = /^WCU_MY32_[0-9A-F]{4}$/.test(name) ? `CF:30:16:00:${name.slice(9, 11)}:${name.slice(11, 13)}` : null;
-      const useMac = async (opts: { force?: boolean; wrong?: boolean } = {}) => {
+      const applyMac = async (opts: { force?: boolean; wrong?: boolean } = {}) => {
         const mac = await c.mac(name, opts.force ? null : found, suggested, opts);
         if (!mac) throw new Error('the cube needs its MAC address to connect');
         const m = macBytes(mac);
         aes = new Aes128(withMac(MOYU32_KEYS[0], m));
         aes.iv = withMac(MOYU32_KEYS[1], m);
       };
-      await useMac();
+      await applyMac();
       retryKey = () => {
-        void useMac({ force: true, wrong: true })
+        void applyMac({ force: true, wrong: true })
           .then(() => {
             bad = 0;
             prevMoveCnt = -1;

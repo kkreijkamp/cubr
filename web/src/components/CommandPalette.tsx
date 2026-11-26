@@ -168,12 +168,14 @@ function PaletteInner({ initial }: { initial: string | null }) {
   const placeholder = stack.length ? stack[stack.length - 1].title : 'Search commands, themes, settings...';
 
   return createPortal(
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- a click outside closes it; Esc does from the keyboard
     <div
       className={`modal-backdrop${previewing ? ' previewing' : ''}`}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) closePalette();
       }}
     >
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- the palette's keys, while focus stays in its input */}
       <div className="modal palette" role="dialog" aria-label="Command palette" onKeyDown={onKeyDown}>
         <div className="palette-input">
           <MagnifyingGlassIcon width={16} height={16} />
@@ -182,6 +184,7 @@ function PaletteInner({ initial }: { initial: string | null }) {
         <div className="palette-list" ref={listRef} onMouseLeave={() => setActive(restIndex.current)}>
           {rows.length === 0 && <div className="palette-empty">No commands found</div>}
           {rows.map((row, i) => (
+            // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- picked with the arrow keys and Enter in the input
             <div
               key={`${row.cmd.id}-${i}`}
               className={`palette-row${i === active ? ' active' : ''}`}

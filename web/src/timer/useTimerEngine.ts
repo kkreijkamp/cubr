@@ -146,9 +146,9 @@ export function useTimerEngine(opts: TimerEngineOptions) {
     [publish],
   );
 
-  /** press = space keydown / touch start */
+  /** press = space keydown / touch start (the hold is timed from now, as csTimer's) */
   const press = useCallback(
-    (t: number) => {
+    (_t: number) => {
       const s = st.current;
       if (s.phase === 'running') return; // handled by stop()
       if (s.phase === 'stopped') return;
@@ -194,7 +194,7 @@ export function useTimerEngine(opts: TimerEngineOptions) {
       if (s.phase === 'ready') {
         // solve starts now - the 8/12 s inspection calls must not go off during the solve
         clearAlerts();
-        document.activeElement instanceof HTMLElement && document.activeElement.blur();
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
         publish({ phase: 'running', startedAt: t });
         optsRef.current.onStart?.();
       }

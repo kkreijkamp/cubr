@@ -352,7 +352,9 @@ async function seedUser(u: SeedUser, idx: number, daily: Record<string, string[]
 
   try {
     avatar = await ensureAvatar(u, token);
-  } catch {}
+  } catch {
+    // no picture for this one: the seed carries on without it
+  }
 
   const sessions = await call<{ sessions: { id: string; event: string; solveCount: number }[] }>('GET', `${SOLVE_URL}/api/sessions`, undefined, token);
   const existing = sessions.data?.sessions ?? [];

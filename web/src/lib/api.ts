@@ -172,6 +172,7 @@ export async function requestRaw<T>(
     throw transportError(err);
   }
   const ms = performance.now() - started;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each api.* call types its own answer
   let json: any = null;
   let notJson = false;
   if (res.status !== 204) {

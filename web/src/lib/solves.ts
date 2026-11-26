@@ -164,7 +164,7 @@ function whenReady(timeoutMs = 15_000): Promise<void> {
 // ================================================================ local persistence
 
 function readLocal(quiet = false): LocalDb {
-  let raw: string | null = null;
+  let raw: string | null;
   try {
     raw = localStorage.getItem(LOCAL_KEY);
   } catch {
@@ -1338,7 +1338,7 @@ async function mergeCloud(target: Session, ids: string[]): Promise<{ sessions: n
   } catch (e) {
     if (g === gen) void refreshCloud();
     const msg = mergeErrorMessage(e);
-    throw new Error(total.sessions > 0 ? `merged ${total.sessions} of ${ids.length} sessions, then: ${msg}` : msg);
+    throw new Error(total.sessions > 0 ? `merged ${total.sessions} of ${ids.length} sessions, then: ${msg}` : msg, { cause: e });
   }
   if (g === gen) await refreshCloud();
   return total;

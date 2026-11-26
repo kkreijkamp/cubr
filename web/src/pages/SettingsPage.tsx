@@ -332,7 +332,7 @@ export default function SettingsPage() {
     if (!asked) return;
     const frame = requestAnimationFrame(() => jump(asked, false));
     return () => cancelAnimationFrame(frame);
-  }, []); // only on arriving
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- only on arriving
 
   // on phones the rail is a row of tabs that scrolls sideways: keep the lit one in sight
   useEffect(() => {

@@ -72,6 +72,8 @@ export class FakeDevice extends EventTarget {
     readonly manufacturerData: Map<number, DataView> | null = null,
   ) {
     super();
+    // the gatt object's getter below reads the device, which `this` there isn't
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     const self = this;
     this.gatt = {
       get connected() {

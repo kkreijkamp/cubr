@@ -255,6 +255,7 @@ export function MergeSessionsModal({ sessions, currentSessionId, event, mode, us
     // top-aligned (not centred): the dialog grows when the picker / preview appear, and a
     // re-centring jump would move rows under the pointer between two clicks
     <Modal title="merge sessions" onClose={close}>
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Enter on a checkbox confirms, as on the buttons */}
       <form className="merge" onSubmit={submit} onKeyDown={onKeyDown} aria-busy={busy}>
         <div className="merge-section">
           <div className="merge-label">into</div>

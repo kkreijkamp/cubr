@@ -51,6 +51,24 @@ jobs:
       - name: Bundle every service and the seed job
         run: npm run build:all
 
+  lint:
+    # ESLint (TypeScript, React hooks, jsx-a11y) and Prettier over the whole repo, web app included:
+    # neither needs type information, so the root's packages are enough.
+    name: Lint and formatting
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: ESLint (no warnings allowed)
+        run: npm run lint
+      - name: Prettier
+        run: npm run format:check
+
   web:
     name: Web app
     runs-on: ubuntu-latest

@@ -39,7 +39,8 @@ export const FEEDBACK_LIMITS = {
   bodyBytes: 32 * 1024,
 } as const;
 
-// control characters other than tab and line feed
+// control characters other than tab, line feed and carriage return (matching them is the point)
+// eslint-disable-next-line no-control-regex
 const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
 /** an empty or all-space field counts as left out */
 const blank = (v: unknown) => (typeof v === 'string' && v.trim() === '' ? undefined : v);

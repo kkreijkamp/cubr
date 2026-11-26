@@ -57,7 +57,7 @@ export default function SsoPage() {
     } else {
       navigate('/login', { replace: true }); // nothing to finish (back on this page later, say)
     }
-  }, []); // once, on arrival
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- once, on arrival
 
   if (view.kind === 'working') return <Loading />;
   if (view.kind === 'error') {

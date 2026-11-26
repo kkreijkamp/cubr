@@ -128,6 +128,7 @@ export async function createRoom(pod: Pod, body: Record<string, unknown> = {}, o
   return res.json().room.id as string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- each test reads the fields its event answers with
 export type Ack = { ok: boolean; error?: string; code?: string } & Record<string, any>;
 
 export interface Player {

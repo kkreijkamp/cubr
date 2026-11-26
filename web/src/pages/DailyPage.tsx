@@ -474,6 +474,7 @@ export default function DailyPage() {
               const current = isToday && i === nextIndex;
               const paren = done && (i === bestIdx || i === worstIdx);
               return (
+                // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- TEMPORARY: picking from the keyboard comes next
                 <li
                   key={i}
                   className={`${current ? 'current' : ''}${a ? ' filled' : ''}${a?.state === 'failed' ? ' failed' : ''}${a && picked === i && isToday ? ' picked' : ''}`}

@@ -52,15 +52,16 @@ export function BtTimerInput(p: Props) {
     void bluetoothAvailable().then(setAvailable);
   }, []);
 
-  const clearAlerts = () => {
+  // the inspection's 8 s / 12 s calls: these read only refs, so they never change
+  const clearAlerts = useCallback(() => {
     alertTimers.current.forEach(clearTimeout);
     alertTimers.current = [];
-  };
-  const startAlerts = () => {
+  }, []);
+  const startAlerts = useCallback(() => {
     clearAlerts();
     const mode = props.current.alerts;
     if (mode !== 'off') alertTimers.current = [setTimeout(() => alertAt(8, mode), 8000), setTimeout(() => alertAt(12, mode), 12000)];
-  };
+  }, [clearAlerts]);
 
   const ctx: TimerCtx = useMemo(
     () => ({
@@ -76,7 +77,7 @@ export function BtTimerInput(p: Props) {
       mac: (name, found, suggested) => mac(name, found, suggested),
       log: () => undefined,
     }),
-    [timer, mac],
+    [timer, mac, clearAlerts, startAlerts],
   );
 
   const afterConnect = useCallback(
@@ -123,7 +124,7 @@ export function BtTimerInput(p: Props) {
       clearAlerts();
       void group.disconnect(false);
     };
-  }, [group, ctx, timer, afterConnect]);
+  }, [group, ctx, timer, afterConnect, clearAlerts]);
 
   // space: inspection (or, not connected yet, connect); esc stops inspection
   useEffect(() => {
@@ -158,7 +159,7 @@ export function BtTimerInput(p: Props) {
       window.removeEventListener('keydown', down, true);
       window.removeEventListener('keyup', up, true);
     };
-  }, [p.enabled, timer, group, connect, conn.status]);
+  }, [p.enabled, timer, group, connect, conn.status, clearAlerts, startAlerts]);
 
   const lastMs = p.last?.timeMs;
   const lastPenalty = p.last?.penalty;

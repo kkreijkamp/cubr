@@ -103,7 +103,7 @@ describe('format detection', () => {
     for (const input of [
       utf8(text),
       new Uint8Array([0xef, 0xbb, 0xbf, ...utf8(text)]),
-      `﻿${text}`,
+      `\uFEFF${text}`,
       utf16(text, true),
       utf16(text, false),
       text.replace(/\n/g, '\r\n'),

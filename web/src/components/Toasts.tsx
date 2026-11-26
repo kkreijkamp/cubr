@@ -16,6 +16,7 @@ export function Toasts() {
         // a toast with an action (e.g. "update ready - click to reload") also works from the keyboard
         const action = t.onClick ? { role: 'button', tabIndex: 0, onKeyDown: (e: React.KeyboardEvent) => e.key === 'Enter' && activate() } : {};
         return (
+          // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- with an action it is a button (`action`); without, a click only dismisses it early
           <div key={t.id} className={`toast ${t.type}${t.important ? ' important' : ''}`} onClick={activate} {...action}>
             <div className="title">
               <Icon width={14} height={14} /> {t.title}

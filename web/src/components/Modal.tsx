@@ -77,6 +77,7 @@ export function Modal({ title, onClose, children, wide, center }: ModalProps) {
   }, [before]);
 
   return createPortal(
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- a click outside closes it; Esc does from the keyboard
     <div
       className={`modal-backdrop${center ? ' modal-centered' : ''}`}
       onMouseDown={(e) => {

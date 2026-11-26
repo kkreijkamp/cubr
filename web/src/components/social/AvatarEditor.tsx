@@ -464,9 +464,11 @@ export function AvatarEditor({ onDone, onCancel }: Props) {
       ) : (
         <>
           <div className="ae-crop">
+            {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- a cropper: arrows move, plus and minus zoom, Enter saves, as its label says */}
             <div
               ref={viewportRef}
               className="ae-viewport"
+              // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- the cropper takes keys, so it takes focus
               tabIndex={0}
               role="group"
               aria-roledescription="image cropper"

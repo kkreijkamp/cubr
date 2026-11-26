@@ -9,6 +9,7 @@ export const EVENT_STREAM_MAXLEN = 200_000;
 
 export type EventData = Record<string, unknown> & { eventId: string; occurredAt: string };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- a handler reads its own event's fields, checked where the event is made
 export interface EventEnvelope<T extends Record<string, unknown> = Record<string, any>> {
   /** Redis stream entry id */
   id: string;

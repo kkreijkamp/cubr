@@ -176,6 +176,7 @@ export function ActivityHeatmap({ userId, event, years = [] }: { userId: string;
                 gridTemplateRows: 'repeat(7, auto) auto',
                 opacity: data ? 1 : 0.4,
               }}
+              // eslint-disable-next-line jsx-a11y/mouse-events-have-key-events -- the tip repeats a cell's count; to a screen reader the grid is one image, its total in the label
               onMouseOver={onOver}
               onMouseLeave={() => setTip(null)}
             >
