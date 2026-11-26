@@ -52,16 +52,38 @@ const csTimer = (sessions: Record<string, unknown>, sessionData?: Record<string,
 
 // One 9.00 solve (scramble "R ...") in one session, per format; non-ASCII text so decoding matters.
 const SAMPLES: [format: string, text: string][] = [
-  ['cubr', JSON.stringify({ exportedAt: '2026-11-16T00:00:00.000Z', sessions: [{ name: NAME, event: '333', solves: [{ timeMs: 9000, penalty: 'OK', scramble: 'R', comment: NAME, createdAt: '2020-09-13T12:26:40.000Z' }] }] })],
+  [
+    'cubr',
+    JSON.stringify({
+      exportedAt: '2026-11-16T00:00:00.000Z',
+      sessions: [{ name: NAME, event: '333', solves: [{ timeMs: 9000, penalty: 'OK', scramble: 'R', comment: NAME, createdAt: '2020-09-13T12:26:40.000Z' }] }],
+    }),
+  ],
   ['csTimer', csTimer({ session1: [[[0, 9000], 'R', NAME, 1600000000]] }, { 1: { name: NAME, opt: {} } })],
   ['csTimer (CSV)', `No.;Time;Comment;Scramble;Date;P.1\n1;9.00;${NAME};R;2020-09-13 12:26:40;9.00\n`],
   ['Twisty Timer', `${TWISTY_HEADER}\n${quoteRow(['333', NAME, '9000', '1600000000000', 'R', '0', NAME])}\n`],
   ['Cubic Timer', `${CUBIC_HEADER}\n${quoteRow(['333', NAME, '9000', '1600000000000', 'R', '0', NAME])}\n`],
-  ['Block Keeper', JSON.stringify({ puzzles: [{ name: NAME, scrambler: '3x3x3', sessions: [{ name: 'S', records: [{ time: 9, result: 'OK', scramble: 'R', comment: NAME, date: 1600000000000 }] }] }] })],
-  ['CubeDesk', JSON.stringify({ sessions: [{ id: 's1', name: NAME, order: 0 }], solves: [{ session_id: 's1', cube_type: '333', raw_time: 9, dnf: false, plus_two: false, scramble: 'R', notes: NAME, started_at: 1600000000000 }] })],
+  [
+    'Block Keeper',
+    JSON.stringify({
+      puzzles: [
+        { name: NAME, scrambler: '3x3x3', sessions: [{ name: 'S', records: [{ time: 9, result: 'OK', scramble: 'R', comment: NAME, date: 1600000000000 }] }] },
+      ],
+    }),
+  ],
+  [
+    'CubeDesk',
+    JSON.stringify({
+      sessions: [{ id: 's1', name: NAME, order: 0 }],
+      solves: [{ session_id: 's1', cube_type: '333', raw_time: 9, dnf: false, plus_two: false, scramble: 'R', notes: NAME, started_at: 1600000000000 }],
+    }),
+  ],
   ['DCTimer', `1\n9000\t0\t1\tR\t2020-09-13 12:26:40\t${NAME}\n`],
   ['mateus Cubetimer', `${MATEUS_HEADER}\n${quoteRow(['3x3x3', '00:09.000', `R ${NAME}`, '2020-09-13 12:26', 'no', 'no', '1'])}\n`],
-  ['GAN CubeStation', JSON.stringify({ code: 200, data: { data: [{ startTime: 1600000000, duration: 9000, scramble: `R ${NAME}`, normalScore: 1, leagueId: 3 }] } })],
+  [
+    'GAN CubeStation',
+    JSON.stringify({ code: 200, data: { data: [{ startTime: 1600000000, duration: 9000, scramble: `R ${NAME}`, normalScore: 1, leagueId: 3 }] } }),
+  ],
 ];
 
 describe('format detection', () => {
@@ -78,7 +100,15 @@ describe('format detection', () => {
   it.each(SAMPLES)('reads a %s file the same as text, UTF-8 (with or without BOM), UTF-16 LE/BE and with CRLF lines', (_format, text) => {
     const expected = parseTimerFile(text);
     expect(JSON.stringify(expected)).toContain(JSON.stringify(NAME).slice(1, -1));
-    for (const input of [utf8(text), new Uint8Array([0xef, 0xbb, 0xbf, ...utf8(text)]), `﻿${text}`, utf16(text, true), utf16(text, false), text.replace(/\n/g, '\r\n'), `\n  ${text}`]) {
+    for (const input of [
+      utf8(text),
+      new Uint8Array([0xef, 0xbb, 0xbf, ...utf8(text)]),
+      `\uFEFF${text}`,
+      utf16(text, true),
+      utf16(text, false),
+      text.replace(/\n/g, '\r\n'),
+      `\n  ${text}`,
+    ]) {
       expect(parseTimerFile(input)).toEqual(expected);
     }
   });
@@ -106,21 +136,48 @@ describe('csTimer export (JSON)', () => {
       }),
     );
     const s = r.sessions[0];
-    expect(s.solves.map((x) => [x.timeMs, x.penalty])).toEqual([[12345, 'OK'], [11000, '+2'], [15000, 'DNF'], [61234, 'OK'], [9000, 'OK']]);
+    expect(s.solves.map((x) => [x.timeMs, x.penalty])).toEqual([
+      [12345, 'OK'],
+      [11000, '+2'],
+      [15000, 'DNF'],
+      [61234, 'OK'],
+      [9000, 'OK'],
+    ]);
     expect(s.solves.map((x) => x.comment)).toEqual([null, 'nice', null, '2 phases', null]);
     expect(s.solves[1].scramble).toBe("F R U'");
     expect(s.solves[0].createdAt).toBe(iso(1760400000 * 1000));
-    expect(s.solves[4].createdAt).toBe(EPOCH); // no timestamp
+    expect(s.solves[4].createdAt).toBe(iso(1760400300 * 1000 + 1)); // no timestamp: just after the solve before
   });
 
   it.each([
-    ['333', '333'], ['222so', '222'], ['444wca', '444'], ['555wca', '555'], ['666wca', '666'], ['777wca', '777'],
-    ['333oh', '333oh'], ['333ni', '333bf'], ['333fm', '333fm'], ['444bld', '444bf'], ['555bld', '555bf'],
-    ['clkwca', 'clock'], ['mgmp', 'minx'], ['pyrso', 'pyram'], ['skbso', 'skewb'], ['sqrs', 'sq1'],
+    ['333', '333'],
+    ['222so', '222'],
+    ['444wca', '444'],
+    ['555wca', '555'],
+    ['666wca', '666'],
+    ['777wca', '777'],
+    ['333oh', '333oh'],
+    ['333ni', '333bf'],
+    ['333fm', '333fm'],
+    ['444bld', '444bf'],
+    ['555bld', '555bf'],
+    ['clkwca', 'clock'],
+    ['mgmp', 'minx'],
+    ['pyrso', 'pyram'],
+    ['skbso', 'skewb'],
+    ['sqrs', 'sq1'],
     // csTimer's other scramble types, by prefix
-    ['222o', '222'], ['444m', '444'], ['pyrm', 'pyram'], ['skbo', 'skewb'], ['sq1h', 'sq1'], ['clkwcab', 'clock'], ['mgmc', 'minx'], ['minx2g', 'minx'],
+    ['222o', '222'],
+    ['444m', '444'],
+    ['pyrm', 'pyram'],
+    ['skbo', 'skewb'],
+    ['sq1h', 'sq1'],
+    ['clkwcab', 'clock'],
+    ['mgmc', 'minx'],
+    ['minx2g', 'minx'],
     // anything else is timed as 3x3
-    ['pll', '333'], ['333ft', '333'],
+    ['pll', '333'],
+    ['333ft', '333'],
   ])('scramble type %s is event %s (source type kept)', (scrType, event) => {
     const r = parseTimerFile(csTimer({ session1: [[[0, 5000], 'x', '', 1700000000]] }, { 1: { name: 'a', opt: { scrType } } }));
     expect(r.sessions[0]).toMatchObject({ event, sourceType: scrType });
@@ -128,17 +185,29 @@ describe('csTimer export (JSON)', () => {
 
   it('treats an empty opt, or no session data at all, as 3x3 and names the session by its number', () => {
     const r = parseTimerFile(csTimer({ session1: [[[0, 5000], 'x', '', 1]], session2: [[[0, 6000], 'y', '', 1]] }, { 1: { name: '  ', opt: {} } }));
-    expect(r.sessions.map((s) => [s.name, s.event, s.sourceType])).toEqual([['csTimer 1', '333', '333'], ['csTimer 2', '333', '333']]);
+    expect(r.sessions.map((s) => [s.name, s.event, s.sourceType])).toEqual([
+      ['csTimer 1', '333', '333'],
+      ['csTimer 2', '333', '333'],
+    ]);
   });
 
   it('accepts sessionData as an object as well as a JSON string, and unescapes HTML in names', () => {
-    const file = JSON.stringify({ session1: [[[0, 5000], 'x', '', 1]], properties: { sessionData: { 1: { name: 'Tom &amp; Jerry &lt;3', opt: { scrType: 'pyrso' } } } } });
+    const file = JSON.stringify({
+      session1: [[[0, 5000], 'x', '', 1]],
+      properties: { sessionData: { 1: { name: 'Tom &amp; Jerry &lt;3', opt: { scrType: 'pyrso' } } } },
+    });
     expect(parseTimerFile(file).sessions[0]).toMatchObject({ name: 'Tom & Jerry <3', event: 'pyram' });
   });
 
   it('orders sessions by rank, and by session number (not text order) where there is no rank', () => {
     const solves = [[[0, 5000], 'x', '', 1]];
-    const file = JSON.stringify({ session10: solves, session9: solves, session2: solves, session1: solves, properties: { sessionData: JSON.stringify({ 2: { name: 'first', rank: 0 } }) } });
+    const file = JSON.stringify({
+      session10: solves,
+      session9: solves,
+      session2: solves,
+      session1: solves,
+      properties: { sessionData: JSON.stringify({ 2: { name: 'first', rank: 0 } }) },
+    });
     expect(parseTimerFile(file).sessions.map((s) => s.name)).toEqual(['first', 'csTimer 1', 'csTimer 9', 'csTimer 10']);
   });
 
@@ -151,12 +220,26 @@ describe('csTimer export (JSON)', () => {
       properties: 'not json either',
     });
     const r = parseTimerFile(file);
-    expect(summary(r)).toEqual([['csTimer 1', '333', [[7000, 'OK']]], ['csTimer 4', '333', [[8000, 'OK']]]]);
+    expect(summary(r)).toEqual([
+      ['csTimer 1', '333', [[7000, 'OK']]],
+      ['csTimer 4', '333', [[8000, 'OK']]],
+    ]);
     expect(r.skipped).toEqual({ multiBlind: 0, invalid: 1 });
   });
 
   it('leaves out a multi-blind session (r3ni) and imports the others', () => {
-    const r = parseTimerFile(csTimer({ session1: [[[0, 5000], 'x', '', 1]], session2: [[[0, 1], 'mbld', '', 1], [[0, 2], 'mbld', '', 1]] }, { 2: { name: 'multi', opt: { scrType: 'r3ni' } } }));
+    const r = parseTimerFile(
+      csTimer(
+        {
+          session1: [[[0, 5000], 'x', '', 1]],
+          session2: [
+            [[0, 1], 'mbld', '', 1],
+            [[0, 2], 'mbld', '', 1],
+          ],
+        },
+        { 2: { name: 'multi', opt: { scrType: 'r3ni' } } },
+      ),
+    );
     expect(r.sessions.map((s) => s.name)).toEqual(['csTimer 1']);
     expect(r.skipped).toEqual({ multiBlind: 2, invalid: 0 });
   });
@@ -172,30 +255,72 @@ describe('csTimer session CSV', () => {
         '3;DNF(58.00);;F;2020-01-01 10:02:00;28.00;30.00',
       ].join('\n'),
     );
-    expect(summary(r)).toEqual([['csTimer CSV', '333', [[61230, 'OK'], [61230, '+2'], [58000, 'DNF']]]]);
+    expect(summary(r)).toEqual([
+      [
+        'csTimer CSV',
+        '333',
+        [
+          [61230, 'OK'],
+          [61230, '+2'],
+          [58000, 'DNF'],
+        ],
+      ],
+    ]);
     expect(r.sessions[0].sourceType).toBe('csTimer CSV');
   });
 
   it('without usable phase columns, takes the time shown less the 2 s of a +2', () => {
-    const r = parseTimerFile(['No.;Time;Comment;Scramble;Date', '1;14.50+;;R;2020-01-01 10:00:00', '2;DNF(9.99);;U;2020-01-01 10:00:00', '3;12.00+;;F;2020-01-01 10:00:00;n/a'].join('\n'));
-    expect(r.sessions[0].solves.map((x) => [x.timeMs, x.penalty])).toEqual([[12500, '+2'], [9990, 'DNF'], [10000, '+2']]);
+    const r = parseTimerFile(
+      ['No.;Time;Comment;Scramble;Date', '1;14.50+;;R;2020-01-01 10:00:00', '2;DNF(9.99);;U;2020-01-01 10:00:00', '3;12.00+;;F;2020-01-01 10:00:00;n/a'].join(
+        '\n',
+      ),
+    );
+    expect(r.sessions[0].solves.map((x) => [x.timeMs, x.penalty])).toEqual([
+      [12500, '+2'],
+      [9990, 'DNF'],
+      [10000, '+2'],
+    ]);
   });
 
   it('takes a DNF time from the phases, skips a DNF with no time and a row it cannot read', () => {
     const r = parseTimerFile(
-      ['No.;Time;Comment;Scramble;Date;P.1', '1;DNF;;R;2020-01-01 10:00:00;12.34', '2;DNF;;U;2020-01-01 10:00:00', '3;abc;;F;2020-01-01 10:00:00;9.00', '4;10.00;"a ""quoted""; comment";B;2020-01-01 10:00:00;10.00'].join('\n'),
+      [
+        'No.;Time;Comment;Scramble;Date;P.1',
+        '1;DNF;;R;2020-01-01 10:00:00;12.34',
+        '2;DNF;;U;2020-01-01 10:00:00',
+        '3;abc;;F;2020-01-01 10:00:00;9.00',
+        '4;10.00;"a ""quoted""; comment";B;2020-01-01 10:00:00;10.00',
+      ].join('\n'),
     );
-    expect(r.sessions[0].solves.map((x) => [x.timeMs, x.penalty, x.comment])).toEqual([[12340, 'DNF', null], [10000, 'OK', 'a "quoted"; comment']]);
+    expect(r.sessions[0].solves.map((x) => [x.timeMs, x.penalty, x.comment])).toEqual([
+      [12340, 'DNF', null],
+      [10000, 'OK', 'a "quoted"; comment'],
+    ]);
     expect(r.skipped.invalid).toBe(1);
   });
 });
 
 describe('Twisty Timer and Cubic Timer backups', () => {
   it.each([
-    ['222', '222'], ['333', '333'], ['444', '444'], ['555', '555'], ['666', '666'], ['777', '777'],
-    ['pyra', 'pyram'], ['skewb', 'skewb'], ['mega', 'minx'], ['sq1', 'sq1'], ['clock', 'clock'],
-    ['333oh', '333oh'], ['333bld', '333bf'], ['444bld', '444bf'], ['555bld', '555bf'], ['333fmc', '333fm'],
-    ['kilominx', '333'], ['toString', '333'], ['__proto__', '333'],
+    ['222', '222'],
+    ['333', '333'],
+    ['444', '444'],
+    ['555', '555'],
+    ['666', '666'],
+    ['777', '777'],
+    ['pyra', 'pyram'],
+    ['skewb', 'skewb'],
+    ['mega', 'minx'],
+    ['sq1', 'sq1'],
+    ['clock', 'clock'],
+    ['333oh', '333oh'],
+    ['333bld', '333bf'],
+    ['444bld', '444bf'],
+    ['555bld', '555bf'],
+    ['333fmc', '333fm'],
+    ['kilominx', '333'],
+    ['toString', '333'],
+    ['__proto__', '333'],
   ])('puzzle %s is event %s', (puzzle, event) => {
     const r = parseTimerFile(twisty([puzzle, 'Normal', '5000', '1600000000000', 'x', '0', '']));
     expect(r.sessions[0]).toMatchObject({ name: `${puzzle}-Normal`, event, sourceType: puzzle });
@@ -211,7 +336,14 @@ describe('Twisty Timer and Cubic Timer backups', () => {
       ),
     );
     expect(summary(r)).toEqual([
-      ['333-OH', '333', [[21000, 'DNF'], [20000, '+2']]],
+      [
+        '333-OH',
+        '333',
+        [
+          [21000, 'DNF'],
+          [20000, '+2'],
+        ],
+      ],
       ['333-Normal', '333', [[10500, 'OK']]],
       ['pyra-Normal', 'pyram', [[3000, 'OK']]],
     ]);
@@ -221,20 +353,40 @@ describe('Twisty Timer and Cubic Timer backups', () => {
 
   it("takes the +2 out of a +2 solve's time (Twisty Timer stores it in), and skips one stored under 2 s", () => {
     // PuzzleUtils.applyPenalty adds 2000 ms to the stored time; the backup writes that time as is
-    const r = parseTimerFile(twisty(['333', 'Normal', '12345', '1600000000000', 'R', '1', ''], ['333', 'Normal', '12345', '1600000000000', 'R', '0', ''], ['333', 'Normal', '1500', '1600000000000', 'R', '1', '']));
-    expect(r.sessions[0].solves.map((x) => [x.timeMs, x.penalty])).toEqual([[10_345, '+2'], [12_345, 'OK']]);
+    const r = parseTimerFile(
+      twisty(
+        ['333', 'Normal', '12345', '1600000000000', 'R', '1', ''],
+        ['333', 'Normal', '12345', '1600000000000', 'R', '0', ''],
+        ['333', 'Normal', '1500', '1600000000000', 'R', '1', ''],
+      ),
+    );
+    expect(r.sessions[0].solves.map((x) => [x.timeMs, x.penalty])).toEqual([
+      [10_345, '+2'],
+      [12_345, 'OK'],
+    ]);
     expect(r.skipped.invalid).toBe(1);
   });
 
   it('skips rows without exactly seven fields and counts unreadable times as invalid', () => {
-    const file = [TWISTY_HEADER, '333;Normal;5000;1;x;0', '333;Normal;5000;1;x;0;;extra', '333;Normal;abc;1;x;0;', '333;Normal;0;1;x;0;', '333;Normal;6000;1;x;0;'].join('\n');
+    const file = [
+      TWISTY_HEADER,
+      '333;Normal;5000;1;x;0',
+      '333;Normal;5000;1;x;0;;extra',
+      '333;Normal;abc;1;x;0;',
+      '333;Normal;0;1;x;0;',
+      '333;Normal;6000;1;x;0;',
+    ].join('\n');
     const r = parseTimerFile(file);
     expect(r.sessions[0].solves.map((x) => x.timeMs)).toEqual([6000]);
     expect(r.skipped).toEqual({ multiBlind: 0, invalid: 2 });
   });
 
   it('Cubic Timer: reads the same rows under its quoted ;-separated header', () => {
-    const file = [CUBIC_HEADER, quoteRow(['skewb', 'Normal', '4321', '1600000000000', 'R L', '1', 'c']), quoteRow(['333mbld', 'Normal', '9', '1600000000000', 'x', '0', ''])].join('\r\n');
+    const file = [
+      CUBIC_HEADER,
+      quoteRow(['skewb', 'Normal', '4321', '1600000000000', 'R L', '1', 'c']),
+      quoteRow(['333mbld', 'Normal', '9', '1600000000000', 'x', '0', '']),
+    ].join('\r\n');
     const r = parseTimerFile(file);
     expect(r.format).toBe('Cubic Timer');
     expect(summary(r)).toEqual([['skewb-Normal', 'skewb', [[4321, '+2']]]]);
@@ -245,11 +397,25 @@ describe('Twisty Timer and Cubic Timer backups', () => {
 
 describe('Block Keeper', () => {
   it.each([
-    ['3x3x3', '333'], ['2x2x2', '222'], ['4x4x4', '444'], ['5x5x5', '555'], ['6x6x6', '666'], ['7x7x7', '777'],
-    ['Pyraminx', 'pyram'], ['Skewb', 'skewb'], ['Megaminx', 'minx'], ['Square-1', 'sq1'], ['Clock', 'clock'],
-    ['3x3x3 BLD', '333bf'], ['4x4x4 BLD', '444bf'], ['5x5x5 BLD', '555bf'], ['Kilominx', '333'],
+    ['3x3x3', '333'],
+    ['2x2x2', '222'],
+    ['4x4x4', '444'],
+    ['5x5x5', '555'],
+    ['6x6x6', '666'],
+    ['7x7x7', '777'],
+    ['Pyraminx', 'pyram'],
+    ['Skewb', 'skewb'],
+    ['Megaminx', 'minx'],
+    ['Square-1', 'sq1'],
+    ['Clock', 'clock'],
+    ['3x3x3 BLD', '333bf'],
+    ['4x4x4 BLD', '444bf'],
+    ['5x5x5 BLD', '555bf'],
+    ['Kilominx', '333'],
   ])('scrambler %s is event %s', (scrambler, event) => {
-    const r = parseTimerFile(JSON.stringify({ puzzles: [{ name: 'P', scrambler, sessions: [{ name: 'S', records: [{ time: 5, result: 'OK', scramble: 'x', date: 1 }] }] }] }));
+    const r = parseTimerFile(
+      JSON.stringify({ puzzles: [{ name: 'P', scrambler, sessions: [{ name: 'S', records: [{ time: 5, result: 'OK', scramble: 'x', date: 1 }] }] }] }),
+    );
     expect(r.sessions[0]).toMatchObject({ name: 'P-S', event, sourceType: scrambler });
   });
 
@@ -279,23 +445,52 @@ describe('Block Keeper', () => {
         ],
       }),
     );
-    expect(summary(r)).toEqual([['3x3-S1', '333', [[1005, 'OK'], [9876, '+2'], [11000, 'DNF'], [12000, 'OK']]]]);
+    expect(summary(r)).toEqual([
+      [
+        '3x3-S1',
+        '333',
+        [
+          [1005, 'OK'],
+          [9876, '+2'],
+          [11000, 'DNF'],
+          [12000, 'OK'],
+        ],
+      ],
+    ]);
     expect(r.sessions[0].solves.map((x) => [x.comment, x.createdAt])).toEqual([
       ['c', iso(1600000000000)],
       [null, iso(1600000001000)],
       [null, iso(1600000002000)],
-      [null, EPOCH],
+      [null, iso(1600000002001)], // no date: just after the solve before
     ]);
   });
 });
 
 describe('CubeDesk', () => {
   it.each([
-    ['222', '222'], ['333', '333'], ['444', '444'], ['555', '555'], ['666', '666'], ['777', '777'],
-    ['pyram', 'pyram'], ['skewb', 'skewb'], ['minx', 'minx'], ['sq1', 'sq1'], ['clock', 'clock'],
-    ['333mirror', '333'], ['222oh', '222'], ['333oh', '333oh'], ['333bl', '333bf'], ['other', '333'],
+    ['222', '222'],
+    ['333', '333'],
+    ['444', '444'],
+    ['555', '555'],
+    ['666', '666'],
+    ['777', '777'],
+    ['pyram', 'pyram'],
+    ['skewb', 'skewb'],
+    ['minx', 'minx'],
+    ['sq1', 'sq1'],
+    ['clock', 'clock'],
+    ['333mirror', '333'],
+    ['222oh', '222'],
+    ['333oh', '333oh'],
+    ['333bl', '333bf'],
+    ['other', '333'],
   ])('cube type %s is event %s', (cube, event) => {
-    const r = parseTimerFile(JSON.stringify({ sessions: [{ id: 'a', name: 'A', order: 0 }], solves: [{ session_id: 'a', cube_type: cube, raw_time: 5, scramble: 'x', started_at: 1 }] }));
+    const r = parseTimerFile(
+      JSON.stringify({
+        sessions: [{ id: 'a', name: 'A', order: 0 }],
+        solves: [{ session_id: 'a', cube_type: cube, raw_time: 5, scramble: 'x', started_at: 1 }],
+      }),
+    );
     expect(r.sessions[0]).toMatchObject({ name: `A-${cube}`, event, sourceType: cube });
   });
 
@@ -314,7 +509,14 @@ describe('CubeDesk', () => {
       }),
     );
     expect(summary(r)).toEqual([
-      ['Early-333', '333', [[3000, 'OK'], [5000, 'OK']]],
+      [
+        'Early-333',
+        '333',
+        [
+          [3000, 'OK'],
+          [5000, 'OK'],
+        ],
+      ],
       ['Early-222', '222', [[4000, 'OK']]],
       ['Late-333', '333', [[2000, 'OK']]],
       ['ghost-333', '333', [[1000, 'OK']]],
@@ -354,7 +556,15 @@ describe('DCTimer text export', () => {
     const r = parseTimerFile(file);
     expect(r.format).toBe('DCTimer');
     expect(summary(r)).toEqual([
-      ['1', '333', [[12345, 'OK'], [13000, '+2'], [9000, 'DNF']]],
+      [
+        '1',
+        '333',
+        [
+          [12345, 'OK'],
+          [13000, '+2'],
+          [9000, 'DNF'],
+        ],
+      ],
       ['2', '333', [[8000, 'OK']]],
     ]);
     expect(r.sessions[0].solves.map((x) => x.comment)).toEqual([null, 'good', null]);
@@ -382,8 +592,22 @@ describe('DCTimer SQLite backup', () => {
     const r = parseTimerFile(bytes);
     expect(r.format).toBe('DCTimer (SQLite backup)');
     expect(summary(r)).toEqual([
-      ['main', '333', [[12345, 'OK'], [13000, '+2']]],
-      ['OH', '333', [[20000, 'DNF'], [21000, 'DNF']]],
+      [
+        'main',
+        '333',
+        [
+          [12345, 'OK'],
+          [13000, '+2'],
+        ],
+      ],
+      [
+        'OH',
+        '333',
+        [
+          [20000, 'DNF'],
+          [21000, 'DNF'],
+        ],
+      ],
     ]);
     expect(r.sessions[0].solves[0]).toEqual({ timeMs: 12345, penalty: 'OK', scramble: "R U R'", comment: null, createdAt: local(2015, 3, 2, 12, 1, 7) });
     expect(r.sessions[0].solves[1].comment).toBe('plus two');
@@ -410,7 +634,8 @@ describe('DCTimer SQLite backup', () => {
       db.exec(DCTIMER_SCHEMA.sessiontb);
       db.exec(DCTIMER_SCHEMA.resultstb);
       db.exec("INSERT INTO sessiontb VALUES (0, ''), (1, NULL), (2, 'named')");
-      for (const sid of [0, 1, 2, 4]) db.exec(`INSERT INTO resultstb (sid, rtime, p1, p2, scr, time, note) VALUES (${sid}, 5000, 0, 1, 'x', '2015-01-01 00:00:00', '')`);
+      for (const sid of [0, 1, 2, 4])
+        db.exec(`INSERT INTO resultstb (sid, rtime, p1, p2, scr, time, note) VALUES (${sid}, 5000, 0, 1, 'x', '2015-01-01 00:00:00', '')`);
     });
     expect(parseTimerFile(bytes).sessions.map((s) => s.name)).toEqual(['1', '2', 'named', '5']);
   });
@@ -418,7 +643,9 @@ describe('DCTimer SQLite backup', () => {
   it('truncates a fractional time to whole ms and skips unusable ones', () => {
     const bytes = sqliteBytes((db) => {
       db.exec('CREATE TABLE resultstb (id INTEGER PRIMARY KEY, sid INTEGER, rtime REAL, p1 INTEGER, p2 INTEGER, scr TEXT, time TEXT, note TEXT)');
-      db.exec("INSERT INTO resultstb (sid, rtime, p1, p2, scr, time, note) VALUES (0, 12345.9, 0, 1, 'x', 'N/A', ''), (0, 0, 0, 1, 'y', '', ''), (0, -5, 0, 1, 'z', '', '')");
+      db.exec(
+        "INSERT INTO resultstb (sid, rtime, p1, p2, scr, time, note) VALUES (0, 12345.9, 0, 1, 'x', 'N/A', ''), (0, 0, 0, 1, 'y', '', ''), (0, -5, 0, 1, 'z', '', '')",
+      );
     });
     const r = parseTimerFile(bytes);
     expect(summary(r)).toEqual([['1', '333', [[12345, 'OK']]]]);
@@ -447,10 +674,24 @@ describe('DCTimer SQLite backup', () => {
 
 describe("mateus' Cubetimer", () => {
   it.each([
-    ['3x3x3', '333'], ['2x2x2', '222'], ['4x4x4', '444'], ['5x5x5', '555'], ['6x6x6', '666'], ['7x7x7', '777'],
-    ['Pyraminx', 'pyram'], ['Skewb', 'skewb'], ['Megaminx', 'minx'], ['Square-1', 'sq1'], ["Rubik's Clock", 'clock'],
-    ['3x3x3 Blindfolded', '333bf'], ['4x4x4 Blindfolded', '444bf'], ['5x5x5 Blindfolded', '555bf'],
-    ['3x3x3 One-Handed', '333oh'], ['3x3x3 With Feet', '333'], ['3x3x3 Fewest Moves', '333fm'], ['Kilominx', '333'],
+    ['3x3x3', '333'],
+    ['2x2x2', '222'],
+    ['4x4x4', '444'],
+    ['5x5x5', '555'],
+    ['6x6x6', '666'],
+    ['7x7x7', '777'],
+    ['Pyraminx', 'pyram'],
+    ['Skewb', 'skewb'],
+    ['Megaminx', 'minx'],
+    ['Square-1', 'sq1'],
+    ["Rubik's Clock", 'clock'],
+    ['3x3x3 Blindfolded', '333bf'],
+    ['4x4x4 Blindfolded', '444bf'],
+    ['5x5x5 Blindfolded', '555bf'],
+    ['3x3x3 One-Handed', '333oh'],
+    ['3x3x3 With Feet', '333'],
+    ['3x3x3 Fewest Moves', '333fm'],
+    ['Kilominx', '333'],
   ])('category %s is event %s', (category, event) => {
     const r = parseTimerFile(mateus([category, '00:05.000', 'x', '2019-05-06 07:08', 'no', 'no', '1']));
     expect(r.sessions[0]).toMatchObject({ name: `${category}-1`, event, sourceType: category });
@@ -466,7 +707,17 @@ describe("mateus' Cubetimer", () => {
         ['5x5x5', '02:00.000', 'too few fields'],
       ),
     );
-    expect(summary(r)).toEqual([['5x5x5-A', '555', [[90125, 'OK'], [3600000, '+2'], [120000, 'DNF']]]]);
+    expect(summary(r)).toEqual([
+      [
+        '5x5x5-A',
+        '555',
+        [
+          [90125, 'OK'],
+          [3600000, '+2'],
+          [120000, 'DNF'],
+        ],
+      ],
+    ]);
     expect(r.sessions[0].solves[0]).toEqual({ timeMs: 90125, penalty: 'OK', scramble: 'Rw', comment: null, createdAt: local(2019, 5, 6, 7, 8) });
     expect(r.skipped.invalid).toBe(1);
   });
@@ -481,7 +732,14 @@ describe("mateus' Cubetimer", () => {
       ),
     );
     expect(summary(r)).toEqual([
-      ['3x3x3-1', '333', [[10000, 'OK'], [12000, 'OK']]],
+      [
+        '3x3x3-1',
+        '333',
+        [
+          [10000, 'OK'],
+          [12000, 'OK'],
+        ],
+      ],
       ['3x3x3-2', '333', [[11000, 'OK']]],
     ]);
     expect(r.skipped.multiBlind).toBe(1);
@@ -507,7 +765,14 @@ describe('GAN CubeStation', () => {
       }),
     );
     expect(summary(r)).toEqual([
-      ['2024-01', '333', [[8000, 'OK'], [6000, 'DNF']]],
+      [
+        '2024-01',
+        '333',
+        [
+          [8000, 'OK'],
+          [6000, 'DNF'],
+        ],
+      ],
       ['2024-02', '333', [[9000, 'OK']]],
       ['League42', '333', [[7000, 'OK']]],
     ]);
@@ -516,13 +781,34 @@ describe('GAN CubeStation', () => {
   });
 
   it('keeps a DNF attempt without a duration and skips a solve with no duration at all', () => {
-    const r = parseTimerFile(JSON.stringify({ code: 200, data: { data: [{ startTime: 1700000000, duration: 0, normalScore: 0 }, { startTime: 1700000000, normalScore: 1 }, { startTime: 1700000000, duration: 5000, normalScore: 1 }] } }));
+    const r = parseTimerFile(
+      JSON.stringify({
+        code: 200,
+        data: {
+          data: [
+            { startTime: 1700000000, duration: 0, normalScore: 0 },
+            { startTime: 1700000000, normalScore: 1 },
+            { startTime: 1700000000, duration: 5000, normalScore: 1 },
+          ],
+        },
+      }),
+    );
     expect(r.sessions[0].solves.map((x) => x.penalty)).toEqual(['DNF', 'OK']);
     expect(r.skipped.invalid).toBe(1);
   });
 
   it('skips a finished solve of 0 ms instead of importing a 0.001 s single', () => {
-    const r = parseTimerFile(JSON.stringify({ code: 200, data: { data: [{ startTime: 1700000000, duration: 0, normalScore: 1 }, { startTime: 1700000060, duration: 8000, normalScore: 1 }] } }));
+    const r = parseTimerFile(
+      JSON.stringify({
+        code: 200,
+        data: {
+          data: [
+            { startTime: 1700000000, duration: 0, normalScore: 1 },
+            { startTime: 1700000060, duration: 8000, normalScore: 1 },
+          ],
+        },
+      }),
+    );
     expect(r.sessions[0].solves.map((x) => x.timeMs)).toEqual([8000]);
     expect(r.skipped.invalid).toBe(1);
   });
@@ -536,14 +822,29 @@ describe('cubr export', () => {
   const file = (sessions: unknown[]) => JSON.stringify({ exportedAt: '2026-11-16T00:00:00.000Z', sessions });
 
   it('falls back to 3x3 for an unknown event, OK for an unknown penalty and the epoch for a bad date', () => {
-    const r = parseTimerFile(file([{ name: 'odd', event: '333mbf', solves: [{ timeMs: '9000', penalty: 'X', scramble: 'R', comment: '  hi ', createdAt: 'garbage' }] }]));
-    expect(r.sessions[0]).toEqual({ name: 'odd', event: '333', sourceType: '333', solves: [{ timeMs: 9000, penalty: 'OK', scramble: 'R', comment: 'hi', createdAt: EPOCH }] });
+    const r = parseTimerFile(
+      file([{ name: 'odd', event: '333mbf', solves: [{ timeMs: '9000', penalty: 'X', scramble: 'R', comment: '  hi ', createdAt: 'garbage' }] }]),
+    );
+    expect(r.sessions[0]).toEqual({
+      name: 'odd',
+      event: '333',
+      sourceType: '333',
+      solves: [{ timeMs: 9000, penalty: 'OK', scramble: 'R', comment: 'hi', createdAt: EPOCH }],
+    });
   });
 
   it('keeps a practice session only when practice is exactly true, and names a nameless session by its place', () => {
     const solves = [{ timeMs: 5000, penalty: 'OK', scramble: '', comment: null, createdAt: '2026-01-01T00:00:00Z' }];
-    const r = parseTimerFile(file([{ name: 'a', event: '333', practice: 'true', solves }, { event: '222', practice: true, solves }]));
-    expect(r.sessions.map((s) => [s.name, s.event, s.practice ?? false])).toEqual([['a', '333', false], ['import 2', '222', true]]);
+    const r = parseTimerFile(
+      file([
+        { name: 'a', event: '333', practice: 'true', solves },
+        { event: '222', practice: true, solves },
+      ]),
+    );
+    expect(r.sessions.map((s) => [s.name, s.event, s.practice ?? false])).toEqual([
+      ['a', '333', false],
+      ['import 2', '222', true],
+    ]);
   });
 
   it('is not mistaken for a list of sessions without solves, and an empty export has nothing to import', () => {
@@ -554,7 +855,11 @@ describe('cubr export', () => {
 
 describe('csTimer export of cubr sessions', () => {
   it.each(EVENT_IDS)('a %s session keeps its event through a csTimer file', (event) => {
-    const r = parseTimerFile(toCsTimerExport([{ name: `s ${event}`, event, solves: [{ timeMs: 1234, penalty: 'OK', scramble: 'x', comment: null, createdAt: '2026-01-01T00:00:00.000Z' }] }]));
+    const r = parseTimerFile(
+      toCsTimerExport([
+        { name: `s ${event}`, event, solves: [{ timeMs: 1234, penalty: 'OK', scramble: 'x', comment: null, createdAt: '2026-01-01T00:00:00.000Z' }] },
+      ]),
+    );
     expect(r.sessions[0]).toMatchObject({ name: `s ${event}`, event });
   });
 
@@ -579,7 +884,9 @@ describe('csTimer export of cubr sessions', () => {
   });
 
   it('writes a solve without a valid date as time 0, which reads back as the epoch', () => {
-    const file = toCsTimerExport([{ name: 'm', event: '333', solves: [{ timeMs: 2000, penalty: 'OK', scramble: 'b', comment: null, createdAt: 'not a date' }] }]);
+    const file = toCsTimerExport([
+      { name: 'm', event: '333', solves: [{ timeMs: 2000, penalty: 'OK', scramble: 'b', comment: null, createdAt: 'not a date' }] },
+    ]);
     expect(JSON.parse(file).session1[0][3]).toBe(0);
     expect(parseTimerFile(file).sessions[0].solves[0].createdAt).toBe(EPOCH);
   });
@@ -661,7 +968,10 @@ describe('parsing helpers', () => {
   });
 
   it('readDelimited handles CR-only line endings, empty fields, quotes inside a field and an unclosed quote', () => {
-    expect(readDelimited('a;b\rc;d\r', ';')).toEqual([['a', 'b'], ['c', 'd']]);
+    expect(readDelimited('a;b\rc;d\r', ';')).toEqual([
+      ['a', 'b'],
+      ['c', 'd'],
+    ]);
     expect(readDelimited(';;\n', ';')).toEqual([['', '', '']]);
     expect(readDelimited('say "hi";x', ';')).toEqual([['say "hi"', 'x']]);
     expect(readDelimited('"open;still\nopen', ';')).toEqual([['open;still\nopen']]);

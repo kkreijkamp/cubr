@@ -143,7 +143,7 @@ describe('smart cube timing (csTimer giiker.js)', () => {
     const s = new SmartCubeSession();
     const hand = new Hand(s);
     s.hinter.setScramble("R U' F2");
-    const evs = ["R", "U'", 'F2'].map((m, i) => hand.turn(m, i * 100, '222'));
+    const evs = ['R', "U'", 'F2'].map((m, i) => hand.turn(m, i * 100, '222'));
     expect(evs[2].markIn).toBe(0);
     s.markScrambled(300);
     hand.turn('F2', 1000, '222');
@@ -162,11 +162,13 @@ describe("the scramble line (csTimer's scrHinter)", () => {
     expect(hint(h, scrambleCube('R')!).hint).toMatchObject({ done: 1, rest: null });
     expect(hint(h, scrambleCube('R U')!).hint).toMatchObject({ done: 1, rest: 'U' });
     expect(hint(h, scrambleCube("R U'")!).hint).toMatchObject({ done: 1, rest: "U'" });
-    expect(hint(h, scrambleCube("R U2 F")!).hint).toMatchObject({ done: 2, rest: 'F2' });
+    expect(hint(h, scrambleCube('R U2 F')!).hint).toMatchObject({ done: 2, rest: 'F2' });
     expect(hint(h, scrambleCube("R U2 F' D")!).hint).toMatchObject({ done: 4 });
     expect(h.matches(scrambleCube("R U2 F' D")!, false)).toBe(true);
   });
 
+  // movesBetween builds the two-phase solver's tables on first use (seconds; more with the whole suite
+  // running), so this test gets the solver tests' allowance
   it('off the scramble, asks once for a way back and then follows it', () => {
     const h = new ScrambleHinter();
     h.setScramble("R U2 F' D");
@@ -186,7 +188,7 @@ describe("the scramble line (csTimer's scrHinter)", () => {
     for (const m of steps.slice(1)) c.move(m.length === 1 ? m + ' ' : m);
     // back on the scramble: the scramble shows done
     expect(hint(h, c).hint).toMatchObject({ fix: false, done: 4 });
-  });
+  }, 30_000);
 
   it("has nothing to say for a scramble with turns a smart cube can't check", () => {
     const h = new ScrambleHinter();

@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import { fakeCsTimer } from './fakes.js';
 import { describe, expect, it, vi } from 'vitest';
 import type { Redis } from '@cubr/common';
 import { GENERATED_PER_MIN, REQUESTS_PER_MIN, registerScrambleRoutes } from '../src/routes/scrambles.js';
@@ -51,6 +52,7 @@ async function setup(opts: { stock?: number; poolOn?: boolean } = {}) {
     pool: { available: () => opts.poolOn ?? true, take } as unknown as ScramblePool,
     redis,
     internalToken: TOKEN,
+    cstimer: fakeCsTimer(),
   });
   await app.ready();
   const get = (url: string, internal = false) => app.inject({ method: 'GET', url, headers: internal ? { 'x-internal-token': TOKEN } : {} });

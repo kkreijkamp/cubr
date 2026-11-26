@@ -1,5 +1,6 @@
 import type { ScrambleBackend } from './backends.js';
 import { GenerationTimeoutError, QueueFullError } from './errors.js';
+import { jobLabel } from './practice.js';
 
 /** User-facing work always runs before background pool refills. */
 export type Priority = 'request' | 'refill';
@@ -159,8 +160,9 @@ export class ScrambleGenerator {
     }
   }
 
-  private record(event: string, ms: number) {
+  private record(job: string, ms: number) {
     this.generated++;
+    const event = jobLabel(job); // practice jobs are timed together per puzzle, not per state
     const t = this.timings.get(event) ?? { count: 0, totalMs: 0, maxMs: 0 };
     t.count++;
     t.totalMs += ms;

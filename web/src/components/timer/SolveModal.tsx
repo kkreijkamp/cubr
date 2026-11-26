@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon, Square2StackIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { getEvent, type Penalty, type Precision } from '@cubr/cubestats';
+import { scrambleImageUrl } from '../../lib/api';
 import { Modal } from '../Modal';
 import { TwistyPreview } from '../TwistyPreview';
 import type { Solve } from '../../lib/types';
@@ -17,6 +18,8 @@ interface Props {
   total: number;
   precision: Precision;
   preview: PreviewMode;
+  /** the session's practice scramble type, if it has one (csTimer draws its scrambles as that type) */
+  scrambleType?: string;
   confirmDelete: boolean;
   onNavigate: (index: number) => void;
   onClose: () => void;
@@ -24,7 +27,7 @@ interface Props {
 
 const PENALTIES: Penalty[] = ['OK', '+2', 'DNF'];
 
-export function SolveModal({ solve, index, total, precision, preview, confirmDelete, onNavigate, onClose }: Props) {
+export function SolveModal({ solve, index, total, precision, preview, scrambleType, confirmDelete, onNavigate, onClose }: Props) {
   const [comment, setCommentText] = useState(solve.comment ?? '');
   const [armed, setArmed] = useState(false);
   const armTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -34,9 +37,12 @@ export function SolveModal({ solve, index, total, precision, preview, confirmDel
     setArmed(false);
   }, [solve.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => () => {
-    if (armTimer.current) clearTimeout(armTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (armTimer.current) clearTimeout(armTimer.current);
+    },
+    [],
+  );
 
   const saveComment = () => {
     if ((solve.comment ?? '') !== comment.trim()) void setComment(solve.id, comment);
@@ -70,7 +76,9 @@ export function SolveModal({ solve, index, total, precision, preview, confirmDel
     onClose();
   };
 
-  const puzzle = getEvent(solve.event)?.puzzle ?? '3x3x3';
+  // null: a puzzle cubing.js can't draw (no preview); an unknown event shows as a 3x3
+  const info = getEvent(solve.event);
+  const puzzle = info ? info.puzzle : '3x3x3';
   const dnf = solve.penalty === 'DNF';
 
   return (
@@ -125,7 +133,15 @@ export function SolveModal({ solve, index, total, precision, preview, confirmDel
         <div className="tp-detail-scramble">{solve.scramble || <span className="sub">no scramble recorded</span>}</div>
         {preview !== 'off' && solve.scramble && (
           <div className="tp-detail-preview">
-            <TwistyPreview puzzle={puzzle} scramble={solve.scramble} visualization={preview} height={150} />
+            <TwistyPreview
+              puzzle={puzzle}
+              scramble={solve.scramble}
+              visualization={preview}
+              height={150}
+              event={solve.event}
+              scrambleType={scrambleType}
+              imageUrl={scrambleImageUrl(solve.event, solve.scramble, scrambleType)}
+            />
           </div>
         )}
       </div>

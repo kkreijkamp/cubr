@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: A security problem
+    url: https://github.com/kkreijkamp/cubr/security/advisories/new
+    about: Please report it privately (SECURITY.md says how).
+  - name: A question, or feedback
+    url: https://cubr.dev/about#help
+    about: The help on cubr.dev, or the feedback form at the bottom of every page.

@@ -120,8 +120,15 @@ export class SimGan {
       const start = req[2];
       const n = req[4];
       const h = new Bits(20);
-      if (v === 3) h.set(0, 8, 0x55).set(8, 8, 6).set(16, 8, n / 2 + 1).set(24, 8, start);
-      else h.set(0, 8, 0xd1).set(8, 8, n / 2 + 1).set(16, 8, start);
+      if (v === 3)
+        h.set(0, 8, 0x55)
+          .set(8, 8, 6)
+          .set(16, 8, n / 2 + 1)
+          .set(24, 8, start);
+      else
+        h.set(0, 8, 0xd1)
+          .set(8, 8, n / 2 + 1)
+          .set(16, 8, start);
       const base = v === 3 ? 32 : 24;
       for (let k = 0; k < n; k++) {
         const m = this.history.get((start - k) & 0xff);
@@ -149,8 +156,21 @@ export class SimGan {
       }
     } else {
       const hot = [2, 32, 8, 1, 16, 4]['URFDLB'.indexOf(m[0])];
-      if (this.version === 3) w.set(0, 8, 0x55).set(8, 8, 1).set(16, 8, 9).le(24, 4, this.devTs).le(56, 2, this.cnt).set(72, 2, code & 1).set(74, 6, hot);
-      else w.set(0, 8, 0x01).set(8, 8, 9).le(16, 4, this.devTs).le(48, 2, this.cnt).set(64, 2, code & 1).set(66, 6, hot);
+      if (this.version === 3)
+        w.set(0, 8, 0x55)
+          .set(8, 8, 1)
+          .set(16, 8, 9)
+          .le(24, 4, this.devTs)
+          .le(56, 2, this.cnt)
+          .set(72, 2, code & 1)
+          .set(74, 6, hot);
+      else
+        w.set(0, 8, 0x01)
+          .set(8, 8, 9)
+          .le(16, 4, this.devTs)
+          .le(48, 2, this.cnt)
+          .set(64, 2, code & 1)
+          .set(66, 6, hot);
     }
     this.send(w.bytes());
   }

@@ -1,8 +1,6 @@
 import { badRequest, conflict, forbidden } from '@cubr/common';
-import { computeStandings } from './standings.js';
-import type {
-  Identity, Penalty, PlayerStatus, Presence, RoomState, ScrambleSource, StoredRoom,
-} from './types.js';
+import { computeStandings, foldRound } from './standings.js';
+import type { Identity, Penalty, PlayerStatus, Presence, RoomState, ScrambleSource, StoredRoom } from './types.js';
 
 /**
  * Pure room-state transitions. Nothing here touches Redis or sockets, so all the game rules
@@ -12,6 +10,12 @@ import type {
 
 export const MAX_PLAYERS = 16;
 export const MAX_RESULT_MS = 3_600_000;
+/**
+ * Rounds whose results a room keeps (and sends with every state): older ones are folded into each
+ * player's totals, so the standings stay exact while the state and every broadcast stay bounded (the
+ * October review's #12: 100 rounds of 16 players made each room:state 84 KiB).
+ */
+export const ROUNDS_KEPT = 25;
 
 export function newRoom(opts: { id: string; name: string; event: string; isPrivate: boolean; createdBy: string | null; now: number }): StoredRoom {
   return {
@@ -57,6 +61,7 @@ export function removePlayer(room: StoredRoom, playerId: string): boolean {
   const before = room.players.length;
   room.players = room.players.filter((p) => p.id !== playerId);
   for (const round of Object.values(room.results)) delete round[playerId];
+  if (room.earlier) delete room.earlier[playerId];
   return room.players.length !== before;
 }
 
@@ -74,14 +79,27 @@ export function startRound(room: StoredRoom, by: string, expectedN: number, scra
   if (n !== expectedN) throw conflict('Round was already advanced');
   room.round = { n: n + 1, scramble, startedAt: new Date(now).toISOString(), scrambleSource: source };
   room.results[String(n + 1)] = {};
+  pruneRounds(room);
   for (const p of room.players) p.status = 'idle';
   room.status = 'running';
+}
+
+/** Keeps the last ROUNDS_KEPT rounds' results; older ones go into the players' earlier totals. */
+export function pruneRounds(room: StoredRoom): void {
+  const kept = Object.keys(room.results).sort((a, b) => Number(a) - Number(b));
+  while (kept.length > ROUNDS_KEPT) {
+    const key = kept.shift()!;
+    foldRound((room.earlier ??= {}), room.results[key]);
+    delete room.results[key];
+  }
 }
 
 /** Live status (inspecting/solving/...). Returns false when nothing changed (no broadcast needed). */
 export function setStatus(room: StoredRoom, playerId: string, status: PlayerStatus): boolean {
   const p = requirePlayer(room, playerId);
   if (status !== 'idle' && !room.round) throw badRequest('No round in progress');
+  // "done" comes with a result (submitResult sets it): a player can't look finished without one
+  if (status === 'done' && !room.results[room.round!.n]?.[playerId]) throw badRequest('Submit a result first');
   if (room.round && room.results[room.round.n]?.[playerId] && status !== 'done') {
     throw conflict('You already submitted a result for this round');
   }
@@ -136,7 +154,7 @@ export function toRoomState(room: StoredRoom, presence: Presence): RoomState {
       return { id: p.id, name: p.name, userId: p.userId, status: p.status, connected: pods.length > 0, pods };
     }),
     results: room.results,
-    standings: computeStandings(room.players, room.results),
+    standings: computeStandings(room.players, room.results, room.earlier),
     createdAt: room.createdAt,
     isPrivate: room.isPrivate,
     rev: room.rev,

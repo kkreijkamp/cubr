@@ -7,7 +7,18 @@ import { SOLVE_COLUMNS, toSolve, type Solve, type SolveRow } from '../mapping.js
 import { enqueue } from '../outbox.js';
 import { sessionRolling, solveDeletedPayload, solveEventPayload } from '../repo.js';
 import { dailyOverview, dailyResult, type Rolling } from '../rolling.js';
-import { assertDailyAllowed, createSolveBody, dailyQuery, idParams, isDailyOpen, patchSolveBody, resolveCreatedAt, utcDay } from '../schemas.js';
+import {
+  MAX_TIME_MS,
+  assertDailyAllowed,
+  createSolveBody,
+  dailyQuery,
+  dailyStartBody,
+  idParams,
+  isDailyOpen,
+  patchSolveBody,
+  resolveCreatedAt,
+  utcDay,
+} from '../schemas.js';
 
 /** Translates constraint violations raised inside a solve transaction into API errors. */
 function mapPgError(err: unknown): never {
@@ -119,8 +130,20 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
          ON CONFLICT (id) DO NOTHING
          RETURNING ${SOLVE_COLUMNS}`,
-        [id, user.id, body.sessionId, event, body.timeMs, body.penalty, body.scramble, body.comment ?? null, source,
-          daily?.date ?? null, daily?.index ?? null, createdAt],
+        [
+          id,
+          user.id,
+          body.sessionId,
+          event,
+          body.timeMs,
+          body.penalty,
+          body.scramble,
+          body.comment ?? null,
+          source,
+          daily?.date ?? null,
+          daily?.index ?? null,
+          createdAt,
+        ],
       );
 
       if (!ins.rows[0]) {
@@ -128,16 +151,18 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
         const existing = await client.query<SolveRow>(`SELECT ${SOLVE_COLUMNS} FROM solve.solves WHERE id = $1`, [id]);
         const row = existing.rows[0];
         if (!row || row.user_id !== user.id) throw conflict('solve id already in use');
-        return { created: false, row, rolling: await sessionRolling(client, row.session_id) };
+        return { created: false, row, rolling: await sessionRolling(client, row.session_id, { createdAt: row.created_at, id: row.id }) };
       }
 
       const row = ins.rows[0];
       const newAttempt = daily ? await recordDailyAttempt(client, user, row) : false;
-      const rolling = await sessionRolling(client, row.session_id);
+      const rolling = await sessionRolling(client, row.session_id, { createdAt: row.created_at, id: row.id });
       // sessionName lets read models (stats) label sessions without querying this service;
       // practice keeps the solve off personal bests (stats) and the boards (leaderboard)
       await enqueue(client, 'solve.created', {
-        ...solveEventPayload(user, row, tz, rolling), sessionName: session.rows[0].name, practice: session.rows[0].practice,
+        ...solveEventPayload(user, row, tz, rolling),
+        sessionName: session.rows[0].name,
+        practice: session.rows[0].practice,
       });
       if (daily && newAttempt) await queueDailyResult(client, user, daily.date, event, tz, 'daily.completed');
       return { created: true, row, rolling };
@@ -153,10 +178,7 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
     const tz = tzFrom(req);
 
     return withTx(pool, async (client): Promise<{ solve: Solve; rolling?: Rolling }> => {
-      const cur = await client.query<SolveRow>(
-        `SELECT ${SOLVE_COLUMNS} FROM solve.solves WHERE id = $1 AND user_id = $2 FOR UPDATE`,
-        [id, user.id],
-      );
+      const cur = await client.query<SolveRow>(`SELECT ${SOLVE_COLUMNS} FROM solve.solves WHERE id = $1 AND user_id = $2 FOR UPDATE`, [id, user.id]);
       const before = cur.rows[0];
       if (!before) throw notFound('solve not found');
       const penalty = body.penalty ?? before.penalty;
@@ -164,10 +186,12 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
       // No-op edits don't emit events (consumers recompute the event on every solve.updated).
       if (penalty === before.penalty && comment === before.comment) return { solve: toSolve(before) };
 
-      const upd = await client.query<SolveRow>(
-        `UPDATE solve.solves SET penalty = $3, comment = $4 WHERE id = $1 AND user_id = $2 RETURNING ${SOLVE_COLUMNS}`,
-        [id, user.id, penalty, comment],
-      );
+      const upd = await client.query<SolveRow>(`UPDATE solve.solves SET penalty = $3, comment = $4 WHERE id = $1 AND user_id = $2 RETURNING ${SOLVE_COLUMNS}`, [
+        id,
+        user.id,
+        penalty,
+        comment,
+      ]);
       const row = upd.rows[0];
       const rolling = await sessionRolling(client, row.session_id);
       await enqueue(client, 'solve.updated', solveEventPayload(user, row, tz, rolling));
@@ -181,14 +205,53 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
     const { id } = parse(idParams, req.params);
     const tz = tzFrom(req);
     await withTx(pool, async (client) => {
-      const { rows } = await client.query<SolveRow>(
-        `DELETE FROM solve.solves WHERE id = $1 AND user_id = $2 RETURNING ${SOLVE_COLUMNS}`,
-        [id, user.id],
-      );
+      const { rows } = await client.query<SolveRow>(`DELETE FROM solve.solves WHERE id = $1 AND user_id = $2 RETURNING ${SOLVE_COLUMNS}`, [id, user.id]);
       if (!rows[0]) throw notFound('solve not found');
       await enqueue(client, 'solve.deleted', solveDeletedPayload(user, rows[0], tz));
     });
     return reply.code(204).send();
+  });
+
+  // An official daily attempt starts (inspection, or the solve without it): the October review's #18,
+  // decided 2026-11-26. Starting an index again before its result arrived (a reload, a closed tab, a
+  // second try) makes it a DNF instead of a fresh chance: 200 {abandoned: true}. An index that has its
+  // result already: 409. Esc during inspection is the page's own DNF (it submits one).
+  app.post('/api/solves/daily/start', authed, async (req, reply) => {
+    const user = currentUser(req);
+    const { date, event, index } = parse(dailyStartBody, req.body ?? {});
+    assertDailyAllowed(date, event);
+    const tz = tzFrom(req);
+    const res = await withTx(pool, async (client) => {
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`solve:daily:${user.id}:${date}:${event}`]);
+      const key = [user.id, date, event, index];
+      const done = await client.query('SELECT 1 FROM solve.daily_attempts WHERE user_id = $1 AND daily_date = $2 AND event = $3 AND daily_index = $4', key);
+      if (done.rowCount) throw conflict('daily attempt already recorded');
+      const started = await client.query<{ ms: number }>(
+        `SELECT (extract(epoch from now() - started_at) * 1000)::int AS ms FROM solve.daily_starts
+          WHERE user_id = $1 AND daily_date = $2 AND event = $3 AND daily_index = $4`,
+        key,
+      );
+      if (!started.rows[0]) {
+        await client.query('INSERT INTO solve.daily_starts (user_id, daily_date, event, daily_index) VALUES ($1, $2, $3, $4)', key);
+        // this user's starts of days long closed go (a handful of rows a day at most)
+        await client.query(`DELETE FROM solve.daily_starts WHERE user_id = $1 AND daily_date < $2::date - 7`, [user.id, date]);
+        return { abandoned: false as const };
+      }
+      // started before and never finished: a DNF, with the time since it started
+      const timeMs = Math.min(Math.max(1, started.rows[0].ms), MAX_TIME_MS);
+      await client.query(
+        `INSERT INTO solve.daily_attempts (user_id, daily_date, event, daily_index, solve_id, time_ms, penalty)
+         VALUES ($1, $2, $3, $4, $5, $6, 'DNF')`,
+        [...key, randomUUID(), timeMs],
+      );
+      const { rows } = await client.query<{ n: number }>(
+        'SELECT count(*)::int AS n FROM solve.daily_attempts WHERE user_id = $1 AND daily_date = $2 AND event = $3',
+        [user.id, date, event],
+      );
+      if (rows[0].n === 5) await queueDailyResult(client, user, date, event, tz, 'daily.completed');
+      return { abandoned: true as const, attempt: { index, timeMs, penalty: 'DNF' as const } };
+    });
+    return reply.code(res.abandoned ? 200 : 201).send(res);
   });
 
   // The user's daily-challenge solves for one UTC day, grouped by event, with the official ao5.
@@ -197,16 +260,13 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
     const q = parse(dailyQuery, req.query ?? {});
     const date = q.date ?? utcDay(Date.now());
     const [solves, attempts] = await Promise.all([
-      pool.query<SolveRow>(
-        `SELECT ${SOLVE_COLUMNS} FROM solve.solves WHERE user_id = $1 AND daily_date = $2 ORDER BY event, daily_index`,
-        [user.id, date],
-      ),
-      pool.query<{ event: string; time_ms: number; penalty: Penalty }>(
-        'SELECT event, time_ms, penalty FROM solve.daily_attempts WHERE user_id = $1 AND daily_date = $2 ORDER BY event, daily_index',
+      pool.query<SolveRow>(`SELECT ${SOLVE_COLUMNS} FROM solve.solves WHERE user_id = $1 AND daily_date = $2 ORDER BY event, daily_index`, [user.id, date]),
+      pool.query<{ event: string; daily_index: number; solve_id: string; time_ms: number; penalty: Penalty }>(
+        'SELECT event, daily_index, solve_id, time_ms, penalty FROM solve.daily_attempts WHERE user_id = $1 AND daily_date = $2 ORDER BY event, daily_index',
         [user.id, date],
       ),
     ]);
-    const official = attempts.rows.map((a) => ({ event: a.event, timeMs: a.time_ms, penalty: a.penalty }));
+    const official = attempts.rows.map((a) => ({ event: a.event, index: a.daily_index, solveId: a.solve_id, timeMs: a.time_ms, penalty: a.penalty }));
     return { date, events: dailyOverview(solves.rows.map(toSolve), official) };
   });
 }

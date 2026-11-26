@@ -6,10 +6,12 @@ import {
   ChartBarIcon,
   ClockIcon,
   CommandLineIcon,
+  EyeIcon,
   FlagIcon,
   GiftIcon,
   GlobeAltIcon,
   HeartIcon,
+  QuestionMarkCircleIcon,
   SignalSlashIcon,
   Square3Stack3DIcon,
   SwatchIcon,
@@ -23,7 +25,7 @@ import { formatDate, formatNumber } from '../lib/format';
 import { useCanonical } from '../lib/canonical';
 import { PAGE_META } from '../lib/pageMeta';
 import { usePageMeta } from '../lib/usePageMeta';
-import { DONATE_URL } from '../lib/links';
+import { DONATE_URL, REPO_URL } from '../lib/links';
 import { THEMES } from '../lib/themes';
 import type { GlobalStats } from '../lib/types';
 import { useAsync } from '../lib/useAsync';
@@ -34,22 +36,39 @@ const REFRESH_MS = 15_000;
 // a feature with a page of its own links to it (`to`): descriptive links between pages help search
 // engines and people find them
 const FEATURES: { icon: typeof ClockIcon; t: string; d: string; to?: string }[] = [
-  { icon: ClockIcon, t: 'a timer that gets out of the way', to: '/', d: 'space to start, hold-to-ready, wca inspection with 8 s / 12 s alerts, +2 and dnf, focus mode while solving.' },
+  {
+    icon: ClockIcon,
+    t: 'a timer that gets out of the way',
+    to: '/',
+    d: 'space to start, hold-to-ready, wca inspection with 8 s / 12 s alerts, +2 and dnf, focus mode while solving.',
+  },
   { icon: ChartBarIcon, t: 'csTimer-grade stats', d: 'mo3, ao5 ... ao1000 with wca trimming, session bests, and a solve history chart on your profile.' },
-  { icon: ArrowUpTrayIcon, t: 'sessions & import', d: 'unlimited sessions for all 16 wca events, import from csTimer and every timer it reads, json and csTimer export.' },
+  {
+    icon: ArrowUpTrayIcon,
+    t: 'events & sessions',
+    d: "every wca event and csTimer's other puzzles and relays, with its practice scrambles (pll, oll, cmll, eg...). unlimited sessions, import from csTimer and every timer it reads, json and csTimer export.",
+  },
   { icon: CalendarDaysIcon, t: 'daily challenge', to: '/daily', d: 'five shared scrambles a day for everyone, ranked by ao5 on a global board.' },
   { icon: FlagIcon, t: 'live races', to: '/race', d: 'real-time multiplayer rooms over websockets - share a link and race any event.' },
   { icon: TrophyIcon, t: 'leaderboards', to: '/leaderboards', d: 'all-time, weekly and daily boards for every event, single, ao5 and ao12.' },
   { icon: GlobeAltIcon, t: 'wca comparison', to: '/wca', d: 'see where your personal bests would rank among every official wca competitor.' },
-  { icon: SwatchIcon, t: 'themes & command line', d: `${THEMES.length} cube-inspired themes with live preview, light or dark with your device. press esc and type - everything is a command.` },
-  { icon: SignalSlashIcon, t: 'an app that works offline', d: "install it on your phone or computer. the timer opens and works without a connection, and your solves sync when you're back online." },
+  {
+    icon: SwatchIcon,
+    t: 'themes & command line',
+    d: `${THEMES.length} cube-inspired themes with live preview, light or dark with your device. press esc and type - everything is a command.`,
+  },
+  {
+    icon: SignalSlashIcon,
+    t: 'an app that works offline',
+    d: "install it on your phone or computer. the timer opens and works without a connection, and your solves sync when you're back online.",
+  },
 ];
 
 // the everyday ones - csTimer's keys; settings > keyboard shortcuts lists them all
 const KEYS: [string[], string][] = [
   [['esc'], 'command line (or ctrl + k)'],
   [['space'], 'hold, release to start - press to stop'],
-  [['tab'], 'new scramble'],
+  [['tab'], 'new scramble (on a control you reached with the keyboard, the next control)'],
   [['alt', '1-7'], 'switch event: square-1, 2x2 ... 7x7 (alt + p / m / c / s for the others)'],
   [['ctrl', '1'], 'mark the last solve ok'],
   [['ctrl', '2'], 'add a +2 to the last solve'],
@@ -62,7 +81,11 @@ const KEYS: [string[], string][] = [
 function Counter({ label, value, decimals = 0, hint }: { label: string; value: number | null; decimals?: number; hint?: string }) {
   const animated = useCountUp(value);
   const text =
-    value === null ? '-' : decimals > 0 ? animated.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) : formatNumber(Math.round(animated));
+    value === null
+      ? '-'
+      : decimals > 0
+        ? animated.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+        : formatNumber(Math.round(animated));
   return (
     <div className="stat" data-tip={hint}>
       <span className="label">{label}</span>
@@ -218,6 +241,84 @@ export default function AboutPage() {
         </div>
       </section>
 
+      {/* the questions people ask, answered where the answer lives: links go to the setting itself */}
+      <section aria-labelledby="ab-help" id="help">
+        <h2 className="ab-h" id="ab-help">
+          <QuestionMarkCircleIcon /> help
+        </h2>
+        <div className="ab-faq">
+          <h3 className="ab-q">how does inspection work?</h3>
+          <p className="ab-a">
+            Turn on WCA inspection in <Link to="/settings?tab=timer">settings &gt; timer</Link>. Space then starts 15 seconds to inspect; hold space and release
+            to start the solve (on a phone, tap the timer, then hold it and release). Starting after 15 seconds adds +2, after 17 the solve is a DNF, as at a
+            competition, and the timer can call out 8 and 12 seconds. Esc stops an inspection; on the daily challenge that attempt is a DNF.
+          </p>
+          <h3 className="ab-q">can I bring my times from csTimer?</h3>
+          <p className="ab-a">
+            Yes: in csTimer, export to a file, then choose it under import in <Link to="/settings?tab=data">settings &gt; data</Link>. cubr also reads Twisty
+            Timer, Cubic Timer, Block Keeper, CubeDesk, DCTimer, mateus Cubetimer and GAN CubeStation files. Each session becomes a cubr session (one imported
+            before carries on, and solves already there are left out), in your account when you&apos;re signed in, in this browser when you&apos;re not. The
+            same page exports them, as cubr&apos;s own file or for csTimer.
+          </p>
+          <h3 className="ab-q">can I install it, and does it work offline?</h3>
+          <p className="ab-a">
+            Yes. In Chrome or Edge, install it from <Link to="/settings?tab=app">settings &gt; app</Link> or the browser&apos;s menu; on an iPhone or iPad, use
+            Safari&apos;s share button, then &quot;Add to Home Screen&quot;. It opens in its own window, the timer works without a connection, and your solves
+            sync when you&apos;re back online.
+          </p>
+          <h3 className="ab-q">why isn&apos;t my time on the leaderboard?</h3>
+          <p className="ab-a">
+            The boards rank signed-in cubers (a guest&apos;s solves stay in their browser, and signing in offers to bring them along). A time stays off them
+            when it&apos;s in a practice session or from a practice scramble (only an event&apos;s default scramble counts), when it&apos;s faster than the WCA
+            world record for that event (the anti-cheat: your profile says when a faster time was left off), when an average is a DNF, or when your profile is
+            private. The daily board ranks a full ao5 of the day&apos;s five scrambles.
+          </p>
+          <h3 className="ab-q">what happens to my data?</h3>
+          <p className="ab-a">
+            When you&apos;re signed in, your account, solves and settings are kept on cubr&apos;s server in Sydney, with nightly backups in Melbourne, until you
+            delete your account in <Link to="/settings?tab=danger">settings &gt; danger zone</Link>: that removes them at once, and from the backups within 30
+            days. Export your solves any time in <Link to="/settings?tab=data">settings &gt; data</Link>. cubr doesn&apos;t sell your data or show ads, and
+            counts page views without cookies. The <Link to="/privacy">privacy policy</Link> has the rest.
+          </p>
+          <p className="ab-a">
+            The keys are above, and <Link to="/settings?tab=shortcuts">settings</Link> lists them all. Anything else: the feedback form at the bottom of every
+            page, or <a href="mailto:hello@cubr.dev">hello@cubr.dev</a>.
+          </p>
+        </div>
+      </section>
+
+      {/* the accessibility statement (the AHRC recommends one): what cubr does, how it was checked, what's
+          missing, and how to report a problem */}
+      <section aria-labelledby="ab-a11y" id="accessibility">
+        <h2 className="ab-h" id="ab-a11y">
+          <EyeIcon /> accessibility
+        </h2>
+        <p className="ab-p">
+          cubr aims for WCAG 2.2 at level AA, so you can time your solves however you use a computer or phone: with a keyboard, a screen reader, touch or a
+          smart cube.
+        </p>
+        <p className="ab-p">
+          Every page has a skip link and headings in order. Everything works from the keyboard, menus and dialogs included (Tab, the arrow keys, Esc), and the
+          timer with space. A screen reader hears each solve&apos;s time once it ends, and nothing while it runs. The high-contrast setting brings labels, links
+          and errors to 4.5:1 in any theme and underlines links in text, Windows high contrast mode keeps focus and your choices visible, pages reflow down to
+          320 px wide, and motion follows your reduced-motion setting.
+        </p>
+        <p className="ab-p">
+          Checked in November 2026: every main page in Chrome, Firefox and Safari&apos;s engine, with the keyboard alone, at 200 % zoom, with wider text
+          spacing, in high contrast mode and with reduced motion; automated checks (axe) test every main page with each change. Not yet with every screen reader
+          on every device.
+        </p>
+        <p className="ab-p">
+          Not there yet: the charts on profiles are pictures (their numbers are in the summaries and tables beside them); some themes have low-contrast text
+          (turn on high contrast, or pick a high-contrast theme); smart cubes need Bluetooth, which only Chrome and Edge have; the 3D previews are visual, and
+          the scramble is always there as text.
+        </p>
+        <p className="ab-p">
+          Something in your way? Tell us with the feedback form at the bottom of every page, or at <a href="mailto:hello@cubr.dev">hello@cubr.dev</a>. We answer
+          within a week, and fix what we can.
+        </p>
+      </section>
+
       <Supporters />
 
       <section aria-labelledby="ab-credits">
@@ -229,7 +330,9 @@ export default function AboutPage() {
             <a href="https://cstimer.net" target="_blank" rel="noreferrer noopener">
               csTimer
             </a>
-            <span className="d">by cs0x7f - the timer behaviour, statistics and export format cubers rely on.</span>
+            <span className="d">
+              by cs0x7f - the timer behaviour, statistics and export format cubers rely on, and the scramblers for the other puzzles and practice scrambles.
+            </span>
           </div>
           <div className="ab-credit">
             <a href="https://monkeytype.com" target="_blank" rel="noreferrer noopener">
@@ -251,6 +354,13 @@ export default function AboutPage() {
           </div>
         </div>
         <WcaCitation />
+        <div className="ab-citation">
+          cubr is free software under the GNU GPL v3: its source is on{' '}
+          <a href={REPO_URL} target="_blank" rel="noreferrer noopener">
+            github
+          </a>
+          , and the licences of everything the app includes are in <a href="/licenses.txt">licenses.txt</a>.
+        </div>
       </section>
     </div>
   );

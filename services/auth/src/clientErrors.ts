@@ -38,7 +38,9 @@ export const clientErrorSchema = z
 
 export type ClientErrorReport = z.infer<typeof clientErrorSchema>;
 
-const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
+// starts only where a run of address characters starts: tried from inside a long run, the search would
+// take time growing with the square of its length (CodeQL's polynomial-ReDoS finding, 2026-11-26)
+const EMAIL = /(?<![\w.+-])[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
 const JWT = /\beyJ[\w-]+\.[\w-]+\.[\w-]+/g;
 // a URL's query string or fragment (tokens, ids, search terms); its address stays
 const URL_EXTRA = /(\bhttps?:\/\/[^\s?#"'`)]+)[?#][^\s"'`)]*/g;

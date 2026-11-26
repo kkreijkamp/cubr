@@ -1,9 +1,11 @@
 import type { Migration } from '@cubr/common';
-import { EVENTS, practiceSessionName } from '@cubr/cubestats';
+import { practiceSessionName } from '@cubr/cubestats';
 
 const sqlText = (s: string) => `'${s.replace(/'/g, "''")}'`;
+/** the events migration 004 knew (kept as they were, so its SQL never changes) */
+const EVENTS_AT_004 = ['333', '222', '444', '555', '666', '777', '333oh', '333bf', '333fm', '444bf', '555bf', 'clock', 'minx', 'pyram', 'skewb', 'sq1'];
 /** (event, practice session name) rows for migration 004, e.g. ('333', '3x3 practice') */
-const PRACTICE_NAMES = EVENTS.map((e) => `(${sqlText(e.id)}, ${sqlText(practiceSessionName(e.id))})`).join(',\n         ');
+const PRACTICE_NAMES = EVENTS_AT_004.map((e) => `(${sqlText(e)}, ${sqlText(practiceSessionName(e))})`).join(',\n         ');
 
 // Schema `solve` exactly as in docs/SPEC.md section 7.2. `migrate()` creates the schema itself and
 // tracks applied ids in solve.schema_migrations (advisory-locked, safe with many replicas).
@@ -98,6 +100,65 @@ SELECT gen_random_uuid(), u.user_id, coalesce(n.name, u.event || ' practice'), u
  WHERE NOT EXISTS (
    SELECT 1 FROM solve.sessions p WHERE p.user_id = u.user_id AND p.event = u.event AND p.practice
  );
+`,
+  },
+  {
+    id: '005_session_scramble',
+    sql: `
+-- A session's scramble type when it isn't its event's default ("pll", "222eg1": csTimer's ids,
+-- packages/cubestats/src/scrambleTypes.ts). Such a session is always a practice session, so only
+-- the default scramble counts for personal bests and leaderboards. NULL = the default.
+ALTER TABLE solve.sessions ADD COLUMN scramble text;
+`,
+  },
+  {
+    id: '006_daily_starts',
+    sql: `
+-- When each official daily attempt started (inspection, or the solve without it): starting an index
+-- again before its result arrived (a reload, a closed tab) makes it a DNF (POST /api/solves/daily/start).
+CREATE TABLE solve.daily_starts (
+  user_id     uuid NOT NULL,
+  daily_date  date NOT NULL,
+  event       text NOT NULL,
+  daily_index smallint NOT NULL,
+  started_at  timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, daily_date, event, daily_index)
+);
+`,
+  },
+  {
+    id: '007_push_subscriptions',
+    sql: `
+-- Daily-challenge reminders: one row per browser that turned them on (its Web Push subscription), with
+-- the minute of the day it wants them, in its own time zone. Removed when turned off, when the push
+-- service says the subscription is gone, or with the account (purge.ts).
+CREATE TABLE solve.push_subscriptions (
+  endpoint      text PRIMARY KEY,
+  user_id       uuid NOT NULL,
+  p256dh        text NOT NULL,
+  auth          text NOT NULL,
+  remind_minute smallint NOT NULL DEFAULT 600 CHECK (remind_minute BETWEEN 0 AND 1439),
+  tz            text NOT NULL,
+  last_day      date,          -- the local day it was last reminded, or found the person had played
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX push_subscriptions_user ON solve.push_subscriptions (user_id);
+`,
+  },
+  {
+    id: '008_outbox_notify',
+    sql: `
+-- Wakes the outbox relay when events are written, instead of it asking Postgres four times a second
+-- around the clock: one NOTIFY per transaction that adds outbox rows, sent when it commits (Postgres
+-- folds the same notification within a transaction into one).
+CREATE FUNCTION solve.outbox_notify() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM pg_notify('solve_outbox', '');
+  RETURN NULL;
+END
+$$;
+CREATE TRIGGER outbox_notify AFTER INSERT ON solve.outbox FOR EACH STATEMENT EXECUTE FUNCTION solve.outbox_notify();
 `,
   },
 ];

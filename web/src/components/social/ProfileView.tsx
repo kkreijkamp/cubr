@@ -96,7 +96,8 @@ export function ProfileView({ user, own, onEdit, children }: Props) {
         <p className="pf-empty">
           {own ? (
             <>
-              no solves yet - <Link to="/">open the timer</Link> and {isTouchDevice() ? 'hold it to start' : 'press space'}. personal bests, progress and the wca comparison show up here.
+              no solves yet - <Link to="/">open the timer</Link> and {isTouchDevice() ? 'hold it to start' : 'press space'}. personal bests, progress and the
+              wca comparison show up here.
             </>
           ) : (
             'no solves yet - personal bests and progress show up here after the first solve.'
@@ -106,20 +107,27 @@ export function ProfileView({ user, own, onEdit, children }: Props) {
         // a screen's height: the ring, the totals and the event below come in its place, all at once
         !summary.error && <PageLoading />
       ) : (
-        (
-          <div className="pf-event">
-            <EventTabs events={events} counts={counts} value={event} onChange={pick} />
-            <EventBests key={event} userId={user.id} event={event} summary={summary} precision={precision} fade={event !== firstEvent.current} />
-            <SolveHistoryChart key={`hist-${user.id}-${event}`} userId={user.id} event={event} precision={precision} solves={counts.get(event) ?? 0} />
-            {/* when they cube: days (the calendar keeps its range across events) and hours */}
-            <div className="pf-habits">
-              <ActivityHeatmap key={`act-${user.id}`} userId={user.id} event={event} years={summary.data?.totals.activeYears} />
-              <HourlyChart key={`hr-${user.id}-${event}`} userId={user.id} event={event} precision={precision} />
-            </div>
-            <WcaComparison key={`wca-${event}`} summary={summary} event={event} wcaId={user.wcaId} country={user.country} own={own} onEdit={onEdit} precision={precision} />
-            <ProfileSolves key={`solves-${user.id}-${event}`} userId={user.id} event={event} precision={precision} solves={counts.get(event) ?? 0} />
+        <div className="pf-event">
+          <EventTabs events={events} counts={counts} value={event} onChange={pick} />
+          <EventBests key={event} userId={user.id} event={event} summary={summary} precision={precision} fade={event !== firstEvent.current} />
+          <SolveHistoryChart key={`hist-${user.id}-${event}`} userId={user.id} event={event} precision={precision} solves={counts.get(event) ?? 0} />
+          {/* when they cube: days (the calendar keeps its range across events) and hours */}
+          <div className="pf-habits">
+            <ActivityHeatmap key={`act-${user.id}`} userId={user.id} event={event} years={summary.data?.totals.activeYears} />
+            <HourlyChart key={`hr-${user.id}-${event}`} userId={user.id} event={event} precision={precision} />
           </div>
-        )
+          <WcaComparison
+            key={`wca-${event}`}
+            summary={summary}
+            event={event}
+            wcaId={user.wcaId}
+            country={user.country}
+            own={own}
+            onEdit={onEdit}
+            precision={precision}
+          />
+          <ProfileSolves key={`solves-${user.id}-${event}`} userId={user.id} event={event} precision={precision} solves={counts.get(event) ?? 0} />
+        </div>
       )}
       {settled && children}
     </div>

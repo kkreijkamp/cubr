@@ -77,6 +77,30 @@ export function createRepo(pool: Pool) {
     return rows[0];
   }
 
+  /**
+   * Everyone's result in one event and kind, fastest first (for rankIndex.ts: counts by binary search
+   * instead of a range scan per request). WCA results fit in 32 bits (multi-blind's encoded ones too).
+   */
+  async function sortedBests(kind: Kind, eventId: string): Promise<Int32Array> {
+    // one int[] from Postgres rather than a row per person: a single array to read, not ~250k small ones
+    const { rows } = await pool.query<{ bests: number[] }>(
+      `SELECT coalesce(array_agg(best ORDER BY best), '{}') AS bests FROM ${RANKS[kind]} WHERE event_id = $1`,
+      [eventId],
+    );
+    return Int32Array.from(rows[0].bests);
+  }
+
+  /** The same within one country (each person's current country). */
+  async function sortedCountryBests(kind: Kind, eventId: string, countryId: string): Promise<Int32Array> {
+    const { rows } = await pool.query<{ bests: number[] }>(
+      `SELECT coalesce(array_agg(r.best ORDER BY r.best), '{}') AS bests
+         FROM wca.persons p JOIN ${RANKS[kind]} r ON r.person_id = p.wca_id AND r.event_id = $1
+        WHERE p.country_id = $2 AND p.sub_id = 1`,
+      [eventId, countryId],
+    );
+    return Int32Array.from(rows[0].bests);
+  }
+
   /** Same counts within one country (current country of each person) plus the country total. */
   async function countryCounts(kind: Kind, eventId: string, countryId: string, fasterBelow: number, slowerAbove: number) {
     const { rows } = await pool.query<{ faster: number; notSlower: number; total: number }>(
@@ -119,10 +143,10 @@ export function createRepo(pool: Pool) {
 
   /** Fine histogram counts, bucket 1..n in order. */
   async function distribution(eventId: string, kind: Kind): Promise<number[]> {
-    const { rows } = await pool.query<{ count: number }>(
-      'SELECT count FROM wca.distribution WHERE event_id = $1 AND kind = $2 ORDER BY bucket',
-      [eventId, kind],
-    );
+    const { rows } = await pool.query<{ count: number }>('SELECT count FROM wca.distribution WHERE event_id = $1 AND kind = $2 ORDER BY bucket', [
+      eventId,
+      kind,
+    ]);
     return rows.map((r) => r.count);
   }
 
@@ -168,10 +192,15 @@ export function createRepo(pool: Pool) {
 
   async function person(wcaId: string) {
     const { rows } = await pool.query<{
-      wcaId: string; name: string; gender: string | null; countryId: string; countryIso2: string | null;
-      countryName: string; continentId: string; continentName: string;
+      wcaId: string;
+      name: string;
+      countryId: string;
+      countryIso2: string | null;
+      countryName: string;
+      continentId: string;
+      continentName: string;
     }>(
-      `SELECT p.wca_id AS "wcaId", p.name, p.gender, p.country_id AS "countryId", c.iso2 AS "countryIso2",
+      `SELECT p.wca_id AS "wcaId", p.name, p.country_id AS "countryId", c.iso2 AS "countryIso2",
               c.name AS "countryName", c.continent_id AS "continentId", ct.name AS "continentName"
        FROM wca.persons p
        JOIN wca.countries c ON c.id = p.country_id
@@ -185,7 +214,12 @@ export function createRepo(pool: Pool) {
   /** All personal records of one person (both kinds) via the (person_id, event_id) primary keys. */
   async function personRanks(wcaId: string) {
     const { rows } = await pool.query<{
-      kind: Kind; eventId: string; best: number; worldRank: number; continentRank: number; countryRank: number;
+      kind: Kind;
+      eventId: string;
+      best: number;
+      worldRank: number;
+      continentRank: number;
+      countryRank: number;
     }>(
       `SELECT 'single' AS kind, event_id AS "eventId", best, world_rank AS "worldRank",
               continent_rank AS "continentRank", country_rank AS "countryRank"
@@ -212,8 +246,19 @@ export function createRepo(pool: Pool) {
   }
 
   return {
-    findCountry, worldCounts, countryCounts, neighbours, percentiles, distribution, recordHolders,
-    searchPersons, person, personRanks, countries,
+    findCountry,
+    worldCounts,
+    countryCounts,
+    sortedBests,
+    sortedCountryBests,
+    neighbours,
+    percentiles,
+    distribution,
+    recordHolders,
+    searchPersons,
+    person,
+    personRanks,
+    countries,
   };
 }
 

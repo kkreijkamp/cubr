@@ -3,6 +3,8 @@ import { CloudArrowUpIcon } from '@heroicons/react/24/outline';
 import { Modal } from '../Modal';
 import { Spinner } from '../Spinner';
 import { dismissUploadOffer, uploadLocalSolves, useUploadOffer } from '../../lib/solves';
+import { useStore } from '../../lib/store';
+import { solvingStore } from '../../timer/useTimerEngine';
 import { formatNumber } from '../../lib/format';
 import { toast } from '../../lib/toast';
 import './dialogs.css';
@@ -16,10 +18,12 @@ const solvesText = (n: number) => `${formatNumber(n)} solve${n === 1 ? '' : 's'}
  */
 export function LocalUploadOffer() {
   const offer = useUploadOffer();
+  // it waits while a solve is under way: it must never open over a running timer
+  const solving = useStore(solvingStore);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!offer) return null;
+  if (!offer || solving) return null;
   const one = offer.solves === 1;
 
   const upload = async () => {
@@ -39,9 +43,9 @@ export function LocalUploadOffer() {
     <Modal title="keep your guest solves?" onClose={() => !busy && dismissUploadOffer()} center>
       <div className="dialog-message">
         <p style={{ margin: 0 }}>
-          This browser has <span className="main">{solvesText(offer.solves)}</span> in {offer.sessions} session{offer.sessions === 1 ? '' : 's'} from
-          before you signed in. {one ? 'Upload it to your account so it syncs' : 'Upload them to your account so they sync'} across devices and{' '}
-          {one ? 'counts' : 'count'} towards your stats.
+          This browser has <span className="main">{solvesText(offer.solves)}</span> in {offer.sessions} session{offer.sessions === 1 ? '' : 's'} from before you
+          signed in. {one ? 'Upload it to your account so it syncs' : 'Upload them to your account so they sync'} across devices and {one ? 'counts' : 'count'}{' '}
+          towards your stats.
         </p>
         <p className="sub" style={{ margin: '0.75rem 0 0' }}>
           They are added as new sessions; the local copy is removed once the upload succeeds.
@@ -56,7 +60,7 @@ export function LocalUploadOffer() {
         <button className="btn" onClick={dismissUploadOffer} disabled={busy}>
           not now
         </button>
-        <button className="btn primary" onClick={upload} disabled={busy} autoFocus>
+        <button className="btn primary" onClick={upload} disabled={busy}>
           {busy ? <Spinner size={16} /> : <CloudArrowUpIcon width={16} height={16} />} upload {solvesText(offer.solves)}
         </button>
       </div>

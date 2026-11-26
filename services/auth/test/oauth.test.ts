@@ -23,7 +23,12 @@ describe('loadOAuthConfig', () => {
     expect(cfg.google).toMatchObject({ tokenUrl: 'https://oauth2.googleapis.com/token', issuers: ['https://accounts.google.com', 'accounts.google.com'] });
   });
   it("reads Apple's key from one .env line with \\n for the line breaks", () => {
-    const cfg = loadOAuthConfig({ APPLE_CLIENT_ID: 'a', APPLE_TEAM_ID: 't', APPLE_KEY_ID: 'k', APPLE_PRIVATE_KEY: '-----BEGIN PRIVATE KEY-----\\nabc\\n-----END PRIVATE KEY-----' });
+    const cfg = loadOAuthConfig({
+      APPLE_CLIENT_ID: 'a',
+      APPLE_TEAM_ID: 't',
+      APPLE_KEY_ID: 'k',
+      APPLE_PRIVATE_KEY: '-----BEGIN PRIVATE KEY-----\\nabc\\n-----END PRIVATE KEY-----',
+    });
     expect((cfg.apple as AppleConfig).privateKey).toBe('-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----');
   });
 });
@@ -71,7 +76,7 @@ describe('appleClientSecret', () => {
 });
 
 describe('appleName', () => {
-  it("reads the name Apple sends on the first sign-in, and nothing otherwise", () => {
+  it('reads the name Apple sends on the first sign-in, and nothing otherwise', () => {
     expect(appleName(JSON.stringify({ name: { firstName: 'Ada', lastName: 'Lovelace' } }))).toBe('Ada Lovelace');
     expect(appleName(JSON.stringify({ name: { firstName: 'Ada' } }))).toBe('Ada');
     expect(appleName(undefined)).toBeNull();

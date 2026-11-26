@@ -11,7 +11,11 @@ import {
   solvesImportedSchema,
   userDeletedSchema,
   userEventSchema,
-  type SolveCreated, sessionRenamedSchema, sessionsMergedSchema, sessionUpdatedSchema} from './eventSchemas.js';
+  type SolveCreated,
+  sessionRenamedSchema,
+  sessionsMergedSchema,
+  sessionUpdatedSchema,
+} from './eventSchemas.js';
 import { recomputeEvent, type RecomputeDeps } from './recompute.js';
 import { CACHE_KEY as GLOBAL_CACHE_KEY } from './routes/global.js';
 import { ensureUser, loadPbs, lockUser, markProcessed, queuePbUpdated, queuePeriodsChanged, refreshTotals, upsertPb } from './store.js';
@@ -44,7 +48,14 @@ export interface ProjectorDeps {
  * Upserts a session's display name (from solve.created, session.renamed and session.updated), and
  * its practice flag where the event carries one.
  */
-export async function upsertSessionName(c: PoolClient | Pool, sessionId: string, userId: string, event: string, name: string, practice?: boolean | null): Promise<void> {
+export async function upsertSessionName(
+  c: PoolClient | Pool,
+  sessionId: string,
+  userId: string,
+  event: string,
+  name: string,
+  practice?: boolean | null,
+): Promise<void> {
   await c.query(
     `INSERT INTO stats.sessions (session_id, user_id, event, name, practice) VALUES ($1, $2, $3, $4, coalesce($5, false))
      ON CONFLICT (session_id) DO UPDATE
@@ -128,10 +139,11 @@ export function createProjector(deps: ProjectorDeps) {
 
     // A back-dated solve lands in the middle of its session and shifts the rolling windows, so an
     // incremental compare would be wrong: rebuild the event from solve-service instead (rare).
-    const later = await c.query(
-      'SELECT 1 FROM stats.solve_ledger WHERE session_id = $1 AND NOT deleted AND solve_id <> $2 AND created_at > $3 LIMIT 1',
-      [d.sessionId, d.solveId, d.createdAt],
-    );
+    const later = await c.query('SELECT 1 FROM stats.solve_ledger WHERE session_id = $1 AND NOT deleted AND solve_id <> $2 AND created_at > $3 LIMIT 1', [
+      d.sessionId,
+      d.solveId,
+      d.createdAt,
+    ]);
     if (later.rowCount) {
       log.info({ userId: d.userId, solveId: d.solveId }, 'back-dated solve, recomputing event');
       const { queued } = await recomputeEvent(c, rdeps, { userId: d.userId, username: user.username, event: d.event, tz: user.tz });
@@ -192,13 +204,21 @@ export function createProjector(deps: ProjectorDeps) {
       if (!isImprovement(value, prev?.value_ms)) continue;
       const valueMs = value as number;
       await upsertPb(c, d.userId, d.event, kind, valueMs, d.solveId, achievedAt);
-      await c.query(
-        'INSERT INTO stats.pb_history (user_id, event, kind, value_ms, achieved_at) VALUES ($1, $2, $3, $4, $5)',
-        [d.userId, d.event, kind, valueMs, achievedAt],
-      );
+      await c.query('INSERT INTO stats.pb_history (user_id, event, kind, value_ms, achieved_at) VALUES ($1, $2, $3, $4, $5)', [
+        d.userId,
+        d.event,
+        kind,
+        valueMs,
+        achievedAt,
+      ]);
       await queuePbUpdated(c, {
-        userId: d.userId, username: user.username, event: d.event, kind,
-        valueMs, previousMs: prev?.value_ms ?? null, achievedAt,
+        userId: d.userId,
+        username: user.username,
+        event: d.event,
+        kind,
+        valueMs,
+        previousMs: prev?.value_ms ?? null,
+        achievedAt,
       });
       queued++;
     }
@@ -244,10 +264,7 @@ export function createProjector(deps: ProjectorDeps) {
     if (!d) return;
     await inUserTx(d.eventId, d.userId, async (c) => {
       const user = await ensureUser(c, d.userId, d.username, validTz(d.tz));
-      await c.query(
-        'INSERT INTO stats.deleted_sessions (session_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-        [d.sessionId, d.userId],
-      );
+      await c.query('INSERT INTO stats.deleted_sessions (session_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [d.sessionId, d.userId]);
       await c.query('DELETE FROM stats.sessions WHERE session_id = $1', [d.sessionId]);
       const { queued } = await recomputeEvent(c, rdeps, { userId: d.userId, username: user.username, event: d.event, tz: user.tz });
       await refreshTotals(c, d.userId);

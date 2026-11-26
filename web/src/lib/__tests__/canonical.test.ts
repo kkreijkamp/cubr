@@ -8,10 +8,12 @@ describe('canonical addresses', () => {
     expect(canonicalUrl('/')).toBe('https://cubr.dev/');
   });
 
-  it("give a board its event, kind and period, never the page or the day; the default board is plain /leaderboards", () => {
+  it('give a board its event, kind and period, never the page or the day; the default board is plain /leaderboards', () => {
     expect(leaderboardCanonical({ event: '333', kind: 'single', period: 'all' })).toBe('/leaderboards');
     expect(leaderboardCanonical({ event: '444', kind: 'ao5', period: 'weekly' })).toBe('/leaderboards?event=444&kind=ao5&period=weekly');
-    expect(leaderboardCanonical({ event: '333', kind: 'ao5', period: 'challenge', page: 3, date: '2026-11-15' } as never)).toBe('/leaderboards?event=333&kind=ao5&period=challenge');
+    expect(leaderboardCanonical({ event: '333', kind: 'ao5', period: 'challenge', page: 3, date: '2026-11-15' } as never)).toBe(
+      '/leaderboards?event=333&kind=ao5&period=challenge',
+    );
   });
 
   it("match the sitemap's addresses", () => {

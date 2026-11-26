@@ -7,6 +7,8 @@ export * from './redis.js';
 export * from './auth.js';
 export * from './internal.js';
 export * from './events.js';
+export * from './deadLetters.js';
 export * from './http.js';
 export * from './time.js';
 export * from './privacy.js';
+export * from './moderation.js';

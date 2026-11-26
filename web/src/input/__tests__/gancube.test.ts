@@ -13,7 +13,8 @@ async function connect(sim: SimGan) {
   await model.init(
     sim.device as never,
     {
-      state: (facelet: string, moves: string[], ts: [number | null, number | null], _d: string, puzzle?: '333' | '222') => states.push({ facelet, moves: moves.slice(), ts, puzzle }),
+      state: (facelet: string, moves: string[], ts: [number | null, number | null], _d: string, puzzle?: '333' | '222') =>
+        states.push({ facelet, moves: moves.slice(), ts, puzzle }),
       battery: (l: number) => battery.push(l),
       mac: async () => MAC,
       connected: (f: string) => connected.push(f),

@@ -123,11 +123,14 @@ describe('readSqliteTables', () => {
     const text = Array.from({ length: 20_000 }, (_, i) => String.fromCharCode(97 + (i % 26))).join('');
     const blob = Uint8Array.from({ length: 100_000 }, (_, i) => (i * 31) & 0xff);
     for (const pageSize of [512, 4096]) {
-      const bytes = sqliteBytes((db) => {
-        db.exec('CREATE TABLE big (id INTEGER PRIMARY KEY, t TEXT, b BLOB, tail TEXT)');
-        db.prepare('INSERT INTO big (t, b, tail) VALUES (?, ?, ?)').run(text, blob, 'end');
-        db.prepare('INSERT INTO big (t, b, tail) VALUES (?, ?, ?)').run('short', new Uint8Array([9]), 'end 2');
-      }, [`page_size = ${pageSize}`]);
+      const bytes = sqliteBytes(
+        (db) => {
+          db.exec('CREATE TABLE big (id INTEGER PRIMARY KEY, t TEXT, b BLOB, tail TEXT)');
+          db.prepare('INSERT INTO big (t, b, tail) VALUES (?, ?, ?)').run(text, blob, 'end');
+          db.prepare('INSERT INTO big (t, b, tail) VALUES (?, ?, ?)').run('short', new Uint8Array([9]), 'end 2');
+        },
+        [`page_size = ${pageSize}`],
+      );
       const rows = readSqliteTables(bytes).get('big')!;
       expect(rows[0][1]).toBe(text);
       expect(rows[0][2]).toEqual(blob);
@@ -137,15 +140,18 @@ describe('readSqliteTables', () => {
   });
 
   it('returns only live rows: deleted rows and dropped tables do not come back', () => {
-    const bytes = sqliteBytes((db) => {
-      db.exec('CREATE TABLE keep (id INTEGER PRIMARY KEY, v TEXT)');
-      db.exec('CREATE TABLE gone (id INTEGER PRIMARY KEY, v TEXT)');
-      const ins = db.prepare('INSERT INTO keep (v) VALUES (?)');
-      for (let i = 1; i <= 300; i++) ins.run(`v${i}`);
-      db.exec("INSERT INTO gone (v) VALUES ('secret')");
-      db.exec('DELETE FROM keep WHERE id % 3 = 0');
-      db.exec('DROP TABLE gone');
-    }, ['page_size = 512']);
+    const bytes = sqliteBytes(
+      (db) => {
+        db.exec('CREATE TABLE keep (id INTEGER PRIMARY KEY, v TEXT)');
+        db.exec('CREATE TABLE gone (id INTEGER PRIMARY KEY, v TEXT)');
+        const ins = db.prepare('INSERT INTO keep (v) VALUES (?)');
+        for (let i = 1; i <= 300; i++) ins.run(`v${i}`);
+        db.exec("INSERT INTO gone (v) VALUES ('secret')");
+        db.exec('DELETE FROM keep WHERE id % 3 = 0');
+        db.exec('DROP TABLE gone');
+      },
+      ['page_size = 512'],
+    );
     const tables = readSqliteTables(bytes);
     expect([...tables.keys()]).toEqual(['keep']);
     const rows = tables.get('keep')!;
@@ -195,22 +201,28 @@ describe('readSqliteTables on damaged files', () => {
 
   it('stops at a b-tree page that points back at itself', () => {
     let root = 0;
-    const bytes = sqliteBytes((db) => {
-      db.exec('CREATE TABLE t (id INTEGER PRIMARY KEY, label TEXT)');
-      const ins = db.prepare('INSERT INTO t (label) VALUES (?)');
-      for (let i = 0; i < 500; i++) ins.run(`row ${i}`);
-      root = Number((db.prepare("SELECT rootpage FROM sqlite_master WHERE name = 't'").get() as { rootpage: number }).rootpage);
-    }, ['page_size = 512']);
+    const bytes = sqliteBytes(
+      (db) => {
+        db.exec('CREATE TABLE t (id INTEGER PRIMARY KEY, label TEXT)');
+        const ins = db.prepare('INSERT INTO t (label) VALUES (?)');
+        for (let i = 0; i < 500; i++) ins.run(`row ${i}`);
+        root = Number((db.prepare("SELECT rootpage FROM sqlite_master WHERE name = 't'").get() as { rootpage: number }).rootpage);
+      },
+      ['page_size = 512'],
+    );
     const start = (root - 1) * 512;
     expect(bytes[start]).toBe(0x05); // precondition: the root is an interior page
     expect(() => readSqliteTables(withU32(bytes, start + 8, root))).toThrow('b-tree cycle');
   });
 
   it('stops at an overflow chain that loops or ends early', () => {
-    const bytes = sqliteBytes((db) => {
-      db.exec('CREATE TABLE big (t TEXT)');
-      db.prepare('INSERT INTO big VALUES (?)').run('x'.repeat(5000));
-    }, ['page_size = 512']);
+    const bytes = sqliteBytes(
+      (db) => {
+        db.exec('CREATE TABLE big (t TEXT)');
+        db.prepare('INSERT INTO big VALUES (?)').run('x'.repeat(5000));
+      },
+      ['page_size = 512'],
+    );
     // page 2 is the table, its overflow pages follow from page 3 (each starts with the next page number)
     const first = 3 * 512 - 512;
     expect(u32(bytes, first)).toBe(4); // precondition

@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { EVENT_IDS } from '@cubr/cubestats';
-import { clockScramble, cubeScramble, fallbackScramble, megaminxScramble, pyraminxScramble, skewbScramble, square1Scramble } from '../fallbackScramble';
+import {
+  offlineScramble,
+  clockScramble,
+  cubeScramble,
+  fallbackScramble,
+  megaminxScramble,
+  pyraminxScramble,
+  skewbScramble,
+  square1Scramble,
+} from '../fallbackScramble';
 
 function seeded(seed: number) {
   let s = seed;
@@ -73,5 +82,28 @@ describe('fallback scrambles', () => {
   it('blind and fewest-moves variants carry their extras', () => {
     expect(fallbackScramble('333fm', seeded(2))).toMatch(/^R' U' F .* R' U' F$/);
     expect(fallbackScramble('444bf', seeded(2))).toMatch(/ [xy]['2]?$/);
+  });
+});
+
+describe('offline scrambles for the other events and the practice types', () => {
+  it('builds relays from each puzzle, labelled one per line', () => {
+    const lines = fallbackScramble('r234').split('\n');
+    expect(lines.map((l) => l.split(':')[0])).toEqual(['2x2', '3x3', '4x4']);
+    // ten puzzles, each labelled once (megaminx's part runs over several lines)
+    expect(fallbackScramble('rmngf').match(/^(2x2|3x3|4x4|5x5|3x3 oh|pyra|skewb|sq-1|clock|mega): /gm)).toHaveLength(10);
+  });
+
+  it("uses csTimer's random moves where it has them, and nothing where only the service can scramble", () => {
+    expect(fallbackScramble('888').split(' ')).toHaveLength(120);
+    expect(fallbackScramble('fto').split(' ')).toHaveLength(30);
+    expect(fallbackScramble('335')).toMatch(/ \/ /);
+    expect(fallbackScramble('15p')).toBe('');
+    expect(fallbackScramble('redi')).toBe('');
+  });
+
+  it('makes random-move practice types offline, and not the ones that need a solver', () => {
+    expect(offlineScramble('333', '2gen').split(' ')).toHaveLength(25);
+    expect(offlineScramble('333', 'pll')).toBe('');
+    expect(offlineScramble('333')).not.toBe('');
   });
 });

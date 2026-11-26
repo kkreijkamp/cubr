@@ -30,7 +30,21 @@ interface Props {
   timerUpdate: TimerUpdate;
   sizeRem: number;
   pb: boolean;
-  settings: Pick<Settings, 'stickerColours' | 'customStickers' | 'virtualSpeed' | 'virtualView' | 'virtualFloat' | 'virtualOutline' | 'smartScrambled' | 'smartSpace' | 'smartBeep' | 'smartView' | 'smartTurnMark' | 'smartReset'>;
+  settings: Pick<
+    Settings,
+    | 'stickerColours'
+    | 'customStickers'
+    | 'virtualSpeed'
+    | 'virtualView'
+    | 'virtualFloat'
+    | 'virtualOutline'
+    | 'smartScrambled'
+    | 'smartSpace'
+    | 'smartBeep'
+    | 'smartView'
+    | 'smartTurnMark'
+    | 'smartReset'
+  >;
   onState: (s: TimerState) => void;
   /** a solve; `scramble`: the one worked out from a cube scrambled by hand */
   onSolve: (r: { timeMs: number; penalty: Penalty }, scramble?: string) => void;
@@ -40,7 +54,12 @@ interface Props {
   onHint: (h: ScrambleHint | null) => void;
 }
 
-type Conn = { status: 'off' } | { status: 'connecting' } | { status: 'connected'; name: string } | { status: 'reconnecting'; name: string } | { status: 'error'; message: string };
+type Conn =
+  | { status: 'off' }
+  | { status: 'connecting' }
+  | { status: 'connected'; name: string }
+  | { status: 'reconnecting'; name: string }
+  | { status: 'error'; message: string };
 
 const STEP = Math.PI / 24;
 
@@ -425,7 +444,8 @@ export function SmartCubeInput(p: Props) {
 
   // the status in rows: the cube, what can be done, then a question or a word on what to do
   const rows: React.ReactNode[] = [];
-  if (available === false) rows.push(<span className="error">this browser has no bluetooth - use Chrome or Edge on a computer or Android, with bluetooth on</span>);
+  if (available === false)
+    rows.push(<span className="error">this browser has no bluetooth - use Chrome or Edge on a computer or Android, with bluetooth on</span>);
   else if (conn.status === 'off')
     rows.push(
       <button className="btn-text active" onClick={() => void connect()} {...noFocus}>
@@ -480,7 +500,12 @@ export function SmartCubeInput(p: Props) {
         </>,
       );
     else if (eventPz === null) rows.push(<span className="sub">the scramble can't be checked for {eventName}</span>);
-    else if (eventPz !== puzzle) rows.push(<span className="sub">this is a {puzzle === '222' ? '2x2' : '3x3'} - the scramble can't be checked for {eventName}</span>);
+    else if (eventPz !== puzzle)
+      rows.push(
+        <span className="sub">
+          this is a {puzzle === '222' ? '2x2' : '3x3'} - the scramble can't be checked for {eventName}
+        </span>,
+      );
     else if (idle && (session.mark !== 'never' || p.settings.smartSpace))
       rows.push(
         <span className="sub">
@@ -525,7 +550,16 @@ export function SmartCubeInput(p: Props) {
   );
 }
 
-function paint(ctx: CanvasRenderingContext2D, w: number, h: number, v: CubeView, flat: boolean, cam: Camera, palette: Palette, look: { float: number; outline: number }) {
+function paint(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  v: CubeView,
+  flat: boolean,
+  cam: Camera,
+  palette: Palette,
+  look: { float: number; outline: number },
+) {
   const puzzle = v.model.twisty.puzzle;
   if (flat) {
     const colors: string[] = [];

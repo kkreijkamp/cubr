@@ -1,12 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { changePasswordSchema, passwordChangedNotice, signInUrl } from '../src/passwordChange.js';
+import { changePasswordSchema, passwordChangedNotice, signInMethodNotice, signInUrl } from '../src/passwordChange.js';
 
 describe('changing the password', () => {
   it('takes the new password by the sign-up rule (8 to 128 characters) and the current one, which an account without one leaves out', () => {
     expect(changePasswordSchema.parse({ password: 'old secret', newPassword: 'new secret' })).toEqual({ password: 'old secret', newPassword: 'new secret' });
     expect(changePasswordSchema.parse({ newPassword: 'n'.repeat(8) })).toEqual({ newPassword: 'n'.repeat(8) });
     expect(changePasswordSchema.parse({ newPassword: 'n'.repeat(128) }).newPassword).toHaveLength(128);
-    for (const bad of [{}, { password: 'old secret' }, { newPassword: 'n'.repeat(7) }, { newPassword: 'n'.repeat(129) }, { password: '', newPassword: 'new secret' }]) {
+    for (const bad of [
+      {},
+      { password: 'old secret' },
+      { newPassword: 'n'.repeat(7) },
+      { newPassword: 'n'.repeat(129) },
+      { password: '', newPassword: 'new secret' },
+    ]) {
       expect(changePasswordSchema.safeParse(bad).success, JSON.stringify(bad)).toBe(false);
     }
   });
@@ -31,5 +37,18 @@ describe('changing the password', () => {
   it("points at the sign-in page of the site the emails' links go to", () => {
     expect(signInUrl('https://cubr.dev')).toBe('https://cubr.dev/login');
     expect(signInUrl('http://localhost:8080/')).toBe('http://localhost:8080/login');
+  });
+});
+
+describe('signInMethodNotice', () => {
+  it('says which provider was connected or disconnected, and the way back', () => {
+    const on = signInMethodNotice({ username: 'cuber', provider: 'GitHub', connected: true, signInUrl: 'https://cubr.dev/login' });
+    expect(on.subject).toBe('GitHub was connected to your cubr account');
+    expect(on.text).toContain('can be used to sign in to it now');
+    expect(on.text).toContain('https://cubr.dev/login');
+    const off = signInMethodNotice({ username: '<b>x</b>', provider: 'Google', connected: false, signInUrl: 'https://cubr.dev/login' });
+    expect(off.subject).toBe('Google was disconnected from your cubr account');
+    expect(off.text).toContain("can't be used to sign in to it any more");
+    expect(off.html).not.toContain('<b>x</b>');
   });
 });

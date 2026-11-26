@@ -3,7 +3,7 @@
 // outages and generator failures. Searches come from a fake backend, so no cubing.js here.
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createServer, loadConfig } from '@cubr/common';
-import { EVENT_IDS } from '@cubr/cubestats';
+import { ALL_EVENT_IDS, EVENT_IDS } from '@cubr/cubestats';
 import { describeIntegration, startTestServer, type TestServer } from '@cubr/testkit';
 import { DailyChallenges } from '../src/daily.js';
 import { ScrambleGenerator } from '../src/generator.js';
@@ -11,7 +11,7 @@ import { migrations } from '../src/migrations.js';
 import { ScramblePool, poolKey } from '../src/pool.js';
 import { registerRoutes } from '../src/routes/index.js';
 import { GENERATED_PER_MIN, REQUESTS_PER_MIN, registerScrambleRoutes, type ScrambleRouteDeps } from '../src/routes/scrambles.js';
-import { fakeBackend } from './fakes.js';
+import { fakeBackend, fakeCsTimer } from './fakes.js';
 
 /** A fresh client IP per call, so the per-IP limits only trip where a test means them to. */
 let ipCount = 0;
@@ -21,6 +21,7 @@ const generated = (event: string) => expect.stringMatching(new RegExp(`^${event}
 describeIntegration('scramble API', () => {
   let s: TestServer;
   const generator = new ScrambleGenerator(fakeBackend(), { timeoutMs: 5000, maxQueue: 100 });
+  const cstimer = fakeCsTimer();
   const extraApps: { close(): Promise<unknown> }[] = [];
 
   beforeAll(async () => {
@@ -35,6 +36,7 @@ describeIntegration('scramble API', () => {
           daily: new DailyChallenges({ pool, generator, isMigrated: () => true, log: app.log }),
           redis,
           internalToken: config.internalToken,
+          cstimer,
         }),
     });
   });
@@ -53,7 +55,7 @@ describeIntegration('scramble API', () => {
   /** The scramble routes alone on another server, with their own settings. */
   async function scrambleApp(deps: Partial<ScrambleRouteDeps>) {
     const { app } = createServer({ ...loadConfig('scramble'), logLevel: 'silent' }, { infoPrefixes: [] });
-    registerScrambleRoutes(app, { generator, pool: new ScramblePool(s.redis), redis: s.redis, internalToken: s.config.internalToken, ...deps });
+    registerScrambleRoutes(app, { generator, pool: new ScramblePool(s.redis), redis: s.redis, internalToken: s.config.internalToken, cstimer, ...deps });
     await app.ready();
     extraApps.push(app);
     return app;
@@ -77,8 +79,79 @@ describeIntegration('scramble API', () => {
     const res = await get('/api/scrambles/events');
     expect(res.statusCode).toBe(200);
     expect(res.headers['cache-control']).toBe('public, max-age=300');
-    expect(res.json().events.map((e: { id: string }) => e.id)).toEqual(EVENT_IDS);
-    expect(res.json().events[0]).toEqual({ id: '333', name: '3x3x3 Cube', short: '3x3', puzzle: '3x3x3' });
+    expect(res.json().events.map((e: { id: string }) => e.id)).toEqual(ALL_EVENT_IDS);
+    const first = res.json().events[0];
+    expect(first).toMatchObject({ id: '333', name: '3x3x3 Cube', short: '3x3', puzzle: '3x3x3', kind: 'wca' });
+    expect(first.types[0]).toEqual({ id: '333', label: 'wca' });
+    expect(first.types.find((t: { id: string }) => t.id === 'wvls')).toEqual({ id: 'wvls', label: 'wvls' });
+    const minx = res.json().events.find((e: { id: string }) => e.id === 'minx');
+    expect(minx.types.find((t: { id: string }) => t.id === 'mgms2l')).toEqual({ id: 'mgms2l', label: 's2l', pending: true });
+    expect(res.json().events.find((e: { id: string }) => e.id === 'r234')).toMatchObject({ kind: 'other', puzzle: null });
+  });
+
+  it('makes practice scrambles and the other events on request, never from the pool', async () => {
+    await stock('333', 'pool A', 'pool B');
+    const pll = await get('/api/scrambles/333?count=2&type=pll');
+    expect(pll.statusCode).toBe(200);
+    expect(pll.json()).toMatchObject({ event: '333', type: 'pll', source: 'generated' });
+    // the fake backend echoes the job: a 3x3 practice state to solve
+    expect(pll.json().scrambles).toEqual([
+      expect.stringMatching(/^solve:3x3x3:\{.*\} scramble \d+$/),
+      expect.stringMatching(/^solve:3x3x3:\{.*\} scramble \d+$/),
+    ]);
+    expect(await s.redis.llen(poolKey('333'))).toBe(2); // the pool's wca scrambles stay for wca solves
+    const moves = await get('/api/scrambles/333?type=333o');
+    expect(moves.json().scrambles[0].split(' ')).toHaveLength(25);
+    // a relay takes its parts from the pools
+    await stock('222', 'two');
+    await stock('444', 'four');
+    expect((await get('/api/scrambles/r234')).json().scrambles).toEqual(['2x2: two\n3x3: pool A\n4x4: four']);
+  });
+
+  it("asks csTimer for the rest, at its lengths: other puzzles' defaults and their practice types", async () => {
+    expect((await get('/api/scrambles/15p')).json()).toMatchObject({
+      event: '15p',
+      type: '15prp',
+      scrambles: [expect.stringMatching(/^15prp cstimer \d+$/)],
+      source: 'generated',
+    });
+    expect((await get('/api/scrambles/sq1?type=sqrcsp&count=2')).json().scrambles).toEqual([
+      expect.stringMatching(/^sqrcsp cstimer/),
+      expect.stringMatching(/^sqrcsp cstimer/),
+    ]);
+    expect((await get('/api/scrambles/333?type=2gen')).json().scrambles[0]).toMatch(/^2gen cstimer/);
+    expect(cstimer.calls).toContain('15prp:0');
+  });
+
+  it("draws, with csTimer, the scrambles cubr can't draw (puzzles cubing.js lacks, notation it can't read): an SVG that runs nothing, cached by the browser", async () => {
+    const res = await get(`/api/scrambles/15p/image?scramble=${encodeURIComponent('R D L')}`);
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-type']).toBe('image/svg+xml; charset=utf-8');
+    expect(res.headers['cache-control']).toBe('public, max-age=86400');
+    expect(res.headers['content-security-policy']).toBe("default-src 'none'; style-src 'unsafe-inline'");
+    expect(res.body).toMatch(/^<svg[^>]*><text>15prp<\/text>/);
+    // relays go to csTimer in its own labels
+    const relay = await get(`/api/scrambles/r234/image?scramble=${encodeURIComponent('2x2: R U\n3x3: F2\n4x4: Rw2')}`);
+    expect(relay.statusCode).toBe(200);
+    expect(relay.body).toContain('<desc>19</desc>'); // "2) R U\n3) F2\n4) Rw2"
+    expect((await get('/api/scrambles/giga/image?scramble=R%2B%2B%20D--')).statusCode).toBe(200); // notation cubing.js can't read
+    expect((await get('/api/scrambles/334/image?scramble=R')).statusCode).toBe(404); // csTimer can't either
+    expect((await get('/api/scrambles/15p/image')).statusCode).toBe(400);
+    expect((await get('/api/scrambles/nope/image?scramble=R')).statusCode).toBe(404);
+  });
+
+  it('refuses a drawing with anything in it that could run or load something', async () => {
+    const evil = { ...fakeCsTimer(), image: async () => '<svg onload="alert(1)"><rect/></svg>' };
+    const app = await scrambleApp({ cstimer: evil });
+    const res = await app.inject({ method: 'GET', url: `/api/scrambles/15p/image?scramble=R` });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('answers 404 to a scramble type the event does not have, or one that is not available yet', async () => {
+    expect((await get('/api/scrambles/333?type=nope')).statusCode).toBe(404);
+    expect((await get('/api/scrambles/pyram?type=pll')).statusCode).toBe(404);
+    expect((await get('/api/scrambles/minx?type=mgms2l')).statusCode).toBe(404); // newer than cubr's csTimer scramblers
+    expect((await get('/api/scrambles/333?type=bad%20id')).statusCode).toBe(400);
   });
 
   it('generates past the pool for fresh=1 with the internal token, and ignores fresh=1 from everyone else', async () => {
@@ -172,7 +245,12 @@ describeIntegration('scramble API', () => {
   describe('ScramblePool', () => {
     it('trims a pool to its target when pushing, pops the oldest first and reports the size of every pool', async () => {
       const pool = new ScramblePool(s.redis);
-      expect(await pool.push('sq1', Array.from({ length: 60 }, (_, i) => `sq1 #${i}`))).toBe(50); // target 50
+      expect(
+        await pool.push(
+          'sq1',
+          Array.from({ length: 60 }, (_, i) => `sq1 #${i}`),
+        ),
+      ).toBe(50); // target 50
       expect(await pool.take('sq1', 3)).toEqual(['sq1 #0', 'sq1 #1', 'sq1 #2']);
       const sizes = await pool.sizes();
       expect(Object.keys(sizes).sort()).toEqual([...EVENT_IDS].sort());

@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { HttpError, parse } from '@cubr/common';
 import {
-  assertDailyAllowed, createSessionBody, createSolveBody, importBody, isDailyOpen, MAX_IMPORT_SOLVES, mergeSessionsBody, patchSessionBody,
-  patchSolveBody, resolveCreatedAt, utcDay,
+  assertDailyAllowed,
+  createSessionBody,
+  createSolveBody,
+  importBody,
+  isDailyOpen,
+  MAX_IMPORT_SOLVES,
+  mergeSessionsBody,
+  patchSessionBody,
+  patchSolveBody,
+  resolveCreatedAt,
+  utcDay,
 } from '../src/schemas.js';
 
 const SID = '33333333-3333-4333-8333-333333333333';
@@ -53,6 +62,23 @@ describe('createSolveBody', () => {
   });
 });
 
+describe('practice scramble sessions', () => {
+  it("accepts one of the event's practice scramble types, never its default or another event's", () => {
+    expect(parse(createSessionBody, { name: '3x3 pll', event: '333', scramble: 'pll' })).toMatchObject({ event: '333', scramble: 'pll' });
+    expect(parse(createSessionBody, { name: 'x', event: '333', scramble: null })).toMatchObject({ scramble: null });
+    expect(errorOf(() => parse(createSessionBody, { name: 'x', event: '333', scramble: '333' })).message).toMatch(/^scramble:/);
+    expect(errorOf(() => parse(createSessionBody, { name: 'x', event: 'pyram', scramble: 'pll' })).message).toMatch(/^scramble:/);
+    expect(errorOf(() => parse(createSessionBody, { name: 'x', event: '333', scramble: 'p ll' })).message).toMatch(/^scramble:/);
+  });
+
+  it('carries the type through an import, checked the same way', () => {
+    const solve = { timeMs: 1840, createdAt: '2026-11-21T10:00:00Z' };
+    const ok = parse(importBody, { sessions: [{ name: 'pll', event: '333', scramble: 'pll', solves: [solve] }] });
+    expect(ok.sessions[0]).toMatchObject({ scramble: 'pll' });
+    expect(errorOf(() => parse(importBody, { sessions: [{ name: 'x', event: '222', scramble: 'pll', solves: [solve] }] })).message).toMatch(/scramble/);
+  });
+});
+
 describe('createSessionBody / patchSolveBody', () => {
   it('validates session name and event', () => {
     expect(parse(createSessionBody, { name: '  OH  ', event: '333oh' })).toEqual({ name: 'OH', event: '333oh', practice: false });
@@ -93,15 +119,20 @@ describe('importBody', () => {
   });
 
   it('requires createdAt and a known event', () => {
-    expect(errorOf(() => parse(importBody, { sessions: [{ name: 'a', event: '333', solves: [{ timeMs: 1 }] }] })).message).toMatch(
-      /createdAt/,
-    );
+    expect(errorOf(() => parse(importBody, { sessions: [{ name: 'a', event: '333', solves: [{ timeMs: 1 }] }] })).message).toMatch(/createdAt/);
     expect(errorOf(() => parse(importBody, { sessions: [{ name: 'a', event: 'abc', solves: [] }] })).message).toMatch(/event/);
   });
 
   it(`rejects more than ${MAX_IMPORT_SOLVES} solves in total`, () => {
     const half = Array.from({ length: MAX_IMPORT_SOLVES / 2 + 1 }, () => solve);
-    const err = errorOf(() => parse(importBody, { sessions: [{ name: 'a', event: '333', solves: half }, { name: 'b', event: '333', solves: half }] }));
+    const err = errorOf(() =>
+      parse(importBody, {
+        sessions: [
+          { name: 'a', event: '333', solves: half },
+          { name: 'b', event: '333', solves: half },
+        ],
+      }),
+    );
     expect(err.message).toMatch(/at most 100000 solves/);
   });
 });

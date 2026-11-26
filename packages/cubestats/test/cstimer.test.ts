@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CsTimerFormatError, eventForScrType, parseCsTimerExport } from '../src/cstimer.js';
+import { scrambleForScrType, CsTimerFormatError, eventForScrType, parseCsTimerExport } from '../src/cstimer.js';
 
 const sample = JSON.stringify({
   session1: [
@@ -40,5 +40,34 @@ describe('csTimer import', () => {
   it('rejects junk', () => {
     expect(() => parseCsTimerExport('hello')).toThrow(CsTimerFormatError);
     expect(() => parseCsTimerExport('{"a":1}')).toThrow(CsTimerFormatError);
+  });
+});
+
+describe("csTimer's practice and other-puzzle sessions", () => {
+  const file = (scrType: string) =>
+    JSON.stringify({
+      session1: [[[0, 1840], "R2 U' R2 D B2 L2 U L2 D' B2 U2", '', 1763600000]],
+      properties: { sessionData: JSON.stringify({ 1: { name: scrType, opt: { scrType }, rank: 1 } }) },
+    });
+
+  it('imports a PLL session as a 3x3 pll practice session, so its times never become 3x3 records', () => {
+    const [s] = parseCsTimerExport(file('pll'));
+    expect(s).toMatchObject({ event: '333', scramble: 'pll', practice: true, sourceType: 'pll' });
+  });
+
+  it('imports the other puzzles and relays as their own events, at their default', () => {
+    expect(parseCsTimerExport(file('klmso'))[0]).toMatchObject({ event: 'klm' });
+    expect(parseCsTimerExport(file('klmso'))[0].scramble).toBeUndefined();
+    expect(parseCsTimerExport(file('r234w'))[0]).toMatchObject({ event: 'r234' });
+    expect(parseCsTimerExport(file('ftoso'))[0]).toMatchObject({ event: 'fto' });
+    expect(parseCsTimerExport(file('222eg1'))[0]).toMatchObject({ event: '222', scramble: '222eg1', practice: true });
+  });
+
+  it('maps scramble types cubr lists to their event and type', () => {
+    expect(scrambleForScrType('pll')).toEqual({ event: '333', scramble: 'pll' });
+    expect(scrambleForScrType('333')).toEqual({ event: '333' });
+    expect(scrambleForScrType('444m')).toEqual({ event: '444', scramble: '444m' });
+    expect(scrambleForScrType('sq1h')).toEqual({ event: 'sq1', scramble: 'sq1h' });
+    expect(scrambleForScrType('mysteryType')).toEqual({ event: '333' });
   });
 });

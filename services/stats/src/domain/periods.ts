@@ -77,7 +77,10 @@ export function periodBests(sessions: readonly PeriodSolve[][], since: Date, flo
       const at = when.toISOString();
       const day = dayKey(when, 'UTC');
       const week = isoWeekKey(when, 'UTC');
-      for (const [kind, v] of [['single', single], ['ao5', averages[0]]] as const) {
+      for (const [kind, v] of [
+        ['single', single],
+        ['ao5', averages[0]],
+      ] as const) {
         if (!v) continue;
         offer(out.days, day, kind, v, at);
         offer(out.weeks, week, kind, v, at);
@@ -106,7 +109,11 @@ export function allTimeBests(sessions: readonly PeriodSolve[][], floors: PeriodF
   for (const solves of sessions) {
     for (const { at: when, single, averages } of sessionValues(solves, floors, [5, 12])) {
       const at = when.toISOString();
-      for (const [kind, v] of [['single', single], ['ao5', averages[0]], ['ao12', averages[1]]] as const) {
+      for (const [kind, v] of [
+        ['single', single],
+        ['ao5', averages[0]],
+        ['ao12', averages[1]],
+      ] as const) {
         if (!v) continue;
         const into: AllTimeValues = v.ok ? out : (out.flagged ??= {});
         if (better(into[kind], v.valueMs, at)) into[kind] = { valueMs: v.valueMs, achievedAt: at };

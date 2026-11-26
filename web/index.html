@@ -11,14 +11,14 @@
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1d2024" />
     <!-- the title, this description and the summary in #root are the home page's: the build writes each
          public page's own into its copy of this file (plugins/pageFiles.ts, from src/lib/pageMeta.ts) -->
-    <meta name="description" content="a minimalist speedcube timer for cubers: scrambles for every wca event, csTimer-grade stats, a daily challenge and live races with other speedcubers." />
+    <meta name="description" content="a minimalist speedcube timer for cubers, from the rubik's cube to every wca event: csTimer-grade stats, a daily challenge and live races with other speedcubers." />
     <!-- link previews (chat apps, social sites): crawlers don't run the app, so each page's card is its HTML's.
          The title is "cubr" on every card; the description is the page's. public/og.png is drawn by
          web/scripts/pwa-assets.mjs og; no og:url, so a shared page links to itself -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="cubr" />
     <meta property="og:title" content="cubr" />
-    <meta property="og:description" content="a minimalist speedcube timer for cubers: scrambles for every wca event, csTimer-grade stats, a daily challenge and live races with other speedcubers." />
+    <meta property="og:description" content="a minimalist speedcube timer for cubers, from the rubik's cube to every wca event: csTimer-grade stats, a daily challenge and live races with other speedcubers." />
     <meta property="og:image" content="https://cubr.dev/og.png" />
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
@@ -39,7 +39,7 @@
             "url": "https://cubr.dev/",
             "name": "cubr",
             "alternateName": ["cubr.dev"],
-            "description": "a minimalist speedcube timer for cubers: scrambles for every wca event, csTimer-grade stats, a daily challenge and live races with other speedcubers.",
+            "description": "a minimalist speedcube timer for cubers, from the rubik's cube to every wca event: csTimer-grade stats, a daily challenge and live races with other speedcubers.",
             "inLanguage": "en",
             "publisher": { "@id": "https://cubr.dev/#organization" }
           },
@@ -54,7 +54,13 @@
         ]
       }
     </script>
+    <!-- the SVG first: the theme recolours it (lib/themes.ts). The PNGs, drawn on whole pixels, stay sharp
+         where the SVG blurs (16 px) and are what search results show (Google wants 48 px or more);
+         /favicon.ico (16, 32 and 48 px) answers the tools that ask for it. -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/icons/favicon-48.png" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/icons/favicon-96.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/favicon-192.png" />
     <!-- the installable app (PWA): public/manifest.webmanifest, the service worker is src/sw/ -->
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -191,7 +197,7 @@
     <div id="root">
       <div id="page-summary" style="position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap">
         <h1>cubr: a minimalist speedcube timer</h1>
-        <p>a minimalist speedcube timer for cubers: scrambles for every wca event, csTimer-grade stats, a daily challenge and live races with other speedcubers.</p>
+        <p>a minimalist speedcube timer for cubers, from the rubik's cube to every wca event: csTimer-grade stats, a daily challenge and live races with other speedcubers.</p>
         <nav aria-label="pages">
           <a href="/">cube timer</a> <a href="/daily">daily challenge</a> <a href="/race">live races</a> <a href="/leaderboards">leaderboards</a> <a href="/wca">wca rankings</a> <a href="/about">about cubr</a>
         </nav>

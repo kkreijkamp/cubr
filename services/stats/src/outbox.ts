@@ -27,10 +27,7 @@ export function createPbRelay(pool: Pool, redis: Redis, log: FastifyBaseLogger, 
   /** One batch; `more` = a full batch went out and there may be more rows waiting. */
   async function flushBatch(): Promise<{ published: number; more: boolean }> {
     return withTx(pool, async (c) => {
-      const { rows: lock } = await c.query<{ ok: boolean }>(
-        'SELECT pg_try_advisory_xact_lock(hashtext($1), 0) AS ok',
-        ['cubr:stats:pb-outbox'],
-      );
+      const { rows: lock } = await c.query<{ ok: boolean }>('SELECT pg_try_advisory_xact_lock(hashtext($1), 0) AS ok', ['cubr:stats:pb-outbox']);
       if (!lock[0].ok) return { published: 0, more: false }; // another replica is relaying right now
       const { rows } = await c.query<{ id: number; type: string; payload: Record<string, unknown> }>(
         'SELECT id, type, payload FROM stats.pb_outbox ORDER BY id LIMIT $1',

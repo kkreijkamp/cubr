@@ -21,10 +21,7 @@ export interface Refiller {
  * stands down while user requests are being served, so it soaks up idle CPU only - and it never
  * affects correctness: an empty pool just means requests generate on the fly.
  */
-export function startRefiller(
-  deps: { pool: ScramblePool; generator: ScrambleGenerator; log: FastifyBaseLogger },
-  opts: RefillOptions,
-): Refiller {
+export function startRefiller(deps: { pool: ScramblePool; generator: ScrambleGenerator; log: FastifyBaseLogger }, opts: RefillOptions): Refiller {
   const { pool, generator, log } = deps;
   const warn = throttledWarn(log, 15_000);
   let running = true;

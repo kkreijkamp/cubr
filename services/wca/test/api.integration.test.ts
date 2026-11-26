@@ -8,6 +8,7 @@ import { EVENT_IDS } from '@cubr/cubestats';
 import { describeIntegration, startTestServer, type TestServer } from '@cubr/testkit';
 import { createCache } from '../src/cache.js';
 import { createDataset } from '../src/dataset.js';
+import { createRankIndex } from '../src/rankIndex.js';
 import { createRepo } from '../src/repo.js';
 import { registerRoutes } from '../src/routes/index.js';
 import { createService } from '../src/service.js';
@@ -72,7 +73,11 @@ describeIntegration('wca API', () => {
         single: { value: 4_000, ...ADA, holders: [ADA, BEN] },
         average: { value: 5_000, ...ADA, holders: [ADA] },
       });
-      expect(byEvent['333fm']).toMatchObject({ unit: 'moves', single: { value: 20, personId: ADA.personId }, average: { value: 24.67, personId: ADA.personId } });
+      expect(byEvent['333fm']).toMatchObject({
+        unit: 'moves',
+        single: { value: 20, personId: ADA.personId },
+        average: { value: 24.67, personId: ADA.personId },
+      });
       expect(byEvent['222']).toMatchObject({ single: { value: 1_500, personId: '2014JJJJ01' }, average: null });
       expect(byEvent['444']).toMatchObject({ single: null, average: null });
     });
@@ -87,12 +92,39 @@ describeIntegration('wca API', () => {
     });
   });
 
+  it('ranks from the in-memory lists exactly as the SQL counts do, for every event and value of the export', async () => {
+    const repo = createRepo(s.pool);
+    const ranks = createRankIndex(repo);
+    const { rows } = await s.pool.query<{ event_id: string; best: number }>('SELECT DISTINCT event_id, best FROM wca.ranks_single ORDER BY 1, 2');
+    for (const { event_id: event, best } of rows)
+      for (const raw of [best - 1, best, best + 1]) {
+        const sql = await repo.worldCounts('single', event, raw, raw);
+        expect(await ranks.world('v', 'single', event, raw, raw), `${event} ${raw}`).toMatchObject({
+          faster: Number(sql.faster),
+          notSlower: Number(sql.notSlower),
+        });
+        const country = await repo.countryCounts('single', event, 'Australia', raw, raw);
+        expect(await ranks.country('v', 'single', event, 'Australia', raw, raw), `${event} ${raw} in Australia`).toEqual({
+          faster: Number(country.faster),
+          notSlower: Number(country.notSlower),
+          total: Number(country.total),
+        });
+      }
+  });
+
   describe('rank', () => {
     it('ranks a time among everyone: 1 + the people strictly faster, beating the people strictly slower', async () => {
       const res = await s.request('GET', '/api/wca/rank?event=333&kind=single&value=12000');
       expect(res.headers['cache-control']).toBe('public, max-age=300');
       expect(res.headers['x-cache']).toBeUndefined(); // one answer per value: not kept in Redis
-      expect(res.json()).toMatchObject({ event: '333', kind: 'single', value: 12_000, unit: 'time', world: { rank: 5, total: 9, percentile: 33.33 }, country: null });
+      expect(res.json()).toMatchObject({
+        event: '333',
+        kind: 'single',
+        value: 12_000,
+        unit: 'time',
+        world: { rank: 5, total: 9, percentile: 33.33 },
+        country: null,
+      });
     });
 
     it.each([
@@ -137,7 +169,11 @@ describeIntegration('wca API', () => {
     });
 
     it('ranks FMC in moves: whole moves for singles, two decimals for averages', async () => {
-      expect(await get('/api/wca/rank?event=333fm&kind=single&value=25')).toMatchObject({ unit: 'moves', value: 25, world: { rank: 2, total: 3, percentile: 33.33 } });
+      expect(await get('/api/wca/rank?event=333fm&kind=single&value=25')).toMatchObject({
+        unit: 'moves',
+        value: 25,
+        world: { rank: 2, total: 3, percentile: 33.33 },
+      });
       const average = await get('/api/wca/rank?event=333fm&kind=average&value=24.67');
       expect(average).toMatchObject({ value: 24.67, world: { rank: 1, total: 3, percentile: 66.67 } });
       expect(average.neighbours.map((x: { value: number }) => x.value)).toEqual([24.67, 28, 31.33]);
@@ -162,7 +198,19 @@ describeIntegration('wca API', () => {
   describe('distribution', () => {
     it('gives the percentiles and an equal-width histogram in ms that accounts for every result', async () => {
       const d = await get('/api/wca/distribution?event=333&kind=single&buckets=50');
-      expect(d).toMatchObject({ event: '333', kind: 'single', unit: 'time', total: 9, min: 4_000, p10: 4_000, p25: 10_000, p50: 12_000, p75: 15_000, p90: 22_000, p99: 29_200 });
+      expect(d).toMatchObject({
+        event: '333',
+        kind: 'single',
+        unit: 'time',
+        total: 9,
+        min: 4_000,
+        p10: 4_000,
+        p25: 10_000,
+        p50: 12_000,
+        p75: 15_000,
+        p90: 22_000,
+        p99: 29_200,
+      });
       expect(d.buckets).toHaveLength(50);
       expect(d.buckets[0].from).toBe(4_000);
       expect(new Set(d.buckets.map((b: { from: number; to: number }) => b.to - b.from))).toEqual(new Set([600]));
@@ -174,13 +222,33 @@ describeIntegration('wca API', () => {
       const d = await get('/api/wca/distribution?event=333fm&kind=average');
       expect(d).toMatchObject({ unit: 'moves', total: 3, min: 24.67, p50: 28 });
       expect(d.buckets.map((b: { from: number; to: number; count: number }) => [b.from, b.to, b.count])).toEqual([
-        [24, 25, 1], [25, 26, 0], [26, 27, 0], [27, 28, 0], [28, 29, 1], [29, 30, 0], [30, 31, 0], [31, 32, 1],
+        [24, 25, 1],
+        [25, 26, 0],
+        [26, 27, 0],
+        [27, 28, 0],
+        [28, 29, 1],
+        [29, 30, 0],
+        [30, 31, 0],
+        [31, 32, 1],
       ]);
     });
 
     it('answers an event without results with an empty distribution', async () => {
       expect(await get('/api/wca/distribution?event=444')).toEqual({
-        event: '444', kind: 'single', unit: 'time', total: 0, p10: null, p25: null, p50: null, p75: null, p90: null, p99: null, min: null, below: 0, above: 0, buckets: [],
+        event: '444',
+        kind: 'single',
+        unit: 'time',
+        total: 0,
+        p10: null,
+        p25: null,
+        p50: null,
+        p75: null,
+        p90: null,
+        p99: null,
+        min: null,
+        below: 0,
+        above: 0,
+        buckets: [],
       });
     });
 
@@ -233,12 +301,32 @@ describeIntegration('wca API', () => {
   describe('person', () => {
     it('shows a person with their current country and a PB line for each cubr event they have results in', async () => {
       expect(await get('/api/wca/persons/2010aaaa01')).toEqual({
-        person: { wcaId: '2010AAAA01', name: 'Ada Fast', gender: 'f', countryId: 'Australia', countryIso2: 'AU', countryName: 'Australia', continentId: '_Oceania', continentName: 'Oceania' },
+        person: {
+          wcaId: '2010AAAA01',
+          name: 'Ada Fast',
+          countryId: 'Australia',
+          countryIso2: 'AU',
+          countryName: 'Australia',
+          continentId: '_Oceania',
+          continentName: 'Oceania',
+        },
         // cubr's event order; the multi-blind and retired-event results are left out
         pbs: [
-          { event: '333', eventName: '3x3x3 Cube', unit: 'time', single: { value: 4_000, worldRank: 1, continentRank: 1, countryRank: 1 }, average: { value: 5_000, worldRank: 1, continentRank: 1, countryRank: 1 } },
+          {
+            event: '333',
+            eventName: '3x3x3 Cube',
+            unit: 'time',
+            single: { value: 4_000, worldRank: 1, continentRank: 1, countryRank: 1 },
+            average: { value: 5_000, worldRank: 1, continentRank: 1, countryRank: 1 },
+          },
           { event: '222', eventName: '2x2x2 Cube', unit: 'time', single: { value: 2_000, worldRank: 2, continentRank: 2, countryRank: 2 }, average: null },
-          { event: '333fm', eventName: '3x3x3 Fewest Moves', unit: 'moves', single: { value: 20, worldRank: 1, continentRank: 1, countryRank: 1 }, average: { value: 24.67, worldRank: 1, continentRank: 1, countryRank: 1 } },
+          {
+            event: '333fm',
+            eventName: '3x3x3 Fewest Moves',
+            unit: 'moves',
+            single: { value: 20, worldRank: 1, continentRank: 1, countryRank: 1 },
+            average: { value: 24.67, worldRank: 1, continentRank: 1, countryRank: 1 },
+          },
         ],
       });
     });

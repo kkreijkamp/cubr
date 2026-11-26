@@ -14,7 +14,7 @@ function rng(seed: number) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-const pick = <T,>(r: () => number, a: T[]) => a[Math.floor(r() * a.length)];
+const pick = <T>(r: () => number, a: T[]) => a[Math.floor(r() * a.length)];
 
 /** for each face (by its solved colour), the colours on it now - from cubing.js */
 async function cubingFaces(id: string, alg: string): Promise<Map<number, number[]>> {
@@ -70,7 +70,8 @@ describe('virtual puzzles match cubing.js (the scramble preview)', () => {
       expect(ourFaces(t, alg), alg).toEqual(await cubingFaces(`${n}x${n}x${n}`, alg));
     }
     // slices on odd cubes
-    if (n % 2 === 1) for (const alg of ["M E S'", 'M2 U M\' U2 E', "R M' x' S E2"]) expect(ourFaces(t, alg), alg).toEqual(await cubingFaces(`${n}x${n}x${n}`, alg));
+    if (n % 2 === 1)
+      for (const alg of ["M E S'", "M2 U M' U2 E", "R M' x' S E2"]) expect(ourFaces(t, alg), alg).toEqual(await cubingFaces(`${n}x${n}x${n}`, alg));
   });
 
   it('pyraminx', async () => {
@@ -103,7 +104,10 @@ describe('virtual puzzles match cubing.js (the scramble preview)', () => {
       expect(ourFaces(t, alg), alg).toEqual(await cubingFaces('megaminx', alg));
     }
     for (let i = 0; i < 6; i++) {
-      const alg = Array.from({ length: 12 }, () => pick(r, ['U', 'F', 'R', 'L', 'BR', 'BL', 'FR', 'FL', 'DR', 'DL', 'B', 'D']) + pick(r, ['', "'", '2', "2'"])).join(' ');
+      const alg = Array.from(
+        { length: 12 },
+        () => pick(r, ['U', 'F', 'R', 'L', 'BR', 'BL', 'FR', 'FL', 'DR', 'DL', 'B', 'D']) + pick(r, ['', "'", '2', "2'"]),
+      ).join(' ');
       expect(ourFaces(t, alg), alg).toEqual(await cubingFaces('megaminx', alg));
     }
   });
@@ -154,7 +158,12 @@ describe('virtual puzzles', () => {
   });
 
   it("every key of csTimer's layout makes a move the puzzle can do", () => {
-    const codes = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'].map((c) => `Key${c}`).concat(['Semicolon', 'Comma', 'Period', 'Slash'], [...'0123456789'].map((d) => `Digit${d}`));
+    const codes = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ']
+      .map((c) => `Key${c}`)
+      .concat(
+        ['Semicolon', 'Comma', 'Period', 'Slash'],
+        [...'0123456789'].map((d) => `Digit${d}`),
+      );
     for (const t of [cubeTwisty(2), cubeTwisty(3), cubeTwisty(5), pyraminxTwisty(), skewbTwisty(), megaminxTwisty()]) {
       let moves = 0;
       for (const code of codes) {

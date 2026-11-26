@@ -1,4 +1,4 @@
-import Fastify, { type FastifyInstance, type FastifyError } from 'fastify';
+import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import { ZodError } from 'zod';
 import type { BaseConfig } from './config.js';
 import { HttpError } from './errors.js';
@@ -69,6 +69,33 @@ export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
 export const ROBOTS_HEADERS: Readonly<Record<string, string>> = { 'X-Robots-Tag': 'noindex' };
 
 /**
+ * The JSON error envelope (SPEC section 5) for whatever a route throws. HttpErrors, bad requests and
+ * oversized bodies are answered without a log line, so a route that keeps its requests out of the logs
+ * (logLevel warn: /api/errors, /api/feedback) never has one recorded next to the visitor's address;
+ * anything else is logged as "unhandled error" and answered 500.
+ */
+export function replyWithError(err: FastifyError | HttpError | ZodError | Error, req: FastifyRequest, reply: FastifyReply) {
+  if (err instanceof HttpError) {
+    return reply.status(err.statusCode).send({ error: { code: err.code, message: err.message } });
+  }
+  if (err instanceof ZodError) {
+    const issue = err.issues[0];
+    return reply.status(400).send({
+      error: { code: 'BAD_REQUEST', message: `${issue.path.join('.')}: ${issue.message}` },
+    });
+  }
+  const fe = err as FastifyError;
+  if (fe.statusCode === 413 || fe.code === 'FST_ERR_CTP_BODY_TOO_LARGE') {
+    return reply.status(413).send({ error: { code: 'PAYLOAD_TOO_LARGE', message: 'Request body too large' } });
+  }
+  if (fe.validation || (fe.statusCode && fe.statusCode >= 400 && fe.statusCode < 500)) {
+    return reply.status(fe.statusCode ?? 400).send({ error: { code: 'BAD_REQUEST', message: fe.message } });
+  }
+  req.log.error({ err }, 'unhandled error');
+  return reply.status(500).send({ error: { code: 'INTERNAL', message: 'Internal server error' } });
+}
+
+/**
  * Creates a Fastify instance with the cross-cutting behaviour every cubr service shares:
  * JSON error envelope, the security headers, /healthz, /readyz and <prefix>/_info.
  */
@@ -95,26 +122,7 @@ export function createServer(config: BaseConfig, opts: ServerOptions): Server {
     return payload;
   });
 
-  app.setErrorHandler((err: FastifyError | HttpError | ZodError | Error, req, reply) => {
-    if (err instanceof HttpError) {
-      return reply.status(err.statusCode).send({ error: { code: err.code, message: err.message } });
-    }
-    if (err instanceof ZodError) {
-      const issue = err.issues[0];
-      return reply.status(400).send({
-        error: { code: 'BAD_REQUEST', message: `${issue.path.join('.')}: ${issue.message}` },
-      });
-    }
-    const fe = err as FastifyError;
-    if (fe.statusCode === 413 || fe.code === 'FST_ERR_CTP_BODY_TOO_LARGE') {
-      return reply.status(413).send({ error: { code: 'PAYLOAD_TOO_LARGE', message: 'Request body too large' } });
-    }
-    if (fe.validation || (fe.statusCode && fe.statusCode >= 400 && fe.statusCode < 500)) {
-      return reply.status(fe.statusCode ?? 400).send({ error: { code: 'BAD_REQUEST', message: fe.message } });
-    }
-    req.log.error({ err }, 'unhandled error');
-    return reply.status(500).send({ error: { code: 'INTERNAL', message: 'Internal server error' } });
-  });
+  app.setErrorHandler(replyWithError);
 
   app.setNotFoundHandler((req, reply) => {
     reply.status(404).send({ error: { code: 'NOT_FOUND', message: `Route ${req.method} ${req.url} not found` } });
@@ -127,9 +135,7 @@ export function createServer(config: BaseConfig, opts: ServerOptions): Server {
   // routes traffic to ready pods.
   app.get('/readyz', { logLevel: 'warn' }, async (_req, reply) => {
     if (shuttingDown) return reply.status(503).send({ status: 'shutting-down' });
-    const entries = await Promise.all(
-      Object.entries(checks).map(async ([name, fn]) => [name, await runCheck(fn)] as const),
-    );
+    const entries = await Promise.all(Object.entries(checks).map(async ([name, fn]) => [name, await runCheck(fn)] as const));
     const deps = Object.fromEntries(entries);
     const ok = entries.every(([, s]) => s === 'ok');
     return reply.status(ok ? 200 : 503).send({ status: ok ? 'ready' : 'not-ready', deps });
@@ -172,11 +178,7 @@ export function createServer(config: BaseConfig, opts: ServerOptions): Server {
  * Starts listening and wires graceful shutdown: on SIGTERM/SIGINT readiness flips to 503,
  * in-flight requests finish, then the `onClose` hooks (pools, consumers) run.
  */
-export async function start(
-  server: Server,
-  config: BaseConfig,
-  onClose: Array<() => Promise<unknown> | unknown> = [],
-): Promise<void> {
+export async function start(server: Server, config: BaseConfig, onClose: Array<() => Promise<unknown> | unknown> = []): Promise<void> {
   const { app } = server;
   let closing = false;
   const shutdown = async (signal: string) => {
@@ -206,8 +208,5 @@ export async function start(
   process.once('SIGINT', () => void shutdown('SIGINT'));
 
   await app.listen({ host: '0.0.0.0', port: config.port });
-  app.log.info(
-    { version: config.version, node: config.nodeName },
-    `${config.serviceName} listening on :${config.port}`,
-  );
+  app.log.info({ version: config.version, node: config.nodeName }, `${config.serviceName} listening on :${config.port}`);
 }

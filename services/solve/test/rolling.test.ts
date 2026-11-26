@@ -55,14 +55,28 @@ describe('dailyOverview', () => {
 
   it('reports the official ao5 from the attempts, not from the solves as they are now', () => {
     // the solve of attempt 3 was later re-penalised to DNF; the attempt keeps the submitted time
-    const solves = [{ event: '333', id: 'a' }, { event: '333', id: 'b' }];
+    const solves = [
+      { event: '333', id: 'a' },
+      { event: '333', id: 'b' },
+    ];
     const official = attempts('333', ok(10_000), ok(11_000), ok(12_000), ok(13_000), ok(20_000));
-    expect(dailyOverview(solves, official)).toEqual({ '333': { solves, ao5: 12_000 } });
+    expect(dailyOverview(solves, official)).toMatchObject({ '333': { solves, ao5: 12_000 } });
   });
 
   it('keeps events whose solves were deleted and is null until all five attempts exist', () => {
-    expect(dailyOverview([], attempts('222', ok(3_000), ok(4_000)))).toEqual({ '222': { solves: [], ao5: null } });
-    expect(dailyOverview([{ event: 'pyram' }], [])).toEqual({ pyram: { solves: [{ event: 'pyram' }], ao5: null } });
+    expect(dailyOverview([], attempts('222', ok(3_000), ok(4_000)))).toMatchObject({ '222': { solves: [], ao5: null } });
+    expect(dailyOverview([{ event: 'pyram' }], [])).toEqual({ pyram: { solves: [{ event: 'pyram' }], attempts: [], ao5: null } });
+  });
+
+  it('lists the official attempts with their index and solve, which may be gone', () => {
+    const official = [
+      { event: '333', index: 0, solveId: 'gone', ...ok(10_000) },
+      { event: '333', index: 1, solveId: 'b', ...ok(11_000) },
+    ];
+    expect(dailyOverview([{ event: '333', id: 'b' }], official)['333'].attempts).toEqual([
+      { index: 0, timeMs: 10_000, penalty: 'OK', solveId: 'gone' },
+      { index: 1, timeMs: 11_000, penalty: 'OK', solveId: 'b' },
+    ]);
   });
 });
 

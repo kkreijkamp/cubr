@@ -6,7 +6,7 @@ Accounts, JWT login/logout, sign-in with Google, Apple and GitHub, profiles with
 
 | Route | Auth | Notes |
 |---|---|---|
-| `POST /api/auth/register` | - | `{username, email, password}` -> 201 `{token, user}`; 409 if username/email taken (case-insensitive); 20/hour/IP |
+| `POST /api/auth/register` | - | `{username, email, password}` -> 201 `{token, user}`; 409 if the username is taken, or the email is another account's (case-insensitive; one never confirmed within its 7 days is freed instead, `src/unconfirmed.ts`); 20/hour/IP |
 | `POST /api/auth/login` | - | `{login, password}` (username or email) -> `{token, user}`; 401; 429 after 10 attempts/min/IP |
 | `POST /api/auth/logout` | req | 204; stores `auth:revoked:<jti>` with TTL = token's remaining life. Accepts any/empty body |
 | `GET /api/auth/me` | req | `{user: PrivateUser, settings}` |
@@ -21,7 +21,10 @@ Accounts, JWT login/logout, sign-in with Google, Apple and GitHub, profiles with
 | `GET /api/auth/_info`, `/api/users/_info` | - | info |
 
 Sign-in with providers (`/api/auth/oauth/*`, `/api/auth/me/sign-in`, `/api/auth/me/identities/:provider`) is in
-SPEC section 9.1, and below.
+SPEC section 9.1, and below. So are the front-end error reports (`POST /api/errors`, SPEC 10.5) and the feedback
+form (`POST /api/feedback`, SPEC 10.6, `src/feedback.ts`): a message emailed to the contact inbox (`MAIL_REPLY_TO`)
+with reply-to the sender, nothing stored; 3 per 10 min and 10 a day per IP, 25 a day in all (that cap fails closed
+when Redis is down, so a flood can't use up the emails password resets need).
 
 - Passwords: bcryptjs cost 10 (async). Unknown logins still run a bcrypt compare against a dummy hash
   so response time doesn't reveal whether an account exists.

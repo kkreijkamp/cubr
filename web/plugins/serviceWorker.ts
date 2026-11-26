@@ -27,7 +27,12 @@ export function serviceWorker(): Plugin {
       const off = process.env.VITE_SW === 'off';
       const urls = off ? [] : precacheUrls(filesIn(outDir).map((f) => relative(outDir, f).split(sep).join('/')));
       const hash = createHash('sha256');
-      for (const url of urls) hash.update(url).update('\0').update(readFileSync(join(outDir, url.slice(1)))).update('\0');
+      for (const url of urls)
+        hash
+          .update(url)
+          .update('\0')
+          .update(readFileSync(join(outDir, url.slice(1))))
+          .update('\0');
       const version = hash.digest('hex').slice(0, 16);
       await build({
         configFile: false,

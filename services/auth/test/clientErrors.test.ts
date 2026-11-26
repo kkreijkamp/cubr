@@ -43,6 +43,16 @@ describe('front-end error reports', () => {
     expect(scrubText('/profile/:username')).toBe('/profile/:username'); // a route pattern stays
   });
 
+  it('scrub a long run of address characters in linear time', () => {
+    // the old pattern took over a second on 50,000 characters (it tried every start inside the run)
+    for (const run of ['a'.repeat(50_000), 'a.'.repeat(25_000)]) {
+      const t0 = performance.now();
+      expect(scrubText(`${run} koen@cubr.dev`)).toContain('<email>');
+      expect(performance.now() - t0).toBeLessThan(250);
+    }
+    expect(scrubText('x a.b+c@d-e.co.uk y')).toBe('x <email> y');
+  });
+
   it('leave a stack readable: asset names, line numbers and long function names stay', () => {
     const stack = 'at useSyncExternalStoreWithSelector (https://cubr.dev/assets/index-D3oOLUDV.js:12:3456)';
     expect(scrubText(stack)).toBe(stack);

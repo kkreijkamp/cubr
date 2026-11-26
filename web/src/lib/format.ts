@@ -1,4 +1,4 @@
-export { formatTime, formatSolve, formatDuration, getEvent, EVENTS } from '@cubr/cubestats';
+export { formatTime, formatAverage, formatResult, formatSolve, formatDuration, getEvent, EVENTS } from '@cubr/cubestats';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 

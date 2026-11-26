@@ -182,7 +182,7 @@ describe('bluetooth timers, connected (fake devices)', () => {
     expect(ack.slice(0, 10)).toEqual([0, 0, 0, 2, 0, 0, 0, 9, 0x10, 0x03]);
   });
 
-  it("QiYi: without advertisements, the MAC its name suggests", async () => {
+  it('QiYi: without advertisements, the MAC its name suggests', async () => {
     const write = new FakeCharacteristic('00000001-0000-1001-8001-00805f9b07d0');
     const read = new FakeCharacteristic('00000002-0000-1001-8001-00805f9b07d0');
     const device = new FakeDevice('QY-Adapter-ABCD', [new FakeService('0000fd50-0000-1000-8000-00805f9b34fb', [write, read])]);

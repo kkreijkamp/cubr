@@ -1,6 +1,6 @@
 // Pure helpers behind lib/solves.ts (kept free of browser globals so they can be unit-tested):
 // compact localStorage codec, retry-queue coalescing, optimistic overlays, import chunking, backoff.
-import { defaultSessionName, practiceSessionName, type Penalty } from '@cubr/cubestats';
+import { defaultSessionName, isPracticeScramble, practiceSessionName, type Penalty } from '@cubr/cubestats';
 import type { ImportPayload, NewSolve } from '../lib/api';
 import type { Session, Solve } from '../lib/types';
 
@@ -20,10 +20,10 @@ export function freeSessionName(base: string, sessions: readonly { name: string 
  */
 export function defaultSessionsPlan(
   event: string,
-  sessions: readonly Pick<Session, 'name' | 'event' | 'practice'>[],
+  sessions: readonly Pick<Session, 'name' | 'event' | 'practice' | 'scramble'>[],
 ): { name: string; practice: boolean }[] {
   const normal = { name: freeSessionName(defaultSessionName(event), sessions), practice: false };
-  if (sessions.some((s) => s.event === event && s.practice)) return [normal];
+  if (sessions.some((s) => s.event === event && s.practice && !s.scramble)) return [normal];
   const practice = { name: freeSessionName(practiceSessionName(event), [...sessions, normal]), practice: true };
   return [normal, practice];
 }
@@ -91,6 +91,8 @@ interface LocalSessionRow {
   event: string;
   /** only stored when true */
   practice?: boolean;
+  /** a practice scramble type; only stored when set */
+  scramble?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -188,7 +190,8 @@ export function decodeLocalDb(raw: unknown, isEvent: (id: string) => boolean): {
       id: row.id,
       name,
       event,
-      ...(row.practice === true ? { practice: true } : {}),
+      ...(row.practice === true || isStr(row.scramble) ? { practice: true } : {}),
+      ...(isStr(row.scramble) && isPracticeScramble(event, row.scramble) ? { scramble: row.scramble } : {}),
       createdAt,
       updatedAt: validIso(row.updatedAt, createdAt),
       solveCount: sorted.length,
@@ -205,7 +208,15 @@ export function decodeLocalDb(raw: unknown, isEvent: (id: string) => boolean): {
 export function encodeLocalDb(db: LocalDb): string {
   const file: LocalDbFile = {
     v: 1,
-    sessions: db.sessions.map(({ id, name, event, practice, createdAt, updatedAt }) => ({ id, name, event, ...(practice ? { practice } : {}), createdAt, updatedAt })),
+    sessions: db.sessions.map(({ id, name, event, practice, scramble, createdAt, updatedAt }) => ({
+      id,
+      name,
+      event,
+      ...(practice ? { practice } : {}),
+      ...(scramble ? { scramble } : {}),
+      createdAt,
+      updatedAt,
+    })),
     solves: {},
     current: db.current,
     lastByEvent: db.lastByEvent,
@@ -220,7 +231,11 @@ export const QUEUE_KEY = 'cubr.queue.v1';
 
 export type SyncOp =
   /** keepCreatedAt: send createdAt too (a cleared session's replacement keeps the old one's place) */
-  | { kind: 'createSession'; session: { id: string; name: string; event: string; practice?: boolean; createdAt: string }; keepCreatedAt?: boolean }
+  | {
+      kind: 'createSession';
+      session: { id: string; name: string; event: string; practice?: boolean; scramble?: string; createdAt: string };
+      keepCreatedAt?: boolean;
+    }
   | { kind: 'renameSession'; id: string; name: string }
   | { kind: 'setPractice'; id: string; practice: boolean }
   | { kind: 'deleteSession'; id: string }
@@ -241,8 +256,7 @@ const OP_KINDS = new Set(['createSession', 'renameSession', 'setPractice', 'dele
 export function decodeQueue(raw: unknown): QueuedOp[] {
   if (!Array.isArray(raw)) return [];
   return raw.filter(
-    (q): q is QueuedOp =>
-      !!q && typeof q === 'object' && isStr(q.opId) && isStr(q.userId) && !!q.op && typeof q.op === 'object' && OP_KINDS.has(q.op.kind),
+    (q): q is QueuedOp => !!q && typeof q === 'object' && isStr(q.opId) && isStr(q.userId) && !!q.op && typeof q.op === 'object' && OP_KINDS.has(q.op.kind),
   );
 }
 
@@ -377,11 +391,12 @@ export function overlaySolves(sessionId: string, server: Solve[], ops: SyncOp[])
 type ImportSession = ImportPayload['sessions'][number];
 
 /**
- * Packs sessions into request bodies of at most `max` solves. A session is never split across
- * requests (the import endpoint creates one server session per entry) unless it alone exceeds the
- * server's hard limit, in which case it is split into "name (2)", "name (3)" ... parts.
+ * Packs sessions into request bodies of at most `max` solves and `maxSessions` sessions (the server's
+ * limit per request: services/solve/src/schemas.ts MAX_IMPORT_SESSIONS). A session is never split
+ * across requests (the import endpoint creates one server session per entry) unless it alone exceeds
+ * the server's hard limit, in which case it is split into "name (2)", "name (3)" ... parts.
  */
-export function planImportChunks(sessions: ImportSession[], max = 20_000, hardMax = 100_000): ImportPayload[] {
+export function planImportChunks(sessions: ImportSession[], max = 20_000, hardMax = 100_000, maxSessions = 1_000): ImportPayload[] {
   const parts: ImportSession[] = [];
   for (const s of sessions) {
     if (s.solves.length === 0) continue;
@@ -398,7 +413,7 @@ export function planImportChunks(sessions: ImportSession[], max = 20_000, hardMa
   let cur: ImportSession[] = [];
   let count = 0;
   for (const p of parts) {
-    if (cur.length && count + p.solves.length > max) {
+    if (cur.length && (count + p.solves.length > max || cur.length >= maxSessions)) {
       out.push({ sessions: cur });
       cur = [];
       count = 0;

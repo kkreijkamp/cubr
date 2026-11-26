@@ -91,6 +91,12 @@ describeIntegration('auth with Redis down', () => {
     expect(res.statusCode).toBe(503);
     expect((await row(user.id)).password_hash).toBe(before);
   }, 20_000);
+
+  it("doesn't email feedback it can't count against the daily cap", async () => {
+    const res = await s.request('POST', '/api/feedback', { body: { kind: 'bug', message: 'offline?' } });
+    expect(res.statusCode).toBe(503);
+    expect(res.json().error.code).toBe('UNAVAILABLE');
+  }, 20_000);
 });
 
 describeIntegration('the private-profile set', () => {

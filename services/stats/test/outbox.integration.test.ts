@@ -42,11 +42,18 @@ describeIntegration('pb.updated outbox relay', () => {
 
   const userId = randomUUID();
   const change = (kind: PbKind, valueMs: number | null): PbChange => ({
-    userId, username: 'relay_test', event: '333', kind, valueMs, previousMs: null, achievedAt: valueMs === null ? null : '2026-10-01T10:00:00.000Z',
+    userId,
+    username: 'relay_test',
+    event: '333',
+    kind,
+    valueMs,
+    previousMs: null,
+    achievedAt: valueMs === null ? null : '2026-10-01T10:00:00.000Z',
   });
-  const queue = (...changes: PbChange[]) => withTx(s.pool, async (c) => {
-    for (const ch of changes) await queuePbUpdated(c, ch);
-  });
+  const queue = (...changes: PbChange[]) =>
+    withTx(s.pool, async (c) => {
+      for (const ch of changes) await queuePbUpdated(c, ch);
+    });
   const outboxIds = async () =>
     (await s.pool.query<{ event_id: string }>(`SELECT payload->>'eventId' AS event_id FROM stats.pb_outbox ORDER BY id`)).rows.map((r) => r.event_id);
   const publishedIds = async () => (await s.events()).map((e) => e.data.eventId as string);

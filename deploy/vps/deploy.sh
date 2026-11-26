@@ -45,15 +45,28 @@ gcloud artifacts docker images describe "${REGISTRY_HOST}/cubr-app/cubr/web:${VE
   || { echo "no images for ${VERSION} in Artifact Registry: build them with deploy/vps/release.sh" >&2; exit 1; }
 echo "deploying cubr ${VERSION} (${TAG} on main) to ${VM}"
 
-# 1. compose files, gateway config, backup script and systemd timers from the release tag, laid out
-#    like the repo so relative paths keep working; (re)install the timers (backup, WCA import)
-git archive --format=tar "$TAG" docker-compose.yml deploy/vps/compose.prod.yml deploy/gateway/nginx.conf \
-    deploy/vps/backup.sh deploy/vps/systemd | gzip \
+# 1. compose files, gateway config, the scripts the timers run, the timers and the journal's limits
+#    from the release tag, laid out like the repo so relative paths keep working; (re)install them.
+#    An older release (a rollback) lacks some of these files: only those its tag has are copied, and
+#    the newer ones already on the VM stay.
+present=()
+while IFS= read -r f; do present+=("$f"); done < <(git ls-tree -r --name-only "$TAG" -- docker-compose.yml \
+  deploy/vps/compose.prod.yml deploy/gateway/nginx.conf deploy/vps/backup.sh deploy/vps/watch.sh \
+  deploy/vps/journald.conf deploy/vps/vapid-keys.mjs deploy/vps/systemd)
+git archive --format=tar "$TAG" "${present[@]}" | gzip \
   | on_vm 'set -e; test -f /opt/cubr/.env || { echo "no /opt/cubr/.env: run deploy.sh init first" >&2; exit 1; }
       tar -xzf - -C /opt/cubr
       sudo install -m 644 /opt/cubr/deploy/vps/systemd/cubr-* /etc/systemd/system/
       sudo systemctl daemon-reload
-      sudo systemctl enable --now cubr-backup.timer cubr-wca-import.timer 2>/dev/null'
+      for t in cubr-backup.timer cubr-wca-import.timer cubr-watch.timer; do
+        if [ -f /etc/systemd/system/$t ]; then sudo systemctl enable --now $t 2>/dev/null; fi
+      done
+      # the journal keeps 14 days at most (the containers log there): only restarted when that changes
+      if [ -f /opt/cubr/deploy/vps/journald.conf ] &&
+        ! sudo cmp -s /opt/cubr/deploy/vps/journald.conf /etc/systemd/journald.conf.d/cubr.conf; then
+        sudo install -D -m 644 /opt/cubr/deploy/vps/journald.conf /etc/systemd/journald.conf.d/cubr.conf
+        sudo systemctl restart systemd-journald
+      fi'
 
 # 2. registry login (VM service account), pull the new version (a shell variable beats .env), and
 #    only once that worked record it in .env and restart, then wait for health
@@ -61,7 +74,17 @@ on_vm "set -e; cd /opt/cubr
   grep -q '^CLOUDFLARE_TUNNEL_TOKEN=.\\+' .env || { echo 'CLOUDFLARE_TUNNEL_TOKEN is empty in .env' >&2; exit 1; }
   gcloud auth configure-docker ${REGISTRY_HOST} --quiet >/dev/null 2>&1
   CUBR_VERSION=${VERSION} ${COMPOSE} pull --quiet
+  # The weekly WCA import's image too (profile jobs, which a plain pull skips): its timer runs as root,
+  # which has no registry login, so it only works with the image already here (it failed on 15 and 22
+  # November 2026 trying to pull it).
+  CUBR_VERSION=${VERSION} ${COMPOSE} --profile jobs pull --quiet wca-import
   grep -q '^CUBR_VERSION=' .env && sed -i 's/^CUBR_VERSION=.*/CUBR_VERSION=${VERSION}/' .env || echo 'CUBR_VERSION=${VERSION}' >> .env
+  # The daily reminders' VAPID keys, made here the first time with the solve image's Node, so the
+  # private key never leaves the VM (deploy/vps/vapid-keys.mjs; an older release has no such file)
+  if [ -f deploy/vps/vapid-keys.mjs ] && ! grep -q '^VAPID_PRIVATE_KEY=.\\+' .env; then
+    ${COMPOSE} run --rm --no-deps -T --entrypoint node solve --input-type=module - < deploy/vps/vapid-keys.mjs >> .env
+    echo 'made the daily reminders VAPID keys (in .env)'
+  fi
   ${COMPOSE} up -d --remove-orphans
   # The gateway's nginx.conf is a single-file mount: the release's copy is a new file (a new inode),
   # which the running container never sees, and up -d sees nothing to change. So when the config the

@@ -8,6 +8,8 @@ export interface SessionRow {
   name: string;
   event: string;
   practice: boolean;
+  /** a practice scramble type, or null for the event's default */
+  scramble?: string | null;
   created_at: Date;
   updated_at: Date;
   /** count(*) - the common pg type parser turns int8 into a JS number */
@@ -36,6 +38,8 @@ export interface Session {
   event: string;
   /** its solves count for no personal best and no leaderboard */
   practice: boolean;
+  /** a practice scramble type (always a practice session); absent for the event's default */
+  scramble?: string;
   createdAt: string;
   updatedAt: string;
   solveCount: number;
@@ -56,8 +60,7 @@ export interface Solve {
 }
 
 /** Columns to SELECT for a full Solve (keep in sync with SolveRow). */
-export const SOLVE_COLUMNS =
-  'id, user_id, session_id, event, time_ms, penalty, scramble, comment, source, daily_date, daily_index, created_at';
+export const SOLVE_COLUMNS = 'id, user_id, session_id, event, time_ms, penalty, scramble, comment, source, daily_date, daily_index, created_at';
 
 /** pg returns timestamptz as Date; tolerate strings too (e.g. rows built in tests). */
 export function iso(v: Date | string): string {
@@ -70,6 +73,7 @@ export function toSession(row: SessionRow): Session {
     name: row.name,
     event: row.event,
     practice: row.practice === true,
+    ...(row.scramble ? { scramble: row.scramble } : {}),
     createdAt: iso(row.created_at),
     updatedAt: iso(row.updated_at),
     solveCount: Number(row.solve_count ?? 0),

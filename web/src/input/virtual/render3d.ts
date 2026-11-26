@@ -147,7 +147,17 @@ function onPlate(ctx: CanvasRenderingContext2D, plateAt: [number, number][], col
 /** the stickers alone, off a hollow puzzle, each on a plate of its own (when there's an outline):
  * the far side's seen from inside, in its own colours. Far ones first; at rest the puzzle is convex,
  * so the far side all goes first */
-function drawFloating(ctx: CanvasRenderingContext2D, pc: Projected, puzzle: PolyPuzzle, palette: Palette, turning: Turning[], color: (slot: number) => string, round: number, float: number, outline: number) {
+function drawFloating(
+  ctx: CanvasRenderingContext2D,
+  pc: Projected,
+  puzzle: PolyPuzzle,
+  palette: Palette,
+  turning: Turning[],
+  color: (slot: number) => string,
+  round: number,
+  float: number,
+  outline: number,
+) {
   const k = 1 - FLOAT_SHRINK * float;
   const w = edgeWidth(puzzle.gap * k * pc.unit, outline, round);
   const drawn = puzzle.slots.map((s, i) => {
@@ -181,7 +191,17 @@ export interface PolyOptions {
  * A polyhedral puzzle. `turning` are moves being animated: all about one axis (they are only animated
  * together when parallel), each on its own layers.
  */
-export function drawPoly(ctx: CanvasRenderingContext2D, width: number, height: number, puzzle: PolyPuzzle, state: Int16Array, cam: Camera, palette: Palette, turning: Turning[], opts: PolyOptions = {}) {
+export function drawPoly(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  puzzle: PolyPuzzle,
+  state: Int16Array,
+  cam: Camera,
+  palette: Palette,
+  turning: Turning[],
+  opts: PolyOptions = {},
+) {
   const float = Math.max(0, Math.min(1, opts.float ?? 0));
   // lifted stickers reach further out: the view takes them in
   const pc = camera(float > 0 ? { ...cam, radius: cam.radius * (1 + FLOAT_LIFT * float) } : cam, width, height);
@@ -214,7 +234,11 @@ export function drawPoly(ctx: CanvasRenderingContext2D, width: number, height: n
     if (t.move.to <= axis.cuts.length) bounds.add(axis.cuts[t.move.to - 1]);
   }
   const cuts = [...bounds].sort((a, b) => b - a);
-  const slabs = Array.from({ length: cuts.length + 1 }, (_, i) => ({ hi: i === 0 ? Infinity : cuts[i - 1], lo: i === cuts.length ? -Infinity : cuts[i], m: IDENTITY as Mat }));
+  const slabs = Array.from({ length: cuts.length + 1 }, (_, i) => ({
+    hi: i === 0 ? Infinity : cuts[i - 1],
+    lo: i === cuts.length ? -Infinity : cuts[i],
+    m: IDENTITY as Mat,
+  }));
   for (const s of slabs) {
     // a point inside the slab, to see which move (if any) turns it
     const mid = Number.isFinite(s.hi) && Number.isFinite(s.lo) ? (s.hi + s.lo) / 2 : Number.isFinite(s.hi) ? s.hi - 1 : Number.isFinite(s.lo) ? s.lo + 1 : 0;
@@ -269,7 +293,15 @@ export interface Sq1Turning {
 }
 
 /** Square-1: pieces are convex, drawn far group first (layers, or the two halves during a slash), far piece first. */
-export function drawSq1(ctx: CanvasRenderingContext2D, width: number, height: number, state: Sq1State, cam: Camera, palette: Palette, turning: Sq1Turning | null) {
+export function drawSq1(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  state: Sq1State,
+  cam: Camera,
+  palette: Palette,
+  turning: Sq1Turning | null,
+) {
   const pc = camera(cam, width, height);
   const round = Math.max(1, Math.min(width, height) / 170);
   type Piece = { faces: Sq1Face[]; group: number };
@@ -317,7 +349,11 @@ export function drawSq1(ctx: CanvasRenderingContext2D, width: number, height: nu
   const depth = (f: Sq1Face[]) => {
     let c: Vec = [0, 0, 0];
     let k = 0;
-    for (const face of f) for (const v of face.poly) (c = [c[0] + v[0], c[1] + v[1], c[2] + v[2]]), k++;
+    for (const face of f)
+      for (const v of face.poly) {
+        c = [c[0] + v[0], c[1] + v[1], c[2] + v[2]];
+        k++;
+      }
     c = [c[0] / k, c[1] / k, c[2] / k];
     return -dot(sub(c, pc.eye), sub(c, pc.eye));
   };

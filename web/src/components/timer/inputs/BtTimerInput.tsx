@@ -22,7 +22,12 @@ interface Props {
   onSolve: (r: { timeMs: number; penalty: Penalty }) => void;
 }
 
-type Conn = { status: 'off' } | { status: 'connecting' } | { status: 'connected'; name: string } | { status: 'reconnecting'; name: string } | { status: 'error'; message: string };
+type Conn =
+  | { status: 'off' }
+  | { status: 'connecting' }
+  | { status: 'connected'; name: string }
+  | { status: 'reconnecting'; name: string }
+  | { status: 'error'; message: string };
 
 function isTyping(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
@@ -47,15 +52,16 @@ export function BtTimerInput(p: Props) {
     void bluetoothAvailable().then(setAvailable);
   }, []);
 
-  const clearAlerts = () => {
+  // the inspection's 8 s / 12 s calls: these read only refs, so they never change
+  const clearAlerts = useCallback(() => {
     alertTimers.current.forEach(clearTimeout);
     alertTimers.current = [];
-  };
-  const startAlerts = () => {
+  }, []);
+  const startAlerts = useCallback(() => {
     clearAlerts();
     const mode = props.current.alerts;
     if (mode !== 'off') alertTimers.current = [setTimeout(() => alertAt(8, mode), 8000), setTimeout(() => alertAt(12, mode), 12000)];
-  };
+  }, [clearAlerts]);
 
   const ctx: TimerCtx = useMemo(
     () => ({
@@ -71,7 +77,7 @@ export function BtTimerInput(p: Props) {
       mac: (name, found, suggested) => mac(name, found, suggested),
       log: () => undefined,
     }),
-    [timer, mac],
+    [timer, mac, clearAlerts, startAlerts],
   );
 
   const afterConnect = useCallback(
@@ -118,7 +124,7 @@ export function BtTimerInput(p: Props) {
       clearAlerts();
       void group.disconnect(false);
     };
-  }, [group, ctx, timer, afterConnect]);
+  }, [group, ctx, timer, afterConnect, clearAlerts]);
 
   // space: inspection (or, not connected yet, connect); esc stops inspection
   useEffect(() => {
@@ -153,14 +159,18 @@ export function BtTimerInput(p: Props) {
       window.removeEventListener('keydown', down, true);
       window.removeEventListener('keyup', up, true);
     };
-  }, [p.enabled, timer, group, connect, conn.status]);
+  }, [p.enabled, timer, group, connect, conn.status, clearAlerts, startAlerts]);
 
   const lastMs = p.last?.timeMs;
   const lastPenalty = p.last?.penalty;
   const state: TimerState = useMemo(() => {
     void tick;
     const hard = timer.hardTime;
-    const shown = hard ? { timeMs: hard, penalty: (lastMs === hard ? lastPenalty : 'OK') ?? 'OK' } : lastMs !== undefined && hard === null ? { timeMs: lastMs, penalty: lastPenalty ?? 'OK' } : null;
+    const shown = hard
+      ? { timeMs: hard, penalty: (lastMs === hard ? lastPenalty : 'OK') ?? 'OK' }
+      : lastMs !== undefined && hard === null
+        ? { timeMs: lastMs, penalty: lastPenalty ?? 'OK' }
+        : null;
     if (timer.phase === 'running') return { phase: 'running', inInspection: false, startedAt: timer.startTime, inspectionStartedAt: null, result: null };
     if (timer.phase === 'inspecting') {
       const phase = timer.light === 'green' ? 'ready' : timer.light === 'red' ? 'holding' : 'inspecting';
@@ -175,7 +185,8 @@ export function BtTimerInput(p: Props) {
   useEffect(() => onState(state), [state, onState]);
 
   let status: React.ReactNode;
-  if (available === false) status = <span className="error">this browser has no bluetooth - use Chrome or Edge on a computer or Android, with bluetooth on</span>;
+  if (available === false)
+    status = <span className="error">this browser has no bluetooth - use Chrome or Edge on a computer or Android, with bluetooth on</span>;
   else if (conn.status === 'off')
     status = (
       <button className="btn-text active" onClick={() => void connect()} {...noFocus}>

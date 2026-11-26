@@ -1,14 +1,4 @@
-import {
-  loadConfig,
-  createServer,
-  start,
-  createPool,
-  pingPostgres,
-  waitForPostgres,
-  migrate,
-  createRedis,
-  makeAuth,
-} from '@cubr/common';
+import { loadConfig, createServer, start, createPool, pingPostgres, waitForPostgres, migrate, createRedis, makeAuth } from '@cubr/common';
 import { migrations } from './migrations.js';
 import { registerRoutes } from './routes/index.js';
 import { startPrivacySync } from './privacySync.js';
@@ -30,7 +20,7 @@ const server = createServer(config, {
 const { app } = server;
 const pool = createPool(config.databaseUrl, { log: app.log });
 const redis = createRedis(config.redisUrl, app.log);
-const auth = makeAuth(config.jwtSecret, redis);
+const auth = makeAuth(config.jwtSecret, redis, config.jwtSecretPrevious);
 
 await registerRoutes(app, { config, pool, redis, auth });
 

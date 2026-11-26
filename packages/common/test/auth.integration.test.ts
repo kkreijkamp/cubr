@@ -58,7 +58,7 @@ describeIntegration('makeAuth with revocation', () => {
     expect((await call('/maybe', bearer(token))).json()).toEqual({ id: null }); // optional routes: anonymous
   });
 
-  it("refuses every token of a user issued up to an account-wide revocation, but not the new one issued after it", async () => {
+  it('refuses every token of a user issued up to an account-wide revocation, but not the new one issued after it', async () => {
     const user = newUser();
     const older = await signToken(SECRET, user);
     const { iat } = await verifyToken(SECRET, older.token);
@@ -80,15 +80,30 @@ describeIntegration('makeAuth with revocation', () => {
   });
 
   /** A token for `user` built by hand, so a test can break one thing about it. */
-  async function craft(user: { id: string; username: string }, opts: { alg?: string; secret?: Uint8Array; issuer?: string; claims?: Record<string, unknown>; jti?: boolean; exp?: string | number } = {}) {
-    const jwt = new SignJWT({ username: user.username, ...opts.claims }).setProtectedHeader({ alg: opts.alg ?? 'HS256' }).setSubject(user.id).setIssuer(opts.issuer ?? 'cubr').setIssuedAt().setExpirationTime(opts.exp ?? '1h');
+  async function craft(
+    user: { id: string; username: string },
+    opts: { alg?: string; secret?: Uint8Array; issuer?: string; claims?: Record<string, unknown>; jti?: boolean; exp?: string | number } = {},
+  ) {
+    const jwt = new SignJWT({ username: user.username, ...opts.claims })
+      .setProtectedHeader({ alg: opts.alg ?? 'HS256' })
+      .setSubject(user.id)
+      .setIssuer(opts.issuer ?? 'cubr')
+      .setIssuedAt()
+      .setExpirationTime(opts.exp ?? '1h');
     if (opts.jti !== false) jwt.setJti(randomUUID());
     return jwt.sign(opts.secret ?? key);
   }
 
   it.each([
-    ['an unsigned token (alg "none")', async (u: { id: string; username: string }) => new UnsecuredJWT({ username: u.username }).setSubject(u.id).setIssuer('cubr').setJti(randomUUID()).setIssuedAt().setExpirationTime('1h').encode()],
-    ['a token signed with another secret', async (u: { id: string; username: string }) => craft(u, { secret: new TextEncoder().encode('not-the-secret-not-the-secret-xx') })],
+    [
+      'an unsigned token (alg "none")',
+      async (u: { id: string; username: string }) =>
+        new UnsecuredJWT({ username: u.username }).setSubject(u.id).setIssuer('cubr').setJti(randomUUID()).setIssuedAt().setExpirationTime('1h').encode(),
+    ],
+    [
+      'a token signed with another secret',
+      async (u: { id: string; username: string }) => craft(u, { secret: new TextEncoder().encode('not-the-secret-not-the-secret-xx') }),
+    ],
     ['a token signed with HS512', async (u: { id: string; username: string }) => craft(u, { alg: 'HS512' })],
     ['a token from another issuer', async (u: { id: string; username: string }) => craft(u, { issuer: 'evil' })],
     ['an expired token', async (u: { id: string; username: string }) => craft(u, { exp: Math.floor(Date.now() / 1000) - 10 })],

@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { lazy, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowPathIcon,
@@ -17,13 +17,30 @@ import {
   TrophyIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
-import { EVENTS, effectiveMs, formatTime, getEvent, rollingAverage, sessionStats, type Penalty } from '@cubr/cubestats';
+import {
+  ALL_EVENTS,
+  EVENTS,
+  RELAY_EVENTS,
+  effectiveMs,
+  formatAverage,
+  formatResult,
+  getEvent,
+  isEventReady,
+  rollingAverage,
+  scrambleSessionName,
+  sessionStats,
+  type Penalty,
+} from '@cubr/cubestats';
 import { TimerDisplay } from '../timer/TimerDisplay';
 import { useTimerEngine, type TimerResult, type TimerState } from '../timer/useTimerEngine';
-import { useScrambleQueue } from '../timer/useScrambleQueue';
+import { peekScramble, useScrambleQueue } from '../timer/useScrambleQueue';
+import { scrambleImageUrl } from '../lib/api';
 import { shortcutFor, type ShortcutAction } from '../timer/shortcuts';
 import { PracticeBottle } from '../components/SessionName';
 import { TwistyPreview } from '../components/TwistyPreview';
+import { prefetchDrawnNet } from '../components/DrawnNet';
+import { preview3D } from '../lib/cubing3d';
+import { CUBOIDS } from '../lib/cuboid';
 import { ConfigBar } from '../components/timer/ConfigBar';
 import { ScrambleBar } from '../components/timer/ScrambleBar';
 import { StatsPanel } from '../components/timer/StatsPanel';
@@ -32,16 +49,13 @@ import { SolveModal } from '../components/timer/SolveModal';
 import { AverageModal } from '../components/timer/AverageModal';
 import { QuickActions } from '../components/timer/QuickActions';
 import { ManualEntry } from '../components/timer/ManualEntry';
-import { VirtualInput } from '../components/timer/inputs/VirtualInput';
-import { StackmatInput } from '../components/timer/inputs/StackmatInput';
-import { BtTimerInput } from '../components/timer/inputs/BtTimerInput';
-import { SmartCubeInput } from '../components/timer/inputs/SmartCubeInput';
+import { Loading } from '../components/Spinner';
 import type { ScrambleHint } from '../input/bluetooth/smartSession';
 import { AVAILABLE_INPUTS, INPUT_MODES, modeInfo, updateInput, useInputState, type InputMode } from '../input/inputMode';
 import { ConfirmModal, PromptModal } from '../components/timer/Dialogs';
 import { MergeSessionsModal } from '../components/timer/MergeSessionsModal';
 import { copyText, isTouchDevice, playPbSound } from '../components/timer/feedback';
-import { averageWindow, detectPbs, fmtAvg, fmtSolveShort, pbFlags, statNs } from '../components/timer/statsUtil';
+import { averageWindow, detectPbs, fmtSolveShort, pbFlags, statNs } from '../components/timer/statsUtil';
 import { noFocus } from '../components/timer/ConfigBar';
 import '../components/timer/timer-page.css';
 import { useAuth } from '../lib/auth';
@@ -59,6 +73,7 @@ import {
   setSessionPractice,
   suggestSessionName,
   switchEvent,
+  switchScramble,
   switchSession,
   useSolveState,
 } from '../lib/solves';
@@ -116,6 +131,19 @@ function isTyping(el: EventTarget | null): boolean {
   return el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName);
 }
 
+// The other ways to time load when you pick them: most people time with the keyboard or a touch screen,
+// and the virtual cube, smart cubes and stackmats were a third of the page's first download
+// (scripts/size-budget.mjs keeps it under its budget).
+const VirtualInput = lazy(() => import('../components/timer/inputs/VirtualInput').then((m) => ({ default: m.VirtualInput })));
+const StackmatInput = lazy(() => import('../components/timer/inputs/StackmatInput').then((m) => ({ default: m.StackmatInput })));
+const BtTimerInput = lazy(() => import('../components/timer/inputs/BtTimerInput').then((m) => ({ default: m.BtTimerInput })));
+const SmartCubeInput = lazy(() => import('../components/timer/inputs/SmartCubeInput').then((m) => ({ default: m.SmartCubeInput })));
+
+/** A control that has keyboard focus (it matches :focus-visible): Tab moves on from it instead of giving a new scramble. */
+function isKeyboardOnControl(el: Element | null): boolean {
+  return el instanceof HTMLElement && el.matches('a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])') && el.matches(':focus-visible');
+}
+
 export default function TimerPage() {
   useCanonical('/'); // the home page, without any query (/?v=1 is the same page)
   usePageMeta(HOME);
@@ -127,7 +155,11 @@ export default function TimerPage() {
   const session = st.sessions.find((s) => s.id === st.currentSessionId) ?? null;
   const event = session?.event ?? settings.lastEvent;
   const eventInfo = getEvent(event) ?? EVENTS[0];
-  const scr = useScrambleQueue(event);
+  /** the session's practice scramble type: its scrambles, and its solves count for no pbs */
+  const scrambleType = session?.event === event ? session.scramble : undefined;
+  const scr = useScrambleQueue(event, scrambleType);
+  /** the scramble up now (the queue's state, not a ref) */
+  const currentScramble = scr.current;
 
   const device = useInputState();
   const input: InputMode = AVAILABLE.includes(device.mode) ? device.mode : 'timer';
@@ -221,7 +253,7 @@ export default function TimerPage() {
     const pbs = detectPbs(prev.stats, stats);
     const newest = solves[solves.length - 1];
     if (!pbs.length || !newest) return;
-    const text = pbs.map((p) => `${p.kind} ${p.kind === 'single' ? formatTime(p.value, settings.precision) : fmtAvg(p.value, settings.precision)}`).join(' - ');
+    const text = pbs.map((p) => `${p.kind} ${formatResult(p.value, p.kind, settings.precision)}`).join(' - ');
     toast.pb(`new pb! ${text}`);
     setPbSolveId(newest.id);
     setPbKey((k) => k + 1);
@@ -285,6 +317,13 @@ export default function TimerPage() {
     setEditingScramble(false);
     void switchEvent(ev).catch((e: Error) => toast.error(e.message));
   }, []);
+  const changeScramble = useCallback(
+    (type: string | null) => {
+      setEditingScramble(false);
+      void switchScramble(event, type).catch((e: Error) => toast.error(e.message));
+    },
+    [event],
+  );
 
   // ---------------------------------------------------------------- keyboard
   useEffect(() => {
@@ -321,6 +360,9 @@ export default function TimerPage() {
       // in the typing box, alt / ctrl+alt shortcuts and ctrl+1/2/3 still work (ctrl+z stays undo there)
       if (isTyping(e.target) && !(inManualInput && (e.altKey || (e.ctrlKey && /^Digit[123]$/.test(e.code))))) return;
       if (e.key === 'Tab' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+        // someone moving through the controls with the keyboard (the focused one wears its ring) keeps Tab;
+        // anywhere else (nothing focused, the heading, a control clicked with the mouse) it's a new scramble
+        if (isKeyboardOnControl(document.activeElement)) return;
         e.preventDefault();
         scrRef.current.next();
         return;
@@ -372,7 +414,9 @@ export default function TimerPage() {
     if (!session) return;
     const on = !session.practice;
     void setSessionPractice(session.id, on);
-    toast.notice(on ? `${session.name} is a practice session: no pbs or leaderboards` : `${session.name} counts for pbs and leaderboards again`, { durationMs: 2500 });
+    toast.notice(on ? `${session.name} is a practice session: no pbs or leaderboards` : `${session.name} counts for pbs and leaderboards again`, {
+      durationMs: 2500,
+    });
   }, [session]);
 
   // ---------------------------------------------------------------- palette commands
@@ -387,7 +431,7 @@ export default function TimerPage() {
           icon: <ClockIcon />,
           keywords: ['puzzle', 'cube'],
           children: () =>
-            EVENTS.map((e) => ({
+            ALL_EVENTS.filter((e) => isEventReady(e.id)).map((e) => ({
               id: `timer-event-${e.id}`,
               label: `${e.short.toLowerCase()} - ${e.name}`,
               keywords: [e.id],
@@ -446,11 +490,23 @@ export default function TimerPage() {
           },
           { id: 'timer-comment-last', label: 'Comment last solve', icon: <ChatBubbleLeftIcon />, run: commentLast },
           { id: 'timer-delete-last', label: 'Delete last solve', icon: <TrashIcon />, run: deleteLast },
-          { id: 'timer-clear-session', label: 'Clear session (delete all its solves)', icon: <TrashIcon />, keywords: ['reset', 'empty'], run: () => setModal({ kind: 'clearSession' }) },
+          {
+            id: 'timer-clear-session',
+            label: 'Clear session (delete all its solves)',
+            icon: <TrashIcon />,
+            keywords: ['reset', 'empty'],
+            run: () => setModal({ kind: 'clearSession' }),
+          },
         );
       }
       cmds.push(
-        { id: 'timer-toggle-list', label: settings.showSolveList ? 'Hide solve list' : 'Show solve list', icon: <ListBulletIcon />, keywords: ['toggle'], run: () => updateSettings({ showSolveList: !settings.showSolveList }) },
+        {
+          id: 'timer-toggle-list',
+          label: settings.showSolveList ? 'Hide solve list' : 'Show solve list',
+          icon: <ListBulletIcon />,
+          keywords: ['toggle'],
+          run: () => updateSettings({ showSolveList: !settings.showSolveList }),
+        },
         {
           id: 'timer-input',
           label: 'Enter times with...',
@@ -464,13 +520,30 @@ export default function TimerPage() {
               run: () => setInput(m.id),
             })),
         },
-        { id: 'timer-inspection-toggle', label: settings.inspection ? 'Turn inspection off' : 'Turn inspection on', icon: <EyeIcon />, keywords: ['toggle', 'wca'], run: () => updateSettings({ inspection: !settings.inspection }) },
+        {
+          id: 'timer-inspection-toggle',
+          label: settings.inspection ? 'Turn inspection off' : 'Turn inspection on',
+          icon: <EyeIcon />,
+          keywords: ['toggle', 'wca'],
+          run: () => updateSettings({ inspection: !settings.inspection }),
+        },
       );
       return cmds;
     },
-    [st.sessions, event, session?.id, session?.practice, togglePractice, last?.id, last?.penalty, settings.showSolveList, settings.inspection, input, deleteLast],
+    [
+      st.sessions,
+      event,
+      session?.id,
+      session?.practice,
+      togglePractice,
+      last?.id,
+      last?.penalty,
+      settings.showSolveList,
+      settings.inspection,
+      input,
+      deleteLast,
+    ],
   );
-
 
   // ---------------------------------------------------------------- display
   // idle: show the latest solve of this session (with its current penalty), like csTimer
@@ -500,7 +573,22 @@ export default function TimerPage() {
   }, [modal, stats, solves]);
 
   const showPreview = settings.scramblePreview !== 'off';
-  const previewScramble = useDeferredValue(scr.current?.text ?? null);
+  // deferred with the event and type it belongs to: the text alone would pair, for a render, the
+  // event just picked with the last event's scramble
+  const shownScramble = useMemo(
+    () => (currentScramble?.text ? { event, type: scrambleType, text: currentScramble.text } : null),
+    [currentScramble, event, scrambleType],
+  );
+  const preview = useDeferredValue(shownScramble);
+  // csTimer draws the puzzles cubing.js can't: the next scramble's drawing is fetched while this one
+  // is up, so it shows at once (relays and the cuboids are drawn here, relays from their puzzles' own
+  // nets; in 3D, the puzzles cubing.js builds from their geometry show its model instead)
+  useEffect(() => {
+    if (!showPreview || eventInfo.puzzle !== null || RELAY_EVENTS.includes(event) || event in CUBOIDS) return;
+    const next = peekScramble(event, scrambleType);
+    if (!next || (settings.scramblePreview === '3D' && preview3D(event, scrambleType, next))) return;
+    prefetchDrawnNet(scrambleImageUrl(event, next, scrambleType), event);
+  }, [currentScramble, showPreview, settings.scramblePreview, eventInfo.puzzle, event, scrambleType]);
   const previewBoxRef = useRef<HTMLDivElement>(null);
   const previewHeight = usePreviewHeight(previewBoxRef, showPreview);
   const cols = 1 + (showPreview ? 1 : 0) + (settings.showSolveList ? 1 : 0);
@@ -521,6 +609,8 @@ export default function TimerPage() {
           sessions={st.sessions}
           currentSessionId={st.currentSessionId}
           onEvent={changeEvent}
+          scramble={scrambleType ?? null}
+          onScramble={changeScramble}
           onSession={(id) => void switchSession(id)}
           onNewSession={() => setModal({ kind: 'newSession' })}
           onRenameSession={() => setModal({ kind: 'renameSession' })}
@@ -540,6 +630,7 @@ export default function TimerPage() {
 
         <ScrambleBar
           scramble={scr.current}
+          lines={RELAY_EVENTS.includes(event)}
           onNext={scr.next}
           onPrev={scr.prev}
           hasPrev={scr.hasPrev}
@@ -549,91 +640,103 @@ export default function TimerPage() {
           hint={input === 'smartcube' ? smartHint : null}
         />
 
-        <div className={`tp-timer-area input-${input}`} {...(input === 'timer' ? engine.touchHandlers : {})} aria-label={input !== 'timer' ? undefined : touch ? 'timer: hold to get ready, release to start' : 'timer'}>
-          {manual ? (
-            <ManualEntry onSubmit={(r) => record(r, 'manual')} disabled={modal !== null || paletteOpen} />
-          ) : input === 'stackmat' || input === 'moyu' ? (
-            <StackmatInput
-              key={input}
-              kind={input}
-              enabled={inputsEnabled}
-              inspection={settings.inspection && eventInfo.inspection}
-              alerts={settings.inspectionAlerts}
-              useStatus={settings.stackmatStatus}
-              last={lastResult}
-              precision={settings.precision}
-              timerUpdate={settings.timerUpdate}
-              sizeRem={settings.timerSize}
-              pb={pb && isIdle}
-              onState={setAltState}
-              onSolve={(r) => {
-                lastStopAt.current = performance.now();
-                record(r, 'timer');
-              }}
-            />
-          ) : input === 'bttimer' ? (
-            <BtTimerInput
-              enabled={inputsEnabled}
-              inspection={settings.inspection && eventInfo.inspection}
-              alerts={settings.inspectionAlerts}
-              last={lastResult}
-              precision={settings.precision}
-              timerUpdate={settings.timerUpdate}
-              sizeRem={settings.timerSize}
-              pb={pb && isIdle}
-              onState={setAltState}
-              onSolve={(r) => {
-                lastStopAt.current = performance.now();
-                record(r, 'timer');
-              }}
-            />
-          ) : input === 'smartcube' ? (
-            <SmartCubeInput
-              event={event}
-              scramble={scr.current?.text ?? null}
-              enabled={inputsEnabled}
-              inspection={settings.inspection && eventInfo.inspection}
-              alerts={settings.inspectionAlerts}
-              last={lastResult}
-              precision={settings.precision}
-              timerUpdate={settings.timerUpdate}
-              sizeRem={settings.timerSize}
-              pb={pb && isIdle}
-              settings={settings}
-              onState={setAltState}
-              onSolve={(r, own) => {
-                lastStopAt.current = performance.now();
-                record(r, 'timer', own);
-              }}
-              onScramble={scr.setFromCube}
-              onHint={setSmartHint}
-            />
-          ) : input === 'virtual' || input === 'qcube' ? (
-            <VirtualInput
-              key={input}
-              event={event}
-              flat={input === 'qcube'}
-              scramble={scr.current?.text ?? null}
-              enabled={inputsEnabled}
-              inspection={settings.inspection && eventInfo.inspection}
-              alerts={settings.inspectionAlerts}
-              last={lastResult}
-              precision={settings.precision}
-              timerUpdate={settings.timerUpdate}
-              sizeRem={settings.timerSize}
-              pb={pb && isIdle}
-              settings={settings}
-              onState={setAltState}
-              onSolve={(r) => {
-                lastStopAt.current = performance.now();
-                record(r, 'timer');
-              }}
-            />
-          ) : (
-            <div key={pbKey}>
-              <TimerDisplay state={displayState} precision={settings.precision} timerUpdate={settings.timerUpdate} sizeRem={settings.timerSize} pb={pb && isIdle} />
-            </div>
-          )}
+        <div
+          className={`tp-timer-area input-${input}`}
+          {...(input === 'timer' ? engine.touchHandlers : {})}
+          aria-label={input !== 'timer' ? undefined : touch ? 'timer: hold to get ready, release to start' : 'timer'}
+        >
+          <Suspense fallback={<Loading label="loading the input" />}>
+            {manual ? (
+              <ManualEntry onSubmit={(r) => record(r, 'manual')} disabled={modal !== null || paletteOpen} />
+            ) : input === 'stackmat' || input === 'moyu' ? (
+              <StackmatInput
+                key={input}
+                kind={input}
+                enabled={inputsEnabled}
+                inspection={settings.inspection && eventInfo.inspection}
+                alerts={settings.inspectionAlerts}
+                useStatus={settings.stackmatStatus}
+                last={lastResult}
+                precision={settings.precision}
+                timerUpdate={settings.timerUpdate}
+                sizeRem={settings.timerSize}
+                pb={pb && isIdle}
+                onState={setAltState}
+                onSolve={(r) => {
+                  lastStopAt.current = performance.now();
+                  record(r, 'timer');
+                }}
+              />
+            ) : input === 'bttimer' ? (
+              <BtTimerInput
+                enabled={inputsEnabled}
+                inspection={settings.inspection && eventInfo.inspection}
+                alerts={settings.inspectionAlerts}
+                last={lastResult}
+                precision={settings.precision}
+                timerUpdate={settings.timerUpdate}
+                sizeRem={settings.timerSize}
+                pb={pb && isIdle}
+                onState={setAltState}
+                onSolve={(r) => {
+                  lastStopAt.current = performance.now();
+                  record(r, 'timer');
+                }}
+              />
+            ) : input === 'smartcube' ? (
+              <SmartCubeInput
+                event={event}
+                scramble={scr.current?.text ?? null}
+                enabled={inputsEnabled}
+                inspection={settings.inspection && eventInfo.inspection}
+                alerts={settings.inspectionAlerts}
+                last={lastResult}
+                precision={settings.precision}
+                timerUpdate={settings.timerUpdate}
+                sizeRem={settings.timerSize}
+                pb={pb && isIdle}
+                settings={settings}
+                onState={setAltState}
+                onSolve={(r, own) => {
+                  lastStopAt.current = performance.now();
+                  record(r, 'timer', own);
+                }}
+                onScramble={scr.setFromCube}
+                onHint={setSmartHint}
+              />
+            ) : input === 'virtual' || input === 'qcube' ? (
+              <VirtualInput
+                key={input}
+                event={event}
+                flat={input === 'qcube'}
+                scramble={scr.current?.text ?? null}
+                enabled={inputsEnabled}
+                inspection={settings.inspection && eventInfo.inspection}
+                alerts={settings.inspectionAlerts}
+                last={lastResult}
+                precision={settings.precision}
+                timerUpdate={settings.timerUpdate}
+                sizeRem={settings.timerSize}
+                pb={pb && isIdle}
+                settings={settings}
+                onState={setAltState}
+                onSolve={(r) => {
+                  lastStopAt.current = performance.now();
+                  record(r, 'timer');
+                }}
+              />
+            ) : (
+              <div key={pbKey}>
+                <TimerDisplay
+                  state={displayState}
+                  precision={settings.precision}
+                  timerUpdate={settings.timerUpdate}
+                  sizeRem={settings.timerSize}
+                  pb={pb && isIdle}
+                />
+              </div>
+            )}
+          </Suspense>
         </div>
 
         {/* on a touch screen the line under the time starts the timer too: a thumb aimed a little low lands here */}
@@ -660,10 +763,10 @@ export default function TimerPage() {
                 </span>
               )}
               <span>
-                ao5<b>{fmtAvg(stats.averages.ao5?.current, settings.precision)}</b>
+                ao5<b>{formatAverage(stats.averages.ao5?.current, settings.precision)}</b>
               </span>
               <span>
-                ao12<b>{fmtAvg(stats.averages.ao12?.current, settings.precision)}</b>
+                ao12<b>{formatAverage(stats.averages.ao12?.current, settings.precision)}</b>
               </span>
             </div>
           )}
@@ -678,14 +781,31 @@ export default function TimerPage() {
                 <EyeIcon width={14} height={14} /> scramble preview
               </div>
               <div className="tp-preview-box" ref={previewBoxRef}>
-                {previewScramble ? (
-                  <TwistyPreview puzzle={eventInfo.puzzle} scramble={previewScramble} visualization={settings.scramblePreview === '3D' ? '3D' : '2D'} height={previewHeight} />
+                {preview ? (
+                  <TwistyPreview
+                    puzzle={getEvent(preview.event)?.puzzle ?? null}
+                    scramble={preview.text}
+                    visualization={settings.scramblePreview === '3D' ? '3D' : '2D'}
+                    height={previewHeight}
+                    event={preview.event}
+                    scrambleType={preview.type}
+                    imageUrl={scrambleImageUrl(preview.event, preview.text, preview.type)}
+                  />
                 ) : null}
               </div>
             </section>
           )}
           {settings.showSolveList && (
-            <SolveList solves={solves} ao5={ao5} ao12={ao12} pbs={pbs} bestIndex={stats.bestIndex} precision={settings.precision} loading={st.loading || !st.ready} onOpen={openSolve} />
+            <SolveList
+              solves={solves}
+              ao5={ao5}
+              ao12={ao12}
+              pbs={pbs}
+              bestIndex={stats.bestIndex}
+              precision={settings.precision}
+              loading={st.loading || !st.ready}
+              onOpen={openSolve}
+            />
           )}
         </div>
 
@@ -720,6 +840,7 @@ export default function TimerPage() {
             total={solves.length}
             precision={settings.precision}
             preview={settings.scramblePreview}
+            scrambleType={session?.scramble}
             confirmDelete={settings.confirmDelete}
             onNavigate={(i) => i >= 0 && i < solves.length && setModal({ kind: 'solve', index: i })}
             onClose={() => setModal(null)}
@@ -731,11 +852,12 @@ export default function TimerPage() {
         {modal?.kind === 'newSession' && (
           <PromptModal
             title="new session"
-            label={`name - ${eventInfo.short.toLowerCase()}`}
-            initial={suggestSessionName(event)}
+            label={`name - ${scrambleType ? scrambleSessionName(event, scrambleType).toLowerCase() : eventInfo.short.toLowerCase()}`}
+            initial={scrambleType ? scrambleSessionName(event, scrambleType) : suggestSessionName(event)}
             confirmLabel="create"
             onSubmit={async (name) => {
-              const s = await createSession(name, event);
+              // a new session of the practice scramble in use (a practice session too)
+              const s = await createSession(name, event, scrambleType ? { scramble: scrambleType } : {});
               await switchSession(s.id);
             }}
             validate={(v) => (v.trim().length < 1 ? 'give it a name' : null)}
@@ -771,7 +893,8 @@ export default function TimerPage() {
             title="clear session"
             message={
               <>
-                Delete all {session.solveCount} solve{session.solveCount === 1 ? '' : 's'} in <span className="main">{session.name}</span>? The session stays. This can't be undone.
+                Delete all {session.solveCount} solve{session.solveCount === 1 ? '' : 's'} in <span className="main">{session.name}</span>? The session stays.
+                This can't be undone.
               </>
             }
             confirmLabel="clear session"
@@ -785,7 +908,7 @@ export default function TimerPage() {
         )}
         {modal?.kind === 'mergeSessions' && (
           <MergeSessionsModal
-            sessions={st.sessions}
+            sessions={st.sessions.filter((x) => x.scramble === scrambleType)}
             currentSessionId={st.currentSessionId}
             event={event}
             mode={st.mode}

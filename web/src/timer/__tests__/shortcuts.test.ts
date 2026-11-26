@@ -26,7 +26,10 @@ describe('csTimer shortcuts', () => {
     };
     for (const [code, event] of Object.entries(want)) {
       expect(alt(code), code).toEqual({ kind: 'event', event });
-      expect(EVENTS.some((e) => e.id === event), event).toBe(true);
+      expect(
+        EVENTS.some((e) => e.id === event),
+        event,
+      ).toBe(true);
     }
     expect(alt('Digit8')).toBeNull();
   });
@@ -54,7 +57,16 @@ describe('csTimer shortcuts', () => {
   });
 
   it("ctrl + alt + a letter: csTimer's inputs; last layer training says cubr hasn't got it", () => {
-    const inputs: Record<string, string> = { KeyT: 'timer', KeyI: 'typing', KeyS: 'stackmat', KeyM: 'moyu', KeyV: 'virtual', KeyG: 'smartcube', KeyQ: 'qcube', KeyB: 'bttimer' };
+    const inputs: Record<string, string> = {
+      KeyT: 'timer',
+      KeyI: 'typing',
+      KeyS: 'stackmat',
+      KeyM: 'moyu',
+      KeyV: 'virtual',
+      KeyG: 'smartcube',
+      KeyQ: 'qcube',
+      KeyB: 'bttimer',
+    };
     for (const [code, input] of Object.entries(inputs)) expect(ctrlAlt(code), code).toEqual({ kind: 'input', input });
     expect(ctrlAlt('KeyL')?.kind).toBe('missingInput');
     // ctrl + alt + a key csTimer doesn't use is nothing, not the alt or ctrl shortcut

@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { revokedKey, revokedUserKey, signToken, verifyToken, type Redis } from '@cubr/common';
 import { createTestRedis, describeIntegration } from '@cubr/testkit';
-import { GUEST_ID_RE, generateGuestId } from '../src/sanitize.js';
+import { generateGuestId, randomId } from '../src/sanitize.js';
 import type { ChatMessage } from '../src/types.js';
 import { connect, createRoom, disconnectAll, expectRefused, keys, playerIn, settle, startPod, type Player, type Pod } from './harness.js';
 
@@ -44,10 +44,12 @@ describeIntegration('race socket protocol', () => {
   }
 
   describe('handshake and identity', () => {
-    it('gives a guest without an id a fresh guest id and a default name', async () => {
+    /** a guest id made from a key (identity.ts guestIdFor): the old guestId field can't claim it */
+    const FRESH_ID = /^gst-[a-z0-9]{12}$/;
+    it('gives a guest without a key a fresh guest id nobody can claim, and a default name', async () => {
       const p = await connect(pod);
       const ack = await p.join(await createRoom(pod));
-      expect(ack.playerId).toMatch(GUEST_ID_RE);
+      expect(ack.playerId).toMatch(FRESH_ID);
       expect(ack.name).toBe(`guest-${ack.playerId.slice(-4)}`);
       expect(playerIn(ack.room, ack.playerId)).toMatchObject({ name: ack.name, userId: null });
     });
@@ -78,8 +80,35 @@ describeIntegration('race socket protocol', () => {
       const p = await connect(pod, { guestId });
       const ack = await p.join(await createRoom(pod));
       expect(ack.playerId).not.toBe(guestId);
-      expect(ack.playerId).toMatch(GUEST_ID_RE);
+      expect(ack.playerId).toMatch(FRESH_ID);
       expect(playerIn(ack.room, ack.playerId).userId).toBeNull();
+    });
+
+    it("makes a guest's id from its secret key: the same on every connection, and nobody can take it from the id", async () => {
+      const roomId = await createRoom(pod);
+      const key = randomId(32);
+      const first = await connect(pod, { guestKey: key, name: 'Alice' });
+      const ack = await first.join(roomId);
+      expect(ack.playerId).toMatch(/^gst-[a-z0-9]{12}$/);
+      expect(ack.playerId).not.toContain(key.slice(0, 8));
+      first.close();
+      const again = await connect(pod, { guestKey: key });
+      expect((await again.join(roomId)).playerId).toBe(ack.playerId);
+      // every member sees the id; using it (the old handshake field) gets a new guest, not Alice (the October review's #12)
+      const thief = await connect(pod, { guestId: ack.playerId, name: 'Alice' });
+      expect((await thief.join(roomId)).playerId).not.toBe(ack.playerId);
+      const other = await connect(pod, { guestKey: randomId(32) });
+      expect((await other.join(roomId)).playerId).not.toBe(ack.playerId);
+      for (const bad of ['short', 'UPPERCASE'.repeat(4), 'x'.repeat(65)]) {
+        const p = await connect(pod, { guestKey: bad });
+        expect((await p.join(roomId)).playerId).toMatch(/^gst-[a-z0-9]{12}$/); // a fresh guest
+      }
+    });
+
+    it("still accepts the previous release's guest ids, in their old form, for one release", async () => {
+      const guestId = generateGuestId();
+      const p = await connect(pod, { guestId });
+      expect((await p.join(await createRoom(pod))).playerId).toBe(guestId);
     });
 
     it('lets a signed-in user play as themselves, whatever name or guestId they also send', async () => {
@@ -385,9 +414,28 @@ describeIntegration('race socket protocol', () => {
 
       const acks = await Promise.all([tab1.emit('round:next'), tab2.emit('round:next')]);
       expect(acks.filter((a) => a.ok)).toHaveLength(1);
-      expectRefused(acks.find((a) => !a.ok)!, 'CONFLICT', /already advanced/);
+      expectRefused(
+        acks.find((a) => !a.ok)!,
+        'CONFLICT',
+        /already advanced/,
+      );
       await tab1.until((s) => s.round?.n === 1);
       expect(JSON.parse((await base.get(keys.room(roomId)))!).round.n).toBe(1);
+    });
+
+    it("starts the round after the one the host saw, once, however often it is asked (the October review's #12)", async () => {
+      const roomId = await createRoom(pod);
+      const alice = await guest('Alice');
+      await alice.join(roomId);
+      const first = await alice.emit('round:next', { fromRound: 0 });
+      expect(first).toMatchObject({ ok: true, round: { n: 1 } });
+      const calls = pod.scrambles.calls.length;
+      // a retry after a lost answer, or a double click: round 1 again, no round 2, no new scramble
+      expect(await alice.emit('round:next', { fromRound: 0 })).toMatchObject({ ok: true, round: first.round });
+      expect(pod.scrambles.calls.length).toBe(calls);
+      expectRefused(await alice.emit('round:next', { fromRound: 5 }), 'CONFLICT');
+      expect(await alice.emit('round:next', { fromRound: 1 })).toMatchObject({ ok: true, round: { n: 2 } });
+      expect(await alice.emit('round:next')).toMatchObject({ ok: true, round: { n: 3 } }); // the previous release's tabs send nothing
     });
 
     it('refuses results for any round but the current one', async () => {
@@ -425,6 +473,22 @@ describeIntegration('race socket protocol', () => {
       const p = await soloRound();
       expectRefused(await p.emit('player:status', payload), 'BAD_REQUEST');
     });
+
+    it('refuses a flood as it arrives, before queueing it, and keeps the room usable for everyone else', async () => {
+      const roomId = await createRoom(pod);
+      const flooder = await guest('Flood');
+      const bob = await guest('Bob');
+      await flooder.join(roomId);
+      await bob.join(roomId);
+      const acks = await Promise.all(Array.from({ length: 80 }, (_, i) => flooder.emit('player:status', { status: i % 2 ? 'idle' : 'idle' })));
+      const ok = acks.filter((a) => a.ok).length;
+      expect(ok).toBeLessThanOrEqual(60);
+      expect(acks.every((a) => a.ok || a.code === 'RATE_LIMITED')).toBe(true);
+      expect(acks.some((a) => !a.ok)).toBe(true);
+      const t0 = Date.now();
+      expect((await bob.emit('player:status', { status: 'idle' })).ok).toBe(true);
+      expect(Date.now() - t0).toBeLessThan(2000);
+    });
   });
 
   describe('results and standings', () => {
@@ -447,6 +511,12 @@ describeIntegration('race socket protocol', () => {
         { playerId: alice.playerId, name: 'Alice', wins: 1, solves: 1, meanMs: 9120, ao5: null },
         { playerId: bob.playerId, name: 'Bob', wins: 0, solves: 1, meanMs: null, ao5: null },
       ]);
+    });
+
+    it('refuses "done" from a player without a result', async () => {
+      const p = await soloRound();
+      expectRefused(await p.emit('player:status', { status: 'done' }), 'BAD_REQUEST', /result/);
+      expect(playerIn(p.state, p.playerId).status).toBe('idle');
     });
 
     it('accepts one result per player per round, after which live status can only be "done"', async () => {
@@ -504,9 +574,21 @@ describeIntegration('race socket protocol', () => {
       const c = await guest('Cat');
       for (const p of [a, b, c]) await p.join(roomId);
       const rounds: [Player, number, string][][] = [
-        [[a, 10_000, 'OK'], [b, 9_000, '+2'], [c, 8_000, 'DNF']], // Ann wins (Ben = 11 s)
-        [[a, 12_000, 'OK'], [b, 12_000, 'OK'], [c, 11_000, '+2']], // Ann and Ben tie (Cat = 13 s)
-        [[a, 5_000, 'DNF'], [b, 5_000, 'DNF'], [c, 5_000, 'DNF']], // nobody wins
+        [
+          [a, 10_000, 'OK'],
+          [b, 9_000, '+2'],
+          [c, 8_000, 'DNF'],
+        ], // Ann wins (Ben = 11 s)
+        [
+          [a, 12_000, 'OK'],
+          [b, 12_000, 'OK'],
+          [c, 11_000, '+2'],
+        ], // Ann and Ben tie (Cat = 13 s)
+        [
+          [a, 5_000, 'DNF'],
+          [b, 5_000, 'DNF'],
+          [c, 5_000, 'DNF'],
+        ], // nobody wins
       ];
       for (const [i, round] of rounds.entries()) {
         expect((await a.emit('round:next')).round.n).toBe(i + 1);
@@ -547,6 +629,28 @@ describeIntegration('race socket protocol', () => {
 
       const late = await guest('Late');
       expect((await late.join(roomId)).chat).toEqual([msg]);
+    });
+
+    it("lets a moderator clear a room's chat: its history goes, and its players are told", async () => {
+      const roomId = await createRoom(pod);
+      const alice = await guest('Alice');
+      await alice.join(roomId);
+      expect((await alice.emit('chat:send', { text: 'something to remove' })).ok).toBe(true);
+      await settle(() => expect(alice.chats).toHaveLength(1));
+      const res = await pod.inject({ method: 'POST', url: `/internal/moderation/rooms/${roomId}/clear-chat` });
+      expect(res.statusCode).toBe(204);
+      await settle(() => expect(alice.clears).toBe(1));
+      expect(alice.chats).toEqual([]);
+      const late = await guest('Late');
+      expect((await late.join(roomId)).chat).toEqual([]);
+      expect((await pod.inject({ method: 'POST', url: '/internal/moderation/rooms/no!/clear-chat' })).statusCode).toBe(404);
+    });
+
+    it('refuses a slur, and takes ordinary swearing', async () => {
+      const p = await guest();
+      await p.join(await createRoom(pod));
+      expectRefused(await p.emit('chat:send', { text: 'you are a r3tard' }), 'BAD_REQUEST', "text: that message has a word cubr doesn't allow");
+      expect((await p.emit('chat:send', { text: 'what a shit solve' })).ok).toBe(true);
     });
 
     it('accepts a message of exactly 200 characters', async () => {

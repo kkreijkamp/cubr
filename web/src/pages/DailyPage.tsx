@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRightEndOnRectangleIcon, ArrowUturnLeftIcon, CalendarDaysIcon, ClockIcon, SignalSlashIcon } from '@heroicons/react/24/outline';
-import { averageOfN, DAILY_EVENTS, effectiveMs, formatSolve, formatTime, getEvent, type Penalty } from '@cubr/cubestats';
+import { averageOfN, DAILY_EVENTS, effectiveMs, formatAverage, formatSolve, formatTime, getEvent, type Penalty } from '@cubr/cubestats';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useSettings } from '../lib/settings';
@@ -28,6 +28,19 @@ import type { TimerResult } from '../timer/useTimerEngine';
 import '../components/live/live.css';
 import '../components/live/daily/daily.css';
 
+/** The scramble preview's height on this page. */
+const PREVIEW_HEIGHT = 160;
+/**
+ * While today's scrambles load: one of a typical length for each daily event, drawn invisibly, so the
+ * scramble's box (its text size and lines follow the length) takes the room the real one will.
+ */
+const SCRAMBLE_STAND_IN: Record<string, string> = {
+  '333': "D2 R2 B2 U' L2 D' F2 U B2 R2 U' F' R D' L' B U2 R' F' U'",
+  '222': "R U2 F' R2 U' F2 R' U F2 R'",
+  '444': "Rw2 U2 B' R2 F' U2 L2 B D2 F' R2 U' L' D R' U2 B' F2 Uw2 L' Uw2 F2 Rw2 B' Uw2 L2 Fw2 U2 R' D' Rw2 F U' Fw' L' D2 Rw' Uw' F' Uw R2 Fw' L2 U",
+  pyram: "U' L' B R' U B L U' l' r b'",
+  skewb: "R U' L B' U L' R B' U L'",
+};
 const ATTEMPTS = 5;
 const PRACTICE_KEY = 'cubr.daily.practice';
 
@@ -183,7 +196,14 @@ export default function DailyPage() {
         byIndex.set(idx, { index: idx, timeMs: s.timeMs, penalty: s.penalty, state: 'saved', solveId: s.id, sessionId: s.sessionId });
       }
     }
-    for (const a of local[key] ?? []) if (!byIndex.has(a.index) || a.state !== 'saved') byIndex.set(a.index, byIndex.get(a.index)?.state === 'saved' ? byIndex.get(a.index)! : a);
+    // the official attempts: an attempt whose solve was deleted is still used (the server refuses another
+    // solve for it), so its slot shows as done rather than open (the October review's #5)
+    for (const a of progress.data?.events?.[event]?.attempts ?? []) {
+      if (a.index >= 0 && a.index < ATTEMPTS && !byIndex.has(a.index))
+        byIndex.set(a.index, { index: a.index, timeMs: a.timeMs, penalty: a.penalty, state: 'saved', solveId: a.solveId });
+    }
+    for (const a of local[key] ?? [])
+      if (!byIndex.has(a.index) || a.state !== 'saved') byIndex.set(a.index, byIndex.get(a.index)?.state === 'saved' ? byIndex.get(a.index)! : a);
     return [...byIndex.values()]
       .map((a) => (a.solveId && penalties[a.solveId] ? { ...a, penalty: penalties[a.solveId] } : a))
       .sort((a, b) => a.index - b.index);
@@ -196,7 +216,7 @@ export default function DailyPage() {
   const done = nextIndex === null;
   const progressReady = !authed || (!!progress.data && !progress.error);
   const canStart = isToday && !!scrambles && progressReady && !done;
-  const scramble = scrambles && nextIndex !== null ? scrambles[nextIndex] ?? null : null;
+  const scramble = scrambles && nextIndex !== null ? (scrambles[nextIndex] ?? null) : null;
 
   const setLocalAttempt = useCallback((k: string, a: Attempt) => {
     setLocal((m) => ({ ...m, [k]: [...(m[k] ?? []).filter((x) => x.index !== a.index), a] }));
@@ -233,10 +253,51 @@ export default function DailyPage() {
     [setLocalAttempt, progress, rerank],
   );
 
+  // ---------------------------------------------------------------- one try per scramble (the October review's #18)
+  // An official attempt counts from the moment its inspection (or, without inspection, its solve) starts:
+  // the server notes it, and starting it again later (after a reload or a closed tab) makes it a DNF.
+  // Esc during inspection, or leaving for another event or day, is a DNF here and now.
+  const begun = useRef<{ key: string; event: string; date: string; index: number; scramble: string; at: number } | null>(null);
+  const beginAttempt = () => {
+    if (!authed || !isToday || nextIndex === null || !scramble) return;
+    if (begun.current && begun.current.key === key && begun.current.index === nextIndex) return; // inspection already began it
+    const b = { key, event, date, index: nextIndex, scramble, at: Date.now() };
+    begun.current = b;
+    api.solves
+      .dailyStart({ date: b.date, event: b.event, index: b.index })
+      .then((res) => {
+        if (!res.abandoned) return;
+        if (begun.current === b) begun.current = null; // the server made it a DNF already
+        cancel();
+        toast.notice(`attempt ${b.index + 1} counts as a DNF: it was started before`);
+        progress.reload();
+      })
+      .catch((e) => {
+        if (!(e instanceof ApiError) || e.status !== 409) return; // offline: the attempt goes on, the rule waits
+        if (begun.current === b) begun.current = null;
+        cancel();
+        progress.reload();
+      });
+  };
+  const abandonAttempt = () => {
+    const b = begun.current;
+    begun.current = null;
+    if (!b) return;
+    send(b.key, b.event, b.date, { index: b.index, timeMs: Math.max(1, Date.now() - b.at), penalty: 'DNF', state: 'saving', solveId: uuid() }, b.scramble);
+    toast.notice(`attempt ${b.index + 1} counts as a DNF: it was started`);
+  };
+
   const onSolve = (r: TimerResult) => {
+    begun.current = null;
     if (nextIndex === null || !scramble) return;
     setPicked(null);
-    const a: Attempt = { index: nextIndex, timeMs: r.timeMs, penalty: r.penalty, state: authed ? 'saving' : 'practice', ...(authed ? { solveId: uuid() } : {}) };
+    const a: Attempt = {
+      index: nextIndex,
+      timeMs: r.timeMs,
+      penalty: r.penalty,
+      state: authed ? 'saving' : 'practice',
+      ...(authed ? { solveId: uuid() } : {}),
+    };
     if (!authed) {
       setPractice((p) => {
         const next = { ...p, [key]: [...(p[key] ?? []).filter((x) => x.index !== a.index), a] };
@@ -248,7 +309,14 @@ export default function DailyPage() {
     send(key, event, date, a, scramble);
   };
 
-  const engine = useLiveTimer({ canStart, inspection: settings.inspection && ev.inspection, onSolve });
+  const engine = useLiveTimer({
+    canStart,
+    inspection: settings.inspection && ev.inspection,
+    onSolve,
+    onInspectionStart: beginAttempt,
+    onStart: beginAttempt,
+    onCancel: abandonAttempt,
+  });
   const { cancel, clearResult } = engine;
   useEffect(() => {
     cancel();
@@ -387,7 +455,13 @@ export default function DailyPage() {
           description, never a scramble, a time or the board */}
       <div className="daily-config fade-on-focus" data-nosnippet>
         <EventPicker events={DAILY_EVENTS} value={event} onChange={setEvent} />
-        <Segmented label="day" className="scroll" value={date} onChange={setDate} options={days.map((k) => ({ value: k, label: dayLabel(k, today), tip: k }))} />
+        <Segmented
+          label="day"
+          className="scroll"
+          value={date}
+          onChange={setDate}
+          options={days.map((k) => ({ value: k, label: dayLabel(k, today), tip: k }))}
+        />
       </div>
 
       {!authed && status !== 'loading' && isToday && (
@@ -405,37 +479,46 @@ export default function DailyPage() {
 
       <div className="daily-layout" data-nosnippet>
         <div className="daily-main">
-          {!isToday && (
-            <div className="daily-past sub small fade-on-focus">
-              viewing {date} (UTC) - past challenges are closed, leaderboard only.
-            </div>
-          )}
+          {!isToday && <div className="daily-past sub small fade-on-focus">viewing {date} (UTC) - past challenges are closed, leaderboard only.</div>}
 
           <ol className={`daily-strip fade-on-focus${isToday ? ' pickable' : ''}`} aria-label="attempts">
             {Array.from({ length: ATTEMPTS }, (_, i) => {
               const a = attempts.find((x) => x.index === i);
               const current = isToday && i === nextIndex;
               const paren = done && (i === bestIdx || i === worstIdx);
+              const time = a ? (
+                <>
+                  {paren ? '(' : ''}
+                  {formatSolve(a.timeMs, a.penalty, settings.precision)}
+                  {paren ? ')' : ''}
+                </>
+              ) : current ? (
+                'now'
+              ) : (
+                '-'
+              );
+              const timeClass = `t${a?.penalty === 'DNF' ? ' dnf' : ''}`;
               return (
+                // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- a pointer picks anywhere on the attempt; the keyboard picks with its time, a button
                 <li
                   key={i}
                   className={`${current ? 'current' : ''}${a ? ' filled' : ''}${a?.state === 'failed' ? ' failed' : ''}${a && picked === i && isToday ? ' picked' : ''}`}
                   onClick={a && isToday ? () => setPicked(i) : undefined}
                 >
                   <span className="n">{i + 1}</span>
-                  <span className={`t${a?.penalty === 'DNF' ? ' dnf' : ''}`}>
-                    {a ? (
-                      <>
-                        {paren ? '(' : ''}
-                        {formatSolve(a.timeMs, a.penalty, settings.precision)}
-                        {paren ? ')' : ''}
-                      </>
-                    ) : current ? (
-                      'now'
-                    ) : (
-                      '-'
-                    )}
-                  </span>
+                  {a && isToday ? (
+                    // its click reaches the attempt's own (Enter gives one too)
+                    <button
+                      type="button"
+                      className={timeClass}
+                      aria-pressed={picked === i}
+                      aria-label={`attempt ${i + 1}: ${formatSolve(a.timeMs, a.penalty, settings.precision)} (pick it for ok / +2 / dnf)`}
+                    >
+                      {time}
+                    </button>
+                  ) : (
+                    <span className={timeClass}>{time}</span>
+                  )}
                   <span className="s">
                     {a?.state === 'saving' && <Spinner size={12} />}
                     {a?.state === 'failed' && (
@@ -459,23 +542,25 @@ export default function DailyPage() {
               error={new Error(unavailable ? 'the scramble service is unavailable - the daily challenge needs its official scrambles' : scr.error!.message)}
               onRetry={scr.reload}
             />
-          ) : !scrambles ? (
+          ) : !scrambles && !(scr.loading && isToday) ? (
             scr.loading ? (
               <Loading label="loading scrambles..." />
             ) : (
               <div className="empty">no daily scrambles for {ev.name} on this day.</div>
             )
-          ) : done ? (
+          ) : done && scrambles ? (
             <div className="daily-result">
-              {isToday && <QuickActions className="daily-quick" last={selected ?? null} onPenalty={changePenalty} label={`attempt ${(selected?.index ?? 0) + 1}`} />}
+              {isToday && (
+                <QuickActions className="daily-quick" last={selected ?? null} onPenalty={changePenalty} label={`attempt ${(selected?.index ?? 0) + 1}`} />
+              )}
               <div className="stat lg">
                 <span className="label">ao5</span>
-                <span className="value">{formatTime(ao5, settings.precision)}</span>
+                <span className="value">{formatAverage(ao5, settings.precision)}</span>
               </div>
               <div className="daily-result-stats">
                 <div className="stat">
                   <span className="label">mean</span>
-                  <span className="value text">{formatTime(mean, settings.precision)}</span>
+                  <span className="value text">{formatAverage(mean, settings.precision)}</span>
                 </div>
                 <div className="stat">
                   <span className="label">best</span>
@@ -510,12 +595,25 @@ export default function DailyPage() {
               {isToday && <div className="sub small center">come back in {formatCountdown(nextMidnight - now)} for new scrambles.</div>}
             </div>
           ) : isToday ? (
+            // while today's scrambles load, this view stands as it will be (an invisible scramble of a
+            // typical length, an empty preview box), so nothing below it moves when they come
             <>
+              {!scrambles && (
+                <span className="sr-only" role="status">
+                  loading scrambles...
+                </span>
+              )}
               <div className="daily-scramble-label fade-on-focus">
                 scramble <span className="main">{(nextIndex ?? 0) + 1}</span>/{ATTEMPTS}
               </div>
               <div className="fade-on-focus">
-                <ScrambleText scramble={scramble} event={event} />
+                {scrambles ? (
+                  <ScrambleText scramble={scramble} event={event} />
+                ) : (
+                  <div className="reserve" aria-hidden="true">
+                    <ScrambleText scramble={SCRAMBLE_STAND_IN[event] ?? null} event={event} />
+                  </div>
+                )}
               </div>
               <TimerArea
                 engine={engine}
@@ -530,7 +628,7 @@ export default function DailyPage() {
               />
               <div className="live-keytips fade-on-focus">
                 {touch ? (
-                  `${settings.inspection && ev.inspection ? 'tap the timer to inspect, then hold it and release to start' : 'hold the timer, release to start'} - tap to stop - one try per scramble`
+                  `${settings.inspection && ev.inspection ? 'tap the timer to inspect, then hold it and release to start' : 'hold the timer, release to start'} - tap to stop - one try per scramble: it counts once you start`
                 ) : (
                   <>
                     {settings.inspection && ev.inspection ? (
@@ -542,13 +640,23 @@ export default function DailyPage() {
                         hold <kbd>space</kbd>, release to start
                       </>
                     )}{' '}
-                    - <kbd>esc</kbd> while solving = DNF - one try per scramble
+                    - <kbd>esc</kbd> = DNF - one try per scramble: it counts once you start
                   </>
                 )}
               </div>
+              {settings.scramblePreview !== 'off' && !scrambles && (
+                <div className="daily-preview fade-on-focus">
+                  <div className="twisty-host twisty-none" style={{ minHeight: PREVIEW_HEIGHT }} />
+                </div>
+              )}
               {settings.scramblePreview !== 'off' && scramble && (
                 <div className="daily-preview fade-on-focus">
-                  <TwistyPreview puzzle={ev.puzzle} scramble={scramble} visualization={settings.scramblePreview === '3D' ? '3D' : '2D'} height={160} />
+                  <TwistyPreview
+                    puzzle={ev.puzzle}
+                    scramble={scramble}
+                    visualization={settings.scramblePreview === '3D' ? '3D' : '2D'}
+                    height={PREVIEW_HEIGHT}
+                  />
                 </div>
               )}
             </>
@@ -556,7 +664,7 @@ export default function DailyPage() {
             <details className="daily-scrambles card">
               <summary className="sub small">show this day's scrambles</summary>
               <ol>
-                {scrambles.map((s, i) => (
+                {scrambles?.map((s, i) => (
                   <li key={i}>
                     <span className="sub">{i + 1}.</span> {s}
                   </li>

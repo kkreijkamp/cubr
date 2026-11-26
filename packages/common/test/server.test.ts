@@ -76,7 +76,8 @@ describe('security headers', () => {
 
   it('let search engines fetch the API (pages render from it) but never list its answers', async () => {
     expect(ROBOTS_HEADERS).toEqual({ 'X-Robots-Tag': 'noindex' });
-    for (const url of ['/api/test/thing', '/api/test/nope', '/api/test/_info']) expect((await app.inject({ url })).headers['x-robots-tag'], url).toBe('noindex');
+    for (const url of ['/api/test/thing', '/api/test/nope', '/api/test/_info'])
+      expect((await app.inject({ url })).headers['x-robots-tag'], url).toBe('noindex');
   });
 
   it("leave a route's own stricter value alone (the avatars' sandbox)", async () => {

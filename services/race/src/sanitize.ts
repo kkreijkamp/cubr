@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { hasBlockedWord, isReservedUsername } from '@cubr/common';
 
 const ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
 
@@ -45,7 +46,9 @@ export function sanitizeText(raw: string, maxChars: number): string {
 export function sanitizeName(raw: unknown, fallback: string): string {
   if (typeof raw !== 'string') return fallback;
   const name = sanitizeText(raw, 20);
-  return name.length > 0 ? name : fallback;
+  // a guest can't race as "admin" or under a word cubr doesn't allow (packages/common moderation.ts)
+  if (name.length === 0 || isReservedUsername(name.replace(/\s+/g, '_')) || hasBlockedWord(name)) return fallback;
+  return name;
 }
 
 /** Default display name for a guest: "guest-" + the last 4 characters of the guest id. */

@@ -87,7 +87,8 @@ function detect(text: string): [string, RawSession[]] {
   const firstLine = trimmed.split(/\r?\n/, 1)[0];
   if (/^No\.;Time;Comment;Scramble;Date/i.test(firstLine)) return ['csTimer (CSV)', csTimerCsv(trimmed)];
   if (/^Puzzle,Category,Time\(millis\),Date\(millis\),Scramble,Penalty,Comment/i.test(firstLine)) return ['Twisty Timer', twistyTimer(trimmed, true)];
-  if (/^"Puzzle";"Category";"Time\(millis\)";"Date\(millis\)";"Scramble";"Penalty";"Comment"/i.test(firstLine)) return ['Cubic Timer', twistyTimer(trimmed, false)];
+  if (/^"Puzzle";"Category";"Time\(millis\)";"Date\(millis\)";"Scramble";"Penalty";"Comment"/i.test(firstLine))
+    return ['Cubic Timer', twistyTimer(trimmed, false)];
   if (/^"Category";"Time \(MM:SS\.SSS\)";"Scrambler";"Date";"Penalty \+2 \(yes or no\)";"DNF \(yes or no\)";"Section"/i.test(firstLine)) {
     return ['mateus Cubetimer', mateus(trimmed)];
   }
@@ -140,7 +141,7 @@ export function parseTimeString(s: string): { ms: number; penalty: Penalty } | n
     if (!t) return { ms: NaN, penalty };
   } else if (/\+2?$/.test(t)) {
     penalty = '+2';
-    t = t.replace(/\s*\+2?$/, '');
+    t = t.replace(/\+2?$/, '').trimEnd(); // not /\s*\+2?$/, whose time grows with the square of a run of spaces
   }
   const parts = t.split(':');
   if (parts.length > 3 || !parts.every((p) => /^\d+(\.\d+)?$/.test(p) || (p === '' && parts.length > 1))) return null;
@@ -207,7 +208,10 @@ function csTimerCsv(text: string): RawSession[] {
   for (const row of readDelimited(text, ';').slice(1)) {
     const shown = parseTimeString(row[1] ?? '');
     if (!shown) continue;
-    const phases = row.slice(5).filter((p) => p.trim() !== '').map((p) => parseTimeString(p));
+    const phases = row
+      .slice(5)
+      .filter((p) => p.trim() !== '')
+      .map((p) => parseTimeString(p));
     const raw =
       phases.length && phases.every((p) => p !== null && Number.isFinite(p.ms))
         ? phases.reduce((a, p) => a + (p as { ms: number }).ms, 0)
@@ -479,14 +483,16 @@ function ganCubeStation(list: unknown[]): RawSession[] {
     const d = new Date(Number.isFinite(at) ? at : 0);
     const name = x.leagueId ? `League${str(x.leagueId)}` : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     const ok = Boolean(x.normalScore);
-    groups.session(name, () => ({ name, event: '333', sourceType: 'GAN' })).solves.push({
-      // a DNF needs no real time; a finished solve of 0 ms is broken data (and would be a 0.001 s
-      // "PB"), so it stays below 1 ms and is skipped as invalid
-      timeMs: ok ? Number(x.duration) : Math.max(1, Number(x.duration)),
-      penalty: ok ? 'OK' : 'DNF',
-      scramble: x.scramble,
-      at,
-    });
+    groups
+      .session(name, () => ({ name, event: '333', sourceType: 'GAN' }))
+      .solves.push({
+        // a DNF needs no real time; a finished solve of 0 ms is broken data (and would be a 0.001 s
+        // "PB"), so it stays below 1 ms and is skipped as invalid
+        timeMs: ok ? Number(x.duration) : Math.max(1, Number(x.duration)),
+        penalty: ok ? 'OK' : 'DNF',
+        scramble: x.scramble,
+        at,
+      });
   }
   return groups.sessions;
 }

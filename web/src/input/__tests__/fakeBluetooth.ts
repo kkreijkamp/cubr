@@ -20,7 +20,11 @@ export class FakeCharacteristic extends EventTarget {
     return this as never;
   }
   async writeValue(v: BufferSource) {
-    const bytes = Array.from(v instanceof ArrayBuffer ? new Uint8Array(v) : new Uint8Array((v as ArrayBufferView).buffer, (v as ArrayBufferView).byteOffset, (v as ArrayBufferView).byteLength));
+    const bytes = Array.from(
+      v instanceof ArrayBuffer
+        ? new Uint8Array(v)
+        : new Uint8Array((v as ArrayBufferView).buffer, (v as ArrayBufferView).byteOffset, (v as ArrayBufferView).byteLength),
+    );
     this.writes.push(bytes);
     this.onWrite?.(bytes);
   }
@@ -68,6 +72,8 @@ export class FakeDevice extends EventTarget {
     readonly manufacturerData: Map<number, DataView> | null = null,
   ) {
     super();
+    // the gatt object's getter below reads the device, which `this` there isn't
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     const self = this;
     this.gatt = {
       get connected() {

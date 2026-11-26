@@ -2,12 +2,18 @@
 
 Official WCA **random-state** scrambles generated server-side with [cubing.js](https://js.cubing.net)
 (`randomScrambleForEvent`), a Redis pool of pre-generated scrambles shared by all replicas, and the
-daily challenge (5 persisted scrambles per event per day).
+daily challenge (5 persisted scrambles per event per day). Also every other event and practice
+scramble type cubr lists (`@cubr/cubestats` scrambleTypes.ts, SPEC section 6), made on request:
+3x3/2x2 practice states solved by cubing.js (`practice.ts`), csTimer's move tables, relays from WCA
+scrambles, and the rest from csTimer's own scramblers (npm `cstimer_module`, GPL-3.0, in a worker
+thread of its own, `cstimer.ts`), which also draw the scrambles cubr can't (a puzzle cubing.js
+lacks, or csTimer's own notation); the web app redraws them as its own nets.
 
 | Route | Response |
 |---|---|
-| `GET /api/scrambles/events` | `{events: [{id, name, short, puzzle}]}` (from `@cubr/cubestats` EVENTS) |
-| `GET /api/scrambles/:event?count=1..25&fresh=0\|1` | `{event, scrambles, source: "pool"\|"generated"}` - 404 unknown event (e.g. `333mbf`), 400 bad count, 429 over the per-IP limits (120 requests/min, 60 newly generated scrambles/min; past the generation budget the pool's scrambles are still returned), 503 on timeout/overload. `fresh=1` and no limits only with `X-Internal-Token` |
+| `GET /api/scrambles/events` | `{events: [{id, name, short, puzzle, kind, types}]}` (from `@cubr/cubestats` ALL_EVENTS and their scramble types) |
+| `GET /api/scrambles/:event?count=1..25&fresh=0\|1&type=` | `{event, scrambles, source: "pool"\|"generated"}` - `type`: a scramble type (the event's default when omitted; anything but a WCA event's default is made on request and counts against the generation budget) - 404 unknown event (e.g. `333mbf`) or type, 400 bad count, 429 over the per-IP limits (120 requests/min, 60 newly generated scrambles/min; past the generation budget the pool's scrambles are still returned), 503 on timeout/overload. `fresh=1` and no limits only with `X-Internal-Token` |
+| `GET /api/scrambles/:event/image?scramble=&type=` | csTimer's SVG of the scramble, any event and type (cached a day); 404 where csTimer can't draw it |
 | `GET /api/scrambles/daily?date=YYYY-MM-DD` | `{date, events: {333, 222, 444, pyram, skewb: string[5]}}` - default today (UTC), only the last 30 days; 503 while Postgres is unreachable |
 | `GET /api/scrambles/_info` | standard info + `warmup`, `generator` (queue depth, generated, timings), `pool` (LLEN per event), `refill`, `memory` |
 
@@ -63,10 +69,12 @@ Shared vars (SPEC section 4) plus `SCRAMBLE_WORKERS` (1), `SCRAMBLE_TIMEOUT_MS` 
 `SCRAMBLE_REFILL_INTERVAL_MS` (2000), `SCRAMBLE_REFILL_BATCH` (5), `SCRAMBLE_REFILL_BUDGET_MS` (300).
 
 ## Build notes
-cubing.js is **external** to the esbuild bundle (`"cubr": {"external": ["cubing"]}`) because it
-spawns its search worker from its own files. The Dockerfile installs `cubing@0.65.1` (pinned to the
-lockfile) into `/app/node_modules` next to `/app/dist/index.mjs`, removing the browser/CLI-only
-deps (three.js, @optique, types) that `cubing/scramble` never loads.
+cubing.js is **external** to the esbuild bundle (`"cubr": {"external": ["cubing", "cstimer_module"]}`)
+because it spawns its search worker from its own files. The Dockerfile installs `cubing@0.65.1` and
+`cstimer_module@0.1.5` (pinned to the lockfile; install scripts off) into `/app/node_modules` next to
+`/app/dist/index.mjs`, removing the browser/CLI-only deps (three.js, @optique, types) that
+`cubing/scramble` never loads. `cstimer_module` is loaded by path in its worker thread.
+cstimer.test.ts checks the two pins agree.
 
 Dev: `docker compose up -d postgres redis`, then
 `PORT=8082 DATABASE_URL=postgres://cubr:cubr@localhost:55433/cubr REDIS_URL=redis://localhost:56380 npm run dev -w services/scramble` -

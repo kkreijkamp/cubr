@@ -46,11 +46,24 @@ export interface StoredRoom {
   round: Round | null;
   players: StoredPlayer[];
   results: Results;
+  /** per player, the totals of rounds no longer kept in `results` (room.ts ROUNDS_KEPT), for the standings */
+  earlier?: Record<string, EarlierTotals>;
   createdAt: string;
   createdBy: string | null;
   /** incremented on every saved change - clients ignore room:state with an older rev */
   rev: number;
   updatedAt: number;
+}
+
+/** A player's results in rounds that were pruned: what the standings need of them. */
+export interface EarlierTotals {
+  wins: number;
+  solves: number;
+  /** sum and count of the effective times that weren't DNF */
+  sumMs: number;
+  finite: number;
+  /** the last 5 results, oldest first (an ao5 can reach back into pruned rounds) */
+  last: ResultEntry[];
 }
 
 export interface Standing {

@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { EVENT_IDS } from '@cubr/cubestats';
 import {
-  clockScramble, fallbackScramble, megaminxScramble, nxnScramble, pyraminxScramble, skewbScramble, sq1Apply, sq1Scramble,
+  clockScramble,
+  fallbackScramble,
+  megaminxScramble,
+  nxnScramble,
+  pyraminxScramble,
+  skewbScramble,
+  sq1Apply,
+  sq1Scramble,
   sq1SolvedLayers,
 } from '../src/scramble.js';
 
@@ -66,7 +73,11 @@ describe('fallback scrambles', () => {
       expect(parsed).toHaveLength(len);
       expect(Math.max(...parsed.map((p) => p.width))).toBeLessThanOrEqual(maxWidth);
     }
-    expect(nxnScramble(7, 200).split(' ').some((m) => /^3[UDLRFB]w/.test(m))).toBe(true);
+    expect(
+      nxnScramble(7, 200)
+        .split(' ')
+        .some((m) => /^3[UDLRFB]w/.test(m)),
+    ).toBe(true);
   });
 
   it('2x2 only turns U, R and F', () => {

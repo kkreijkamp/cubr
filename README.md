@@ -53,13 +53,17 @@ npm install && npm test                 # services and packages
 cd web && npm install && npm run dev    # the web app, with hot reload
 ```
 
-`npm run test:integration` adds the database suites.
+`npm run test:integration` adds the database suites, `npm run lint` and `npm run format:check` check the
+code. With the stack running, `cd e2e && npm install && npm test` runs the end-to-end tests in a browser:
+sign-up, a solve that reaches the leaderboards, a daily attempt, a two-player race, and axe on every main
+page (locally in the installed Google Chrome).
 
 ## Documentation
 
 - [`docs/SPEC.md`](docs/SPEC.md): the system specification (APIs, schemas and events)
 - [`deploy/README.md`](deploy/README.md): the local stack, the WCA data and demo users, and Kubernetes
 - [`deploy/vps/README.md`](deploy/vps/README.md): production
+- [`CONTRIBUTING.md`](CONTRIBUTING.md): running it, and making a change; [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)
 - [`SECURITY.md`](SECURITY.md): reporting a vulnerability
 
 ## Acknowledgements

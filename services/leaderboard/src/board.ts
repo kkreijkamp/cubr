@@ -70,7 +70,13 @@ export async function readBoard(redis: Redis, key: string, page: number, size: n
   let users: (string | null)[] = [];
   let ats: (string | null)[] = [];
   if (ids.length) {
-    [users, ats] = unwrap<(string | null)[]>(await redis.pipeline().hmget(USERS_KEY, ...ids).hmget(atKey(key), ...ids).exec());
+    [users, ats] = unwrap<(string | null)[]>(
+      await redis
+        .pipeline()
+        .hmget(USERS_KEY, ...ids)
+        .hmget(atKey(key), ...ids)
+        .exec(),
+    );
   }
   const entries = ids.map((userId, i): BoardEntry => {
     const info = parseUserInfo(users[i]);

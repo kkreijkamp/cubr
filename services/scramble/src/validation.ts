@@ -3,13 +3,26 @@ import { badRequest } from '@cubr/common';
 
 export const MAX_COUNT = 25;
 
-/** GET /api/scrambles/:event?count=1..25&fresh=0|1 */
+/** GET /api/scrambles/:event?count=1..25&fresh=0|1&type=<scramble type> (the event's default when omitted) */
 export const scrambleQuerySchema = z.object({
   count: z.coerce.number().int().min(1).max(MAX_COUNT).default(1),
+  type: z
+    .string()
+    .regex(/^[A-Za-z0-9_]{1,32}$/, 'type: a scramble type id')
+    .optional(),
   fresh: z
     .enum(['0', '1', 'true', 'false'])
     .optional()
     .transform((v) => v === '1' || v === 'true'),
+});
+
+/** GET /api/scrambles/:event/image?scramble=...&type=<scramble type> */
+export const imageQuerySchema = z.object({
+  scramble: z.string().trim().min(1, 'scramble: required').max(2000),
+  type: z
+    .string()
+    .regex(/^[A-Za-z0-9_]{1,32}$/, 'type: a scramble type id')
+    .optional(),
 });
 
 /** GET /api/scrambles/daily?date=YYYY-MM-DD */

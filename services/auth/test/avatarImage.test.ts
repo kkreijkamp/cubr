@@ -21,7 +21,10 @@ async function pixel(img: Buffer, x: number, y: number): Promise<number[]> {
 const isNear = (got: number[], want: number[]) => got.every((v, i) => Math.abs(v - want[i]) <= 40);
 
 const refusal = async (input: Buffer) => {
-  const err = await reencodeAvatar(input).then(() => null, (e: unknown) => e);
+  const err = await reencodeAvatar(input).then(
+    () => null,
+    (e: unknown) => e,
+  );
   expect(err).toBeInstanceOf(AvatarImageError);
   return (err as Error).message;
 };
@@ -33,7 +36,12 @@ describe('reencodeAvatar', () => {
       ['jpeg 100x100', await solid(100, 100).jpeg().toBuffer()],
       ['webp 256x256 (what the web app sends)', await solid(256, 256).webp({ quality: 86 }).toBuffer()],
       ['png 1x1', await solid(1, 1).png().toBuffer()],
-      ['transparent png', await sharp({ create: { width: 64, height: 64, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).png().toBuffer()],
+      [
+        'transparent png',
+        await sharp({ create: { width: 64, height: 64, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+          .png()
+          .toBuffer(),
+      ],
     ];
     for (const [name, input] of inputs) {
       const out = await reencodeAvatar(input);
@@ -79,7 +87,9 @@ describe('reencodeAvatar', () => {
 
   it('keeps only the first frame of an animation', async () => {
     const frames = [await solid(64, 64, '#ff0000').png().toBuffer(), await solid(64, 64, '#0000ff').png().toBuffer()];
-    const animated = await sharp(frames, { join: { animated: true } }).webp().toBuffer();
+    const animated = await sharp(frames, { join: { animated: true } })
+      .webp()
+      .toBuffer();
     expect((await sharp(animated, { pages: -1 }).metadata()).pages).toBe(2);
     const out = await reencodeAvatar(animated);
     expect((await sharp(out, { pages: -1 }).metadata()).pages ?? 1).toBe(1);

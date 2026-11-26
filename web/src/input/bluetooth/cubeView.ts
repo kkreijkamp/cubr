@@ -104,7 +104,8 @@ export class CubeView {
       return false;
     }
     if (this.active.length === 0 && this.queue.length > 0) this.active.push({ move: this.queue.shift()!, progress: 0 });
-    while (this.queue.length > 0 && this.active.every((a) => this.model.parallel(a.move, this.queue[0]))) this.active.push({ move: this.queue.shift()!, progress: 0 });
+    while (this.queue.length > 0 && this.active.every((a) => this.model.parallel(a.move, this.queue[0])))
+      this.active.push({ move: this.queue.shift()!, progress: 0 });
     if (this.active.length === 0) return false;
     const inc = Math.min(1, Math.max(0.0001, (dt / this.speed) * ((this.queue.length + 2) / 2)));
     for (const a of this.active) a.progress += inc;

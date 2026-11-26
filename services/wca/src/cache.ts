@@ -23,10 +23,7 @@ export function createCache(redis: Redis, log: FastifyBaseLogger) {
   async function get(key: string): Promise<string | null> {
     if (redis.status !== 'ready') return null; // reconnecting: don't wait for it
     try {
-      return await Promise.race([
-        redis.get(key),
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), GET_TIMEOUT_MS)),
-      ]);
+      return await Promise.race([redis.get(key), new Promise<null>((resolve) => setTimeout(() => resolve(null), GET_TIMEOUT_MS))]);
     } catch (err) {
       log.debug({ err: (err as Error).message }, 'cache get failed');
       return null;

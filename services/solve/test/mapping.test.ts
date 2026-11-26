@@ -42,9 +42,7 @@ describe('toSolve', () => {
   });
 
   it('accepts string timestamps', () => {
-    expect(toSolve({ ...baseRow, created_at: '2026-01-01T00:00:00+10:00' as unknown as Date }).createdAt).toBe(
-      '2025-12-31T14:00:00.000Z',
-    );
+    expect(toSolve({ ...baseRow, created_at: '2026-01-01T00:00:00+10:00' as unknown as Date }).createdAt).toBe('2025-12-31T14:00:00.000Z');
   });
 });
 

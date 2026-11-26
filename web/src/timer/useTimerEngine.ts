@@ -1,9 +1,18 @@
 // The speedcubing timer state machine (keyboard + touch), modelled on csTimer with WCA rules.
 //   Esc: cancels holding/ready/inspection; while running it stops the solve as a DNF.
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createStore } from '../lib/store';
 import type { Penalty } from '@cubr/cubestats';
 
 export type TimerPhase = 'idle' | 'holding' | 'ready' | 'inspecting' | 'running' | 'stopped';
+
+/**
+ * Whether a solve is under way on the page's timer (held, inspecting or running): what opens on its
+ * own across the app (the guest upload offer) waits until it's over, so it never takes the key that
+ * stops the timer.
+ */
+export const solvingStore = createStore(false);
+const SOLVING: ReadonlySet<TimerPhase> = new Set(['holding', 'ready', 'inspecting', 'running']);
 
 export interface TimerResult {
   timeMs: number;
@@ -111,7 +120,10 @@ export function useTimerEngine(opts: TimerEngineOptions) {
   const publish = useCallback((patch: Partial<TimerState>) => {
     st.current = { ...st.current, ...patch };
     setState(st.current);
+    solvingStore.set(SOLVING.has(st.current.phase));
   }, []);
+  // a timer that goes away (another page) leaves no solve under way
+  useEffect(() => () => solvingStore.set(false), []);
 
   const clearHold = () => {
     if (holdTimer.current) clearTimeout(holdTimer.current);
@@ -134,9 +146,9 @@ export function useTimerEngine(opts: TimerEngineOptions) {
     [publish],
   );
 
-  /** press = space keydown / touch start */
+  /** press = space keydown / touch start (the hold is timed from now, as csTimer's) */
   const press = useCallback(
-    (t: number) => {
+    (_t: number) => {
       const s = st.current;
       if (s.phase === 'running') return; // handled by stop()
       if (s.phase === 'stopped') return;
@@ -182,7 +194,7 @@ export function useTimerEngine(opts: TimerEngineOptions) {
       if (s.phase === 'ready') {
         // solve starts now - the 8/12 s inspection calls must not go off during the solve
         clearAlerts();
-        document.activeElement instanceof HTMLElement && document.activeElement.blur();
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
         publish({ phase: 'running', startedAt: t });
         optsRef.current.onStart?.();
       }
@@ -226,15 +238,19 @@ export function useTimerEngine(opts: TimerEngineOptions) {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!gateOpen()) return;
-      if (isTypingTarget(e.target) || blockedByOverlay()) return;
+      if (isTypingTarget(e.target)) return;
       const s = st.current;
+      // a solve in progress stops on its key even when a dialog opened meanwhile: the dialog must
+      // never swallow the stop (nor get the key: it's consumed here, before any focused button sees it)
       if (s.phase === 'running') {
         if (MODIFIERS.has(e.key) && e.key !== 'Tab') return;
         e.preventDefault();
+        e.stopPropagation();
         keysDown.current.add(e.code);
         stop(now(e), e.key === 'Escape');
         return;
       }
+      if (blockedByOverlay()) return;
       if (e.key === 'Escape') {
         if (s.phase !== 'idle' && s.phase !== 'stopped') {
           e.preventDefault(); // consume so the command palette doesn't open
@@ -280,10 +296,13 @@ export function useTimerEngine(opts: TimerEngineOptions) {
   }, [press, release, stop, cancel, publish]);
 
   // cleanup timers on unmount; cancel if disabled mid-way
-  useEffect(() => () => {
-    clearHold();
-    clearAlerts();
-  }, []);
+  useEffect(
+    () => () => {
+      clearHold();
+      clearAlerts();
+    },
+    [],
+  );
   useEffect(() => {
     if (!opts.enabled && st.current.phase !== 'running') cancel();
   }, [opts.enabled, cancel]);

@@ -1,5 +1,6 @@
 import { createPool, createRedis, createServer, loadConfig, migrate, pingPostgres, start } from '@cubr/common';
 import { createBackend } from './backends.js';
+import { createCsTimerHost } from './cstimer.js';
 import { DailyChallenges } from './daily.js';
 import { ScrambleGenerator } from './generator.js';
 import { migrations } from './migrations.js';
@@ -36,6 +37,7 @@ const server = createServer(config, {
     return {
       warmup,
       generator: generator.stats(),
+      cstimer: cstimer.stats(),
       pool: { available: scramblePool.available(), ...((await scramblePool.cachedSizes()) ?? { sizes: null }) },
       refill: refiller?.stats() ?? { enabled: settings.refillEnabled, started: false },
       daily: { migrated },
@@ -49,11 +51,13 @@ const redis = createRedis(config.redisUrl, app.log);
 
 const backend = await createBackend(settings.workers, app.log);
 const generator = new ScrambleGenerator(backend, { timeoutMs: settings.timeoutMs, maxQueue: settings.maxQueue });
+// csTimer's own scramblers, in a worker thread of their own (started on the first request)
+const cstimer = createCsTimerHost({ timeoutMs: settings.timeoutMs, maxQueue: settings.maxQueue });
 const scramblePool = new ScramblePool(redis);
 const daily = new DailyChallenges({ pool: pg, generator, isMigrated: () => migrated, log: app.log });
 app.log.info({ ...settings, backend: backend.kind }, 'scramble generator configured');
 
-await registerRoutes(app, { generator, pool: scramblePool, daily, redis, internalToken: config.internalToken });
+await registerRoutes(app, { generator, pool: scramblePool, daily, redis, internalToken: config.internalToken, cstimer });
 
 // Listen first so liveness passes; readiness stays 503 until the warm-up below has finished.
 await start(server, config, [
@@ -62,6 +66,7 @@ await start(server, config, [
   },
   () => refiller?.stop(),
   () => generator.close(),
+  () => cstimer.close(),
   () => pg.end(),
   () => redis.quit(),
 ]);

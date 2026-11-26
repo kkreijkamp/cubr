@@ -1,13 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import {
-  CheckIcon,
-  CloudArrowUpIcon,
-  ExclamationCircleIcon,
-  EyeIcon,
-  EyeSlashIcon,
-  XMarkIcon,
-} from '@heroicons/react/24/outline';
+import { CheckIcon, CloudArrowUpIcon, ExclamationCircleIcon, EyeIcon, EyeSlashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Loading, Spinner } from '../components/Spinner';
 import { SsoButtons } from '../components/social/Sso';
 import { safeNext } from '../components/social/util';
@@ -196,63 +189,57 @@ function RegisterForm({ active, focusFirst }: FormProps) {
   };
 
   return (
-    <form
-      className="lg-form"
-      id="lg-panel-register"
-      role="tabpanel"
-      aria-labelledby="lg-tab-register"
-      hidden={!active}
-      onSubmit={onSubmit}
-      noValidate
-    >
-      <Field
-        name="username"
-        placeholder="username"
-        autoComplete="username"
-        inputRef={usernameRef}
-        maxLength={20}
-        value={username}
-        onChange={(v) => {
-          setUsername(v);
-          if (serverField?.field === 'username') setServerField(null);
-        }}
-        error={errors.username}
-        show={submitted || serverField?.field === 'username'}
-      />
-      <Field
-        type="email"
-        name="email"
-        placeholder="email"
-        autoComplete="email"
-        maxLength={254}
-        value={email}
-        onChange={(v) => {
-          setEmail(v);
-          if (serverField?.field === 'email') setServerField(null);
-        }}
-        error={errors.email}
-        show={submitted || serverField?.field === 'email'}
-      />
-      <Field
-        type="password"
-        name="new-password"
-        placeholder="password (8+ characters)"
-        autoComplete="new-password"
-        maxLength={128}
-        value={password}
-        onChange={setPassword}
-        error={errors.password}
-        show={submitted}
-        revealable
-      />
-      {formError && <FormError shakeKey={errorTick}>{formError}</FormError>}
-      <button type="submit" className="btn primary block" disabled={busy}>
-        {busy && <Spinner size={16} />} create account
-      </button>
-      <p className="lg-agree">
-        by signing up you agree to the <Link to="/terms">terms</Link> and <Link to="/privacy">privacy policy</Link>.
-      </p>
-    </form>
+    <div id="lg-panel-register" role="tabpanel" aria-labelledby="lg-tab-register" hidden={!active}>
+      <form className="lg-form" onSubmit={onSubmit} noValidate>
+        <Field
+          name="username"
+          placeholder="username"
+          autoComplete="username"
+          inputRef={usernameRef}
+          maxLength={20}
+          value={username}
+          onChange={(v) => {
+            setUsername(v);
+            if (serverField?.field === 'username') setServerField(null);
+          }}
+          error={errors.username}
+          show={submitted || serverField?.field === 'username'}
+        />
+        <Field
+          type="email"
+          name="email"
+          placeholder="email"
+          autoComplete="email"
+          maxLength={254}
+          value={email}
+          onChange={(v) => {
+            setEmail(v);
+            if (serverField?.field === 'email') setServerField(null);
+          }}
+          error={errors.email}
+          show={submitted || serverField?.field === 'email'}
+        />
+        <Field
+          type="password"
+          name="new-password"
+          placeholder="password (8+ characters)"
+          autoComplete="new-password"
+          maxLength={128}
+          value={password}
+          onChange={setPassword}
+          error={errors.password}
+          show={submitted}
+          revealable
+        />
+        {formError && <FormError shakeKey={errorTick}>{formError}</FormError>}
+        <button type="submit" className="btn primary block" disabled={busy}>
+          {busy && <Spinner size={16} />} create account
+        </button>
+        <p className="lg-agree">
+          by signing up you agree to the <Link to="/terms">terms</Link> and <Link to="/privacy">privacy policy</Link>.
+        </p>
+      </form>
+    </div>
   );
 }
 
@@ -297,45 +284,39 @@ function LoginForm({ active, focusFirst }: FormProps) {
   };
 
   return (
-    <form
-      className="lg-form"
-      id="lg-panel-login"
-      role="tabpanel"
-      aria-labelledby="lg-tab-login"
-      hidden={!active}
-      onSubmit={onSubmit}
-      noValidate
-    >
-      <Field
-        name="login"
-        placeholder="username or email"
-        autoComplete="username"
-        inputRef={identityRef}
-        value={identity}
-        onChange={setIdentity}
-        error={errors.identity}
-        show={submitted}
-      />
-      <Field
-        type="password"
-        name="password"
-        placeholder="password"
-        autoComplete="current-password"
-        inputRef={passwordRef}
-        value={password}
-        onChange={setPassword}
-        error={errors.password}
-        show={submitted && !formError}
-        revealable
-      />
-      {formError && <FormError shakeKey={errorTick}>{formError}</FormError>}
-      <button type="submit" className="btn primary block" disabled={busy}>
-        {busy && <Spinner size={16} />} sign in
-      </button>
-      <Link to="/login?mode=forgot" state={{ email: EMAIL_RE.test(identity.trim()) ? identity.trim() : '' }} className="lg-forgot">
-        forgot password?
-      </Link>
-    </form>
+    <div id="lg-panel-login" role="tabpanel" aria-labelledby="lg-tab-login" hidden={!active}>
+      <form className="lg-form" onSubmit={onSubmit} noValidate>
+        <Field
+          name="login"
+          placeholder="username or email"
+          autoComplete="username"
+          inputRef={identityRef}
+          value={identity}
+          onChange={setIdentity}
+          error={errors.identity}
+          show={submitted}
+        />
+        <Field
+          type="password"
+          name="password"
+          placeholder="password"
+          autoComplete="current-password"
+          inputRef={passwordRef}
+          value={password}
+          onChange={setPassword}
+          error={errors.password}
+          show={submitted && !formError}
+          revealable
+        />
+        {formError && <FormError shakeKey={errorTick}>{formError}</FormError>}
+        <button type="submit" className="btn primary block" disabled={busy}>
+          {busy && <Spinner size={16} />} sign in
+        </button>
+        <Link to="/login?mode=forgot" state={{ email: EMAIL_RE.test(identity.trim()) ? identity.trim() : '' }} className="lg-forgot">
+          forgot password?
+        </Link>
+      </form>
+    </div>
   );
 }
 
@@ -376,8 +357,7 @@ function ForgotForm() {
     return (
       <div className="lg-form lg-sent" role="status">
         <p>
-          if an account uses <span className="lg-sent-to">{sentTo}</span> and has confirmed it, a reset link is on its way. it works once, for an
-          hour.
+          if an account uses <span className="lg-sent-to">{sentTo}</span> and has confirmed it, a reset link is on its way. it works once, for an hour.
         </p>
         <p className="lg-sent-sub">
           nothing after a few minutes? check your spam folder, or{' '}
@@ -459,7 +439,9 @@ export function ResetPasswordPage() {
       <div className="lg-page">
         <h1 className="lg-title">reset password</h1>
         <p className="lg-lede">
-          {wellFormed ? 'this link has expired or was already used. links work once, for an hour.' : 'this link is incomplete. open it straight from the email.'}
+          {wellFormed
+            ? 'this link has expired or was already used. links work once, for an hour.'
+            : 'this link is incomplete. open it straight from the email.'}
         </p>
         <Link to="/login?mode=forgot" className="btn primary block">
           send a new link
@@ -497,11 +479,7 @@ export function ResetPasswordPage() {
 }
 
 type Confirming =
-  | { kind: 'working' }
-  | { kind: 'done'; email: string; changed: boolean }
-  | { kind: 'expired' }
-  | { kind: 'taken' }
-  | { kind: 'failed'; message: string };
+  { kind: 'working' } | { kind: 'done'; email: string; changed: boolean } | { kind: 'expired' } | { kind: 'taken' } | { kind: 'failed'; message: string };
 
 /**
  * /confirm-email#<token>: the page a confirmation link opens, once. The link either confirms the
@@ -665,6 +643,8 @@ export default function LoginPage() {
 
   return (
     <div className="lg-page">
+      {/* the tabs are the page's visible title; the heading names the one chosen (like the timer page's) */}
+      <h1 className="sr-only">{tab.label}</h1>
       <div className="lg-tabs" role="tablist" aria-label="account">
         {TABS.map((t) => (
           <button

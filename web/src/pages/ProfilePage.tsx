@@ -7,7 +7,6 @@ import { friendlyError } from '../components/social/util';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useAsync } from '../lib/useAsync';
-import { useCanonical } from '../lib/canonical';
 import { useNoIndex } from '../lib/useNoIndex';
 import { usePageMeta } from '../lib/usePageMeta';
 
@@ -18,12 +17,10 @@ export default function ProfilePage() {
 
   usePageMeta({ title: `${username} | cubr` });
 
-  // nobody by this name: the server answered 200 (the name is well-formed), so tell search engines here
+  // profiles stay out of search results (the server says so too, X-Robots-Tag), and so have no
+  // canonical address; a missing one is told apart for the page itself
   const missing = !profile.data && profile.error instanceof ApiError && profile.error.status === 404;
-  useNoIndex(missing);
-  // the name as stored: /profile/koen_k and /profile/KOEN_K are one page (names ignore case)
-  const stored = profile.data?.user.username;
-  useCanonical(stored ? `/profile/${encodeURIComponent(stored)}` : null);
+  useNoIndex(true);
 
   // Every outcome is at least a screen tall, like the loading state before it (PageLoading): the footer
   // stays below the screen instead of jumping up for a short one (no cuber, private, no solves yet).

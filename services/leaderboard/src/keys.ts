@@ -1,5 +1,5 @@
 import { dayKey, isoWeekKey } from '@cubr/common';
-import { isEventId } from '@cubr/cubestats';
+import { isWcaEvent } from '@cubr/cubestats';
 
 // ---------------------------------------------------------------------------------------------
 // Redis key builders and period / paging math (pure, unit-tested). Keyspace: docs/SPEC.md section 7.6.
@@ -66,8 +66,8 @@ export const WEEKLY_TTL_SEC = 15 * 86_400;
 
 export const isKind = (k: string): k is Kind => (KINDS as readonly string[]).includes(k);
 
-/** FMC results are move counts, not times, so 333fm has no (time-based) boards. */
-export const hasBoards = (event: string): boolean => isEventId(event) && event !== '333fm';
+/** Boards are for the WCA events; FMC results are move counts, not times, so 333fm has no (time-based) boards. */
+export const hasBoards = (event: string): boolean => isWcaEvent(event) && event !== '333fm';
 
 export const allTimeKey = (event: string, kind: Kind) => `lb:${event}:${kind}:all`;
 export const dailyKey = (event: string, kind: Kind, day: string) => `lb:${event}:${kind}:d:${day}`;

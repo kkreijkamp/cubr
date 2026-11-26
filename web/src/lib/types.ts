@@ -25,6 +25,9 @@ export interface PrivateUser extends PublicUser {
   /** false: the email isn't confirmed yet, so password-reset links don't go to it. Absent in a user
    *  cached by an older version: treat it as unknown, not as unconfirmed. */
   emailVerified?: boolean;
+  /** true: the address was never confirmed within its link's 7 days and another account took it, so
+   *  this account has none until it adds one (its `email` is a placeholder no mail goes to) */
+  emailReleased?: boolean;
 }
 
 /** Sign-in with a provider (services/auth/src/routes/oauth.ts) */
@@ -42,6 +45,8 @@ export interface Session {
   event: string;
   /** a practice session: its solves count for no personal best and no leaderboard (absent = no) */
   practice?: boolean;
+  /** a practice scramble type (packages/cubestats scrambleTypes.ts, e.g. "pll"): always a practice session; absent = the event's default */
+  scramble?: string;
   createdAt: string;
   updatedAt: string;
   solveCount: number;
@@ -232,7 +237,7 @@ export interface WcaRankValue {
   countryRank: number;
 }
 export interface WcaPerson {
-  person: { wcaId: string; name: string; countryId: string; countryIso2: string | null; gender: string | null };
+  person: { wcaId: string; name: string; countryId: string; countryIso2: string | null };
   pbs: { event: string; single: WcaRankValue | null; average: WcaRankValue | null }[];
 }
 

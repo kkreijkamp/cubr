@@ -15,7 +15,7 @@
 //    (1 s ... 60 s, retried immediately on `online`). Server reads are overlaid with queued ops so
 //    optimistic changes survive reloads. The current session is cached (`cubr.cloudcache.v1`)
 //    so a logged-in user can keep timing while solve-service is down.
-import { defaultSessionName, isEventId, type ImportedSession, type Penalty } from '@cubr/cubestats';
+import { defaultSessionName, isEventId, isPracticeScramble, scrambleSessionName, type ImportedSession, type Penalty } from '@cubr/cubestats';
 import { api, ApiError, getToken, type ImportPayload } from './api';
 import { getCurrentUser, onAuthChange } from './auth';
 import { settingsStore, updateSettings } from './settings';
@@ -164,7 +164,7 @@ function whenReady(timeoutMs = 15_000): Promise<void> {
 // ================================================================ local persistence
 
 function readLocal(quiet = false): LocalDb {
-  let raw: string | null = null;
+  let raw: string | null;
   try {
     raw = localStorage.getItem(LOCAL_KEY);
   } catch {
@@ -239,7 +239,11 @@ function readCloudCache(uid: string): { sessions: Session[]; sessionId: string |
   if (session && Array.isArray(c.solves)) {
     // reuse the local codec for the cached solves
     const { db } = decodeLocalDb(
-      { v: 1, sessions: [{ id: session.id, name: session.name, event: session.event, createdAt: session.createdAt, updatedAt: session.updatedAt }], solves: { [session.id]: c.solves } },
+      {
+        v: 1,
+        sessions: [{ id: session.id, name: session.name, event: session.event, createdAt: session.createdAt, updatedAt: session.updatedAt }],
+        solves: { [session.id]: c.solves },
+      },
       isEventId,
     );
     solves = db.solves.get(session.id) ?? [];
@@ -286,7 +290,33 @@ function writeLastSession(): void {
 
 // ================================================================ retry queue
 
-let queue: QueuedOp[] = browser ? decodeQueue(loadJson<unknown>(QUEUE_KEY, [])) : [];
+// Tabs share the queue (the October review's #11): the stored copy is the truth, re-read before every
+// change since another tab may have written it, and followed through 'storage' events. One tab sends at a
+// time (a Web Lock), and the op it is sending is shared too, so no tab folds an edit into it.
+let queue: QueuedOp[] = browser ? readQueue() : [];
+const INFLIGHT_KEY = 'cubr.queue.inflight';
+/** a tab that crashed mid-send leaves its marker: after this long it no longer counts */
+const INFLIGHT_STALE_MS = 60_000;
+const QUEUE_LOCK = 'cubr.queue';
+
+function readQueue(): QueuedOp[] {
+  return decodeQueue(loadJson<unknown>(QUEUE_KEY, []));
+}
+
+/** The op another tab is sending right now, if any. */
+function sharedInflight(): string | null {
+  const m = loadJson<{ opId?: unknown; at?: unknown } | null>(INFLIGHT_KEY, null);
+  return m && typeof m.opId === 'string' && typeof m.at === 'number' && Date.now() - m.at < INFLIGHT_STALE_MS ? m.opId : null;
+}
+
+function shareInflight(opId: string | null): void {
+  try {
+    if (opId) localStorage.setItem(INFLIGHT_KEY, JSON.stringify({ opId, at: Date.now() }));
+    else localStorage.removeItem(INFLIGHT_KEY);
+  } catch {
+    /* storage unavailable: this tab is the only one that can write anyway */
+  }
+}
 /** ops completed in the last minute - re-applied on reads to cover read-after-write races (each
  *  with its account: after switching accounts, the other account's ops must not show) */
 let recent: { op: SyncOp; at: number; userId: string }[] = [];
@@ -328,7 +358,7 @@ function enqueue(op: SyncOp): string {
   const uid = userId();
   if (!uid) throw new Error('not logged in');
   const item: QueuedOp = { opId: uuid(), userId: uid, op, attempts: 0, createdAt: Date.now() };
-  queue = coalesce(queue, item, inflight);
+  queue = coalesce(readQueue(), item, inflight ?? sharedInflight());
   saveQueue();
   // waiters of ops that were folded away (e.g. a solve deleted before it was sent) are done
   for (const id of Array.from(waiters.keys())) if (id !== inflight && !queue.some((q) => q.opId === id)) settle(id);
@@ -353,6 +383,7 @@ async function send(op: SyncOp): Promise<void> {
         name: op.session.name,
         event: op.session.event,
         ...(op.session.practice ? { practice: true } : {}),
+        ...(op.session.scramble ? { scramble: op.session.scramble } : {}),
         ...(op.keepCreatedAt ? { createdAt: op.session.createdAt } : {}),
       });
       return;
@@ -392,10 +423,37 @@ async function pump(): Promise<void> {
   const uid = userId();
   if (!uid || !getToken()) return;
   pumping = true;
+  let elsewhere = false;
+  try {
+    const locks = (globalThis.navigator as (Navigator & { locks?: LockManager }) | undefined)?.locks;
+    if (locks?.request) {
+      await locks.request(QUEUE_LOCK, { ifAvailable: true }, async (lock) => {
+        elsewhere = lock ? await pumpLoop(uid) : true;
+      });
+    } else elsewhere = await pumpLoop(uid);
+  } finally {
+    inflight = null;
+    pumping = false;
+  }
+  // another tab is sending: look again in a moment, in case it stops before reaching what's left
+  if (elsewhere && !retryTimer && pendingCount() > 0) {
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
+      void pump();
+    }, 1000);
+  }
+}
+
+/**
+ * Sends this account's queued ops in order, until the queue is empty or a send fails. True when it stopped
+ * at an op another tab is sending (without Web Locks two tabs can pump at once).
+ */
+async function pumpLoop(uid: string): Promise<boolean> {
   const g = gen;
   try {
     for (;;) {
       if (g !== gen) break;
+      queue = readQueue();
       const head = queue.find((q) => q.userId === uid);
       if (!head) {
         if (queueError) {
@@ -404,11 +462,14 @@ async function pump(): Promise<void> {
         }
         break;
       }
+      if (head.opId === sharedInflight()) return true;
       inflight = head.opId;
+      shareInflight(head.opId);
       try {
         await send(head.op);
         inflight = null;
-        queue = queue.filter((q) => q.opId !== head.opId);
+        shareInflight(null);
+        queue = afterSent(readQueue(), head);
         saveQueue();
         recent.push({ op: head.op, at: Date.now(), userId: head.userId });
         if (recent.length > 200) recent = recent.slice(-200);
@@ -420,6 +481,7 @@ async function pump(): Promise<void> {
         if (hadError && loadError) void refreshCloud();
       } catch (e) {
         inflight = null;
+        shareInflight(null);
         if (g !== gen) break;
         if (e instanceof ApiError && e.status === 401) {
           // token expired/revoked: the auth layer logs out; ops stay queued for the next login
@@ -427,7 +489,7 @@ async function pump(): Promise<void> {
           break;
         }
         if (isRetryable(e)) {
-          head.attempts++;
+          queue = readQueue().map((q) => (q.opId === head.opId ? { ...q, attempts: q.attempts + 1 } : q));
           saveQueue();
           queueError = errorMessage(e);
           settle(head.opId); // accepted locally, will sync later
@@ -435,8 +497,13 @@ async function pump(): Promise<void> {
           scheduleRetry();
           break;
         }
+        // a solve whose session is gone (merged away or deleted on another device): its solves move to a new session
+        if (head.op.kind === 'createSolve' && isSessionGone(e) && !rehomed.has(head.op.solve.sessionId)) {
+          rehomeSolves(head.op.solve.sessionId, head.userId, head.op.solve.event);
+          continue;
+        }
         // permanent rejection (validation, conflict ...): drop it and re-sync to revert
-        queue = queue.filter((q) => q.opId !== head.opId);
+        queue = readQueue().filter((q) => q.opId !== head.opId);
         saveQueue();
         settle(head.opId, e as Error);
         toast.error(`Couldn't save your change: ${errorMessage(e)}`);
@@ -445,9 +512,73 @@ async function pump(): Promise<void> {
       }
     }
   } finally {
+    if (inflight) shareInflight(null);
     inflight = null;
-    pumping = false;
   }
+  return false;
+}
+
+/**
+ * The queue once `sent` went through. Normally that drops it; but if another tab changed it meanwhile (it
+ * read the in-flight marker too late), what changed still has to reach the server: a solve's create can't
+ * carry it any more (the server keeps the first create), so it goes as an edit; other ops are sent again.
+ */
+function afterSent(stored: QueuedOp[], sent: QueuedOp): QueuedOp[] {
+  const now = stored.find((q) => q.opId === sent.opId);
+  if (!now || JSON.stringify(now.op) === JSON.stringify(sent.op)) return stored.filter((q) => q.opId !== sent.opId);
+  if (now.op.kind === 'createSolve') {
+    const { id, sessionId, penalty, comment } = now.op.solve;
+    return stored.map((q) => (q.opId === sent.opId ? { ...q, op: { kind: 'updateSolve', id, sessionId, patch: { penalty, comment: comment ?? null } } } : q));
+  }
+  return stored;
+}
+
+/** The solve service's answer to a solve for a session that isn't there (services/solve/src/routes/solves.ts). */
+const isSessionGone = (e: unknown) => e instanceof ApiError && e.status === 404 && e.message === 'session not found';
+
+/** sessions made by rehomeSolves: a solve that can't go into one of these is dropped, not moved again */
+const rehomed = new Set<string>();
+const RECOVERED = ' (recovered)';
+
+/**
+ * The queued solves of a session that's gone from the account (merged into another, or deleted, on another
+ * device: their creates get 404) move to a new session, "<name> (recovered)", sent before them, with one
+ * notice, instead of being dropped with an error each (the October review's #11). It keeps the old session's
+ * practice and scramble type when this device still knows them; else it's a practice session, so solves of
+ * a scramble type that doesn't count can't reach the boards (turning practice off counts them).
+ */
+function rehomeSolves(lost: string, uid: string, event: string): void {
+  const old = sessionById(lost);
+  const base = old?.name ?? 'session';
+  const name = `${base.slice(0, 40 - RECOVERED.length).trimEnd()}${RECOVERED}`;
+  const practice = old ? old.practice === true : true;
+  const session = {
+    id: uuid(),
+    name,
+    event,
+    ...(practice ? { practice: true } : {}),
+    ...(old?.scramble ? { scramble: old.scramble } : {}),
+    createdAt: new Date().toISOString(),
+  };
+  rehomed.add(session.id);
+  let moved = 0;
+  queue = readQueue().map((q) => {
+    if (q.userId !== uid) return q;
+    if (q.op.kind === 'createSolve' && q.op.solve.sessionId === lost) {
+      moved++;
+      return { ...q, op: { ...q.op, solve: { ...q.op.solve, sessionId: session.id } } };
+    }
+    if ((q.op.kind === 'updateSolve' || q.op.kind === 'deleteSolve') && q.op.sessionId === lost) return { ...q, op: { ...q.op, sessionId: session.id } };
+    return q;
+  });
+  const item: QueuedOp = { opId: uuid(), userId: uid, op: { kind: 'createSession', session }, attempts: 0, createdAt: Date.now() };
+  const first = queue.findIndex((q) => q.userId === uid && q.op.kind === 'createSolve' && q.op.solve.sessionId === session.id);
+  queue = first < 0 ? [...queue, item] : [...queue.slice(0, first), item, ...queue.slice(first)];
+  saveQueue();
+  toast.notice(
+    `${moved} ${moved === 1 ? 'solve' : 'solves'} from a session merged or deleted on another device ${moved === 1 ? 'is' : 'are'} in a new session, "${name}"`,
+  );
+  void refreshCloud();
 }
 
 /**
@@ -515,9 +646,7 @@ function suggestSessionNameFor(event: string): string {
  */
 function createDefaultSessions(event: string): Session {
   const t = Date.now();
-  const created = defaultSessionsPlan(event, model.sessions).map((p, i) =>
-    createSessionInternal(p.name, event, p.practice, new Date(t + i).toISOString()),
-  );
+  const created = defaultSessionsPlan(event, model.sessions).map((p, i) => createSessionInternal(p.name, event, p.practice, new Date(t + i).toISOString()));
   return created[0];
 }
 
@@ -536,10 +665,13 @@ async function loadCloudScope(uid: string, g: number, keepCurrent = false): Prom
     if (e instanceof ApiError && e.status === 401) return; // auth layer switches to local
     loadError = errorMessage(e);
     if (loadRetryTimer) clearTimeout(loadRetryTimer);
-    loadRetryTimer = setTimeout(() => {
-      loadRetryTimer = null;
-      if (g === gen && loadError) void refreshCloud();
-    }, backoffDelay(loadAttempts++ + 1));
+    loadRetryTimer = setTimeout(
+      () => {
+        loadRetryTimer = null;
+        if (g === gen && loadError) void refreshCloud();
+      },
+      backoffDelay(loadAttempts++ + 1),
+    );
   }
   if (g !== gen) return;
   const last = readLastSession(uid);
@@ -707,8 +839,9 @@ if (browser) {
     void pump();
     if (loadError) void refreshCloud();
   });
-  // another tab changed the guest data
+  // another tab changed the guest data, or the queue
   window.addEventListener('storage', (e) => {
+    if (e.key === QUEUE_KEY || e.key === null) queueChangedElsewhere();
     if (e.key !== LOCAL_KEY || scope?.mode !== 'local' || localDirty) return;
     const current = model.current;
     localDb = readLocal(true);
@@ -720,6 +853,14 @@ if (browser) {
     }
     publish();
   });
+}
+
+/** Another tab wrote the queue: follow it; what this tab waited for may have gone through over there. */
+function queueChangedElsewhere(): void {
+  queue = readQueue();
+  for (const id of Array.from(waiters.keys())) if (id !== inflight && !queue.some((q) => q.opId === id)) settle(id);
+  publish();
+  if (userId() && pendingCount() > 0 && !retryTimer) void pump();
 }
 
 // ================================================================ mutations
@@ -750,12 +891,14 @@ function validName(name: string): string {
   return n;
 }
 
-function createSessionInternal(name: string, event: string, practice = false, createdAt = new Date().toISOString()): Session {
+function createSessionInternal(name: string, event: string, practice = false, createdAt = new Date().toISOString(), scramble?: string): Session {
   const now = createdAt;
-  const session: Session = { id: uuid(), name, event, ...(practice ? { practice } : {}), createdAt: now, updatedAt: now, solveCount: 0 };
+  // a practice scramble's session is always a practice session: only the default scramble counts
+  const extra = { ...(practice || scramble ? { practice: true } : {}), ...(scramble ? { scramble } : {}) };
+  const session: Session = { id: uuid(), name, event, ...extra, createdAt: now, updatedAt: now, solveCount: 0 };
   model.sessions = [...model.sessions, session];
   model.solves.set(session.id, []);
-  if (scope?.mode === 'cloud') enqueue({ kind: 'createSession', session: { id: session.id, name, event, ...(practice ? { practice } : {}), createdAt: now } });
+  if (scope?.mode === 'cloud') enqueue({ kind: 'createSession', session: { id: session.id, name, event, ...extra, createdAt: now } });
   else saveLocalSoon();
   return session;
 }
@@ -891,10 +1034,11 @@ export async function deleteSolve(solveId: string): Promise<void> {
   commit();
 }
 
-export async function createSession(name: string, event: string, opts: { practice?: boolean } = {}): Promise<Session> {
+export async function createSession(name: string, event: string, opts: { practice?: boolean; scramble?: string } = {}): Promise<Session> {
   if (!solveStore.get().ready) await whenReady();
   if (!isEventId(event)) throw new Error(`Unknown event ${event}`);
-  const s = createSessionInternal(validName(name), event, opts.practice === true);
+  const scramble = opts.scramble && isPracticeScramble(event, opts.scramble) ? opts.scramble : undefined;
+  const s = createSessionInternal(validName(name), event, opts.practice === true, undefined, scramble);
   commit();
   return s;
 }
@@ -903,6 +1047,7 @@ export async function createSession(name: string, event: string, opts: { practic
 export async function setSessionPractice(sessionId: string, practice: boolean): Promise<void> {
   const s = sessionById(sessionId);
   if (!s || (s.practice === true) === practice) return;
+  if (!practice && s.scramble) return; // only the default scramble counts: its sessions stay practice
   patchSession(sessionId, { practice, updatedAt: new Date().toISOString() });
   if (scope?.mode === 'cloud') enqueue({ kind: 'setPractice', id: sessionId, practice });
   commit();
@@ -925,8 +1070,12 @@ export async function deleteSession(sessionId: string): Promise<void> {
   for (const [ev, id] of Object.entries(model.lastByEvent)) if (id === sessionId) delete model.lastByEvent[ev];
   if (scope?.mode === 'cloud') enqueue({ kind: 'deleteSession', id: sessionId });
   if (model.current === sessionId) {
-    const sibling = [...model.sessions].reverse().find((x) => x.event === s.event);
-    const next = sibling ?? createSessionInternal(suggestSessionNameFor(s.event), s.event);
+    const sibling = [...model.sessions].reverse().find((x) => x.event === s.event && x.scramble === s.scramble);
+    const next =
+      sibling ??
+      (s.scramble
+        ? createSessionInternal(freeSessionName(scrambleSessionName(s.event, s.scramble), model.sessions), s.event, true, undefined, s.scramble)
+        : createSessionInternal(suggestSessionNameFor(s.event), s.event));
     commit();
     await switchSession(next.id);
     return;
@@ -949,14 +1098,30 @@ export async function clearSession(sessionId: string): Promise<void> {
     commit();
     return;
   }
-  const fresh: Session = { id: uuid(), name: old.name, event: old.event, ...(old.practice ? { practice: true } : {}), createdAt: old.createdAt, updatedAt: now, solveCount: 0 };
+  const fresh: Session = {
+    id: uuid(),
+    name: old.name,
+    event: old.event,
+    ...(old.practice ? { practice: true } : {}),
+    ...(old.scramble ? { scramble: old.scramble } : {}),
+    createdAt: old.createdAt,
+    updatedAt: now,
+    solveCount: 0,
+  };
   model.sessions = model.sessions.map((s) => (s.id === sessionId ? fresh : s));
   model.solves.delete(sessionId);
   model.solves.set(fresh.id, []);
   for (const [ev, id] of Object.entries(model.lastByEvent)) if (id === sessionId) model.lastByEvent[ev] = fresh.id;
   enqueue({
     kind: 'createSession',
-    session: { id: fresh.id, name: fresh.name, event: fresh.event, ...(fresh.practice ? { practice: true } : {}), createdAt: fresh.createdAt },
+    session: {
+      id: fresh.id,
+      name: fresh.name,
+      event: fresh.event,
+      ...(fresh.practice ? { practice: true } : {}),
+      ...(fresh.scramble ? { scramble: fresh.scramble } : {}),
+      createdAt: fresh.createdAt,
+    },
     keepCreatedAt: true,
   });
   enqueue({ kind: 'deleteSession', id: sessionId });
@@ -972,7 +1137,7 @@ export async function switchSession(sessionId: string): Promise<void> {
   const s = sessionById(sessionId);
   if (!s) throw new Error('Unknown session');
   model.current = sessionId;
-  model.lastByEvent = { ...model.lastByEvent, [s.event]: sessionId };
+  model.lastByEvent = { ...model.lastByEvent, [s.event]: sessionId, [scrambleScope(s.event, s.scramble)]: sessionId };
   if (settingsStore.get().lastEvent !== s.event) updateSettings({ lastEvent: s.event });
   if (scope?.mode === 'cloud') {
     writeLastSession();
@@ -987,6 +1152,29 @@ function findSessionFor(event: string, counts = false): Session | undefined {
   const last = sessionById(model.lastByEvent[event]);
   if (ok(last)) return last;
   return model.sessions.find(ok);
+}
+
+/** lastByEvent's key for the last session of one scramble type ("333#" = the default, "333#pll") */
+const scrambleScope = (event: string, scramble: string | undefined) => `${event}#${scramble ?? ''}`;
+
+/**
+ * Switch `event` to a scramble type (null = its default): to the session of that type used last,
+ * else its first, else a new one. A practice type's new session is "3x3 pll", a practice session
+ * (only the default scramble counts for PBs and leaderboards); the default's are made as usual.
+ */
+export async function switchScramble(event: string, scramble: string | null): Promise<void> {
+  if (!solveStore.get().ready) await whenReady();
+  if (!isEventId(event)) throw new Error(`Unknown event ${event}`);
+  const type = scramble && isPracticeScramble(event, scramble) ? scramble : undefined;
+  const ok = (s: Session | undefined): s is Session => !!s && s.event === event && s.scramble === type;
+  const last = sessionById(model.lastByEvent[scrambleScope(event, type)]);
+  let target = ok(last) ? last : model.sessions.find(ok);
+  if (!target) {
+    target = type
+      ? createSessionInternal(freeSessionName(scrambleSessionName(event, type), model.sessions), event, true, undefined, type)
+      : createDefaultSessions(event);
+  }
+  await switchSession(target.id);
 }
 
 /** Switch to the first session of `event`, creating one if none exists. */
@@ -1016,6 +1204,7 @@ export async function ensureSession(event: string, opts: { counts?: boolean } = 
 
 const MERGE_CHUNK = 50; // the API merges at most 50 sources per request
 const SAME_EVENT_MSG = 'only sessions of the same event can be merged';
+const SAME_SCRAMBLE_MSG = 'only sessions of the same scramble type can be merged';
 
 /** The session a queued op touches (same rule as storeUtils' coalescing). */
 function opSessionId(op: SyncOp): string {
@@ -1097,6 +1286,7 @@ export async function mergeSessions(targetId: string, sourceIds: string[]): Prom
   const sources = ids.map((id) => sessionById(id));
   if (sources.some((s) => !s)) throw new Error("one of these sessions doesn't exist anymore");
   if (sources.some((s) => s!.event !== target.event)) throw new Error(SAME_EVENT_MSG);
+  if (sources.some((s) => s!.scramble !== target.scramble)) throw new Error(SAME_SCRAMBLE_MSG);
   return scope?.mode === 'cloud' ? mergeCloud(target, ids) : mergeLocal(target, ids);
 }
 
@@ -1148,58 +1338,102 @@ async function mergeCloud(target: Session, ids: string[]): Promise<{ sessions: n
   } catch (e) {
     if (g === gen) void refreshCloud();
     const msg = mergeErrorMessage(e);
-    throw new Error(total.sessions > 0 ? `merged ${total.sessions} of ${ids.length} sessions, then: ${msg}` : msg);
+    throw new Error(total.sessions > 0 ? `merged ${total.sessions} of ${ids.length} sessions, then: ${msg}` : msg, { cause: e });
   }
   if (g === gen) await refreshCloud();
   return total;
 }
 
-/** Import sessions read by parseTimerFile (cloud: POST /api/sessions/import; local: localStorage). */
-export async function importSessions(sessions: ImportedSession[]): Promise<{ sessions: number; solves: number }> {
+/** What an import did: new sessions and the solves it added, solves already there that it left out,
+ *  and existing sessions it added solves to. */
+export interface ImportOutcome {
+  sessions: number;
+  solves: number;
+  skipped: number;
+  continued: number;
+}
+
+/** A solve's identity across imports: the same event, time, penalty and moment (to the millisecond). */
+const importKey = (event: string, timeMs: number, penalty: string, createdAt: string) => `${event}|${timeMs}|${penalty}|${Date.parse(createdAt)}`;
+
+/**
+ * Import sessions read by parseTimerFile (cloud: POST /api/sessions/import; local: localStorage). Solves
+ * already there are left out, here as on the server: importing a file again, or retrying one, adds only
+ * what's missing, and a session imported before continues where it was.
+ */
+export async function importSessions(sessions: ImportedSession[]): Promise<ImportOutcome> {
   if (!solveStore.get().ready) await whenReady();
   const valid = sessions.filter((s) => isEventId(s.event) && s.solves.length > 0);
   if (scope?.mode === 'cloud') {
     const payload: ImportPayload['sessions'] = valid.map((s) => ({
       name: (s.name.trim() || 'import').slice(0, 40),
       event: s.event,
-      ...(s.practice ? { practice: true } : {}),
+      ...(s.practice || s.scramble ? { practice: true } : {}),
+      ...(s.scramble ? { scramble: s.scramble } : {}),
       solves: s.solves.map((x) => ({ timeMs: x.timeMs, penalty: x.penalty, scramble: x.scramble, comment: x.comment, createdAt: x.createdAt })),
     }));
-    const total = { sessions: 0, solves: 0 };
+    const total: ImportOutcome = { sessions: 0, solves: 0, skipped: 0, continued: 0 };
     for (const chunk of planImportChunks(payload)) {
       const r = await api.sessions.import(chunk);
       total.sessions += r.imported.sessions;
       total.solves += r.imported.solves;
+      total.skipped += r.skipped ?? 0; // a server from before v1.6.72 doesn't say
+      total.continued += r.continued ?? 0;
     }
     await refreshCloud();
     return total;
   }
+  // the solves this browser already has, and the session holding each
+  const have = new Map<string, string>();
+  for (const [sessionId, list] of localDb.solves) for (const x of list) have.set(importKey(x.event, x.timeMs, x.penalty, x.createdAt), sessionId);
   const added: Session[] = [];
+  /** continued sessions as they were, to put back if the import doesn't fit */
+  const before = new Map<string, Solve[]>();
+  const sessionsBefore = localDb.sessions;
   let solves = 0;
+  let skipped = 0;
   for (const s of valid) {
     const now = new Date().toISOString();
+    const counts = new Map<string, number>();
+    const fresh = s.solves.filter((x) => {
+      const at = have.get(importKey(s.event, x.timeMs, x.penalty, x.createdAt));
+      if (at !== undefined) counts.set(at, (counts.get(at) ?? 0) + 1);
+      return at === undefined;
+    });
+    skipped += s.solves.length - fresh.length;
+    const toSolve = (x: ImportedSession['solves'][number], sessionId: string): Solve => ({
+      id: uuid(),
+      sessionId,
+      event: s.event,
+      timeMs: x.timeMs,
+      penalty: x.penalty,
+      scramble: x.scramble,
+      comment: x.comment,
+      source: 'import',
+      createdAt: x.createdAt,
+    });
+    // a session imported before: the one holding most of its solves takes the rest
+    const target = [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0];
+    if (target !== undefined && localDb.sessions.some((x) => x.id === target)) {
+      if (!fresh.length) continue;
+      if (!before.has(target)) before.set(target, localDb.solves.get(target) ?? []);
+      const list = sortChrono([...(localDb.solves.get(target) ?? []), ...fresh.map((x) => toSolve(x, target))]);
+      localDb.solves.set(target, list);
+      localDb.sessions = localDb.sessions.map((x) => (x.id === target ? { ...x, solveCount: list.length, updatedAt: now } : x));
+      solves += fresh.length;
+      continue;
+    }
     const session: Session = {
       id: uuid(),
       name: (s.name.trim() || 'import').slice(0, 40),
       event: s.event,
-      ...(s.practice ? { practice: true } : {}),
+      ...(s.practice || s.scramble ? { practice: true } : {}),
+      ...(s.scramble ? { scramble: s.scramble } : {}),
       createdAt: now,
       updatedAt: now,
-      solveCount: s.solves.length,
+      solveCount: fresh.length,
     };
-    const list = sortChrono(
-      s.solves.map((x) => ({
-        id: uuid(),
-        sessionId: session.id,
-        event: s.event,
-        timeMs: x.timeMs,
-        penalty: x.penalty,
-        scramble: x.scramble,
-        comment: x.comment,
-        source: 'import',
-        createdAt: x.createdAt,
-      })),
-    );
+    const list = sortChrono(fresh.map((x) => toSolve(x, session.id)));
     added.push(session);
     localDb.sessions = [...localDb.sessions, session];
     localDb.solves.set(session.id, list);
@@ -1207,15 +1441,15 @@ export async function importSessions(sessions: ImportedSession[]): Promise<{ ses
   }
   localDirty = true;
   if (!flushLocal()) {
-    const ids = new Set(added.map((s) => s.id));
-    localDb.sessions = localDb.sessions.filter((s) => !ids.has(s.id));
-    ids.forEach((id) => localDb.solves.delete(id));
+    localDb.sessions = sessionsBefore;
+    added.forEach((x) => localDb.solves.delete(x.id));
+    before.forEach((list, id) => localDb.solves.set(id, list));
     localDirty = true;
     flushLocal();
     throw new Error('Not enough browser storage for this import. Sign in to import it into your cloud account instead.');
   }
   if (scope?.mode === 'local') publish();
-  return { sessions: added.length, solves };
+  return { sessions: added.length, solves, skipped, continued: before.size };
 }
 
 /** All sessions with all solves (for JSON export). */
@@ -1304,7 +1538,7 @@ export function localDataSummary(): { sessions: number; solves: number } {
 
 /** Forgets what this browser keeps for an account (after deleting it): its offline copy and unsent changes. */
 export function forgetUser(uid: string): void {
-  queue = queue.filter((q) => q.userId !== uid);
+  queue = readQueue().filter((q) => q.userId !== uid);
   saveQueue();
   if (loadJson<{ userId?: unknown } | null>(CLOUD_CACHE_KEY, null)?.userId === uid) {
     try {

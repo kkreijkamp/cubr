@@ -291,7 +291,7 @@ async function og() {
 /** Made-up guest solves (a seeded random walk around 11 s), so the stats and the list look lived in. */
 function guestData() {
   let seed = 20261116;
-  const rand = () => ((seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31);
+  const rand = () => (seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
   const moves = ['R', 'L', 'U', 'D', 'F', 'B'];
   const scramble = () => {
     const out = [];
@@ -351,7 +351,10 @@ async function screenshots(base) {
         `localStorage.clear(); localStorage.setItem('cubr.local.v1', ${JSON.stringify(JSON.stringify(guestData()))}); localStorage.setItem('cubr.settings', ${JSON.stringify(JSON.stringify(settings))}); true`,
       );
       await send('Page.navigate', { url: `${base}/` });
-      await waitFor(ev, `!!document.querySelector('.tp-session-btn') && !!document.querySelector('.scramble-text, .tp-scramble') && document.fonts.status === 'loaded'`);
+      await waitFor(
+        ev,
+        `!!document.querySelector('.tp-session-btn') && !!document.querySelector('.scramble-text, .tp-scramble') && document.fonts.status === 'loaded'`,
+      );
       await sleep(3000); // the scramble, its preview and the stats settle
       // the footer's version (a local stack says "vdev") would date the picture: leave it out
       await ev(`(() => { const v = [...document.querySelectorAll('.footer-right button')].pop(); if (v) v.style.visibility = 'hidden'; return true; })()`);

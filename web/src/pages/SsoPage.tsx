@@ -39,7 +39,13 @@ export default function SsoPage() {
         .then(({ token, user }) => signInWithToken(token, user))
         .then(() => navigate(next, { replace: true }))
         .catch((err: unknown) =>
-          setView({ kind: 'error', message: err instanceof ApiError && err.status === 404 ? 'that sign-in link has expired, or was opened in another browser. please sign in again.' : ssoErrorMessage('failed', null) }),
+          setView({
+            kind: 'error',
+            message:
+              err instanceof ApiError && err.status === 404
+                ? 'that sign-in link has expired, or was opened in another browser. please sign in again.'
+                : ssoErrorMessage('failed', null),
+          }),
         );
     } else if (signup) {
       api.auth.oauth.signup(signup).then(
@@ -51,7 +57,7 @@ export default function SsoPage() {
     } else {
       navigate('/login', { replace: true }); // nothing to finish (back on this page later, say)
     }
-  }, []); // once, on arrival
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- once, on arrival
 
   if (view.kind === 'working') return <Loading />;
   if (view.kind === 'error') {
@@ -74,7 +80,13 @@ export default function SsoPage() {
 }
 
 /** A new account from a provider: everything is known but the (public) username. */
-function ChooseUsername({ id, provider, email, username: suggested, onDone }: Extract<View, { kind: 'signup' }> & { onDone: (token: string, user: Awaited<ReturnType<typeof api.auth.oauth.completeSignup>>['user']) => Promise<void> }) {
+function ChooseUsername({
+  id,
+  provider,
+  email,
+  username: suggested,
+  onDone,
+}: Extract<View, { kind: 'signup' }> & { onDone: (token: string, user: Awaited<ReturnType<typeof api.auth.oauth.completeSignup>>['user']) => Promise<void> }) {
   const [username, setUsername] = useState(suggested);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -93,7 +105,8 @@ function ChooseUsername({ id, provider, email, username: suggested, onDone }: Ex
       await onDone(token, user);
     } catch (err) {
       setBusy(false);
-      if (err instanceof ApiError && err.status === 409) setError(err.message.toLowerCase().includes('username') ? 'that username is taken. try another.' : err.message.toLowerCase());
+      if (err instanceof ApiError && err.status === 409)
+        setError(err.message.toLowerCase().includes('username') ? 'that username is taken. try another.' : err.message.toLowerCase());
       else if (err instanceof ApiError && err.status === 404) setError('this sign-up has expired. please start again from the sign-in page.');
       else setError((err as Error).message || "couldn't create the account. please try again.");
     }
@@ -103,8 +116,8 @@ function ChooseUsername({ id, provider, email, username: suggested, onDone }: Ex
     <div className="lg-page">
       <h1 className="lg-title">choose a username</h1>
       <p className="lg-lede">
-        <ProviderIcon provider={provider} size={14} /> signing up with {PROVIDER_NAMES[provider]} as <span className="text">{email}</span>. your username is public: it&apos;s on
-        your profile and the leaderboards.
+        <ProviderIcon provider={provider} size={14} /> signing up with {PROVIDER_NAMES[provider]} as <span className="text">{email}</span>. your username is
+        public: it&apos;s on your profile and the leaderboards.
       </p>
       <form className="lg-form" onSubmit={(e) => void onSubmit(e)} noValidate>
         <div className="lg-field">

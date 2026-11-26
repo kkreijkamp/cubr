@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { serviceWorker } from './plugins/serviceWorker';
 import { hoverMedia } from './plugins/hoverMedia';
 import { pageFiles } from './plugins/pageFiles';
+import { licensesFile } from './plugins/licenses';
+import { REPO_URL } from './src/lib/links';
 
 // The SPA talks to the backend through same-origin paths (/api/*, /socket.io). In dev, Vite
 // proxies them to the local gateway (docker compose, port 8080) which mimics the K8s Ingress.
@@ -12,8 +14,9 @@ const gateway = process.env.CUBR_GATEWAY ?? 'http://localhost:8080';
 
 export default defineConfig({
   // pageFiles: dist/pages/*.html, each public page's own title, description and heading for crawlers
-  // (src/lib/pageMeta.ts); serviceWorker: dist/sw.js, the offline app (src/sw/), built after the app
-  plugins: [react(), pageFiles(), serviceWorker()],
+  // (src/lib/pageMeta.ts); licensesFile: dist/licenses.txt, the licences of everything bundled;
+  // serviceWorker: dist/sw.js, the offline app (src/sw/), built after the app
+  plugins: [react(), pageFiles(), licensesFile(REPO_URL), serviceWorker()],
   // hover styles only where something can hover: a tap left them on (plugins/hoverMedia.ts)
   css: { postcss: { plugins: [hoverMedia()] } },
   resolve: {
@@ -36,7 +39,8 @@ export default defineConfig({
   worker: { format: 'es' },
   test: {
     environment: 'node',
-    include: ['src/**/__tests__/**/*.test.ts'],
+    // plugins' own tests need Node's modules, which src's type-check (and the image build) leaves out
+    include: ['src/**/__tests__/**/*.test.ts', 'plugins/**/__tests__/**/*.test.ts'],
     // CSS is left out of tests (an empty module) unless listed here; lib/__tests__/themes.test.ts reads
     // the stylesheet's first-paint colours as text (global.css?raw), and __tests__/hoverMedia.test.ts
     // every stylesheet (?raw)

@@ -32,7 +32,7 @@ for (const conn of [pub, sub]) conn.on('error', () => {}); // the command connec
 // Last line of defence: a stray rejected promise is logged instead of taking the pod down.
 process.on('unhandledRejection', (err) => app.log.error({ err }, 'unhandled promise rejection'));
 
-const auth = makeAuth(config.jwtSecret, redis);
+const auth = makeAuth(config.jwtSecret, redis, config.jwtSecretPrevious);
 app.log.info({ redis: config.redisUrl.replace(/\/\/.*@/, '//***@') }, 'race service starting');
 
 const io = createSocketServer(app.server, pub, sub);
@@ -44,10 +44,11 @@ const sockets = registerSocketHandlers({
   scrambles: makeScrambleFetcher(config.urls.scramble, app.log, undefined, config.internalToken),
   redis,
   jwtSecret: config.jwtSecret,
+  jwtSecretPrevious: config.jwtSecretPrevious,
   pod: config.podName,
   log: app.log,
 });
-registerRoutes(app, { store, redis, auth });
+registerRoutes(app, { store, redis, auth, internalToken: config.internalToken, onChatCleared: (roomId) => io.to(roomId).emit('chat:cleared', {}) });
 
 // Shutdown order: preClose runs before Fastify closes the HTTP server - drop our websockets
 // (clients reconnect to another pod) and finish their Redis cleanup while Redis is still open.

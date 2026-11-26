@@ -70,10 +70,10 @@ export async function queuePbUpdated(c: PoolClient, change: PbChange): Promise<v
 }
 
 export async function loadPbs(c: PoolClient, userId: string, event: string): Promise<Map<PbKind, PbRow>> {
-  const { rows } = await c.query<PbRow>(
-    'SELECT kind, value_ms, solve_id, achieved_at FROM stats.personal_bests WHERE user_id = $1 AND event = $2',
-    [userId, event],
-  );
+  const { rows } = await c.query<PbRow>('SELECT kind, value_ms, solve_id, achieved_at FROM stats.personal_bests WHERE user_id = $1 AND event = $2', [
+    userId,
+    event,
+  ]);
   return new Map(rows.map((r) => [r.kind, r]));
 }
 

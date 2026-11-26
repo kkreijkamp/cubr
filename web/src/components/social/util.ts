@@ -1,5 +1,5 @@
 // Small helpers shared by the social pages (login, profile/account, leaderboards, about).
-import { getEvent, type ImportSkipped } from '@cubr/cubestats';
+import { getEvent, isWcaEvent, type ImportSkipped } from '@cubr/cubestats';
 import { ApiError } from '../../lib/api';
 import { localDateKey } from '../../lib/format';
 import type { PbKind } from '../../lib/types';
@@ -17,9 +17,9 @@ const MEAN_OF_3 = new Set(['666', '777', '333bf', '444bf', '555bf']);
 export function wcaAverageKind(event: string): 'ao5' | 'mo3' {
   return MEAN_OF_3.has(event) ? 'mo3' : 'ao5';
 }
-/** Events that can be compared against WCA results (FMC is counted in moves, not ms). */
+/** Events that can be compared against WCA results: the WCA events (FMC is counted in moves, not ms). */
 export function isWcaComparable(event: string): boolean {
-  return event !== '333fm' && getEvent(event) !== undefined;
+  return event !== '333fm' && isWcaEvent(event);
 }
 
 /** Only allow same-origin relative redirects ("/x", never "//evil.com" or "https://..."). */
@@ -104,5 +104,4 @@ export function csTimerFileName(now = new Date()): string {
   return `cstimer_${localDateKey(now).replace(/-/g, '')}_cubr.txt`;
 }
 
-export const prefersReducedMotion = (): boolean =>
-  typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+export const prefersReducedMotion = (): boolean => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;

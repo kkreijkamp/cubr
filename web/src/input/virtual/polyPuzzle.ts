@@ -68,12 +68,19 @@ export class PolyPuzzle {
     for (const a of def.axes) {
       for (const d of a.cuts) {
         const p: Plane = { n: a.n, d };
-        const same = cuts.some((q) => (dist(q.n, p.n) < 1e-6 && Math.abs(q.d - p.d) < 1e-6) || (dist(q.n, scale(p.n, -1)) < 1e-6 && Math.abs(q.d + p.d) < 1e-6));
+        const same = cuts.some(
+          (q) => (dist(q.n, p.n) < 1e-6 && Math.abs(q.d - p.d) < 1e-6) || (dist(q.n, scale(p.n, -1)) < 1e-6 && Math.abs(q.d + p.d) < 1e-6),
+        );
         if (!same) cuts.push(p);
       }
     }
     const slots: Slot[] = [];
-    this.facePolys = def.faces.map((f, i) => facePolygon(f.plane, planes.filter((_, j) => j !== i)));
+    this.facePolys = def.faces.map((f, i) =>
+      facePolygon(
+        f.plane,
+        planes.filter((_, j) => j !== i),
+      ),
+    );
     def.faces.forEach((f, i) => {
       const face = this.facePolys[i];
       if (!face) return;

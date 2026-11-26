@@ -1,0 +1,38 @@
+# Dependency updates (to-do "Supply-chain guards", 2026-11-26): weekly, grouped, onto dev (main only
+# takes releases), and only versions out for a week (cooldown), as the 2025 npm worms spread through
+# brand-new versions.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directories: ["/", "/web", "/e2e"]
+    target-branch: dev
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      npm-minor-and-patch:
+        update-types: [minor, patch]
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: docker
+    directories: ["/services/*", "/web", "/jobs/*"]
+    target-branch: dev
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      base-images:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]

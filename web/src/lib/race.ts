@@ -1,7 +1,7 @@
 // Race client - wraps socket.io-client for the race service (docs/SPEC.md section 9.6).
 //
 // - websocket transport only (no long-polling -> the load balancer needs no sticky sessions);
-// - handshake auth {token, name, guestId} is re-read on every (re)connect;
+// - handshake auth {token, name, guestKey} is re-read on every (re)connect;
 // - every (re)connect re-joins the room, so a race pod being killed / drained during a rolling
 //   update is invisible apart from the "connected via pod ..." label changing;
 // - ack-based calls become promises with timeouts; calls are rejected (never buffered) while
@@ -72,9 +72,14 @@ export class RaceError extends Error {
 }
 
 // ---- guest identity ---------------------------------------------------------------------------
+// A guest is whoever holds its secret key (kept here, sent only in the handshake); the server shows the
+// others an id made from it (services/race/src/identity.ts), which can't be used to play as that guest.
+const GUEST_KEY_KEY = 'cubr.guestKey';
 const GUEST_ID_KEY = 'cubr.guestId';
 const GUEST_NAME_KEY = 'cubr.guestName';
-const GUEST_ID_RE = /^guest-[a-z0-9]{6,24}$/;
+const GUEST_KEY_RE = /^[a-z0-9]{32}$/;
+/** an id the server assigned: "gst-" from a key, or "guest-" from the previous release */
+const GUEST_ID_RE = /^(gst|guest)-[a-z0-9]{6,24}$/;
 
 function randomId(len: number): string {
   const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -83,27 +88,40 @@ function randomId(len: number): string {
   return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('');
 }
 
-/** Stable guest id (`guest-<random>`), so a refresh or a reconnect to another pod keeps your seat. */
-export function getGuestId(): string {
+/** Your guest key: the same on every visit, so a refresh or a reconnect to another pod keeps your seat. */
+export function getGuestKey(): string {
   try {
-    const stored = localStorage.getItem(GUEST_ID_KEY);
-    if (stored && GUEST_ID_RE.test(stored)) return stored;
-    const id = `guest-${randomId(10)}`;
-    localStorage.setItem(GUEST_ID_KEY, id);
-    return id;
+    const stored = localStorage.getItem(GUEST_KEY_KEY);
+    if (stored && GUEST_KEY_RE.test(stored)) return stored;
+    const key = randomId(32);
+    localStorage.setItem(GUEST_KEY_KEY, key);
+    localStorage.removeItem(GUEST_ID_KEY); // an id from before the key belongs to someone else now
+    return key;
   } catch {
-    return (fallbackGuestId ??= `guest-${randomId(10)}`);
+    return (fallbackGuestKey ??= randomId(32));
   }
 }
+let fallbackGuestKey: string | null = null;
 let fallbackGuestId: string | null = null;
 
-/** Adopt the guest id the server assigned (when ours was missing / malformed). */
+/** Your public guest id, as the server last assigned it (for the default name), or null before the first join. */
+export function getGuestId(): string | null {
+  try {
+    const stored = localStorage.getItem(GUEST_ID_KEY);
+    return stored && GUEST_ID_RE.test(stored) ? stored : fallbackGuestId;
+  } catch {
+    return fallbackGuestId;
+  }
+}
+
+/** Keeps the id the server assigned, to show the default name it gives you. */
 function storeGuestId(id: string): void {
   if (!GUEST_ID_RE.test(id)) return;
+  fallbackGuestId = id;
   try {
     localStorage.setItem(GUEST_ID_KEY, id);
   } catch {
-    fallbackGuestId = id;
+    /* kept in memory */
   }
 }
 
@@ -123,9 +141,10 @@ export function setGuestName(name: string): void {
     /* storage unavailable */
   }
 }
-/** Default display name the server gives a guest without a nickname. */
+/** Default display name the server gives a guest without a nickname ("guest" before the first join). */
 export function defaultGuestName(): string {
-  return `guest-${getGuestId().slice(-4)}`;
+  const id = getGuestId();
+  return id ? `guest-${id.slice(-4)}` : 'guest';
 }
 
 /** Accepts a room code or a full invite link and returns the room id (or null). */
@@ -176,7 +195,7 @@ export class RaceConnection {
       path: '/socket.io',
       transports: ['websocket'],
       // a function, so token / nickname are re-read on every reconnect
-      auth: (cb) => cb({ token: getToken() ?? undefined, name: getGuestName() || undefined, guestId: getGuestId() }),
+      auth: (cb) => cb({ token: getToken() ?? undefined, name: getGuestName() || undefined, guestKey: getGuestKey() }),
       reconnection: true,
       reconnectionDelay: 500,
       reconnectionDelayMax: 4000,
@@ -202,6 +221,8 @@ export class RaceConnection {
 
     socket.on('room:state', (state: LiveRoomState) => this.applyState(state));
     socket.on('chat:message', (msg: ChatMessage) => this.addChat([msg]));
+    // a moderator cleared the room's chat
+    socket.on('chat:cleared', () => this.patch({ chat: [] }));
   }
 
   /** Reconnect with a fresh handshake (e.g. after changing the guest nickname). */
@@ -234,8 +255,8 @@ export class RaceConnection {
       const servedBy = res.servedBy ?? null;
       const previousPods = prev.servedBy && servedBy && prev.servedBy !== servedBy ? [prev.servedBy, ...prev.previousPods].slice(0, 5) : prev.previousPods;
       this.joinedOnce = true;
-      // guests: send the server's playerId back as auth.guestId on every reconnect
-      if (typeof res.playerId === 'string' && res.playerId.startsWith('guest-')) storeGuestId(res.playerId);
+      // guests: keep the id the server made from our key (for the default name)
+      if (typeof res.playerId === 'string' && GUEST_ID_RE.test(res.playerId)) storeGuestId(res.playerId);
       this.patch({ playerId: res.playerId, name: res.name ?? prev.name, servedBy, previousPods, joinError: null });
       this.applyState(res.room, true);
       if (Array.isArray(res.chat)) this.addChat(res.chat);
@@ -289,8 +310,9 @@ export class RaceConnection {
     return res as unknown as T;
   }
 
+  /** Starts the round after the one on screen: a retry, or a second click, can't skip one. */
   nextRound(): Promise<{ round: LiveRound }> {
-    return this.call('round:next', {}, 10_000);
+    return this.call('round:next', { fromRound: this.snapshot.room?.round?.n ?? 0 }, 10_000);
   }
   setStatus(status: PlayerStatus): Promise<unknown> {
     return this.call('player:status', { status });

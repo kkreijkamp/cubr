@@ -45,16 +45,16 @@ function RoomsTable({ onJoin }: { onJoin: (id: string) => void }) {
   useEffect(() => {
     load();
     return () => inFlight.current?.abort();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
   useInterval(load, visible ? 5000 : null);
 
   return (
     <section className="card race-rooms" aria-labelledby="rooms-title">
       <div className="live-section-title">
-        <h3 className="h3" id="rooms-title">
+        <h2 className="h3" id="rooms-title">
           <FlagIcon /> public rooms
-        </h3>
-        <button className="btn-text small race-refresh" onClick={load} aria-label="refresh">
+        </h2>
+        <button className="btn-text small race-refresh" onClick={load} aria-label={`${rooms ? `${rooms.length} open, ` : ''}refresh`}>
           {loading ? <Spinner size={14} /> : <ArrowPathIcon width={14} height={14} />} {rooms ? `${rooms.length} open` : ''}
         </button>
       </div>
@@ -74,7 +74,9 @@ function RoomsTable({ onJoin }: { onJoin: (id: string) => void }) {
                 <th>players</th>
                 <th className="center hide-xs">status</th>
                 <th className="hide-sm">created</th>
-                <th className="hide-sm" aria-label="join" />
+                <th className="hide-sm">
+                  <span className="sr-only">join</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -165,8 +167,7 @@ export default function RaceLobbyPage() {
             <FlagIcon /> {PAGE_META['/race'].heading}
           </h1>
           <div className="subtitle" data-nosnippet>
-            real-time races with friends - same scramble, live status, results per round. rooms live in redis and websockets are spread across all
-            race pods.
+            real-time races with friends - same scramble, live status, results per round. rooms live in redis and websockets are spread across all race pods.
           </div>
         </div>
       </div>
@@ -178,9 +179,9 @@ export default function RaceLobbyPage() {
         <div className="stack">
           <section className="card race-card" aria-labelledby="you-title">
             <div className="live-section-title">
-              <h3 className="h3" id="you-title">
+              <h2 className="h3" id="you-title">
                 <UserIcon /> you
-              </h3>
+              </h2>
             </div>
             {status === 'authed' && user ? (
               <div className="small">
@@ -204,9 +205,9 @@ export default function RaceLobbyPage() {
 
           <section className="card race-card" aria-labelledby="create-title">
             <div className="live-section-title">
-              <h3 className="h3" id="create-title">
+              <h2 className="h3" id="create-title">
                 <PlusIcon /> create room
-              </h3>
+              </h2>
             </div>
             <form
               className="stack race-form"
@@ -242,9 +243,9 @@ export default function RaceLobbyPage() {
 
           <section className="card race-card" aria-labelledby="join-title">
             <div className="live-section-title">
-              <h3 className="h3" id="join-title">
+              <h2 className="h3" id="join-title">
                 <HashtagIcon /> join by code
-              </h3>
+              </h2>
             </div>
             <form
               className="row race-join"
@@ -268,7 +269,11 @@ export default function RaceLobbyPage() {
                 join
               </button>
             </form>
-            {codeError && <div className="small error" style={{ marginTop: '0.5rem' }}>{codeError}</div>}
+            {codeError && (
+              <div className="small error" style={{ marginTop: '0.5rem' }}>
+                {codeError}
+              </div>
+            )}
           </section>
         </div>
       </div>

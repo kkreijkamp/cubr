@@ -17,9 +17,7 @@ describe('hover styles only where something can hover', () => {
   });
 
   it('keeps the selectors that need no hover where they are, for touch screens too', () => {
-    expect(squash(run('.a:hover, .a.active { color: red; }'))).toBe(
-      '.a.active { color: red; } @media (hover: hover) { .a:hover { color: red; } }',
-    );
+    expect(squash(run('.a:hover, .a.active { color: red; }'))).toBe('.a.active { color: red; } @media (hover: hover) { .a:hover { color: red; } }');
     expect(squash(run('.b, .c { color: blue; }'))).toBe('.b, .c { color: blue; }');
   });
 

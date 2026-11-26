@@ -1,9 +1,10 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { conflict, notFound, parse, rateLimited, signToken, unauthorized, unavailable, withTx } from '@cubr/common';
+import { conflict, forbidden, notFound, parse, rateLimited, signToken, unauthorized, unavailable, withTx } from '@cubr/common';
 import type { Deps } from './index.js';
 import { allow, publishSafely, withTimeout } from '../safe.js';
-import { loadMailConfig } from '../mail.js';
+import { loadMailConfig, sendMail } from '../mail.js';
+import { signInMethodNotice, signInUrl } from '../passwordChange.js';
 import {
   authorizeUrl,
   fetchIdentity,
@@ -16,11 +17,14 @@ import {
   safeNext,
   suggestUsername,
   usernameCandidates,
+  PROVIDER_NAMES,
   type Provider,
   type ProviderConfig,
   type ProviderIdentity,
 } from '../oauth.js';
-import { USERNAME_RE, USER_COLUMNS, UUID_RE, conflictMessage, toPrivateUser, toPublicUser, userEventData, type UserRow } from '../users.js';
+import { USER_COLUMNS, UUID_RE, conflictMessage, toPrivateUser, toPublicUser, userEventData, usernameSchema, type UserRow } from '../users.js';
+import { HOLDS_EMAIL, releaseUnconfirmed } from '../unconfirmed.js';
+import { SUSPENDED_MESSAGE, isSuspended } from '../suspension.js';
 
 /**
  * Sign-in with Google, Apple and GitHub (OAuth 2 authorization code flow; the providers in oauth.ts).
@@ -73,13 +77,13 @@ interface PendingSignup {
 }
 
 /** Why a sign-in didn't work; the SPA turns these into messages (pages/SsoPage.tsx). */
-type Failure = 'cancelled' | 'expired' | 'failed' | 'no_email' | 'email_taken' | 'linked_elsewhere' | 'already_linked' | 'busy';
+type Failure = 'cancelled' | 'expired' | 'failed' | 'no_email' | 'email_taken' | 'linked_elsewhere' | 'already_linked' | 'busy' | 'suspended';
 
 const startBody = z.object({ mode: z.enum(['signin', 'link']).default('signin'), next: z.string().max(300).optional() });
 const exchangeBody = z.object({ code: z.string().min(16).max(100) });
 const signupBody = z.object({
   id: z.string().min(16).max(100),
-  username: z.string().trim().regex(USERNAME_RE, 'must be 3-20 characters: letters, digits or _'),
+  username: usernameSchema,
 });
 const tokenString = z.string().min(16).max(100);
 
@@ -96,7 +100,27 @@ async function take<T>(redis: Deps['redis'], key: string): Promise<T | null> {
 
 export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, redis, auth }: Deps): Promise<void> {
   const providers = loadOAuthConfig();
-  const publicUrl = loadMailConfig().publicUrl.replace(/\/$/, '');
+  const mail = loadMailConfig();
+  const publicUrl = mail.publicUrl.replace(/\/$/, '');
+
+  /**
+   * Tells the account's email that a sign-in method was connected or disconnected, if the address is
+   * confirmed (an unconfirmed one may be a stranger's), as for a password change. Never fails the request.
+   */
+  const noticeOfMethod = async (userId: string, provider: Provider, connected: boolean, log: FastifyRequest['log']) => {
+    try {
+      const { rows } = await pool.query<{ username: string; email: string; trusted: boolean }>(
+        `select username, email, (email_verified_at is not null or predates_email_confirmation) as trusted from auth.users where id = $1`,
+        [userId],
+      );
+      const u = rows[0];
+      if (!u?.trusted) return;
+      const notice = signInMethodNotice({ username: u.username, provider: PROVIDER_NAMES[provider], connected, signInUrl: signInUrl(mail.publicUrl) });
+      await sendMail(mail, { to: u.email, ...notice }, log);
+    } catch (err) {
+      log.error({ err: (err as Error).message, provider }, 'sign-in method notice failed');
+    }
+  };
   const redirectUri = (p: Provider) => `${publicUrl}/api/auth/oauth/${p}/callback`;
   const enabled = Object.keys(providers) as Provider[];
   if (enabled.length) app.log.info({ providers: enabled }, 'sign-in with providers enabled');
@@ -121,18 +145,21 @@ export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, 
   const fail = (reply: FastifyReply, flow: Pick<Flow, 'mode' | 'next'> | null, provider: Provider, error: Failure) =>
     toSpa(reply, flow?.mode === 'link' ? '/account' : '/login/sso', { error, provider, ...(flow?.mode === 'link' ? {} : { next: flow?.next ?? '/' }) });
 
-  const userById = async (id: string) => (await pool.query<UserRow>(`select ${USER_COLUMNS} from auth.users where id = $1`, [id])).rows[0] ?? null;
-
   /** The provider vouches for `email`: if it's the account's email, it's confirmed. */
   const confirmByProvider = async (userId: string, email: string | null) => {
     if (!email) return;
-    await pool.query('update auth.users set email_verified_at = now() where id = $1 and email_verified_at is null and lower(email) = lower($2)', [userId, email]);
+    await pool.query('update auth.users set email_verified_at = now() where id = $1 and email_verified_at is null and lower(email) = lower($2)', [
+      userId,
+      email,
+    ]);
   };
 
-  /** A free username close to the provider's (null if 50 tries are all taken). */
+  /** A free username close to the provider's (null if 50 tries are all taken); never a reserved or refused one. */
   async function freeUsername(identity: Pick<ProviderIdentity, 'login' | 'name' | 'email'>): Promise<string | null> {
-    const candidates = usernameCandidates(suggestUsername(identity));
-    const { rows } = await pool.query<{ u: string }>('select lower(username) as u from auth.users where lower(username) = any($1)', [candidates.map((c) => c.toLowerCase())]);
+    const candidates = usernameCandidates(suggestUsername(identity)).filter((c) => usernameSchema.safeParse(c).success);
+    const { rows } = await pool.query<{ u: string }>('select lower(username) as u from auth.users where lower(username) = any($1)', [
+      candidates.map((c) => c.toLowerCase()),
+    ]);
     const taken = new Set(rows.map((r) => r.u));
     return candidates.find((c) => !taken.has(c.toLowerCase())) ?? null;
   }
@@ -151,7 +178,11 @@ export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, 
     const nonce = randomToken(16);
     const { verifier, challenge } = pkce();
     const flow: Flow = { provider, verifier, nonce, mode, userId: mode === 'link' ? req.user!.id.toLowerCase() : null, next: safeNext(next) };
-    const stored = await withTimeout(redis.set(flowKey(state), JSON.stringify(flow), 'EX', FLOW_TTL_SEC).then(() => true), 2000, false);
+    const stored = await withTimeout(
+      redis.set(flowKey(state), JSON.stringify(flow), 'EX', FLOW_TTL_SEC).then(() => true),
+      2000,
+      false,
+    );
     if (!stored) throw unavailable('Sign-in with a provider is unavailable right now, please retry');
     reply.header('set-cookie', bindCookie(state, FLOW_TTL_SEC)).header('cache-control', 'no-store');
     return { url: authorizeUrl(cfg, { redirectUri: redirectUri(provider), state, nonce, challenge }) };
@@ -184,7 +215,12 @@ export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, 
       if (linked && linked.user_id !== flow.userId) return fail(reply, flow, provider, 'linked_elsewhere');
       if (!linked) {
         try {
-          await pool.query('insert into auth.user_identities (provider, subject, user_id, email) values ($1, $2, $3, $4)', [provider, identity.subject, flow.userId, identity.email]);
+          await pool.query('insert into auth.user_identities (provider, subject, user_id, email) values ($1, $2, $3, $4)', [
+            provider,
+            identity.subject,
+            flow.userId,
+            identity.email,
+          ]);
         } catch (err) {
           // the unique (user_id, provider): this account already has another account of this provider
           if ((err as { code?: string }).code === '23505') return fail(reply, flow, provider, 'already_linked');
@@ -192,27 +228,41 @@ export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, 
           throw err;
         }
         req.log.info({ provider, userId: flow.userId }, 'provider connected');
+        // after confirmByProvider: connecting a provider that vouches for the address confirms it first
+        await confirmByProvider(flow.userId!, identity.email);
+        void noticeOfMethod(flow.userId!, provider, true, req.log);
+        return toSpa(reply, '/account', { linked: provider });
       }
       await confirmByProvider(flow.userId!, identity.email);
       return toSpa(reply, '/account', { linked: provider });
     }
 
     if (linked) {
+      if (await isSuspended(pool, linked.user_id)) return fail(reply, flow, provider, 'suspended');
       await pool.query('update auth.user_identities set last_used_at = now() where provider = $1 and subject = $2', [provider, identity.subject]);
       await confirmByProvider(linked.user_id, identity.email);
       const code = randomToken();
-      const ok = await withTimeout(redis.set(loginKey(code), JSON.stringify({ userId: linked.user_id }), 'EX', LOGIN_CODE_TTL_SEC).then(() => true), 2000, false);
+      const ok = await withTimeout(
+        redis.set(loginKey(code), JSON.stringify({ userId: linked.user_id }), 'EX', LOGIN_CODE_TTL_SEC).then(() => true),
+        2000,
+        false,
+      );
       if (!ok) return fail(reply, flow, provider, 'busy');
       return toSpa(reply, '/login/sso', { code, next: flow.next }, [code, LOGIN_CODE_TTL_SEC]);
     }
 
-    // a new account: it needs a verified email (password resets) that no account uses yet
+    // a new account: it needs a verified email (password resets) that no account uses yet (an
+    // unconfirmed one past its 7 days doesn't count: it's freed when the account is made)
     if (!identity.email) return fail(reply, flow, provider, 'no_email');
-    const taken = await pool.query('select 1 from auth.users where lower(email) = lower($1)', [identity.email]);
+    const taken = await pool.query(`select 1 from auth.users u where lower(u.email) = lower($1) and ${HOLDS_EMAIL}`, [identity.email]);
     if (taken.rowCount) return fail(reply, flow, provider, 'email_taken');
     const id = randomToken();
     const pending: PendingSignup = { provider, subject: identity.subject, email: identity.email, name: identity.name, login: identity.login };
-    const ok = await withTimeout(redis.set(signupKey(id), JSON.stringify(pending), 'EX', SIGNUP_TTL_SEC).then(() => true), 2000, false);
+    const ok = await withTimeout(
+      redis.set(signupKey(id), JSON.stringify(pending), 'EX', SIGNUP_TTL_SEC).then(() => true),
+      2000,
+      false,
+    );
     if (!ok) return fail(reply, flow, provider, 'busy');
     return toSpa(reply, '/login/sso', { signup: id, next: flow.next }, [id, SIGNUP_TTL_SEC]);
   }
@@ -247,6 +297,8 @@ export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, 
     reply.header('set-cookie', clearCookie);
     const login = await take<{ userId: string }>(redis, loginKey(code));
     if (!login) throw notFound('This sign-in link has expired, please sign in again');
+    // suspended in the two minutes since the code was made
+    if (await isSuspended(pool, login.userId)) throw forbidden(SUSPENDED_MESSAGE);
     const { rows } = await pool.query<UserRow>(`update auth.users set last_login_at = now() where id = $1 returning ${USER_COLUMNS}`, [login.userId]);
     if (!rows[0]) throw notFound('Account no longer exists');
     return signedIn(rows[0]);
@@ -270,11 +322,13 @@ export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, 
     let row: UserRow;
     try {
       row = await withTx(pool, async (c) => {
+        const freed = await releaseUnconfirmed(c, pending.email);
+        if (freed) req.log.info({ userId: freed, provider: pending.provider }, 'an email never confirmed in 7 days was freed for a new account');
         // the provider verified the address, so it starts confirmed
-        const { rows } = await c.query<UserRow>(`insert into auth.users (username, email, password_hash, email_verified_at) values ($1, $2, null, now()) returning ${USER_COLUMNS}`, [
-          username,
-          pending.email,
-        ]);
+        const { rows } = await c.query<UserRow>(
+          `insert into auth.users (username, email, password_hash, email_verified_at) values ($1, $2, null, now()) returning ${USER_COLUMNS}`,
+          [username, pending.email],
+        );
         await c.query('insert into auth.user_settings (user_id) values ($1)', [rows[0].id]);
         await c.query('insert into auth.user_identities (provider, subject, user_id, email, last_used_at) values ($1, $2, $3, $4, now())', [
           pending.provider,
@@ -302,9 +356,10 @@ export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, 
     if (!UUID_RE.test(userId)) throw unauthorized();
     const [user, ids] = await Promise.all([
       pool.query<{ has_password: boolean }>('select password_hash is not null as has_password from auth.users where id = $1', [userId]),
-      pool.query<{ provider: Provider; email: string | null; created_at: Date }>('select provider, email, created_at from auth.user_identities where user_id = $1 order by created_at', [
-        userId,
-      ]),
+      pool.query<{ provider: Provider; email: string | null; created_at: Date }>(
+        'select provider, email, created_at from auth.user_identities where user_id = $1 order by created_at',
+        [userId],
+      ),
     ]);
     if (!user.rows[0]) throw unauthorized('Account no longer exists');
     return {
@@ -320,15 +375,18 @@ export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, 
     if (!isProvider(req.params.provider)) throw notFound('Not connected');
     const provider = req.params.provider;
     await withTx(pool, async (c) => {
-      const { rows } = await c.query<{ has_password: boolean }>('select password_hash is not null as has_password from auth.users where id = $1 for update', [userId]);
+      const { rows } = await c.query<{ has_password: boolean }>('select password_hash is not null as has_password from auth.users where id = $1 for update', [
+        userId,
+      ]);
       if (!rows[0]) throw unauthorized('Account no longer exists');
       const others = await c.query('select 1 from auth.user_identities where user_id = $1 and provider <> $2', [userId, provider]);
-      if (!rows[0].has_password && !others.rowCount) throw conflict('This is your only way to sign in: set a password first (sign out, then "forgot password?")');
+      if (!rows[0].has_password && !others.rowCount)
+        throw conflict('This is your only way to sign in: set a password first (sign out, then "forgot password?")');
       const del = await c.query('delete from auth.user_identities where user_id = $1 and provider = $2', [userId, provider]);
       if (!del.rowCount) throw notFound('Not connected');
     });
     req.log.info({ provider, userId }, 'provider disconnected');
+    void noticeOfMethod(userId, provider, false, req.log);
     return reply.status(204).send();
   });
 }
-

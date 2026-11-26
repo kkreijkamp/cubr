@@ -8,7 +8,7 @@ initSolver();
 
 self.onmessage = (e: MessageEvent<SolverRequest>) => {
   const r = e.data;
-  let moves: string | null = null;
+  let moves: string | null;
   if (r.kind === 'scramble') moves = scrambleForFacelet(r.facelet);
   else {
     const from = new CubieCube().fromFacelet(r.from);

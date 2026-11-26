@@ -79,7 +79,12 @@ export function cubePuzzle(n: number): PolyPuzzle {
 export function cubeTwisty(n: number): PolyTwisty {
   const puzzle = cubePuzzle(n);
   const axis = (f: string) => CUBE_FACES.indexOf(f.toUpperCase() as (typeof CUBE_FACES)[number]);
-  const mv = (from: number, to: number, face: string, amount: number): Move => ({ axis: axis(face), from: Math.max(1, from), to: Math.min(n, Math.max(from, to)), amount });
+  const mv = (from: number, to: number, face: string, amount: number): Move => ({
+    axis: axis(face),
+    from: Math.max(1, from),
+    to: Math.min(n, Math.max(from, to)),
+    amount,
+  });
   let left = 1;
   let right = 1;
 
@@ -144,6 +149,7 @@ export function cubeTwisty(n: number): PolyTwisty {
   });
 
   // csTimer: twisty/twistynnn.js getTouchMoves
+  // prettier-ignore
   const touchMap = (): Record<string, [number, number, string, number]> => ({
     61: [1, 2, 'U', 2], 62: [1, 1, 'B', 1], 63: [1, right, 'R', 1], 64: [1, n, 'U', 2], 65: [1, n, 'U', 1], 67: [1, 1, 'F', 2], 68: [right + 1, right + 1, 'R', -1], 69: [1, 1, 'F', 1],
     41: [1, left, 'L', -1], 42: [1, 1, 'B', -1], 43: [1, 2, 'U', -2], 45: [1, n, 'U', -1], 46: [1, n, 'U', -2], 47: [1, 1, 'F', -1], 48: [left + 1, left + 1, 'L', 1], 49: [1, 1, 'F', -2],
@@ -204,13 +210,13 @@ export function cubeTwisty(n: number): PolyTwisty {
       if (m.from <= 1 && m.to >= n) {
         const rot = { R: 'x', U: 'y', F: 'z', L: 'x', D: 'y', B: 'z' }[face]!;
         const flip = face === 'L' || face === 'D' || face === 'B';
-        return rot + amt + ((m.amount < 0) !== flip ? "'" : '');
+        return rot + amt + (m.amount < 0 !== flip ? "'" : '');
       }
       // the middle layer: M turns as L, E as D, S as F
       if (n % 2 === 1 && m.from === (n + 1) / 2 && m.to === m.from) {
         const slice = { L: 'M', R: 'M', D: 'E', U: 'E', F: 'S', B: 'S' }[face]!;
         const flip = face === 'R' || face === 'U' || face === 'B';
-        return slice + amt + ((m.amount < 0) !== flip ? "'" : '');
+        return slice + amt + (m.amount < 0 !== flip ? "'" : '');
       }
       if (m.from === 1) return (m.to > 2 ? m.to : '') + face + (m.to >= 2 ? 'w' : '') + amt + prime;
       return (m.from === m.to ? `${m.from}` : `${m.from}-${m.to}`) + face + (m.from === m.to ? '' : 'w') + amt + prime;
@@ -340,7 +346,11 @@ export function skewbTwisty(): PolyTwisty {
   if (!skewbCache) {
     const axes: Axis[] = Object.entries(SK_CORNERS).map(([name, v]) => ({ name, n: unit(v), order: 3, cuts: [0] }));
     // x, y, z: the whole puzzle about the R, U and F faces
-    axes.push({ name: 'x', n: [1, 0, 0], order: 4, cuts: [] }, { name: 'y', n: [0, 1, 0], order: 4, cuts: [] }, { name: 'z', n: [0, 0, 1], order: 4, cuts: [] });
+    axes.push(
+      { name: 'x', n: [1, 0, 0], order: 4, cuts: [] },
+      { name: 'y', n: [0, 1, 0], order: 4, cuts: [] },
+      { name: 'z', n: [0, 0, 1], order: 4, cuts: [] },
+    );
     skewbCache = new PolyPuzzle({ faces: CUBE_NORMALS.map((v, i) => ({ plane: { n: v, d: 1 }, color: CUBE_COLORS[i] })), axes, gap: 0.075 });
   }
   const puzzle = skewbCache;

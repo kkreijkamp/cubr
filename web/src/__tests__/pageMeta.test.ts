@@ -22,7 +22,12 @@ const FOCUS = /\b(?:speedcub(?:e|es|ing|er|ers)|cub(?:e|es|ing|er|ers)|timers?|t
 const focusWords = (s: string) => s.match(FOCUS) ?? [];
 
 /** An attribute or element of index.html (or a page's copy), unescaped. */
-const unescape = (s: string) => s.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+const unescape = (s: string) =>
+  s
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
 function head(html: string) {
   const attr = (re: RegExp) => unescape(re.exec(html)?.[1] ?? '');
   const summary = /<div id="page-summary"([^>]*)>\s*<h1>([^<]*)<\/h1>\s*<p>([^<]*)<\/p>([\s\S]*?)<\/div>/.exec(html);
@@ -39,7 +44,7 @@ function head(html: string) {
   };
 }
 
-describe('the public pages\' titles and descriptions', () => {
+describe("the public pages' titles and descriptions", () => {
   it('cover exactly the pages in the sitemap, each a route of the app', () => {
     const routes = [...appSource.matchAll(/\{ path: '([^']+)'/g)].map((m) => m[1]);
     const listed = [...sitemapXml.matchAll(/<loc>https:\/\/cubr\.dev([^<]*)<\/loc>/g)].map((m) => m[1]);
@@ -56,7 +61,8 @@ describe('the public pages\' titles and descriptions', () => {
       expect(page.description.length, `${path}: ${page.description}`).toBeLessThanOrEqual(160);
       expect(page.heading.length, path).toBeGreaterThan(0);
       // the site's voice, lowercase; csTimer keeps its own spelling
-      for (const text of [page.title, page.description, page.heading]) expect(text.replace(/csTimer/g, ''), path).toBe(text.replace(/csTimer/g, '').toLowerCase());
+      for (const text of [page.title, page.description, page.heading])
+        expect(text.replace(/csTimer/g, ''), path).toBe(text.replace(/csTimer/g, '').toLowerCase());
     }
     // the brand last, as search results expect; the home page leads with it, About says it in its sentence
     for (const [path, page] of pages) if (path !== '/' && path !== '/about') expect(page.title, path).toMatch(/ \| cubr$/);
@@ -103,7 +109,7 @@ describe('index.html, the home page', () => {
     expect(h.ogSiteName).toBe('cubr');
   });
 
-  it('carries a summary for crawlers that don\'t run the app, inside #root so the app replaces it', () => {
+  it("carries a summary for crawlers that don't run the app, inside #root so the app replaces it", () => {
     expect(indexHtml).toMatch(/<div id="root">\s*<div id="page-summary"/);
     expect(h.heading).toBe(HOME.heading);
     expect(h.line).toBe(HOME.description);
@@ -128,8 +134,8 @@ describe('index.html, the home page', () => {
   });
 });
 
-describe('each public page\'s own HTML (plugins/pageFiles.ts)', () => {
-  it('is index.html with the page\'s title, description and heading, and nothing else changed', () => {
+describe("each public page's own HTML (plugins/pageFiles.ts)", () => {
+  it("is index.html with the page's title, description and heading, and nothing else changed", () => {
     for (const [path, page] of pages) {
       const html = pageHtml(indexHtml, page);
       const h = head(html);
@@ -171,7 +177,7 @@ describe('what search results may quote', () => {
   // timer's and the tool pages' moving parts out of results (it doesn't change what's shown or indexed).
   const nosnippet = (source: string, className: string) => new RegExp(`className="${className}"[^>]*\\sdata-nosnippet`).test(source);
 
-  it("never the timer: its scramble, time, hints and stats, while its heading stays quotable", () => {
+  it('never the timer: its scramble, time, hints and stats, while its heading stays quotable', () => {
     expect(nosnippet(timerSource, 'timer-page')).toBe(true);
     // the heading comes before (outside) the data-nosnippet block
     expect(timerSource.indexOf('<h1 className="sr-only">{HOME.heading}</h1>')).toBeLessThan(timerSource.indexOf('<div className="timer-page" data-nosnippet>'));
@@ -188,7 +194,8 @@ describe('what search results may quote', () => {
   });
 
   it("never the leaderboard's filters and table, the WCA page's event and country lists, or About's counters", () => {
-    for (const c of ['lb-group lb-periods', 'lb-group lb-dates', 'lb-group lb-kinds', 'lb-group lb-events', 'lb-toolbar', 'table-wrap']) expect(nosnippet(leaderboardsSource, c), c).toBe(true);
+    for (const c of ['lb-group lb-periods', 'lb-group lb-dates', 'lb-group lb-kinds', 'lb-group lb-events', 'lb-toolbar', 'table-wrap'])
+      expect(nosnippet(leaderboardsSource, c), c).toBe(true);
     // the calculator, records and people search sit in one data-nosnippet block that keeps the layout
     expect(wcaSource).toMatch(/<div data-nosnippet style=\{\{ display: 'contents' \}\}>\s*\{tab === 'rank'/);
     expect(aboutSource).toMatch(/<section aria-label="live stats" data-nosnippet>/);

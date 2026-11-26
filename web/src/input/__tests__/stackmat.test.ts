@@ -19,7 +19,7 @@ class Signal {
   }
   level(v: number, bits = 1) {
     const end = this.t + bits * this.bitLen;
-    const target = ((v ^ (this.invert ? 1 : 0)) ? 1 : -1) * this.amp;
+    const target = (v ^ (this.invert ? 1 : 0) ? 1 : -1) * this.amp;
     while (this.samples.length < Math.round(end)) {
       // a fast edge, like a real line, and noise
       this.last += (target - this.last) * 0.9;
@@ -142,7 +142,9 @@ describe('moyu timer signal', () => {
   it.each([0, 1])('reads the time (idle level %d)', (idle) => {
     const sig = new Signal(RATE / 8000).settle(idle);
     for (const t of [0, 0, 5, 1234, 65432]) moyu(sig, t, idle);
-    const got = decode(sig.samples, 'moyu').filter((s) => s.on).slice(-4);
+    const got = decode(sig.samples, 'moyu')
+      .filter((s) => s.on)
+      .slice(-4);
     expect(got.map((s) => s.time_milli)).toEqual([0, 5, 1234, 65432]);
     // the time going up is running
     expect(got.map((s) => s.running)).toEqual([false, true, true, true]);

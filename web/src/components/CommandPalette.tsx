@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckIcon, ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { closePalette, matches, openPalette, paletteStore, useAllCommands, type Command } from '../lib/commands';
@@ -50,6 +50,8 @@ function PaletteInner({ initial }: { initial: string | null }) {
   const [stack, setStack] = useState<{ title: string; items: () => Command[] }[]>([]);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
+  /** the list's id: the input is a combobox that owns it, and names the highlighted row */
+  const listId = useId();
   /** the row the keyboard left highlighted; the highlight returns here when the mouse leaves the list */
   const restIndex = useRef(0);
   const [previewing, setPreviewing] = useState(false);
@@ -168,27 +170,51 @@ function PaletteInner({ initial }: { initial: string | null }) {
   const placeholder = stack.length ? stack[stack.length - 1].title : 'Search commands, themes, settings...';
 
   return createPortal(
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- a click outside closes it; Esc does from the keyboard
     <div
       className={`modal-backdrop${previewing ? ' previewing' : ''}`}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) closePalette();
       }}
     >
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- the palette's keys, while focus stays in its input */}
       <div className="modal palette" role="dialog" aria-label="Command palette" onKeyDown={onKeyDown}>
         <div className="palette-input">
           <MagnifyingGlassIcon width={16} height={16} />
-          <input ref={inputRef} value={query} onChange={(e) => setQuery(e.target.value)} placeholder={placeholder} aria-label="Search commands" />
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={placeholder}
+            aria-label="Search commands"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={rows.length > 0}
+            aria-controls={listId}
+            aria-activedescendant={rows.length ? `${listId}-${active}` : undefined}
+          />
         </div>
-        <div className="palette-list" ref={listRef} onMouseLeave={() => setActive(restIndex.current)}>
+        <div
+          className="palette-list"
+          ref={listRef}
+          id={listId}
+          role={rows.length ? 'listbox' : undefined}
+          aria-label={rows.length ? 'commands' : undefined}
+          onMouseLeave={() => setActive(restIndex.current)}
+        >
           {rows.length === 0 && <div className="palette-empty">No commands found</div>}
           {rows.map((row, i) => (
+            // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/interactive-supports-focus -- focus stays in the input, which names this row (aria-activedescendant); arrows and Enter there pick it
             <div
               key={`${row.cmd.id}-${i}`}
+              id={`${listId}-${i}`}
+              role="option"
+              aria-selected={i === active}
               className={`palette-row${i === active ? ' active' : ''}`}
               onMouseMove={() => i !== active && setActive(i)}
               onClick={() => choose(row)}
             >
-              <span>{row.cmd.active ? <CheckIcon /> : row.cmd.icon ?? null}</span>
+              <span>{row.cmd.active ? <CheckIcon /> : (row.cmd.icon ?? null)}</span>
               <span>
                 {row.label}
                 {row.cmd.after}

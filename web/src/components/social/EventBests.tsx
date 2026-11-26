@@ -2,13 +2,13 @@ import { Link } from 'react-router-dom';
 import { WidgetError } from './Widget';
 import { PB_KINDS, plural } from './util';
 import { api } from '../../lib/api';
-import { formatDate, formatNumber, formatPercent, formatTime, timeAgo } from '../../lib/format';
+import { formatAverage, formatDate, formatNumber, formatPercent, formatResult, timeAgo } from '../../lib/format';
 import type { PB, PbKind, StatsSummary, UserRank } from '../../lib/types';
 import { useAsync, type AsyncState } from '../../lib/useAsync';
 import { Loading } from '../Spinner';
 
-const pbText = (pb: PB | null | undefined, precision: 2 | 3) =>
-  pb && pb.valueMs !== null ? formatTime(pb.valueMs === -1 ? -1 : pb.valueMs, precision) : null;
+const pbText = (pb: PB | null | undefined, kind: PbKind, precision: 2 | 3) =>
+  pb && pb.valueMs !== null ? formatResult(pb.valueMs === -1 ? -1 : pb.valueMs, kind, precision) : null;
 
 /**
  * "#101 on cubr" with the share of ranked cubers, linking to that leaderboard page. The board can
@@ -17,21 +17,21 @@ const pbText = (pb: PB | null | undefined, precision: 2 | 3) =>
  */
 function RankLink({ rank, full, shownMs, precision }: { rank: UserRank; full?: boolean; shownMs: number | null | undefined; precision: 2 | 3 }) {
   const top = rank.total > 0 ? (rank.rank / rank.total) * 100 : 100;
-  const other = shownMs != null && shownMs !== rank.valueMs ? formatTime(rank.valueMs, precision) : null;
+  const other = shownMs != null && shownMs !== rank.valueMs ? formatResult(rank.valueMs, rank.kind, precision) : null;
+  const shown = `#${formatNumber(rank.rank)}${full ? ' on cubr' : ''}${other ? ` (${other})` : ''}`;
   return (
     <Link
       className="pf-rank"
       to={`/leaderboards?event=${rank.event}&kind=${rank.kind}&period=all&page=${Math.ceil(rank.rank / 50)}`}
-      aria-label={`rank ${rank.rank} of ${rank.total} on the ${rank.kind} leaderboard${other ? `, with ${other}` : ''}`}
+      // the name starts with what the link shows (speech input says what it sees)
+      aria-label={`${shown}: ${rank.rank} of ${rank.total} on the ${rank.kind} leaderboard`}
       data-tip={
         other
           ? `the leaderboard has your ${other}: a faster time was left off it`
           : `top ${formatPercent(top)} of ${formatNumber(rank.total)} on the leaderboard`
       }
     >
-      #{formatNumber(rank.rank)}
-      {full && ' on cubr'}
-      {other && ` (${other})`}
+      {shown}
     </Link>
   );
 }
@@ -66,8 +66,8 @@ export function EventBests({
 
   return (
     <section className={fade ? 'pf-bests fade' : 'pf-bests'} aria-label="personal bests">
-      <div className="pf-single" aria-label={single ? `single ${pbText(single, precision)}, set ${formatDate(single.achievedAt)}` : 'no single yet'}>
-        <span className="pf-single-value">{pbText(single, precision) ?? '-'}</span>
+      <div className="pf-single" aria-label={single ? `single ${pbText(single, 'single', precision)}, set ${formatDate(single.achievedAt)}` : 'no single yet'}>
+        <span className="pf-single-value">{pbText(single, 'single', precision) ?? '-'}</span>
         <span className="pf-single-meta">
           <span>single</span>
           {single && <span data-tip={timeAgo(single.achievedAt)}>{formatDate(single.achievedAt)}</span>}
@@ -88,10 +88,14 @@ export function EventBests({
       <div className="pf-avgs">
         {averages.map((k) => {
           const pb = e.pbs[k] ?? null;
-          const text = pbText(pb, precision);
+          const text = pbText(pb, k, precision);
           const rank = rankOf(k);
           return (
-            <div key={k} className={`pf-avg${text ? '' : ' none'}`} data-tip={pb && text ? `set ${formatDate(pb.achievedAt)} - ${timeAgo(pb.achievedAt)}` : undefined}>
+            <div
+              key={k}
+              className={`pf-avg${text ? '' : ' none'}`}
+              data-tip={pb && text ? `set ${formatDate(pb.achievedAt)} - ${timeAgo(pb.achievedAt)}` : undefined}
+            >
               <span className="v">{text ?? '-'}</span>
               <span className="k">
                 {k}
@@ -103,7 +107,7 @@ export function EventBests({
       </div>
       <div className="pf-bests-meta">
         {plural(e.solves, 'solve')}
-        {e.meanMs !== null && e.meanMs > 0 && <> - mean {formatTime(e.meanMs, precision)}</>}
+        {e.meanMs !== null && e.meanMs > 0 && <> - mean {formatAverage(e.meanMs, precision)}</>}
       </div>
     </section>
   );

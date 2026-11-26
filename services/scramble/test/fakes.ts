@@ -2,6 +2,7 @@
 // time on setTimeout, so fake timers control them, and each event can be made slow, stuck or
 // failing. Scrambles come out as "<event> scramble <n>", unique per backend.
 import type { ScrambleBackend } from '../src/backends.js';
+import type { CsTimerHost } from '../src/cstimer.js';
 import { GenerationTimeoutError } from '../src/errors.js';
 import { withTimeout } from '../src/util.js';
 
@@ -33,4 +34,21 @@ export function fakeBackend(size = 1, ms = 0): FakeBackend {
     close: async () => {},
   };
   return backend;
+}
+
+/** A stand-in for csTimer's scramblers (cstimer.ts): "<type> cstimer <n>", and a tiny SVG for the drawable types. */
+export function fakeCsTimer(drawable: readonly string[] = ['15prp', 'gear', 'r234w', 'r3', '888', 'giga']): CsTimerHost & { calls: string[] } {
+  let n = 0;
+  const calls: string[] = [];
+  return {
+    calls,
+    scramble: async (type, length) => {
+      calls.push(`${type}:${length}`);
+      return `${type} cstimer ${++n}`;
+    },
+    image: async (type, scramble) =>
+      drawable.includes(type) ? `<svg xmlns="http://www.w3.org/2000/svg"><text>${type}</text><desc>${scramble.length}</desc></svg>` : null,
+    stats: () => ({ requests: n, failed: 0, timeouts: 0, rejected: 0, restarts: 0, inFlight: 0 }),
+    close: async () => {},
+  };
 }

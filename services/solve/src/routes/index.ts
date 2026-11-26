@@ -1,7 +1,9 @@
 import type { FastifyInstance } from 'fastify';
+import type { VapidDetails } from 'web-push';
 import type { RouteContext } from '../context.js';
 import { registerImportExportRoutes } from './importExport.js';
 import { registerInternalRoutes } from './internal.js';
+import { registerPushRoutes } from './push.js';
 import { registerSessionRoutes } from './sessions.js';
 import { registerSolveRoutes } from './solves.js';
 
@@ -21,10 +23,11 @@ function allowEmptyJsonBodies(app: FastifyInstance): void {
   });
 }
 
-export async function registerRoutes(app: FastifyInstance, ctx: RouteContext): Promise<void> {
+export async function registerRoutes(app: FastifyInstance, ctx: RouteContext, vapid: VapidDetails | null = null): Promise<void> {
   allowEmptyJsonBodies(app);
   registerSessionRoutes(app, ctx);
   registerSolveRoutes(app, ctx);
   registerImportExportRoutes(app, ctx);
   registerInternalRoutes(app, ctx);
+  registerPushRoutes(app, ctx, vapid);
 }

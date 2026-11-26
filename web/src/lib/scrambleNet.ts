@@ -28,7 +28,10 @@ export function transformPoint(m: Matrix, [x, y]: Point): Point {
 export function parseTransform(value: string | null | undefined): Matrix {
   let m = IDENTITY;
   for (const [, fn, args] of (value ?? '').matchAll(/(\w+)\s*\(([^)]*)\)/g)) {
-    const a = args.split(/[\s,]+/).filter(Boolean).map(Number);
+    const a = args
+      .split(/[\s,]+/)
+      .filter(Boolean)
+      .map(Number);
     const rad = ((a[0] ?? 0) * Math.PI) / 180;
     let t: Matrix;
     switch (fn) {
@@ -64,7 +67,10 @@ export function parseTransform(value: string | null | undefined): Matrix {
 
 /** a polygon's "points" attribute */
 export function parsePoints(value: string | null | undefined): Point[] {
-  const n = (value ?? '').split(/[\s,]+/).filter(Boolean).map(Number);
+  const n = (value ?? '')
+    .split(/[\s,]+/)
+    .filter(Boolean)
+    .map(Number);
   const out: Point[] = [];
   for (let i = 0; i + 1 < n.length; i += 2) out.push([n[i], n[i + 1]]);
   return out;
@@ -124,12 +130,12 @@ export function signedArea(points: Point[]): number {
 }
 
 /** drops repeated corners and corners on a straight edge */
-function corners(points: Point[], eps: number): Point[] {
+export function corners(points: Point[], eps: number): Point[] {
   let pts = points.filter((p, i) => {
     const q = points[(i + 1) % points.length];
     return Math.hypot(p[0] - q[0], p[1] - q[1]) > eps;
   });
-  for (let changed = true; changed && pts.length > 3; ) {
+  for (let changed = true; changed && pts.length > 3;) {
     changed = false;
     for (let i = 0; i < pts.length; i++) {
       const prev = pts[(i + pts.length - 1) % pts.length];
@@ -145,18 +151,16 @@ function corners(points: Point[], eps: number): Point[] {
 }
 
 /**
- * The convex polygon moved in by `d` on every side, or null when the polygon is not convex or is
- * too small to move in that far.
+ * A simple polygon, convex or not, moved in by `d` on every side, or null when a side would turn
+ * round or vanish (moved in further than the shape is wide there). Corners stay sharp: a convex one
+ * moves in along its bisector, a concave one out. `sign`: which way round "in" is, by default the
+ * polygon's own winding; a hole in a shape goes round the other way, so it takes the shape's.
  */
-export function insetConvex(points: Point[], d: number): Point[] | null {
+export function insetPolygon(points: Point[], d: number, sign = Math.sign(signedArea(points))): Point[] | null {
   const size = Math.sqrt(Math.abs(signedArea(points)));
   const pts = corners(points, size * 1e-4);
   const n = pts.length;
-  if (n < 3 || size === 0) return null;
-  const sign = Math.sign(signedArea(pts));
-  for (let i = 0; i < n; i++) {
-    if (Math.sign(cross(pts[(i + n - 1) % n], pts[i], pts[(i + 1) % n])) !== sign) return null;
-  }
+  if (n < 3 || size === 0 || sign === 0) return null;
   // each side as a line moved inwards: a point on it and its direction
   const sides = pts.map((p, i) => {
     const q = pts[(i + 1) % n];
@@ -180,6 +184,22 @@ export function insetConvex(points: Point[], d: number): Point[] | null {
   return out;
 }
 
+/**
+ * The convex polygon moved in by `d` on every side, or null when the polygon is not convex or is
+ * too small to move in that far.
+ */
+export function insetConvex(points: Point[], d: number): Point[] | null {
+  const size = Math.sqrt(Math.abs(signedArea(points)));
+  const pts = corners(points, size * 1e-4);
+  const n = pts.length;
+  if (n < 3 || size === 0) return null;
+  const sign = Math.sign(signedArea(pts));
+  for (let i = 0; i < n; i++) {
+    if (Math.sign(cross(pts[(i + n - 1) % n], pts[i], pts[(i + 1) % n])) !== sign) return null;
+  }
+  return insetPolygon(pts, d, sign);
+}
+
 export interface Tile {
   points: Point[];
   /** draw with a round-joined stroke this wide in the fill colour (0: no stroke) */
@@ -189,13 +209,14 @@ export interface Tile {
 /**
  * A sticker's tile: its cell less `gap / 2` all round, corners rounded to `radius`. The rounding is
  * a stroke: the cell is moved in by gap / 2 + radius and stroked 2 * radius wide with round joins,
- * which puts the edge back at gap / 2 with round corners. Stickers too small (or not convex) for that
- * get square corners or, failing that, are shrunk towards their middle.
+ * which puts the edge back at gap / 2 with round corners (concave corners stay sharp). Stickers too
+ * small for that (or, with the default `inset`, not convex) get square corners or, failing that, are
+ * shrunk towards their middle.
  */
-export function tile(points: Point[], gap: number, radius: number): Tile {
-  const rounded = insetConvex(points, gap / 2 + radius);
+export function tile(points: Point[], gap: number, radius: number, inset: (points: Point[], d: number) => Point[] | null = insetConvex): Tile {
+  const rounded = inset(points, gap / 2 + radius);
   if (rounded) return { points: rounded, stroke: 2 * radius };
-  const square = insetConvex(points, gap / 2);
+  const square = inset(points, gap / 2);
   if (square) return { points: square, stroke: 0 };
   const c = points.reduce<Point>((s, p) => [s[0] + p[0] / points.length, s[1] + p[1] / points.length], [0, 0]);
   return { points: points.map((p) => [c[0] + (p[0] - c[0]) * 0.8, c[1] + (p[1] - c[1]) * 0.8]), stroke: 0 };
@@ -287,6 +308,25 @@ export function closeUp(faces: Point[][], gap: number): Point[] {
   return centres.map((c) => [pull * (mid[0] - c[0]), pull * (mid[1] - c[1])]);
 }
 
+/** How a net is drawn. */
+export interface NetStyle {
+  /** the gap between stickers and their corner radius, as fractions of a typical sticker's size */
+  gap: number;
+  radius: number;
+  /** a dark plate behind each face, so white and yellow stickers stand out on light themes too */
+  plates: boolean;
+  /** the gap between faces as a fraction of a face's size (cubing.js lays them out further apart), or null to keep its layout */
+  faceGap: number | null;
+}
+export const NET_STYLE: NetStyle = { gap: 0.14, radius: 0.16, plates: true, faceGap: 0.035 };
+/**
+ * square-1's net splits each sticker into a few polygons, and its pieces are irregular: drawn flat,
+ * each polygon overlapping its neighbours a little so no seams show, as one shape per layer
+ */
+export const FLAT_STYLE: NetStyle = { gap: -0.03, radius: 0.015, plates: false, faceGap: null };
+/** a face plate's corner radius, as a fraction of a typical sticker's size */
+export const PLATE_RADIUS = 0.22;
+
 export interface Orbit {
   orbitName: string;
   numPieces: number;
@@ -317,20 +357,24 @@ export function stickerSources(orbits: Orbit[], pattern: Record<string, OrbitPat
   return out;
 }
 
-// cubing.js colours its nets with pure web colours; cubr's defaults are the same colours a little
-// softer, and each face's colour can be your own (settings: sticker colours)
+// cubing.js colours its nets, and csTimer its drawings (lib/drawnNet), with pure web colours; cubr's
+// defaults are the same colours a little softer, and each face's colour can be your own (settings:
+// sticker colours)
 export interface SchemeFace {
   /** what the face is called in the settings (its position, or its usual colour) */
   name: string;
   /** how cubing.js colours this face in its nets */
   cubing: string[];
+  /** how csTimer colours it in its drawings (#rrggbb) */
+  cstimer?: string[];
   /** cubr's colour for it */
   colour: string;
 }
 
 export interface Scheme {
-  id: 'cube' | 'skewb' | 'square1' | 'pyraminx' | 'megaminx';
+  id: 'cube' | 'skewb' | 'square1' | 'pyraminx' | 'megaminx' | 'fto';
   label: string;
+  /** the cubing.js puzzles drawn in it (csTimer's drawings: lib/drawnNet DRAWN_SCHEMES) */
   puzzles: string[];
   faces: SchemeFace[];
 }
@@ -341,59 +385,90 @@ const RED = '#e8343a';
 const ORANGE = '#ff8a1c';
 const GREEN = '#2fb84c';
 const BLUE = '#2d6ff2';
+const PURPLE = '#8a4fd8';
+const GREY = '#9a9a9a';
 
+// the redi cube's net spells some of them differently (#32cd32, #ffa500, #ffff00)
 const CUBE_FACES: SchemeFace[] = [
-  { name: 'top', cubing: ['white', '#ffffff'], colour: WHITE },
-  { name: 'front', cubing: ['limegreen', '#44ee00'], colour: GREEN },
-  { name: 'right', cubing: ['red', '#ff0000'], colour: RED },
-  { name: 'back', cubing: ['#26f', '#2266ff'], colour: BLUE },
-  { name: 'left', cubing: ['orange', '#ff8000'], colour: ORANGE },
-  { name: 'bottom', cubing: ['yellow', '#f4f400'], colour: YELLOW },
+  { name: 'top', cubing: ['white', '#ffffff'], cstimer: ['#ffffff'], colour: WHITE },
+  { name: 'front', cubing: ['limegreen', '#44ee00', '#32cd32'], cstimer: ['#00dd00'], colour: GREEN },
+  { name: 'right', cubing: ['red', '#ff0000'], cstimer: ['#ff0000'], colour: RED },
+  { name: 'back', cubing: ['#26f', '#2266ff'], cstimer: ['#0000ff'], colour: BLUE },
+  { name: 'left', cubing: ['orange', '#ff8000', '#ffa500'], cstimer: ['#ffaa00'], colour: ORANGE },
+  { name: 'bottom', cubing: ['yellow', '#f4f400', '#ffff00'], cstimer: ['#ffff00'], colour: YELLOW },
 ];
 
 export const SCHEMES: Scheme[] = [
-  { id: 'cube', label: 'cubes', puzzles: ['2x2x2', '3x3x3', '4x4x4', '5x5x5', '6x6x6', '7x7x7'], faces: CUBE_FACES },
+  { id: 'cube', label: 'cubes', puzzles: ['2x2x2', '3x3x3', '4x4x4', '5x5x5', '6x6x6', '7x7x7', 'redi_cube'], faces: CUBE_FACES },
   { id: 'skewb', label: 'skewb', puzzles: ['skewb'], faces: CUBE_FACES },
   {
     id: 'square1',
     label: 'square-1',
     puzzles: ['square1'],
     faces: [
-      ...CUBE_FACES.map((f, i) => ({ ...f, name: ['white', 'green', 'red', 'blue', 'orange', 'yellow'][i] })),
+      // csTimer's square-1 greens and oranges are its own
+      ...CUBE_FACES.map((f, i) => ({
+        ...f,
+        name: ['white', 'green', 'red', 'blue', 'orange', 'yellow'][i],
+        cstimer: [['#ffffff'], ['#00ff00'], ['#ff0000'], ['#0000ff'], ['#ff8800'], ['#ffff00']][i],
+      })),
       { name: 'piece sides', cubing: ['#d8d8d8'], colour: '#a0a0a0' },
     ],
   },
   {
     id: 'pyraminx',
     label: 'pyraminx',
-    puzzles: ['pyraminx'],
+    puzzles: ['pyraminx', 'master_tetraminx'],
     faces: [
-      { name: 'front', cubing: ['limegreen'], colour: GREEN },
-      { name: 'left', cubing: ['red'], colour: RED },
-      { name: 'right', cubing: ['#26f'], colour: BLUE },
-      { name: 'bottom', cubing: ['yellow'], colour: YELLOW },
+      { name: 'front', cubing: ['limegreen', '#44ee00'], cstimer: ['#00ff00'], colour: GREEN },
+      { name: 'left', cubing: ['red', '#ff0000'], cstimer: ['#ff0000'], colour: RED },
+      { name: 'right', cubing: ['#26f', '#2266ff'], cstimer: ['#0000ff'], colour: BLUE },
+      { name: 'bottom', cubing: ['yellow', '#f4f400'], cstimer: ['#ffff00'], colour: YELLOW },
     ],
   },
   {
     id: 'megaminx',
     label: 'megaminx',
-    puzzles: ['megaminx'],
+    // the kilominx's net spells four of them differently; csTimer's pyraminx crystal is coloured as a megaminx
+    puzzles: ['megaminx', 'kilominx', 'gigaminx'],
     faces: [
-      { name: 'white', cubing: ['#ffffff'], colour: WHITE },
-      { name: 'dark green', cubing: ['#008800'], colour: '#16884a' },
-      { name: 'red', cubing: ['#ff0000'], colour: RED },
-      { name: 'purple', cubing: ['#8800dd'], colour: '#8a4fd8' },
-      { name: 'yellow', cubing: ['#f4f400'], colour: YELLOW },
-      { name: 'dark blue', cubing: ['#0000ff'], colour: '#2f46c4' },
-      { name: 'grey', cubing: ['#888888'], colour: '#9a9a9a' },
-      { name: 'beige', cubing: ['#e8d0a0'], colour: '#ead6aa' },
-      { name: 'light blue', cubing: ['#3399ff'], colour: '#46a8f5' },
-      { name: 'orange', cubing: ['#ff8000'], colour: ORANGE },
-      { name: 'light green', cubing: ['#99ff00'], colour: '#a3d93b' },
-      { name: 'pink', cubing: ['#ff66cc'], colour: '#f472b6' },
+      { name: 'white', cubing: ['#ffffff'], cstimer: ['#ffffff'], colour: WHITE },
+      { name: 'dark green', cubing: ['#008800'], cstimer: ['#006600'], colour: '#16884a' },
+      { name: 'red', cubing: ['#ff0000'], cstimer: ['#dd0000'], colour: RED },
+      { name: 'purple', cubing: ['#8800dd'], cstimer: ['#8811ff'], colour: PURPLE },
+      { name: 'yellow', cubing: ['#f4f400', '#ffff00'], cstimer: ['#ffcc00'], colour: YELLOW },
+      { name: 'dark blue', cubing: ['#0000ff'], cstimer: ['#0000bb'], colour: '#2f46c4' },
+      { name: 'grey', cubing: ['#888888', '#999999'], cstimer: ['#999999'], colour: GREY },
+      { name: 'beige', cubing: ['#e8d0a0', '#ffffd0'], cstimer: ['#ffffbb'], colour: '#ead6aa' },
+      { name: 'light blue', cubing: ['#3399ff'], cstimer: ['#88ddff'], colour: '#46a8f5' },
+      { name: 'orange', cubing: ['#ff8000', '#ff6633'], cstimer: ['#ff8833'], colour: ORANGE },
+      { name: 'light green', cubing: ['#99ff00'], cstimer: ['#77ee00'], colour: '#a3d93b' },
+      { name: 'pink', cubing: ['#ff66cc'], cstimer: ['#ff99ff'], colour: '#f472b6' },
+    ],
+  },
+  {
+    id: 'fto',
+    label: 'fto',
+    // csTimer's diamond is coloured as an FTO
+    puzzles: ['fto'],
+    faces: [
+      { name: 'white', cubing: ['#ffffff'], cstimer: ['#ffffff'], colour: WHITE },
+      { name: 'red', cubing: ['red', '#ff0000'], cstimer: ['#ff0000'], colour: RED },
+      { name: 'green', cubing: ['#44ee00'], cstimer: ['#00dd00'], colour: GREEN },
+      { name: 'purple', cubing: ['#8800dd'], cstimer: ['#880088'], colour: PURPLE },
+      { name: 'yellow', cubing: ['#f4f400'], cstimer: ['#ffff00'], colour: YELLOW },
+      { name: 'blue', cubing: ['#2266ff'], cstimer: ['#0000ff'], colour: BLUE },
+      { name: 'grey', cubing: ['#aaaaaa'], cstimer: ['#bbbbbb'], colour: GREY },
+      { name: 'orange', cubing: ['#ff8000'], cstimer: ['#ffaa00'], colour: ORANGE },
     ],
   },
 ];
+
+/**
+ * csTimer's sliding puzzle tiles, which it colours by the part of the solve they belong to (the
+ * first row and column, the second, the last 2x2), in cubr's colours. Not one of your colour settings.
+ */
+export const SLIDING_COLOURS: Readonly<Record<string, string>> = { '#ff9999': RED, '#99ff99': GREEN, '#9999ff': BLUE };
 
 export function schemeFor(puzzle: string): Scheme | undefined {
   return SCHEMES.find((s) => s.puzzles.includes(puzzle));
@@ -402,12 +477,12 @@ export function schemeFor(puzzle: string): Scheme | undefined {
 const HEX = /^#[0-9a-f]{6}$/i;
 
 /**
- * A net colour (as cubing.js gives it) as cubr draws it: your own colour for that face when you
- * picked one (`custom`, one per face of the scheme), otherwise cubr's.
+ * A net colour (as cubing.js or csTimer gives it) as cubr draws it: your own colour for that face
+ * when you picked one (`custom`, one per face of the scheme), otherwise cubr's.
  */
 export function stickerColour(original: string, scheme: Scheme | undefined, custom?: readonly unknown[]): string {
   const c = original.trim().toLowerCase();
-  const face = scheme ? scheme.faces.findIndex((f) => f.cubing.includes(c)) : -1;
+  const face = scheme ? scheme.faces.findIndex((f) => f.cubing.includes(c) || f.cstimer?.includes(c)) : -1;
   if (!scheme || face < 0) return original;
   const own = custom?.[face];
   return typeof own === 'string' && HEX.test(own) ? own.toLowerCase() : scheme.faces[face].colour;

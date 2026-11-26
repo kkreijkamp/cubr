@@ -127,7 +127,12 @@ export class FakeProviders {
   private async idToken(grant: Grant, issuer: string, audience: string, key: CryptoKey, kid: string, alg: string): Promise<string> {
     const t = grant.tamper;
     const p = grant.person;
-    const claims: Record<string, unknown> = { email: p.email ?? undefined, email_verified: p.emailVerified ?? true, name: p.name ?? undefined, nonce: t === 'nonce' ? 'not-the-nonce' : grant.nonce };
+    const claims: Record<string, unknown> = {
+      email: p.email ?? undefined,
+      email_verified: p.emailVerified ?? true,
+      name: p.name ?? undefined,
+      nonce: t === 'nonce' ? 'not-the-nonce' : grant.nonce,
+    };
     const now = Math.floor(Date.now() / 1000);
     return new SignJWT(claims)
       .setProtectedHeader({ alg: t === 'signature' ? 'RS256' : alg, kid })
@@ -182,7 +187,8 @@ export class FakeProviders {
         return [200, { access_token: 'a.x', id_token: await this.idToken(grant, IDS.apple.issuer, IDS.apple.clientId, this.appleKey, 'a1', 'ES256') }];
       }
       case 'POST /github/token': {
-        if (form.get('client_id') !== IDS.github.clientId || form.get('client_secret') !== IDS.github.secret) return [200, { error: 'incorrect_client_credentials' }];
+        if (form.get('client_id') !== IDS.github.clientId || form.get('client_secret') !== IDS.github.secret)
+          return [200, { error: 'incorrect_client_credentials' }];
         const grant = this.take(form, 'github');
         if (typeof grant === 'string') return [200, { error: 'bad_verification_code' }]; // GitHub answers errors with 200
         const token = `gho_${randomBytes(8).toString('hex')}`;

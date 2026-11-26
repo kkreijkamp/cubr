@@ -34,7 +34,13 @@ export async function registerInternalRoutes(app: FastifyInstance, pool: Pool, i
   app.get('/internal/pbs', { preHandler: requireInternal(internalToken, app.log) }, async (req) => {
     const { event, kind } = parse(internalPbsQuery, req.query);
     const { rows } = await pool.query<{
-      user_id: string; username: string; event: string; kind: PbKind; value_ms: number; solve_id: string | null; achieved_at: Date;
+      user_id: string;
+      username: string;
+      event: string;
+      kind: PbKind;
+      value_ms: number;
+      solve_id: string | null;
+      achieved_at: Date;
     }>(
       `SELECT p.user_id, coalesce(u.username, '') AS username, p.event, p.kind, p.value_ms, p.solve_id, p.achieved_at
          FROM stats.personal_bests p LEFT JOIN stats.user_totals u ON u.user_id = p.user_id

@@ -1,15 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  DNF,
-  averageOfN,
-  bestRolling,
-  effectiveMs,
-  rollingAverage,
-  sessionStats,
-  toApiValue,
-  trimFor,
-  trimmedAverage,
-} from '../src/averages.js';
+import { DNF, averageOfN, bestRolling, effectiveMs, rollingAverage, sessionStats, toApiValue, trimFor, trimmedAverage } from '../src/averages.js';
 import { formatSolve, formatTime, parseTimeInput } from '../src/format.js';
 
 describe('trimFor', () => {

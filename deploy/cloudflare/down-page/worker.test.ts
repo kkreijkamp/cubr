@@ -42,13 +42,18 @@ describe('handle', () => {
     }
   });
 
-  it('shows the down page for a page load the server can\'t answer: the tunnel down (530), Cloudflare\'s 52x, the gateway\'s 502-504', async () => {
+  it("shows the down page for a page load the server can't answer: the tunnel down (530), Cloudflare's 52x, the gateway's 502-504", async () => {
     expect([...DOWN_STATUSES].sort()).toEqual([502, 503, 504, 520, 521, 522, 523, 524, 530]);
     for (const status of DOWN_STATUSES) {
       const fromServer = answer(status, '{"error":{"code":"UNAVAILABLE"}}');
       const res = await handle(pageLoad(), origin(fromServer));
       expect(res.status, String(status)).toBe(503);
-      expect(Object.fromEntries(res.headers)).toMatchObject({ 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'retry-after': '30', 'x-robots-tag': 'noindex' });
+      expect(Object.fromEntries(res.headers)).toMatchObject({
+        'content-type': 'text/html; charset=utf-8',
+        'cache-control': 'no-store',
+        'retry-after': '30',
+        'x-robots-tag': 'noindex',
+      });
       expect(await res.text()).toBe(DOWN_PAGE);
       expect(fromServer.bodyUsed || fromServer.body?.locked, 'the server body is let go').toBe(true);
     }
@@ -59,8 +64,12 @@ describe('handle', () => {
     expect(await head.text()).toBe('');
   });
 
-  it("keeps the real answer for everything but page loads, so the app and the uptime check see the failure", async () => {
-    for (const request of [req({ 'sec-fetch-mode': 'cors' }), req({ accept: '*/*' }, 'GET', '/healthz'), req({ 'sec-fetch-mode': 'no-cors' }, 'GET', '/favicon.svg')]) {
+  it('keeps the real answer for everything but page loads, so the app and the uptime check see the failure', async () => {
+    for (const request of [
+      req({ 'sec-fetch-mode': 'cors' }),
+      req({ accept: '*/*' }, 'GET', '/healthz'),
+      req({ 'sec-fetch-mode': 'no-cors' }, 'GET', '/favicon.svg'),
+    ]) {
       const res = answer(530);
       expect(await handle(request, origin(res))).toBe(res);
     }
@@ -88,7 +97,9 @@ describe('the down page', () => {
     expect(refs.length).toBeGreaterThanOrEqual(4);
     for (const ref of refs) expect(['', '/'].includes(ref) || ref.startsWith('data:'), ref.slice(0, 40)).toBe(true);
     expect(DOWN_PAGE).toContain(`url(data:font/woff2;base64,${LEXEND_DECA_400}) format('woff2')`);
-    expect(DOWN_HEADERS['Content-Security-Policy']).toBe("default-src 'none'; style-src 'unsafe-inline'; font-src data:; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
+    expect(DOWN_HEADERS['Content-Security-Policy']).toBe(
+      "default-src 'none'; style-src 'unsafe-inline'; font-src data:; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    );
   });
 
   it('asks to try again in a couple of minutes, and reloads itself meanwhile', () => {
@@ -100,11 +111,13 @@ describe('the down page', () => {
     expect(DOWN_PAGE).toContain('<html lang="en">');
   });
 
-  it("wears the default themes: white cross, and white cross dark in dark mode", () => {
+  it('wears the default themes: white cross, and white cross dark in dark mode', () => {
     const light = webTheme('white_cross');
     const dark = webTheme('white_cross_dark');
     expect(DOWN_PAGE).toContain(`:root { --bg: ${light.bg}; --main: ${light.main}; --sub: ${light.sub}; --sub-alt: ${light.subAlt}; --text: ${light.text};`);
-    expect(DOWN_PAGE).toContain(`@media (prefers-color-scheme: dark) { :root { --bg: ${dark.bg}; --sub: ${dark.sub}; --sub-alt: ${dark.subAlt}; --text: ${dark.text};`);
+    expect(DOWN_PAGE).toContain(
+      `@media (prefers-color-scheme: dark) { :root { --bg: ${dark.bg}; --sub: ${dark.sub}; --sub-alt: ${dark.subAlt}; --text: ${dark.text};`,
+    );
     expect(dark.main).toBe(light.main);
     // the favicon is the site's
     const favicon = readFileSync(new URL('../../../web/public/favicon.svg', import.meta.url), 'utf8').trim();

@@ -8,7 +8,8 @@
     "build": "npm run typecheck && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit && tsc --noEmit -p src/sw",
-    "test": "vitest run"
+    "test": "vitest run",
+    "size": "node scripts/size-budget.mjs"
   },
   "dependencies": {
     "@fontsource/comfortaa": "^5.3.0",

@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, ApiError, getToken, onUnauthorized, setToken, storedToken } from './api';
+import { clearReminder } from './reminders';
 import { mergeServerSettings, setSettingsServerSync } from './settings';
 import { loadJson, saveJson } from './store';
 import { toast } from './toast';
@@ -18,6 +19,8 @@ interface AuthContextValue {
    *  sets its first). Every other session ends; this one carries on with a fresh token. */
   changePassword(newPassword: string, password?: string): Promise<void>;
   logout(): Promise<void>;
+  /** Signs out every other browser and device; this one carries on with a fresh token (other tabs here follow it). */
+  logoutEverywhere(): Promise<void>;
   /** Deletes the account for good (after checking the password, or the username for an account
    *  without one), then signs out. */
   deleteAccount(proof: { password: string } | { confirm: string }): Promise<void>;
@@ -67,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     rememberUser(u);
     setUserState(u);
     setStatus(u ? 'authed' : 'guest');
-    setSettingsServerSync(u ? (s) => api.auth.saveSettings(s as unknown as Record<string, unknown>) : null);
+    setSettingsServerSync(u ? (s) => api.auth.saveSettings(s as unknown as Record<string, unknown>) : null, u?.id);
     listeners.forEach((l) => l(u));
   }, []);
 
@@ -86,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .me(c.signal)
         .then(({ user: u, settings }) => {
           window.removeEventListener('online', check);
-          mergeServerSettings(settings);
+          mergeServerSettings(settings, u.id);
           applyUser(u);
         })
         .catch((err) => {
@@ -143,7 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(res.token);
         try {
           const me = await api.auth.me();
-          mergeServerSettings(me.settings);
+          mergeServerSettings(me.settings, me.user.id);
         } catch {
           /* settings are optional */
         }
@@ -159,7 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(res.token);
         try {
           const me = await api.auth.me();
-          mergeServerSettings(me.settings);
+          mergeServerSettings(me.settings, me.user.id);
         } catch {
           /* settings are optional */
         }
@@ -171,6 +174,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         applyUser(res.user);
       },
       async logout() {
+        // this browser's daily reminder belongs to the account: off with it, while the token still works
+        await clearReminder().catch(() => undefined);
         try {
           await api.auth.logout();
         } catch {
@@ -179,11 +184,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(null);
         applyUser(null);
       },
+      async logoutEverywhere() {
+        const res = await api.auth.logoutEverywhere();
+        setToken(res.token);
+        applyUser(res.user);
+      },
       async signInWithToken(token, signedIn) {
         setToken(token);
         try {
           const me = await api.auth.me();
-          mergeServerSettings(me.settings);
+          mergeServerSettings(me.settings, me.user.id);
         } catch {
           /* settings are optional */
         }

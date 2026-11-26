@@ -1,5 +1,7 @@
 import type { Penalty } from './averages.js';
+import { ALL_EVENTS } from './events.js';
 import { escapeHtml, finishImport, unescapeHtml, type ImportedSession, type RawSession, type RawSolve } from './importCommon.js';
+import { scrambleTypesFor } from './scrambleTypes.js';
 
 /**
  * csTimer files. A csTimer export (`cstimer_YYYYMMDD_hhmmss.txt`) is one JSON object:
@@ -29,17 +31,45 @@ export const CSTIMER_SCRTYPE_TO_EVENT: Record<string, string> = {
   pyrso: 'pyram',
   skbso: 'skewb',
   sqrs: 'sq1',
+  ftoso: 'fto',
 };
+
+/**
+ * The event, and the practice scramble type if it's one, for a csTimer scramble type: "pll" is a
+ * 3x3 PLL practice session, "klmso" kilominx, "r234w" the 2-4 relay. Anything else falls back to
+ * the best-effort prefix mapping (eventForScrType).
+ */
+export function scrambleForScrType(scrType: string | undefined): { event: string; scramble?: string } {
+  if (!scrType) return { event: '333' };
+  const exact = CSTIMER_SCRTYPE_TO_EVENT[scrType];
+  if (exact) return { event: exact };
+  for (const e of ALL_EVENTS) {
+    const i = scrambleTypesFor(e.id).findIndex((t) => t.id === scrType);
+    if (i === 0) return { event: e.id };
+    if (i > 0) return { event: e.id, scramble: scrType };
+  }
+  return { event: eventForScrType(scrType) };
+}
 
 /** Best-effort mapping for csTimer's many non-WCA scramble types (e.g. "222o", "pyrm", "sq1h"). */
 export function eventForScrType(scrType: string | undefined): string {
   if (!scrType) return '333';
   const exact = CSTIMER_SCRTYPE_TO_EVENT[scrType];
   if (exact) return exact;
+  for (const e of ALL_EVENTS) if (scrambleTypesFor(e.id).some((t) => t.id === scrType)) return e.id;
   const prefixes: [string, string][] = [
-    ['222', '222'], ['444', '444'], ['555', '555'], ['666', '666'], ['777', '777'],
-    ['pyr', 'pyram'], ['skb', 'skewb'], ['sq1', 'sq1'], ['sqr', 'sq1'], ['clk', 'clock'],
-    ['mgm', 'minx'], ['minx', 'minx'],
+    ['222', '222'],
+    ['444', '444'],
+    ['555', '555'],
+    ['666', '666'],
+    ['777', '777'],
+    ['pyr', 'pyram'],
+    ['skb', 'skewb'],
+    ['sq1', 'sq1'],
+    ['sqr', 'sq1'],
+    ['clk', 'clock'],
+    ['mgm', 'minx'],
+    ['minx', 'minx'],
   ];
   for (const [p, e] of prefixes) if (scrType.startsWith(p)) return e;
   return '333';
@@ -96,9 +126,11 @@ export function csTimerSessions(root: Record<string, unknown>): RawSession[] {
       });
     }
     const rank = Number(info?.rank);
+    const mapped = scrambleForScrType(scrType);
     out.push({
       name,
-      event: isMultiBlindScrType(scrType) ? null : eventForScrType(scrType),
+      event: isMultiBlindScrType(scrType) ? null : mapped.event,
+      ...(mapped.scramble ? { scramble: mapped.scramble } : {}),
       sourceType: scrType ?? '333',
       rank: Number.isFinite(rank) ? rank : Number(idx),
       solves,

@@ -7,10 +7,15 @@ import { HOME } from '../lib/pageMeta';
 
 // index.html's JSON-LD: what search engines read for the site's name ("cubr") and its logo.
 
-const blocks = [...indexHtml.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1]) as { '@context': string; '@graph': Record<string, unknown>[] });
+const blocks = [...indexHtml.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map(
+  (m) => JSON.parse(m[1]) as { '@context': string; '@graph': Record<string, unknown>[] },
+);
 const graph = blocks[0]?.['@graph'] ?? [];
 const website = graph.find((n) => n['@type'] === 'WebSite') as Record<string, unknown>;
-const org = graph.find((n) => n['@type'] === 'Organization') as Record<string, unknown> & { logo: { url: string; width: number; height: number }; sameAs: string[] };
+const org = graph.find((n) => n['@type'] === 'Organization') as Record<string, unknown> & {
+  logo: { url: string; width: number; height: number };
+  sameAs: string[];
+};
 
 /** A PNG's size and whether it has transparency, from its IHDR chunk. */
 function png(dataUrl: string) {
@@ -36,7 +41,7 @@ describe("the site's structured data", () => {
     expect(website.publisher).toEqual({ '@id': org['@id'] });
   });
 
-  it("gives the organisation a logo search engines accept: on the site, at least 112 px, opaque, the size it says", () => {
+  it('gives the organisation a logo search engines accept: on the site, at least 112 px, opaque, the size it says', () => {
     expect(org).toMatchObject({ '@id': 'https://cubr.dev/#organization', name: 'cubr', url: canonicalUrl('/') });
     expect(org.logo.url).toBe(canonicalUrl('/icons/icon-maskable-512.png'));
     const { width, height, alpha } = png(logoPng);

@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_DARK_THEME, DEFAULT_THEME, faviconSvg, getTheme, isLightTheme, randomTheme, themeColors, THEMES } from '../themes';
+import {
+  DEFAULT_DARK_THEME,
+  DEFAULT_THEME,
+  faviconSvg,
+  getTheme,
+  isLightTheme,
+  randomTheme,
+  READY_GREEN,
+  readyColor,
+  themeColors,
+  THEMES,
+  HIGH_CONTRAST_RATIO,
+  highContrastTheme,
+  setHighContrast,
+} from '../themes';
 import shippedFavicon from '../../../public/favicon.svg?raw';
 import globalCss from '../../styles/global.css?raw';
 import indexHtml from '../../../index.html?raw';
@@ -17,6 +31,22 @@ const contrast = (a: string, b: string) => {
   const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p);
   return (x + 0.05) / (y + 0.05);
 };
+/** OKLab, a space where distance follows how different two colours look */
+function oklab(hex: string): [number, number, number] {
+  const [r, g, b] = [1, 3, 5].map((i) => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+  ];
+}
+const apart = (a: string, b: string) => Math.hypot(...oklab(a).map((v, i) => v - oklab(b)[i]));
 
 describe('themes', () => {
   it('has unique snake_case names and includes the default', () => {
@@ -24,7 +54,17 @@ describe('themes', () => {
     expect(new Set(names).size).toBe(names.length);
     for (const n of names) expect(n).toMatch(/^[a-z0-9_]+$/);
     expect(names).toContain(DEFAULT_THEME);
-    expect(names).toHaveLength(11);
+    expect(names).toHaveLength(42);
+  });
+
+  it('lists the light themes first, white cross leading, then the dark ones, white cross dark leading', () => {
+    const light = THEMES.filter(isLightTheme);
+    expect(THEMES.slice(0, light.length)).toEqual(light);
+    expect(THEMES[0].name).toBe(DEFAULT_THEME);
+    expect(THEMES[light.length].name).toBe(DEFAULT_DARK_THEME);
+    // a real choice for each of the device's modes
+    expect(light.length).toBeGreaterThanOrEqual(15);
+    expect(THEMES.length - light.length).toBeGreaterThanOrEqual(15);
   });
 
   it('defaults to white cross: pure white, a vivid green that stays readable on it', () => {
@@ -39,8 +79,51 @@ describe('themes', () => {
   });
 
   it('keeps the timer readable (text vs background contrast)', () => {
-    // WCAG AA for large text
-    for (const t of THEMES) expect(contrast(t.text, t.bg), t.name).toBeGreaterThanOrEqual(4.5);
+    // WCAG AAA for normal text: the time, and every number beside it
+    for (const t of THEMES) expect(contrast(t.text, t.bg), t.name).toBeGreaterThanOrEqual(7);
+  });
+
+  it('keeps the accent, the labels, the errors and the cards readable', () => {
+    for (const t of THEMES) {
+      // the running time, links and buttons (WCAG's 3:1 for large text and controls)
+      expect(contrast(t.main, t.bg), `${t.name} main`).toBeGreaterThanOrEqual(3);
+      // a dnf, the holding timer and error messages
+      expect(contrast(t.error, t.bg), `${t.name} error`).toBeGreaterThanOrEqual(4);
+      // labels stay quieter than the text but legible (raising them to WCAG AA is an open decision)
+      expect(contrast(t.sub, t.bg), `${t.name} sub`).toBeGreaterThanOrEqual(2);
+      expect(contrast(t.text, t.bg), `${t.name} text over sub`).toBeGreaterThan(contrast(t.sub, t.bg));
+      // cards one step off the background: visible, never loud
+      expect(contrast(t.subAlt, t.bg), `${t.name} subAlt`).toBeGreaterThanOrEqual(1.04);
+      expect(contrast(t.subAlt, t.bg), `${t.name} subAlt`).toBeLessThanOrEqual(1.4);
+    }
+  });
+
+  it('keeps a dnf apart from a pb: the error colour never looks like the accent', () => {
+    for (const t of THEMES) expect(apart(t.error, t.main), t.name).toBeGreaterThanOrEqual(0.1);
+  });
+
+  it('gives every theme its own look (background and accent)', () => {
+    for (const [i, a] of THEMES.entries())
+      for (const b of THEMES.slice(i + 1)) {
+        const distance = apart(a.bg, b.bg) + apart(a.main, b.main) + 0.3 * apart(a.text, b.text);
+        expect(distance, `${a.name} ~ ${b.name}`).toBeGreaterThanOrEqual(0.1);
+      }
+  });
+
+  it("makes the timer's ready green readable on every background, as is wherever it reads", () => {
+    // the stylesheet's default: white cross and white cross dark keep #3ec46d
+    expect(readyColor(getTheme(DEFAULT_THEME))).toBe(READY_GREEN);
+    expect(readyColor(getTheme(DEFAULT_DARK_THEME))).toBe(READY_GREEN);
+    expect(readyColor(getTheme('stackmat'))).not.toBe(READY_GREEN); // #3ec46d was nearly invisible on its olive
+    for (const t of THEMES) {
+      const ready = readyColor(t);
+      expect(ready, t.name).toMatch(/^#[0-9a-f]{6}$/);
+      expect(contrast(ready, t.bg), t.name).toBeGreaterThanOrEqual(ready === READY_GREEN ? 2 : 3);
+      // still green: the green channel leads
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(ready.slice(i, i + 2), 16));
+      expect(g, t.name).toBeGreaterThan(r);
+      expect(g, t.name).toBeGreaterThan(b);
+    }
   });
 
   it('falls back to the default theme for unknown names', () => {
@@ -84,14 +167,20 @@ describe('themes', () => {
     expect(themeColors(getTheme('white_cross'))).toMatchObject({ '--bg-color': '#ffffff', '--main-color': '#00a04d', 'color-scheme': 'light' });
     expect(themeColors(getTheme('white_cross_dark'))).toMatchObject({ '--bg-color': '#1d2024', 'color-scheme': 'dark' });
     expect(themeColors(getTheme('stackmat'))['color-scheme']).toBe('light'); // a mid-tone background with dark text
-    for (const t of THEMES) expect(Object.keys(themeColors(t))).toHaveLength(COLORS.length + 1);
+    expect(themeColors(getTheme('stackmat'))['--timer-ready']).toBe(readyColor(getTheme('stackmat')));
+    // the ten colours, the ready green, high contrast's two switches and the color-scheme
+    for (const t of THEMES) expect(Object.keys(themeColors(t))).toHaveLength(COLORS.length + 4);
+    expect(themeColors(getTheme('white_cross'), false)).toMatchObject({ '--hc': '0', '--hc-link-decoration': 'none' });
+    expect(themeColors(getTheme('white_cross'), true)).toMatchObject({ '--hc': '1', '--hc-link-decoration': 'underline' });
   });
 
   it('starts the page in white cross, or white cross dark in dark mode, before the app runs', () => {
     const vars = (block: string) => Object.fromEntries([...block.matchAll(/(--[a-z-]+):\s*(#[0-9a-f]{6});/g)].map((m) => [m[1], m[2]]));
     const root = /^:root \{([\s\S]*?)\n\}/m.exec(globalCss)![1];
     const darkRoot = /@media \(prefers-color-scheme: dark\) \{\s*:root \{([\s\S]*?)\}/.exec(globalCss)![1];
-    const expected = (name: string) => Object.fromEntries(Object.entries(themeColors(getTheme(name))).filter(([k]) => k.startsWith('--')));
+    // the colours (high contrast's switches have their defaults where they are used: var(--hc, 0))
+    const expected = (name: string) =>
+      Object.fromEntries(Object.entries(themeColors(getTheme(name))).filter(([k, v]) => k.startsWith('--') && v.startsWith('#')));
     expect(vars(root)).toMatchObject(expected('white_cross'));
     expect(root).toContain('color-scheme: light;');
     expect(vars(darkRoot)).toEqual(expected('white_cross_dark'));
@@ -120,9 +209,12 @@ describe("index.html's pre-paint script", () => {
     const metas = [new Map<string, string>(), new Map<string, string>()];
     const document = {
       documentElement: { style: { setProperty: (k: string, v: string) => void style.set(k, v) } },
-      querySelectorAll: (sel: string) => (sel === 'meta[name="theme-color"]' ? metas.map((m) => ({ setAttribute: (k: string, v: string) => void m.set(k, v) })) : []),
+      querySelectorAll: (sel: string) =>
+        sel === 'meta[name="theme-color"]' ? metas.map((m) => ({ setAttribute: (k: string, v: string) => void m.set(k, v) })) : [],
     };
-    const localStorage = { getItem: (k: string) => (k === 'cubr.themeColors' && saved !== undefined ? (typeof saved === 'string' ? saved : JSON.stringify(saved)) : null) };
+    const localStorage = {
+      getItem: (k: string) => (k === 'cubr.themeColors' && saved !== undefined ? (typeof saved === 'string' ? saved : JSON.stringify(saved)) : null),
+    };
     const matchMedia = (q: string) => ({ matches: q === '(prefers-color-scheme: dark)' && dark });
     new Function('document', 'localStorage', 'matchMedia', script)(document, localStorage, matchMedia);
     return { style, themeColors: metas.map((m) => m.get('content')) };
@@ -152,5 +244,50 @@ describe("index.html's pre-paint script", () => {
       expect(style.size).toBe(0);
       expect(tc).toEqual([undefined, undefined]);
     }
+  });
+});
+
+describe('the high-contrast setting', () => {
+  it("brings every theme's labels, links and errors to 4.5:1 on the background and on cards", () => {
+    for (const t of THEMES) {
+      const hc = highContrastTheme(t);
+      expect(contrast(hc.sub, t.bg), `${t.name} labels`).toBeGreaterThanOrEqual(HIGH_CONTRAST_RATIO);
+      if (hc.sub !== t.text) expect(contrast(hc.sub, t.subAlt), `${t.name} labels on cards`).toBeGreaterThanOrEqual(HIGH_CONTRAST_RATIO);
+      expect(contrast(hc.main, t.bg), `${t.name} accent`).toBeGreaterThanOrEqual(HIGH_CONTRAST_RATIO);
+      if (hc.main !== t.text) expect(contrast(hc.main, t.subAlt), `${t.name} accent on cards`).toBeGreaterThanOrEqual(HIGH_CONTRAST_RATIO);
+      expect(contrast(hc.error, t.bg), `${t.name} errors`).toBeGreaterThanOrEqual(HIGH_CONTRAST_RATIO);
+      if (hc.error !== t.text) expect(contrast(hc.error, t.subAlt), `${t.name} errors on cards`).toBeGreaterThanOrEqual(HIGH_CONTRAST_RATIO);
+      // labels stay quieter than the text, or at most as loud
+      expect(contrast(hc.sub, t.bg), t.name).toBeLessThanOrEqual(contrast(t.text, t.bg) + 1e-9);
+      // nothing else changes
+      expect({ ...hc, sub: t.sub, main: t.main, error: t.error }).toEqual(t);
+    }
+  });
+
+  it('moves a colour only as far as it takes, and leaves one that already reads alone', () => {
+    const wc = getTheme('white_cross');
+    expect(contrast(wc.sub, wc.bg)).toBeLessThan(HIGH_CONTRAST_RATIO);
+    const hc = highContrastTheme(wc);
+    expect(hc.sub).not.toBe(wc.sub);
+    // the tighter of the two (its cards, here) lands just past 4.5:1
+    expect(Math.min(contrast(hc.sub, wc.bg), contrast(hc.sub, wc.subAlt))).toBeLessThan(HIGH_CONTRAST_RATIO + 0.4);
+    // white cross dark's labels pass already
+    const dark = getTheme('white_cross_dark');
+    if (contrast(dark.sub, dark.bg) >= HIGH_CONTRAST_RATIO && contrast(dark.sub, dark.subAlt) >= HIGH_CONTRAST_RATIO)
+      expect(highContrastTheme(dark).sub).toBe(dark.sub);
+  });
+
+  it('draws every theme with it once it is on, and without it once it is off', () => {
+    const wc = getTheme('white_cross');
+    expect(themeColors(wc)['--sub-color']).toBe(wc.sub);
+    expect(themeColors(wc, true)['--sub-color']).toBe(highContrastTheme(wc).sub);
+    setHighContrast(true);
+    try {
+      expect(themeColors(wc)['--sub-color']).toBe(highContrastTheme(wc).sub);
+      expect(themeColors(wc)['--main-color']).toBe(highContrastTheme(wc).main);
+    } finally {
+      setHighContrast(false);
+    }
+    expect(themeColors(wc)['--sub-color']).toBe(wc.sub);
   });
 });

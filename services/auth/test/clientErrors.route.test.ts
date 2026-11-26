@@ -73,7 +73,9 @@ describe('POST /api/errors logging', () => {
 
   it('logs nothing for a refused report', async () => {
     const { a, lines } = await app();
-    expect((await a.inject({ method: 'POST', url: '/api/errors', payload: { ...report, kind: 'nope' }, headers: { 'x-forwarded-for': IP } })).statusCode).toBe(400);
+    expect((await a.inject({ method: 'POST', url: '/api/errors', payload: { ...report, kind: 'nope' }, headers: { 'x-forwarded-for': IP } })).statusCode).toBe(
+      400,
+    );
     expect(lines).toHaveLength(0);
     await a.close();
   });

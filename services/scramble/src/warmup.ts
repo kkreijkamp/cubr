@@ -1,12 +1,36 @@
 import type { FastifyBaseLogger } from 'fastify';
 import type { ScrambleGenerator } from './generator.js';
+import { encodeSolveJob, jobLabel, practiceJob } from './practice.js';
 import { errorMessage, sleep } from './util.js';
 
 /**
  * Events whose first scramble is slow because cubing.js builds search tables (4x4x4 ~1-3 s,
- * 333fm/sq1 up to ~2 s). The other events reuse these tables or are random-move scramblers.
+ * 333fm/sq1 up to ~2 s, kilominx ~4.5 s). The other events reuse these tables or are random-move
+ * scramblers. The two practice solves warm the 3x3 and 2x2 solvers (practice.ts).
  */
-export const WARMUP_EVENTS = ['333', '222', '444', 'sq1', '333fm', 'pyram', 'skewb', 'clock', 'minx'];
+export const WARMUP_EVENTS = [
+  '333',
+  '222',
+  '444',
+  'sq1',
+  '333fm',
+  'pyram',
+  'skewb',
+  'clock',
+  'minx',
+  'fto',
+  'kilominx',
+  'master_tetraminx',
+  'redi_cube',
+  warmupSolve('pll'),
+  warmupSolve('222eg0'),
+];
+
+function warmupSolve(type: string): string {
+  const job = practiceJob(type);
+  if (!job) throw new Error(`no practice job for ${type}`);
+  return encodeSolveJob(job.puzzle, job.state);
+}
 
 export interface WarmupState {
   done: boolean;
@@ -38,11 +62,11 @@ export async function warmUp(generator: ScrambleGenerator, state: WarmupState, l
             await generator.generate(event, 'request', slot);
             const ms = Math.round(performance.now() - t0);
             succeeded++;
-            if (slot === 0) state.timings[event] = ms;
-            log.info({ event, ms, slot }, 'warm-up scramble generated');
+            if (slot === 0) state.timings[jobLabel(event)] = ms;
+            log.info({ event: jobLabel(event), ms, slot }, 'warm-up scramble generated');
           } catch (err) {
-            state.failures.push(`${event}: ${errorMessage(err)}`);
-            log.error({ event, slot, err: errorMessage(err) }, 'warm-up scramble failed');
+            state.failures.push(`${jobLabel(event)}: ${errorMessage(err)}`);
+            log.error({ event: jobLabel(event), slot, err: errorMessage(err) }, 'warm-up scramble failed');
           }
         }
       }),

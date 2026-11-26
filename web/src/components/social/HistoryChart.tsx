@@ -4,7 +4,7 @@ import { rollingAverage } from '@cubr/cubestats';
 import { Section, WidgetError } from './Widget';
 import { eventLabel } from './util';
 import { api } from '../../lib/api';
-import { formatDateTime, formatNumber, formatTime, practiceMarker } from '../../lib/format';
+import { formatAverage, formatDateTime, formatNumber, formatResult, formatTime, practiceMarker } from '../../lib/format';
 import { useAsync } from '../../lib/useAsync';
 import { ChartCanvas, themedScales, useThemeColors, type ThemeColors } from '../ChartCanvas';
 import { Loading, Spinner } from '../Spinner';
@@ -41,7 +41,13 @@ type XMode = 'solves' | 'date';
 
 /** '#rrggbb' + alpha -> '#rrggbbaa' (canvas can't use color-mix). */
 function withAlpha(color: string, alpha: number): string {
-  if (/^#[0-9a-f]{6}$/i.test(color)) return color + Math.round(alpha * 255).toString(16).padStart(2, '0');
+  if (/^#[0-9a-f]{6}$/i.test(color))
+    return (
+      color +
+      Math.round(alpha * 255)
+        .toString(16)
+        .padStart(2, '0')
+    );
   return color;
 }
 
@@ -94,7 +100,16 @@ function Swatch({ k }: { k: ToggleKey }) {
       {k === 'pb' ? (
         <path d="M1 2 H9 V6 H21" fill="none" stroke={INK_VAR[s.ink]} strokeWidth={s.width} />
       ) : (
-        <line x1="1" y1="4" x2="21" y2="4" stroke={INK_VAR[s.ink]} strokeWidth={s.width} strokeDasharray={s.dash.join(' ') || undefined} strokeLinecap="round" />
+        <line
+          x1="1"
+          y1="4"
+          x2="21"
+          y2="4"
+          stroke={INK_VAR[s.ink]}
+          strokeWidth={s.width}
+          strokeDasharray={s.dash.join(' ') || undefined}
+          strokeLinecap="round"
+        />
       )}
     </svg>
   );
@@ -185,10 +200,18 @@ export function SolveHistoryChart({ userId, event, precision, solves }: { userId
     const trendUnit = finite.length >= 1000 ? 1000 : 100;
     let trend: number | null = null;
     if (finite.length >= 50) {
-      let sx = 0, sy = 0, sxx = 0, sxy = 0, m = 0;
+      let sx = 0,
+        sy = 0,
+        sxx = 0,
+        sxy = 0,
+        m = 0;
       for (let i = start; i < prep.n; i++) {
         if (!Number.isFinite(prep.eff[i])) continue;
-        sx += i; sy += prep.eff[i]; sxx += i * i; sxy += i * prep.eff[i]; m++;
+        sx += i;
+        sy += prep.eff[i];
+        sxx += i * i;
+        sxy += i * prep.eff[i];
+        m++;
       }
       const denom = m * sxx - sx * sx;
       if (denom !== 0) trend = ((m * sxy - sx * sy) / denom) * trendUnit;
@@ -323,7 +346,7 @@ export function SolveHistoryChart({ userId, event, precision, solves }: { userId
                   .map((l) => {
                     const v = valueAt(l.key, i);
                     if (v === null) return null;
-                    return `${l.key.padEnd(6)} ${Number.isFinite(v) ? formatTime(v, precision) : 'DNF'}`;
+                    return `${l.key.padEnd(6)} ${Number.isFinite(v) ? formatResult(v, l.n === 1 ? 'single' : l.key, precision) : 'DNF'}`;
                   })
                   .filter(Boolean) as string[];
               },
@@ -346,7 +369,6 @@ export function SolveHistoryChart({ userId, event, precision, solves }: { userId
                   return span < 120 * 86_400_000 ? `${String(d.getDate()).padStart(2, '0')} ${mon}` : `${mon} '${String(d.getFullYear()).slice(2)}`;
                 },
               },
-
             },
             y: (() => {
               const b = niceBounds(view.lo, view.hi);
@@ -374,7 +396,11 @@ export function SolveHistoryChart({ userId, event, precision, solves }: { userId
     });
 
   const available: ToggleKey[] = prep
-    ? ['solves', ...(prep.eff.some((v) => !Number.isFinite(v)) ? (['dnf'] as const) : []), ...LINES.filter((l) => l.key === 'pb' || prep.avgs[l.key]).map((l) => l.key)]
+    ? [
+        'solves',
+        ...(prep.eff.some((v) => !Number.isFinite(v)) ? (['dnf'] as const) : []),
+        ...LINES.filter((l) => l.key === 'pb' || prep.avgs[l.key]).map((l) => l.key),
+      ]
     : [];
 
   const trend = view?.trend;
@@ -385,39 +411,44 @@ export function SolveHistoryChart({ userId, event, precision, solves }: { userId
 
   const tools = (
     <>
-          <div className="pv-seg" role="group" aria-label="range">
-            {(['all', '1000', '100'] as Range[]).map((r) => (
-              <button key={r} className={`btn-text${range === r ? ' active' : ''}`} onClick={() => setRange(r)} disabled={!!prep && r !== 'all' && prep.n <= Number(r)}>
-                {r === 'all' ? 'all' : `last ${r}`}
-              </button>
-            ))}
-          </div>
-          <div className="pv-seg" role="group" aria-label="x axis">
-            {(['solves', 'date'] as XMode[]).map((m) => (
-              <button key={m} className={`btn-text${xMode === m ? ' active' : ''}`} onClick={() => setXMode(m)}>
-                {m === 'solves' ? 'by solve' : 'by date'}
-              </button>
-            ))}
-          </div>
-          {sessions.length > 1 && (
-            <select
-              className="pv-select"
-              value={session}
-              onChange={(e) => {
-                setSession(Number(e.target.value));
-                setRange('all');
-              }}
-              aria-label="filter by session"
-            >
-              <option value={-1}>all sessions</option>
-              {sessions.map((s, i) => (
-                <option key={s.id} value={i}>
-                  {s.name ?? `session ${i + 1}`}
-                  {practiceMarker(s.name, s.practice, ' (practice)')} - {formatNumber(s.solves)}
-                </option>
-              ))}
-            </select>
-          )}
+      <div className="pv-seg" role="group" aria-label="range">
+        {(['all', '1000', '100'] as Range[]).map((r) => (
+          <button
+            key={r}
+            className={`btn-text${range === r ? ' active' : ''}`}
+            onClick={() => setRange(r)}
+            disabled={!!prep && r !== 'all' && prep.n <= Number(r)}
+          >
+            {r === 'all' ? 'all' : `last ${r}`}
+          </button>
+        ))}
+      </div>
+      <div className="pv-seg" role="group" aria-label="x axis">
+        {(['solves', 'date'] as XMode[]).map((m) => (
+          <button key={m} className={`btn-text${xMode === m ? ' active' : ''}`} onClick={() => setXMode(m)}>
+            {m === 'solves' ? 'by solve' : 'by date'}
+          </button>
+        ))}
+      </div>
+      {sessions.length > 1 && (
+        <select
+          className="pv-select"
+          value={session}
+          onChange={(e) => {
+            setSession(Number(e.target.value));
+            setRange('all');
+          }}
+          aria-label="filter by session"
+        >
+          <option value={-1}>all sessions</option>
+          {sessions.map((s, i) => (
+            <option key={s.id} value={i}>
+              {s.name ?? `session ${i + 1}`}
+              {practiceMarker(s.name, s.practice, ' (practice)')} - {formatNumber(s.solves)}
+            </option>
+          ))}
+        </select>
+      )}
     </>
   );
 
@@ -488,7 +519,7 @@ export function SolveHistoryChart({ userId, event, precision, solves }: { userId
           <div className="pv-insight">
             {view && view.best !== null && (
               <>
-                best {formatTime(view.best, precision)} - mean {view.mean !== null ? formatTime(view.mean, precision) : '-'}
+                best {formatTime(view.best, precision)} - mean {view.mean !== null ? formatAverage(view.mean, precision) : '-'}
                 {view.dnfs > 0 && ` - ${view.dnfs} dnf`}
                 {insight && ` - ${insight}`}
                 {view.hidden > 0 && ` - ${view.hidden} slow outlier${view.hidden === 1 ? '' : 's'} above ${formatTime(view.hi, 2)} not shown`}

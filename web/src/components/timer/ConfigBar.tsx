@@ -12,9 +12,10 @@ import {
   PlusIcon,
   SignalSlashIcon,
   Square3Stack3DIcon,
+  Squares2X2Icon,
   TrashIcon,
 } from '@heroicons/react/24/outline';
-import { EVENTS, getEvent, type EventInfo } from '@cubr/cubestats';
+import { EVENTS, getEvent, isEventReady, OTHER_EVENTS, scrambleTypesFor, type EventInfo, type ScrambleType } from '@cubr/cubestats';
 import { INPUT_MODES, modeInfo, type InputMode } from '../../input/inputMode';
 import type { Session } from '../../lib/types';
 import { formatNumber, practiceMarker } from '../../lib/format';
@@ -27,7 +28,7 @@ const shortLabel = (id: string) => (getEvent(id)?.short ?? id).toLowerCase();
 
 /** The event dropdown's columns, in WCA order: NxN cubes, their OH / blind / FMC events, other puzzles. */
 const isCube = (e: EventInfo) => /^(\d)\1\1$/.test(e.id);
-const isCubeVariant = (e: EventInfo) => !isCube(e) && /^\dx\dx\d$/.test(e.puzzle);
+const isCubeVariant = (e: EventInfo) => !isCube(e) && /^\dx\dx\d$/.test(e.puzzle ?? '');
 const EVENT_GROUPS = [
   { title: 'cubes', events: EVENTS.filter(isCube) },
   { title: 'variants', events: EVENTS.filter(isCubeVariant) },
@@ -39,6 +40,10 @@ interface Props {
   sessions: Session[];
   currentSessionId: string | null;
   onEvent: (event: string) => void;
+  /** the current session's practice scramble type (null: the event's default) */
+  scramble?: string | null;
+  /** switch to a scramble type (null: the default); optional so older callers keep working */
+  onScramble?: (scramble: string | null) => void;
   onSession: (id: string) => void;
   onNewSession: () => void;
   onRenameSession: () => void;
@@ -62,20 +67,32 @@ interface Props {
 
 export function ConfigBar(p: Props) {
   const [eventsOpen, setEventsOpen] = useState(false);
+  const [scrambleOpen, setScrambleOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [inputOpen, setInputOpen] = useState(false);
   const current = p.sessions.find((s) => s.id === p.currentSessionId) ?? null;
-  const eventSessions = p.sessions.filter((s) => s.event === p.event);
+  // the session menu lists the sessions of this event and scramble type (pll times stay apart)
+  const scramble = p.scramble ?? null;
+  const eventSessions = p.sessions.filter((s) => s.event === p.event && (s.scramble ?? null) === scramble);
+  const types = scrambleTypesFor(p.event);
+  const scrambleType = (scramble && types.find((t) => t.id === scramble)) || types[0];
   const { onOverlayChange } = p;
 
   useEffect(() => {
-    onOverlayChange(eventsOpen || menuOpen || inputOpen);
-  }, [eventsOpen, menuOpen, inputOpen, onOverlayChange]);
+    onOverlayChange(eventsOpen || scrambleOpen || menuOpen || inputOpen);
+  }, [eventsOpen, scrambleOpen, menuOpen, inputOpen, onOverlayChange]);
 
   return (
     <div className="config-bar tp-config fade-on-focus">
       <div className="config-card tp-bar">
         <EventMenu open={eventsOpen} setOpen={setEventsOpen} event={p.event} sessions={p.sessions} onEvent={p.onEvent} />
+
+        {p.onScramble && types.length > 0 && (
+          <>
+            <div className="divider" />
+            <ScrambleMenu open={scrambleOpen} setOpen={setScrambleOpen} event={p.event} types={types} current={scrambleType} onScramble={p.onScramble} />
+          </>
+        )}
 
         <div className="divider" />
         <SessionMenu
@@ -83,7 +100,7 @@ export function ConfigBar(p: Props) {
           setOpen={setMenuOpen}
           current={current}
           sessions={eventSessions}
-          eventLabel={shortLabel(p.event)}
+          eventLabel={scramble && scrambleType ? `${shortLabel(p.event)} ${scrambleType.label}` : shortLabel(p.event)}
           onSession={p.onSession}
           onNew={p.onNewSession}
           onRename={p.onRenameSession}
@@ -94,7 +111,7 @@ export function ConfigBar(p: Props) {
 
         <div className="divider" />
         <button
-          className={`btn-text${p.inspection ? ' active' : ''}`}
+          className={`btn-text tp-inspection-btn${p.inspection ? ' active' : ''}`}
           onClick={p.onToggleInspection}
           aria-pressed={p.inspection}
           data-tip={p.inspection ? 'WCA inspection on (alt+w)' : 'WCA inspection off (alt+w)'}
@@ -113,7 +130,19 @@ export function ConfigBar(p: Props) {
 }
 
 /** Closes a dropdown on a click outside `ref` or on Escape. */
+/** The menu's items, in order (disabled ones left out). */
+const menuItems = (el: HTMLElement) => Array.from(el.querySelectorAll<HTMLElement>('[role^="menuitem"]:not([disabled])'));
+
+/**
+ * A config-bar menu's behaviour, `ref` wrapping its button and the menu: a click outside or Esc closes it
+ * (focus back on the button if it was inside), and the keyboard works as a menu should: Down or Up on the
+ * button opens it at the chosen item (or the last), Down, Up, Home and End move between the items, and
+ * choosing one with Enter or Space puts focus back on the button.
+ */
 function useDismiss(open: boolean, setOpen: (o: boolean) => void, ref: RefObject<HTMLElement | null>) {
+  const focusOnOpen = useRef<'chosen' | 'last' | null>(null);
+  const trigger = () => ref.current?.querySelector<HTMLElement>('[aria-haspopup]') ?? null;
+
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
@@ -123,7 +152,9 @@ function useDismiss(open: boolean, setOpen: (o: boolean) => void, ref: RefObject
       if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
+        const wasInside = ref.current?.contains(document.activeElement) ?? false;
         setOpen(false);
+        if (wasInside) trigger()?.focus();
       }
     };
     window.addEventListener('mousedown', onDown);
@@ -132,7 +163,64 @@ function useDismiss(open: boolean, setOpen: (o: boolean) => void, ref: RefObject
       window.removeEventListener('mousedown', onDown);
       window.removeEventListener('keydown', onKey, true);
     };
-  }, [open, setOpen, ref]);
+  }, [open, setOpen, ref]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const onKey = (e: KeyboardEvent) => {
+      const list = menuItems(el);
+      const active = document.activeElement as HTMLElement | null;
+      const at = active ? list.indexOf(active) : -1;
+      if ((e.key === 'Enter' || e.key === ' ') && at >= 0) {
+        requestAnimationFrame(() => trigger()?.focus()); // after the item's click has closed the menu
+        return;
+      }
+      if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
+      e.preventDefault(); // also keeps the timer page's shortcuts out of it
+      if (!list.length) {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          focusOnOpen.current = e.key === 'ArrowUp' ? 'last' : 'chosen';
+          setOpen(true);
+        }
+        return;
+      }
+      const chosen = Math.max(
+        0,
+        list.findIndex((x) => x.getAttribute('aria-checked') === 'true'),
+      );
+      const next =
+        e.key === 'Home'
+          ? 0
+          : e.key === 'End'
+            ? list.length - 1
+            : e.key === 'ArrowDown'
+              ? at < 0
+                ? chosen
+                : (at + 1) % list.length
+              : at < 0
+                ? list.length - 1
+                : (at - 1 + list.length) % list.length;
+      list[next].focus();
+    };
+    el.addEventListener('keydown', onKey);
+    return () => el.removeEventListener('keydown', onKey);
+  }, [ref, setOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // opened with an arrow key: focus goes to the chosen item (or the first), or the last
+  useEffect(() => {
+    const el = ref.current;
+    if (!open || !el || !focusOnOpen.current) return;
+    const list = menuItems(el);
+    const where = focusOnOpen.current;
+    focusOnOpen.current = null;
+    if (!list.length) return;
+    const chosen = Math.max(
+      0,
+      list.findIndex((x) => x.getAttribute('aria-checked') === 'true'),
+    );
+    list[where === 'last' ? list.length - 1 : chosen].focus();
+  }, [open, ref]);
 }
 
 interface EventMenuProps {
@@ -153,6 +241,10 @@ function EventMenu({ open, setOpen, event, sessions, onEvent }: EventMenuProps) 
     for (const s of sessions) m.set(s.event, (m.get(s.event) ?? 0) + s.solveCount);
     return m;
   }, [sessions]);
+  const pick = (id: string) => {
+    setOpen(false);
+    if (id !== event) onEvent(id);
+  };
 
   return (
     <div className="tp-event-menu" ref={ref}>
@@ -161,10 +253,10 @@ function EventMenu({ open, setOpen, event, sessions, onEvent }: EventMenuProps) 
         onClick={() => setOpen(!open)}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={`event: ${getEvent(event)?.name ?? event}`}
+        aria-label={`${shortLabel(event)}: event, ${getEvent(event)?.name ?? event}`}
         {...noFocus}
       >
-        {shortLabel(event)}
+        <span className="tp-event-label">{shortLabel(event)}</span>
         <ChevronDownIcon width={14} height={14} className="tp-chevron" />
       </button>
       {open && (
@@ -172,29 +264,132 @@ function EventMenu({ open, setOpen, event, sessions, onEvent }: EventMenuProps) 
           {EVENT_GROUPS.map((g) => (
             <div key={g.title} role="group" aria-label={g.title}>
               <div className="tp-menu-title">{g.title}</div>
-              {g.events.map((e) => {
-                const n = counts.get(e.id) ?? 0;
-                return (
-                  <button
-                    key={e.id}
-                    role="menuitemradio"
-                    aria-checked={e.id === event}
-                    className={`tp-menu-item${e.id === event ? ' active' : ''}`}
-                    onClick={() => {
-                      setOpen(false);
-                      if (e.id !== event) onEvent(e.id);
-                    }}
-                    aria-label={e.name}
-                    {...noFocus}
-                  >
-                    <span className="tp-menu-check">{e.id === event && <CheckIcon width={14} height={14} />}</span>
-                    <span className="tp-menu-label">{shortLabel(e.id)}</span>
-                    <span className="tp-menu-count">{n > 0 ? formatNumber(n) : ''}</span>
-                  </button>
-                );
-              })}
+              {g.events.map((e) => (
+                <EventItem key={e.id} e={e} event={event} count={counts.get(e.id) ?? 0} pick={pick} />
+              ))}
             </div>
           ))}
+          {/* csTimer's other puzzles and the relays, under the WCA events, in three columns */}
+          <div className="tp-events-other" role="group" aria-label="other events">
+            <div className="tp-menu-sep" />
+            <div className="tp-menu-title">other events</div>
+            <div className="tp-events-other-list">
+              {OTHER_EVENTS.map((e) => (
+                <EventItem key={e.id} e={e} event={event} count={counts.get(e.id) ?? 0} pick={pick} soon={!isEventReady(e.id)} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** One event in the event menu: its short name and solve count; `soon`: listed, not scrambled yet. */
+function EventItem({ e, event, count, pick, soon = false }: { e: EventInfo; event: string; count: number; pick: (id: string) => void; soon?: boolean }) {
+  return (
+    <button
+      role="menuitemradio"
+      aria-checked={e.id === event}
+      className={`tp-menu-item${e.id === event ? ' active' : ''}`}
+      onClick={() => pick(e.id)}
+      disabled={soon}
+      aria-label={soon ? `${e.name} (coming soon)` : e.name}
+      {...noFocus}
+    >
+      <span className="tp-menu-check">{e.id === event && <CheckIcon width={14} height={14} />}</span>
+      <span className="tp-menu-label">{shortLabel(e.id)}</span>
+      <span className="tp-menu-count">{soon ? 'soon' : count > 0 ? formatNumber(count) : ''}</span>
+    </button>
+  );
+}
+
+/** what the scramble menu says about counting, for WCA events and the others */
+const countsHint = (event: string) => (getEvent(event)?.kind === 'wca' ? 'counts for pbs and leaderboards' : 'counts for pbs');
+
+interface ScrambleMenuProps {
+  open: boolean;
+  setOpen: (o: boolean) => void;
+  event: string;
+  /** the event's scramble types, its default first */
+  types: ScrambleType[];
+  current: ScrambleType;
+  onScramble: (scramble: string | null) => void;
+}
+
+/**
+ * The kind of scramble (csTimer's second scramble menu): the event's default, which alone counts
+ * for pbs and leaderboards, then its practice types, each with its own practice session.
+ */
+function ScrambleMenu({ open, setOpen, event, types, current, onScramble }: ScrambleMenuProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  useDismiss(open, setOpen, ref);
+  const def = types[0];
+  const practice = current.id !== def.id;
+  const groups = useMemo(() => {
+    const out: { title: string; types: ScrambleType[] }[] = [];
+    for (const t of types.slice(1)) {
+      const title = t.group ?? 'practice';
+      let g = out.find((x) => x.title === title);
+      if (!g) out.push((g = { title, types: [] }));
+      g.types.push(t);
+    }
+    return out;
+  }, [types]);
+  const choose = (t: ScrambleType) => {
+    setOpen(false);
+    if (t.id !== current.id) onScramble(t.id === def.id ? null : t.id);
+  };
+  const item = (t: ScrambleType, hint?: string) => (
+    <button
+      key={t.id}
+      role="menuitemradio"
+      aria-checked={t.id === current.id}
+      className={`tp-menu-item${t.id === current.id ? ' active' : ''}`}
+      onClick={() => choose(t)}
+      disabled={t.pending}
+      {...noFocus}
+    >
+      <span className="tp-menu-check">{t.id === current.id && <CheckIcon width={14} height={14} />}</span>
+      <span className="tp-menu-label">{t.label}</span>
+      <span className="tp-menu-count">{t.pending ? 'soon' : ''}</span>
+      {hint && <span className="tp-menu-hint">{hint}</span>}
+    </button>
+  );
+  return (
+    <div className="tp-session tp-scramble-menu" ref={ref}>
+      <button
+        className={`btn-text tp-session-btn${practice ? ' active practice' : ''}${open ? ' open' : ''}`}
+        onClick={() => setOpen(!open)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`scramble: ${current.label}${practice ? ' (practice: no pbs or leaderboards)' : ''}`}
+        data-tip={open ? undefined : practice ? 'practice scramble: no pbs or leaderboards' : 'scramble type'}
+        data-tip-pos="down"
+        {...noFocus}
+      >
+        {practice ? <BeakerIcon width={14} height={14} /> : <Squares2X2Icon width={14} height={14} />}
+        <span className="tp-scramble-label">{current.label}</span>
+        <ChevronDownIcon width={14} height={14} className="tp-chevron" />
+      </button>
+      {open && (
+        <div className="tp-menu tp-scramble-types" role="menu" aria-label="scramble type">
+          <div className="tp-menu-title">{shortLabel(event)} scrambles</div>
+          {item(def, countsHint(event))}
+          {groups.length > 0 && (
+            <>
+              <div className="tp-menu-sep" />
+              <div className="tp-menu-note">practice scrambles: no pbs or leaderboards</div>
+              <div className="tp-menu-list">
+                {groups.map((g) => (
+                  <div key={g.title} role="group" aria-label={g.title}>
+                    <div className="tp-menu-title">{g.title}</div>
+                    {g.types.map((t) => item(t))}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -283,14 +478,14 @@ function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, 
               aria-checked={!!current?.practice}
               className={`tp-menu-item${current?.practice ? ' active' : ''}`}
               onClick={act(onTogglePractice)}
-              disabled={!current}
+              disabled={!current || !!current.scramble}
               {...noFocus}
             >
               <span className="tp-menu-check">
                 <BeakerIcon width={14} height={14} />
               </span>
               <span className="tp-menu-label">practice session</span>
-              <span className="tp-menu-hint">no pbs or leaderboards</span>
+              <span className="tp-menu-hint">{current?.scramble ? 'always, with a practice scramble' : 'no pbs or leaderboards'}</span>
             </button>
           )}
           {onMerge && (
@@ -322,7 +517,19 @@ function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, 
 }
 
 /** How times are entered: the timer, typing, or a stackmat / bluetooth / virtual puzzle (csTimer's inputs). */
-function InputMenu({ open, setOpen, value, options, onChange }: { open: boolean; setOpen: (o: boolean) => void; value: InputMode; options: InputMode[]; onChange: (m: InputMode) => void }) {
+function InputMenu({
+  open,
+  setOpen,
+  value,
+  options,
+  onChange,
+}: {
+  open: boolean;
+  setOpen: (o: boolean) => void;
+  value: InputMode;
+  options: InputMode[];
+  onChange: (m: InputMode) => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   useDismiss(open, setOpen, ref);
   const info = modeInfo(value);

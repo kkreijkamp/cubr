@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   CalendarDaysIcon,
+  ChatBubbleLeftEllipsisIcon,
   ClockIcon,
   CodeBracketIcon,
   Cog6ToothIcon,
   CommandLineIcon,
-  EnvelopeIcon,
   FlagIcon,
   HeartIcon,
   GlobeAltIcon,
@@ -22,9 +22,10 @@ import { CommandPalette, usePaletteHotkeys } from './CommandPalette';
 import { GlobalCommands } from './GlobalCommands';
 import { LocalUploadOffer } from './timer/LocalUploadOffer';
 import { PatchNotesModal } from './PatchNotesModal';
+import { FeedbackModal } from './FeedbackModal';
 import { useAuth } from '../lib/auth';
 import { openPalette } from '../lib/commands';
-import { CONTACT_EMAIL, DONATE_URL, REPO_URL } from '../lib/links';
+import { DONATE_URL, REPO_URL } from '../lib/links';
 import { useActiveTheme } from '../lib/settings';
 import { themeLabel } from '../lib/themes';
 import { api } from '../lib/api';
@@ -79,11 +80,11 @@ function Header() {
   );
 }
 
-
 function Footer() {
   const theme = useActiveTheme();
   const [info, setInfo] = useState<{ version: string; pod: string } | null>(null);
   const [notesOpen, setNotesOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   useEffect(() => {
     api
       .info('/_info')
@@ -92,7 +93,7 @@ function Footer() {
   }, []);
   return (
     <footer className="footer">
-      {/* data-nosnippet: never quoted in search results ("command line github contact support ...") */}
+      {/* data-nosnippet: never quoted in search results ("command line github feedback support ...") */}
       <div className="footer-links" data-nosnippet>
         <button className="btn-text" onClick={() => openPalette()} aria-label="command line">
           <CommandLineIcon width={14} height={14} />
@@ -102,9 +103,10 @@ function Footer() {
         <a href={REPO_URL} className="btn-text" target="_blank" rel="noreferrer noopener" data-tip="source code">
           <CodeBracketIcon width={14} height={14} /> github
         </a>
-        <a href={`mailto:${CONTACT_EMAIL}`} className="btn-text" data-tip={CONTACT_EMAIL}>
-          <EnvelopeIcon width={14} height={14} /> contact
-        </a>
+        {/* where "contact" was: its popup has the same email, and on phones a fifth link would take a third row */}
+        <button className="btn-text" onClick={() => setFeedbackOpen(true)} data-tip="a message, email or github issue" aria-haspopup="dialog">
+          <ChatBubbleLeftEllipsisIcon width={14} height={14} /> feedback
+        </button>
         <a href={DONATE_URL} className="btn-text" target="_blank" rel="noreferrer noopener" data-tip={DONATE_URL.replace(/^https:[/][/]/, '')}>
           <HeartIcon width={14} height={14} /> support
         </a>
@@ -116,7 +118,7 @@ function Footer() {
         <Link to="/privacy" className="btn-text">
           privacy
         </Link>
-        <button className="btn-text" onClick={() => openPalette('theme')} data-tip="change theme" aria-label="change theme">
+        <button className="btn-text" onClick={() => openPalette('theme')} data-tip="change theme" aria-label={`${themeLabel(theme)}: change theme`}>
           <SwatchIcon width={14} height={14} /> {themeLabel(theme)}
         </button>
         <button className="btn-text" onClick={() => setNotesOpen(true)} data-tip="patch notes" aria-haspopup="dialog">
@@ -124,22 +126,56 @@ function Footer() {
         </button>
       </div>
       {notesOpen && <PatchNotesModal running={info?.version ?? null} onClose={() => setNotesOpen(false)} />}
+      {feedbackOpen && <FeedbackModal version={info?.version ?? null} onClose={() => setFeedbackOpen(false)} />}
     </footer>
   );
+}
+
+/** Focuses the page's heading (or, without one, the page): where a screen reader starts reading. */
+function focusPage(heading: HTMLElement | null): void {
+  const target = heading ?? document.querySelector<HTMLElement>('main');
+  if (!target) return;
+  if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '-1');
+  target.focus({ preventScroll: true });
 }
 
 export function Layout() {
   usePaletteHotkeys();
   useLaunchQueue();
   const location = useLocation();
+  const firstPage = useRef(true);
   useEffect(() => {
     window.scrollTo(0, 0);
     document.body.classList.remove('focus');
+    if (firstPage.current) {
+      firstPage.current = false; // the first page: the browser starts at the top, as it should
+      return;
+    }
+    // a new page: its heading takes focus, so a screen reader announces the page (a page loaded on
+    // demand renders a moment later, so look for a little while)
+    let tries = 0;
+    const timer = setInterval(() => {
+      const heading = document.querySelector<HTMLElement>('main h1');
+      if (!heading && ++tries < 30) return;
+      clearInterval(timer);
+      focusPage(heading);
+    }, 50);
+    return () => clearInterval(timer);
   }, [location.pathname]);
   return (
     <div className="app">
+      <a
+        className="skip-link"
+        href="#main"
+        onClick={(e) => {
+          e.preventDefault();
+          focusPage(document.querySelector<HTMLElement>('main h1'));
+        }}
+      >
+        skip to content
+      </a>
       <Header />
-      <main key={location.pathname} className="page">
+      <main key={location.pathname} id="main" className="page" tabIndex={-1}>
         <Outlet />
       </main>
       <Footer />

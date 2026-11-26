@@ -1,12 +1,4 @@
-import {
-  loadConfig,
-  createServer,
-  start,
-  createRedis,
-  makeAuth,
-  consumeEvents,
-  type Consumer,
-} from '@cubr/common';
+import { loadConfig, createServer, start, createRedis, makeAuth, consumeEvents, registerDeadLetterRoutes, type Consumer } from '@cubr/common';
 import { FloorProvider } from './floors.js';
 import { CONSUMED_TYPES, makeHandler } from './ingest.js';
 import { statsPeriodSource } from './periods.js';
@@ -32,11 +24,12 @@ const server = createServer(config, {
 const { app } = server;
 const redis = createRedis(config.redisUrl, app.log);
 defineScripts(redis);
-const auth = makeAuth(config.jwtSecret, redis);
+const auth = makeAuth(config.jwtSecret, redis, config.jwtSecretPrevious);
 const floors = new FloorProvider(config.urls.wca, config.internalToken, app.log);
 const periods = statsPeriodSource(config.urls.stats, config.internalToken);
 
 await registerRoutes(app, { redis, auth });
+registerDeadLetterRoutes(app, { redis, group: 'leaderboard', internalToken: config.internalToken });
 
 await start(server, config, [
   async () => {

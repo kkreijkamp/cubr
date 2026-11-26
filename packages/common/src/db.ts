@@ -12,10 +12,7 @@ pg.types.setTypeParser(1082, (v: string) => v);
 export type Pool = pg.Pool;
 export type PoolClient = pg.PoolClient;
 
-export function createPool(
-  databaseUrl: string,
-  opts: { max?: number; log?: FastifyBaseLogger; queryTimeoutMs?: number } = {},
-): pg.Pool {
+export function createPool(databaseUrl: string, opts: { max?: number; log?: FastifyBaseLogger; queryTimeoutMs?: number } = {}): pg.Pool {
   const pool = new pg.Pool({
     connectionString: databaseUrl,
     max: opts.max ?? 10,
@@ -97,9 +94,7 @@ export async function migrate(pool: pg.Pool, schema: string, migrations: Migrati
   try {
     await client.query('select pg_advisory_lock(hashtext($1))', [`cubr:migrate:${schema}`]);
     await client.query(`create schema if not exists ${schema}`);
-    await client.query(
-      `create table if not exists ${schema}.schema_migrations (id text primary key, applied_at timestamptz not null default now())`,
-    );
+    await client.query(`create table if not exists ${schema}.schema_migrations (id text primary key, applied_at timestamptz not null default now())`);
     const { rows } = await client.query<{ id: string }>(`select id from ${schema}.schema_migrations`);
     const applied = new Set(rows.map((r) => r.id));
     for (const m of migrations) {

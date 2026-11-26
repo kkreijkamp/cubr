@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { badRequest } from '@cubr/common';
-import { isEventId, DAILY_EVENTS } from '@cubr/cubestats';
+import { isEventId, isPracticeScramble, DAILY_EVENTS } from '@cubr/cubestats';
 
 // Request validation (docs/SPEC.md section 5 limits, section 9.3 bodies). Route handlers call
 // `parse(schema, req.body ?? {})` from common, which turns failures into 400 BAD_REQUEST.
@@ -19,21 +19,37 @@ const timeMs = z.number().int().min(1).max(MAX_TIME_MS);
 const scramble = z.string().max(2000);
 const comment = z.string().max(500);
 const isoDateTime = z.string().datetime({ offset: true });
-const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD').refine(isRealDate, 'invalid date');
+const ymd = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD')
+  .refine(isRealDate, 'invalid date');
 
 /** Sources a client may set; `source` is only a label (statistics treat every solve the same). */
 export const SOLVE_SOURCES = ['timer', 'manual', 'race', 'daily', 'import', 'seed'] as const;
 
 export const idParams = z.object({ id: uuid });
 
-export const createSessionBody = z.object({
-  id: uuid.optional(),
-  name: sessionName,
-  event: eventId,
-  practice: z.boolean().default(false),
-  // sessions are listed oldest first: a cleared session's empty replacement keeps its place
-  createdAt: isoDateTime.optional(),
-});
+/** a practice scramble type id (checked against the event in practiceScrambleRule) */
+const scrambleType = z
+  .string()
+  .regex(/^[A-Za-z0-9_]{1,32}$/, 'scramble: a scramble type id')
+  .nullish();
+/** `scramble` must be one of the event's practice scramble types (never its default) */
+const isEventsPracticeScramble = (b: { event: string; scramble?: string | null }) => !b.scramble || isPracticeScramble(b.event, b.scramble);
+const notPracticeScramble = { message: "scramble: not one of this event's practice scramble types", path: ['scramble'] };
+
+export const createSessionBody = z
+  .object({
+    id: uuid.optional(),
+    name: sessionName,
+    event: eventId,
+    practice: z.boolean().default(false),
+    /** a practice scramble type; such a session is always a practice session */
+    scramble: scrambleType,
+    // sessions are listed oldest first: a cleared session's empty replacement keeps its place
+    createdAt: isoDateTime.optional(),
+  })
+  .refine(isEventsPracticeScramble, notPracticeScramble);
 
 export const patchSessionBody = z
   .object({ name: sessionName.optional(), practice: z.boolean().optional() })
@@ -84,7 +100,15 @@ export const importBody = z
   .object({
     sessions: z
       .array(
-        z.object({ name: sessionName, event: eventId, practice: z.boolean().default(false), solves: z.array(importSolve).max(MAX_IMPORT_SOLVES) }),
+        z
+          .object({
+            name: sessionName,
+            event: eventId,
+            practice: z.boolean().default(false),
+            scramble: scrambleType,
+            solves: z.array(importSolve).max(MAX_IMPORT_SOLVES),
+          })
+          .refine(isEventsPracticeScramble, notPracticeScramble),
       )
       .min(1)
       .max(MAX_IMPORT_SESSIONS),
@@ -96,9 +120,18 @@ export const importBody = z
 export type ImportBody = z.infer<typeof importBody>;
 
 export const dailyQuery = z.object({ date: ymd.optional() });
+export const dailyStartBody = z.object({ date: ymd, event: eventId, index: z.number().int().min(0).max(4) });
 
 export const internalParams = z.object({ userId: uuid });
-export const internalQuery = z.object({ event: eventId.optional() });
+/** At most this many solves per page of GET /internal/users/:id/solves (stats asks for pages; without `limit`, everything). */
+export const INTERNAL_SOLVES_PAGE = 50_000;
+/** A page's place: the last row's session, exact created_at (microseconds, UTC) and id, as the next page's `after`. */
+export const SOLVES_CURSOR_RE = /^([0-9a-f-]{36})_(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6})_([0-9a-f-]{36})$/;
+export const internalQuery = z.object({
+  event: eventId.optional(),
+  limit: z.coerce.number().int().min(1).max(INTERNAL_SOLVES_PAGE).optional(),
+  after: z.string().regex(SOLVES_CURSOR_RE).optional(),
+});
 
 function isRealDate(s: string): boolean {
   const d = new Date(`${s}T00:00:00Z`);

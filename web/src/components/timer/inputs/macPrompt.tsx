@@ -19,20 +19,23 @@ export function useMacAddress() {
   const [ask, setAsk] = useState<Ask | null>(null);
   const pending = useRef<Ask | null>(null);
 
-  const mac = useCallback((name: string, found: string | null, suggested: string | null, opts: { force?: boolean; wrong?: boolean } = {}): Promise<string | null> => {
-    const saved = inputStore.get().macs[name];
-    const remember = (m: string) => {
-      if (inputStore.get().macs[name]?.toUpperCase() !== m.toUpperCase()) updateInput({ macs: { ...inputStore.get().macs, [name]: m } });
-      return m;
-    };
-    if (found) return Promise.resolve(remember(found));
-    if (saved && !opts.force) return Promise.resolve(saved);
-    return new Promise((resolve) => {
-      const a: Ask = { name, suggested: saved ?? suggested, wrong: Boolean(opts.wrong), resolve: (m) => resolve(m ? remember(m) : null) };
-      pending.current = a;
-      setAsk(a);
-    });
-  }, []);
+  const mac = useCallback(
+    (name: string, found: string | null, suggested: string | null, opts: { force?: boolean; wrong?: boolean } = {}): Promise<string | null> => {
+      const saved = inputStore.get().macs[name];
+      const remember = (m: string) => {
+        if (inputStore.get().macs[name]?.toUpperCase() !== m.toUpperCase()) updateInput({ macs: { ...inputStore.get().macs, [name]: m } });
+        return m;
+      };
+      if (found) return Promise.resolve(remember(found));
+      if (saved && !opts.force) return Promise.resolve(saved);
+      return new Promise((resolve) => {
+        const a: Ask = { name, suggested: saved ?? suggested, wrong: Boolean(opts.wrong), resolve: (m) => resolve(m ? remember(m) : null) };
+        pending.current = a;
+        setAsk(a);
+      });
+    },
+    [],
+  );
 
   const element = ask ? (
     <PromptModal

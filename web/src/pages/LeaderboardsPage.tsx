@@ -20,11 +20,11 @@ import { Avatar } from '../components/Avatar';
 import { Modal } from '../components/Modal';
 import { ErrorState, Loading, Spinner } from '../components/Spinner';
 import { countryName } from '../components/social/countries';
-import { addDaysKey, eventLabel, formatDayKey, friendlyError } from '../components/social/util';
+import { addDaysKey, eventLabel, formatDayKey, friendlyError, prefersReducedMotion } from '../components/social/util';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useRegisterCommands, type Command } from '../lib/commands';
-import { flagEmoji, formatDate, formatDuration, formatNumber, formatPercent, formatTime, timeAgo, utcDateKey } from '../lib/format';
+import { flagEmoji, formatDate, formatDuration, formatNumber, formatPercent, formatResult, timeAgo, utcDateKey } from '../lib/format';
 import { useSettings } from '../lib/settings';
 import type { LbKind, Leaderboard } from '../lib/types';
 import { hiddenNote, missingNote } from '../lib/antiCheat';
@@ -245,7 +245,7 @@ function MeCard({ board, sel, precision, onJump }: { board: Leaderboard | undefi
         <UserMinusIcon width={20} height={20} />
         <span>
           you are not on this leaderboard yet. {how}{' '}
-          {sel.period === 'challenge' ? (sel.date === utcDateKey() ? <Link to="/daily">go to the challenge</Link> : null) : <Link to="/">open the timer</Link>}
+          {sel.period === 'challenge' ? sel.date === utcDateKey() ? <Link to="/daily">go to the challenge</Link> : null : <Link to="/">open the timer</Link>}
         </span>
         <span />
       </div>
@@ -254,7 +254,9 @@ function MeCard({ board, sel, precision, onJump }: { board: Leaderboard | undefi
   const top = board.total > 0 ? (me.rank / board.total) * 100 : 100;
   return (
     <div className="lb-me" aria-label="your rank">
-      <div className="lb-me-rank">{me.rank === 1 ? <TrophyIcon width={22} height={22} aria-label="first place" aria-hidden={false} /> : `#${formatNumber(me.rank)}`}</div>
+      <div className="lb-me-rank">
+        {me.rank === 1 ? <TrophyIcon width={22} height={22} aria-label="first place" aria-hidden={false} /> : `#${formatNumber(me.rank)}`}
+      </div>
       <div className="lb-me-who">
         <span className="name">
           <Avatar user={user} size={20} />
@@ -264,11 +266,11 @@ function MeCard({ board, sel, precision, onJump }: { board: Leaderboard | undefi
         {flagged && (
           <span className="lb-me-flag-note" role="note">
             <ShieldExclamationIcon width={14} height={14} />
-            {hiddenNote(flagged, precision)}
+            {hiddenNote(flagged, board.kind, precision)}
           </span>
         )}
       </div>
-      <div className="lb-me-value">{formatTime(me.valueMs, precision)}</div>
+      <div className="lb-me-value">{formatResult(me.valueMs, board.kind, precision)}</div>
       <button className="btn small lb-me-jump" onClick={onJump} data-tip="jump to my rank">
         <UserIcon /> my rank
       </button>
@@ -308,9 +310,7 @@ function GoToPageModal({ pages, current, onGo, onClose }: { pages: number; curre
             go
           </button>
         </div>
-        <span className="sub small">
-          {pages === 1 ? 'there is only one page' : `1 - ${formatNumber(pages)}`}
-        </span>
+        <span className="sub small">{pages === 1 ? 'there is only one page' : `1 - ${formatNumber(pages)}`}</span>
       </form>
     </Modal>
   );
@@ -363,7 +363,10 @@ export default function LeaderboardsPage() {
 
   // the default board is the page search engines list as /leaderboards: it carries the page's title;
   // every other board is named after itself ("weekly 2x2 ao5 leaderboard")
-  usePageMeta({ title: canonical === '/leaderboards' ? PAGE_META['/leaderboards'].title : `${boardTitle(sel)} | cubr`, description: PAGE_META['/leaderboards'].description });
+  usePageMeta({
+    title: canonical === '/leaderboards' ? PAGE_META['/leaderboards'].title : `${boardTitle(sel)} | cubr`,
+    description: PAGE_META['/leaderboards'].description,
+  });
 
   // clamp pages past the end (e.g. a stale link)
   useEffect(() => {
@@ -537,7 +540,7 @@ export default function LeaderboardsPage() {
                 <button className="btn" onClick={() => goPage(sel.page - 1)} disabled={sel.page === 1} data-tip="previous page <-" aria-label="previous page">
                   <ChevronLeftIcon />
                 </button>
-                <button className="btn" onClick={() => setGotoOpen(true)} data-tip="go to page" aria-label={`page ${sel.page} of ${pages}, go to page`}>
+                <button className="btn" onClick={() => setGotoOpen(true)} data-tip="go to page" aria-label={`page ${sel.page} / ${pages}, go to page`}>
                   {sel.page} / {pages}
                 </button>
                 <button className="btn" onClick={() => goPage(sel.page + 1)} disabled={sel.page >= pages} data-tip="next page ->" aria-label="next page">
@@ -562,7 +565,9 @@ export default function LeaderboardsPage() {
                     const mine = user?.id === e.userId;
                     return (
                       <tr key={`${e.rank}-${e.userId}`} className={mine ? 'me' : undefined}>
-                        <td className="rank">{e.rank === 1 ? <TrophyIcon width={18} height={18} aria-label="1" aria-hidden={false} /> : formatNumber(e.rank)}</td>
+                        <td className="rank">
+                          {e.rank === 1 ? <TrophyIcon width={18} height={18} aria-label="1" aria-hidden={false} /> : formatNumber(e.rank)}
+                        </td>
                         <td className="name">
                           <Link to={`/profile/${encodeURIComponent(e.username)}`} className="lb-user">
                             <Avatar user={e} size={20} />
@@ -574,13 +579,11 @@ export default function LeaderboardsPage() {
                             </span>
                           )}
                         </td>
-                        <td className="value">{formatTime(e.valueMs, precision)}</td>
+                        <td className="value">{formatResult(e.valueMs, data.kind, precision)}</td>
                         <td className="date" title={e.achievedAt ? timeAgo(e.achievedAt) : undefined}>
                           {formatDate(e.achievedAt)}
                           {e.achievedAt && (
-                            <span className="secondary">
-                              {new Date(e.achievedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-                            </span>
+                            <span className="secondary">{new Date(e.achievedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
                           )}
                         </td>
                       </tr>
@@ -601,7 +604,7 @@ export default function LeaderboardsPage() {
 function scrollToMyRow() {
   const row = document.querySelector<HTMLTableRowElement>('table.lb-table tr.me');
   if (!row) return;
-  row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  row.scrollIntoView({ block: 'center', behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
   row.classList.remove('flash');
   void row.offsetWidth; // restart the animation
   row.classList.add('flash');

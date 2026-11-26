@@ -1,3 +1,4 @@
+import { createRankIndex } from './rankIndex.js';
 import { notFound } from '@cubr/common';
 import type { EventInfo } from '@cubr/cubestats';
 import type { CacheFn } from './cache.js';
@@ -44,6 +45,7 @@ function personOut(event: string, kind: Kind, r: RankedRow) {
 
 export function createService(deps: { repo: Repo; dataset: Dataset; cache: CacheFn }) {
   const { repo, dataset, cache } = deps;
+  const ranks = createRankIndex(repo);
 
   async function percentileMap(meta: DatasetMeta) {
     const { value } = await cache(meta.cacheVersion, 'percentiles', HOUR, () => repo.percentiles(EVENT_IDS));
@@ -82,14 +84,14 @@ export function createService(deps: { repo: Repo; dataset: Dataset; cache: Cache
     const total = stats?.total ?? 0;
 
     const [world, country, near] = await Promise.all([
-      repo.worldCounts(q.kind, q.event, fasterBelow, slowerAbove),
+      ranks.world(meta.cacheVersion, q.kind, q.event, fasterBelow, slowerAbove),
       q.country ? repo.findCountry(q.country) : Promise.resolve(null),
       repo.neighbours(q.kind, q.event, fasterBelow),
     ]);
 
     let countryOut = null;
     if (country) {
-      const cc = await repo.countryCounts(q.kind, q.event, country.id, fasterBelow, slowerAbove);
+      const cc = await ranks.country(meta.cacheVersion, q.kind, q.event, country.id, fasterBelow, slowerAbove);
       countryOut = {
         rank: rankFromCounts(cc.faster),
         total: cc.total,
@@ -116,7 +118,22 @@ export function createService(deps: { repo: Repo; dataset: Dataset; cache: Cache
       const p = (await percentileMap(meta)).get(`${q.event}:${q.kind}`);
       const unit = requireEvent(q.event).unit;
       if (!p) {
-        return { event: q.event, kind: q.kind, unit, total: 0, p10: null, p25: null, p50: null, p75: null, p90: null, p99: null, min: null, below: 0, above: 0, buckets: [] };
+        return {
+          event: q.event,
+          kind: q.kind,
+          unit,
+          total: 0,
+          p10: null,
+          p25: null,
+          p50: null,
+          p75: null,
+          p90: null,
+          p99: null,
+          min: null,
+          below: 0,
+          above: 0,
+          buckets: [],
+        };
       }
       const fine = await repo.distribution(q.event, q.kind);
       const conv = (raw: number) => wcaToApi(q.event, q.kind, raw);
@@ -146,10 +163,7 @@ export function createService(deps: { repo: Repo; dataset: Dataset; cache: Cache
   /** Raw record holders for both kinds, grouped by event (shared by /records and /internal/records). */
   async function recordRows(meta: DatasetMeta) {
     return cache(meta.cacheVersion, 'records', HOUR, async () => {
-      const [single, average] = await Promise.all([
-        repo.recordHolders('single', EVENT_IDS),
-        repo.recordHolders('average', EVENT_IDS),
-      ]);
+      const [single, average] = await Promise.all([repo.recordHolders('single', EVENT_IDS), repo.recordHolders('average', EVENT_IDS)]);
       return { single, average };
     });
   }
@@ -228,9 +242,7 @@ export function createService(deps: { repo: Repo; dataset: Dataset; cache: Cache
       const pbs = WCA_EVENTS.flatMap((e) => {
         const entry = (kind: Kind) => {
           const r = ranks.find((x) => x.eventId === e.id && x.kind === kind);
-          return r
-            ? { value: wcaToApi(e.id, kind, r.best), worldRank: r.worldRank, continentRank: r.continentRank, countryRank: r.countryRank }
-            : null;
+          return r ? { value: wcaToApi(e.id, kind, r.best), worldRank: r.worldRank, continentRank: r.continentRank, countryRank: r.countryRank } : null;
         };
         const single = entry('single');
         const average = entry('average');

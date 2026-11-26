@@ -45,9 +45,13 @@ function gauss(): number {
 }
 
 // ---------------------------------------------------------------- synthetic people
+// prettier-ignore
 const ADJ = ['swift', 'lazy', 'quiet', 'lucky', 'sly', 'turbo', 'mellow', 'crisp', 'neon', 'calm', 'rapid', 'sneaky', 'bold', 'tiny', 'cosmic', 'sleepy', 'zesty', 'fuzzy', 'brave', 'clever'];
+// prettier-ignore
 const NOUN = ['cuber', 'twister', 'fox', 'otter', 'corner', 'edge', 'ollie', 'pll', 'f2l', 'slice', 'turner', 'koala', 'magpie', 'wombat', 'panda', 'falcon', 'gecko', 'lynx', 'hawk', 'roux'];
+// prettier-ignore
 const COUNTRIES = ['AU', 'AU', 'AU', 'AU', 'NZ', 'US', 'US', 'GB', 'CA', 'DE', 'FR', 'NL', 'CN', 'JP', 'KR', 'IN', 'BR', 'PL', 'SE', 'SG', 'MY', 'PH', 'ID', 'ES'];
+// prettier-ignore
 const BIOS = ['cfop main, learning zbll', 'roux gang', 'sub-20 grind', 'oh enjoyer', 'just here for the daily', 'pyra is my comfort event', 'trying to get sub-10 this year', null, null, null];
 
 /** event -> time multiplier relative to the user's 3x3 average, and how likely a user practises it */
@@ -96,7 +100,10 @@ function fakeScramble(event: string): string {
     case 'clock':
       return 'UR3+ DR1- DL4+ UL2- U5+ R0+ D3- L1+ ALL2+ y2 U4- R2+ D1+ L3- ALL5+';
     case 'minx':
-      return Array.from({ length: 7 }, () => `${Array.from({ length: 5 }, () => `R${pick(['++', '--'])} D${pick(['++', '--'])}`).join(' ')} U${pick(['', "'"])}`).join('\n');
+      return Array.from(
+        { length: 7 },
+        () => `${Array.from({ length: 5 }, () => `R${pick(['++', '--'])} D${pick(['++', '--'])}`).join(' ')} U${pick(['', "'"])}`,
+      ).join('\n');
     case 'sq1':
       return Array.from({ length: 12 }, () => `(${Math.floor(rand() * 12) - 5},${Math.floor(rand() * 12) - 5})`).join(' / ');
     default:
@@ -109,7 +116,12 @@ function fakeScramble(event: string): string {
 // as a PNG with node:zlib (no image libraries). Uploaded for most synthetic users so leaderboards
 // and profiles show real pictures.
 const STICKERS: [number, number, number][] = [
-  [255, 255, 255], [255, 213, 0], [196, 30, 58], [255, 88, 0], [0, 81, 186], [0, 158, 96],
+  [255, 255, 255],
+  [255, 213, 0],
+  [196, 30, 58],
+  [255, 88, 0],
+  [0, 81, 186],
+  [0, 158, 96],
 ];
 
 function pngChunk(type: string, data: Buffer): Buffer {
@@ -332,15 +344,17 @@ async function login(u: SeedUser): Promise<{ token: string; created: boolean } |
 
 async function seedUser(u: SeedUser, idx: number, daily: Record<string, string[]> | null, today: string): Promise<number> {
   const auth = await login(u);
-  
+
   if (!auth) return 0;
-  
+
   const { token } = auth;
   let avatar = false;
-  
+
   try {
     avatar = await ensureAvatar(u, token);
-  } catch {}
+  } catch {
+    // no picture for this one: the seed carries on without it
+  }
 
   const sessions = await call<{ sessions: { id: string; event: string; solveCount: number }[] }>('GET', `${SOLVE_URL}/api/sessions`, undefined, token);
   const existing = sessions.data?.sessions ?? [];
@@ -378,15 +392,20 @@ async function seedUser(u: SeedUser, idx: number, daily: Record<string, string[]
   if (s333) {
     for (let k = 0; k < live; k++) {
       const time = Math.round(u.base333 * 0.97 * Math.exp(gauss() * 0.1));
-      await call('POST', `${SOLVE_URL}/api/solves`, {
-        id: randomUUID(),
-        sessionId: s333.id,
-        timeMs: time,
-        penalty: rand() < 0.02 ? '+2' : 'OK',
-        scramble: fakeScramble('333'),
-        source: 'timer',
-        createdAt: new Date(Date.now() - (live - k) * 45_000).toISOString(),
-      }, token);
+      await call(
+        'POST',
+        `${SOLVE_URL}/api/solves`,
+        {
+          id: randomUUID(),
+          sessionId: s333.id,
+          timeMs: time,
+          penalty: rand() < 0.02 ? '+2' : 'OK',
+          scramble: fakeScramble('333'),
+          source: 'timer',
+          createdAt: new Date(Date.now() - (live - k) * 45_000).toISOString(),
+        },
+        token,
+      );
     }
   }
 
@@ -398,20 +417,27 @@ async function seedUser(u: SeedUser, idx: number, daily: Record<string, string[]
       if (!session || !scrambles) continue;
       const mult = EVENT_PROFILE[event].mult;
       for (let index = 0; index < 5; index++) {
-        const res = await call('POST', `${SOLVE_URL}/api/solves`, {
-          id: randomUUID(),
-          sessionId: session.id,
-          timeMs: Math.round(u.base333 * mult * Math.exp(gauss() * 0.1)),
-          penalty: rand() < 0.015 ? 'DNF' : 'OK',
-          scramble: scrambles[index],
-          source: 'daily',
-          daily: { date: today, index },
-        }, token);
+        const res = await call(
+          'POST',
+          `${SOLVE_URL}/api/solves`,
+          {
+            id: randomUUID(),
+            sessionId: session.id,
+            timeMs: Math.round(u.base333 * mult * Math.exp(gauss() * 0.1)),
+            penalty: rand() < 0.015 ? 'DNF' : 'OK',
+            scramble: scrambles[index],
+            source: 'daily',
+            daily: { date: today, index },
+          },
+          token,
+        );
         if (res.status === 409) break; // already done on a previous run
       }
     }
   }
-  console.log(`  [${String(idx + 1).padStart(3)}] ${u.username.padEnd(20)} ${auth.created ? 'new ' : 'seen'} imported=${imported} live=${live}${avatar ? ' +avatar' : ''}`);
+  console.log(
+    `  [${String(idx + 1).padStart(3)}] ${u.username.padEnd(20)} ${auth.created ? 'new ' : 'seen'} imported=${imported} live=${live}${avatar ? ' +avatar' : ''}`,
+  );
   return imported + live;
 }
 

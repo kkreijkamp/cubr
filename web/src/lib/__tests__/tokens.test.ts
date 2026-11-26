@@ -3,7 +3,10 @@ import { followStoredToken, tokenSubject } from '../api';
 
 /** A token-shaped string for `sub` (header and signature don't matter here: nothing is verified). */
 const tokenFor = (sub: string, extra: Record<string, unknown> = {}) =>
-  `eyJhbGciOiJIUzI1NiJ9.${btoa(JSON.stringify({ sub, username: 'felix', ...extra })).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_')}.signature`;
+  `eyJhbGciOiJIUzI1NiJ9.${btoa(JSON.stringify({ sub, username: 'felix', ...extra }))
+    .replace(/=+$/, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')}.signature`;
 
 describe('tokens across tabs', () => {
   const a1 = tokenFor('11111111-1111-4111-8111-111111111111', { iat: 1 });
@@ -14,7 +17,8 @@ describe('tokens across tabs', () => {
     expect(tokenSubject(a1)).toBe('11111111-1111-4111-8111-111111111111');
     // base64url characters (- and _) in the payload
     expect(tokenSubject(tokenFor('x', { note: '??>>~~' }))).toBe('x');
-    for (const bad of [null, undefined, '', 'nonsense', 'a.b.c', 'a.!!!.c', `x.${btoa('{"sub":42}')}.y`, `x.${btoa('null')}.y`]) expect(tokenSubject(bad), String(bad)).toBeNull();
+    for (const bad of [null, undefined, '', 'nonsense', 'a.b.c', 'a.!!!.c', `x.${btoa('{"sub":42}')}.y`, `x.${btoa('null')}.y`])
+      expect(tokenSubject(bad), String(bad)).toBeNull();
   });
 
   it("follows another tab's new token for the same account: a password change there signs out the old one", () => {

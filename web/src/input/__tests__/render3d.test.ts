@@ -28,7 +28,8 @@ const palette: Palette = { faces: ['#ffffff', '#00ff00', '#ff0000', '#0000ff', '
 // the corner view: the top, front and right faces in sight
 const cam: Camera = { yaw: Math.PI / 6, pitch: (5 * Math.PI) / 24, distance: 4.2, radius: Math.sqrt(3) * 3 };
 /** a sticker's width on screen, on average */
-const width = (fills: { pts: [number, number][] }[]) => fills.reduce((sum, f) => sum + Math.max(...f.pts.map((p) => p[0])) - Math.min(...f.pts.map((p) => p[0])), 0) / fills.length;
+const width = (fills: { pts: [number, number][] }[]) =>
+  fills.reduce((sum, f) => sum + Math.max(...f.pts.map((p) => p[0])) - Math.min(...f.pts.map((p) => p[0])), 0) / fills.length;
 
 describe('floating stickers (csTimer’s hollow cube)', () => {
   it('solid: the three faces in sight, each sticker on its plate', () => {

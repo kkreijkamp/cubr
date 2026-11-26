@@ -4,10 +4,13 @@ import { useSettings } from '../lib/settings';
 import {
   closeUp,
   convexHull,
+  FLAT_STYLE,
   IDENTITY,
   multiply,
+  NET_STYLE,
   parsePoints,
   parseTransform,
+  PLATE_RADIUS,
   pathPoints,
   schemeFor,
   signedArea,
@@ -18,6 +21,7 @@ import {
   touchingGroups,
   transformPoint,
   type Matrix,
+  type NetStyle,
   type Point,
   type Tile,
 } from '../lib/scrambleNet';
@@ -41,22 +45,7 @@ interface Net {
   solved: Map<string, string>;
 }
 
-interface Style {
-  /** the gap between stickers and their corner radius, as fractions of a typical sticker's size */
-  gap: number;
-  radius: number;
-  /** a dark plate behind each face, so white and yellow stickers stand out on light themes too */
-  plates: boolean;
-  /** the gap between faces as a fraction of a face's size (cubing.js lays them out further apart), or null to keep its layout */
-  faceGap: number | null;
-}
-const STYLE: Style = { gap: 0.14, radius: 0.16, plates: true, faceGap: 0.035 };
-const PLATE_RADIUS = 0.22;
-const STYLES: Record<string, Style> = {
-  // square-1's net splits each sticker into a few polygons, and its pieces are irregular: drawn
-  // flat, each polygon overlapping its neighbours a little so no seams show, as one shape per layer
-  square1: { gap: -0.03, radius: 0.015, plates: false, faceGap: null },
-};
+const STYLES: Record<string, NetStyle> = { square1: FLAT_STYLE };
 
 /** the transforms from `el` up to (not including) `stop`, as one matrix */
 function chain(el: Element, stop: Element | null): Matrix {
@@ -85,8 +74,13 @@ function shapePoints(el: Element): Point[] | null {
   }
 }
 
-/** a sticker's corners in the net's coordinates (stickers may be <use>s of a shared shape) */
+/** a sticker's corners in the net's coordinates (stickers may be <use>s of a shared shape, or groups around their shape: the redi cube's) */
 function stickerPoints(el: Element, root: Element): Point[] | null {
+  if (el.localName === 'g') {
+    const shape = el.querySelector('rect, polygon, path');
+    const pts = shape && shapePoints(shape);
+    return pts ? pts.map((p) => transformPoint(chain(shape!, root), p)) : null;
+  }
   if (el.localName !== 'use') {
     const pts = shapePoints(el);
     return pts && pts.map((p) => transformPoint(chain(el, root), p));
@@ -141,7 +135,7 @@ async function buildNet(puzzle: string): Promise<Net> {
   // gaps and corners scale with the stickers, so a 7x7 looks like a 3x3
   const sizes = cells.map((c) => Math.sqrt(Math.abs(signedArea(c.points)))).sort((a, b) => a - b);
   const size = sizes[Math.floor(sizes.length / 2)];
-  const style = STYLES[puzzle] ?? STYLE;
+  const style = STYLES[puzzle] ?? NET_STYLE;
   const faces = touchingGroups(
     cells.map((c) => c.points),
     size * 0.02,
@@ -155,7 +149,13 @@ async function buildNet(puzzle: string): Promise<Net> {
       for (const i of face) cells[i].points = cells[i].points.map(([x, y]) => [x + moves[f][0], y + moves[f][1]]);
     });
   }
-  const all = [...cells.flatMap((c) => c.points), ...lines.flatMap((l): Point[] => [[l.x1, l.y1], [l.x2, l.y2]])];
+  const all = [
+    ...cells.flatMap((c) => c.points),
+    ...lines.flatMap((l): Point[] => [
+      [l.x1, l.y1],
+      [l.x2, l.y2],
+    ]),
+  ];
   const [x0, y0] = [Math.min(...all.map((p) => p[0])), Math.min(...all.map((p) => p[1]))];
   const [x1, y1] = [Math.max(...all.map((p) => p[0])), Math.max(...all.map((p) => p[1]))];
   const r = (v: number) => Math.round(v * 1000) / 1000;
@@ -187,12 +187,16 @@ interface Props {
   puzzle: string;
   scramble: string;
   height: number;
+  /** sized by the box's width, at most `height` tall */
+  fit?: boolean;
   /** the puzzle has no net that can be drawn this way */
   onError: () => void;
+  /** cubing.js can't read the scramble (a type in csTimer's own notation) */
+  onUnreadable?: () => void;
 }
 
 /** The scrambled puzzle as a flat net of rounded stickers (see lib/scrambleNet). */
-export function ScrambleNet({ puzzle, scramble, height, onError }: Props) {
+export function ScrambleNet({ puzzle, scramble, height, fit, onError, onUnreadable }: Props) {
   const [net, setNet] = useState<Net | null>(null);
   const { stickerColours, customStickers } = useSettings();
 
@@ -207,29 +211,43 @@ export function ScrambleNet({ puzzle, scramble, height, onError }: Props) {
     };
   }, [puzzle, onError]);
 
+  // undefined while the net loads, null for a scramble cubing.js can't read
   const fills = useMemo(() => {
-    if (!net || net.puzzle !== puzzle) return null;
+    if (!net || net.puzzle !== puzzle) return undefined;
     const scheme = schemeFor(puzzle);
     const custom = stickerColours === 'custom' && scheme ? customStickers?.[scheme.id] : undefined;
     try {
       const sources = stickerSources(net.kpuzzle.definition.orbits, net.kpuzzle.defaultPattern().applyAlg(scramble).patternData);
       return new Map(net.stickers.map((s) => [s.id, stickerColour(net.solved.get(sources.get(s.id) ?? s.id) ?? '#888', scheme, custom)]));
     } catch {
-      // not a scramble for this puzzle (e.g. a hand-typed one): show nothing rather than a wrong state
+      // not a scramble for this puzzle (a hand-typed one, or csTimer's own notation): never a wrong state
       return null;
     }
   }, [net, puzzle, scramble, stickerColours, customStickers]);
 
+  useEffect(() => {
+    if (fills === null) onUnreadable?.();
+  }, [fills, onUnreadable]);
+
   return (
-    <div className="twisty-host" style={{ minHeight: height }}>
+    <div className="twisty-host" style={fit ? undefined : { minHeight: height }}>
       {net && fills && (
-        <svg className="scramble-net" viewBox={net.viewBox} style={{ height }} aria-hidden="true">
+        <svg className="scramble-net" viewBox={net.viewBox} style={fit ? { maxHeight: height } : { height }} aria-hidden="true">
           {net.plates.map((p, i) => (
             <polygon key={i} className="plate" points={p.points} strokeWidth={p.stroke || undefined} strokeLinejoin="round" />
           ))}
           {net.stickers.map((s) => {
             const fill = fills.get(s.id);
-            return <polygon key={s.id} points={s.points} fill={fill} stroke={s.stroke ? fill : undefined} strokeWidth={s.stroke || undefined} strokeLinejoin="round" />;
+            return (
+              <polygon
+                key={s.id}
+                points={s.points}
+                fill={fill}
+                stroke={s.stroke ? fill : undefined}
+                strokeWidth={s.stroke || undefined}
+                strokeLinejoin="round"
+              />
+            );
           })}
           {net.lines.map((l, i) => (
             <line key={i} className="guide" x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} strokeWidth={l.width} />

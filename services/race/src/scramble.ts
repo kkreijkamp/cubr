@@ -193,10 +193,11 @@ export function makeScrambleFetcher(baseUrl: string, log: FastifyBaseLogger, coo
     async get(event) {
       if (Date.now() >= skipUntil) {
         try {
-          const res = await fetchJson<{ scrambles?: unknown }>(
-            `${baseUrl}/api/scrambles/${encodeURIComponent(event)}?count=1`,
-            { timeoutMs: 4000, retries: 1, headers },
-          );
+          const res = await fetchJson<{ scrambles?: unknown }>(`${baseUrl}/api/scrambles/${encodeURIComponent(event)}?count=1`, {
+            timeoutMs: 4000,
+            retries: 1,
+            headers,
+          });
           const s = Array.isArray(res?.scrambles) ? res.scrambles[0] : undefined;
           if (typeof s === 'string' && s.trim() && s.length <= 2000) {
             return { scramble: s.trim(), source: 'scramble-service' };

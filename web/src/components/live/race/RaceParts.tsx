@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChatBubbleLeftIcon, PaperAirplaneIcon, StarIcon, TrophyIcon, UsersIcon } from '@heroicons/react/24/outline';
-import { effectiveMs, formatTime, fromApiValue, type Penalty, type Precision } from '@cubr/cubestats';
+import { ChatBubbleLeftIcon, FlagIcon, PaperAirplaneIcon, SpeakerXMarkIcon, StarIcon, TrophyIcon, UsersIcon } from '@heroicons/react/24/outline';
+import { mutedPlayers, setMutedPlayers } from '../../../lib/moderation';
+import { effectiveMs, formatAverage, formatTime, fromApiValue, type Penalty, type Precision } from '@cubr/cubestats';
 import type { ChatMessage, LivePlayer, LiveRoomState } from '../../../lib/race';
 import { Dot, type DotState } from '../ui';
 
@@ -37,9 +38,9 @@ export function PlayersCard({ room, playerId, precision }: { room: LiveRoomState
   return (
     <section className="card race-card" aria-labelledby="players-title">
       <div className="live-section-title">
-        <h3 className="h3" id="players-title">
+        <h2 className="h3" id="players-title">
           <UsersIcon /> players
-        </h3>
+        </h2>
         <span className="meta">
           {connected}/{room.players.length} online
         </span>
@@ -58,7 +59,7 @@ export function PlayersCard({ room, playerId, precision }: { room: LiveRoomState
         <tbody>
           {ordered.map(({ player: p, wins, meanMs, ao5 }, i) => {
             const pods = p.pods ?? [];
-            const status = !p.connected ? 'offline' : room.status === 'running' || p.status !== 'idle' ? STATUS_LABEL[p.status] ?? p.status : 'online';
+            const status = !p.connected ? 'offline' : room.status === 'running' || p.status !== 'idle' ? (STATUS_LABEL[p.status] ?? p.status) : 'online';
             return (
               <tr key={p.id} className={`${p.id === playerId ? 'me' : ''}${p.connected ? '' : ' offline'}`}>
                 <td className="left">
@@ -79,8 +80,8 @@ export function PlayersCard({ room, playerId, precision }: { room: LiveRoomState
                   </div>
                 </td>
                 <td>{wins}</td>
-                <td>{formatTime(fromApiValue(meanMs), precision)}</td>
-                <td>{formatTime(fromApiValue(ao5), precision)}</td>
+                <td>{formatAverage(fromApiValue(meanMs), precision)}</td>
+                <td>{formatAverage(fromApiValue(ao5), precision)}</td>
               </tr>
             );
           })}
@@ -107,14 +108,17 @@ export function ResultsGrid({ room, playerId, precision }: { room: LiveRoomState
   // players who left still have results? (server removes them) - show only current players
   const players = order.map((id) => room.players.find((p) => p.id === id)!);
   if (rounds.length === 0) return null;
+  const total = Math.max(rounds.length, room.round?.n ?? 0);
   return (
     <section className="race-results" aria-labelledby="results-title">
       <div className="live-section-title">
-        <h3 className="h3" id="results-title">
+        <h2 className="h3" id="results-title">
           <TrophyIcon /> results
-        </h3>
+        </h2>
         <span className="meta">
-          {rounds.length} round{rounds.length === 1 ? '' : 's'}
+          {/* a room keeps its last 25 rounds (services/race room.ts ROUNDS_KEPT); the standings count them all */}
+          {total} round{total === 1 ? '' : 's'}
+          {total > rounds.length && `, the last ${rounds.length} shown`}
         </span>
       </div>
       <div className="table-wrap">
@@ -141,7 +145,8 @@ export function ResultsGrid({ room, playerId, precision }: { room: LiveRoomState
                     const r = row[p.id];
                     const isBest = r && Number.isFinite(best) && effectiveMs(r) === best;
                     let pendingLabel = '';
-                    if (!r && current) pendingLabel = !p.connected ? 'offline' : p.status === 'inspecting' ? 'inspecting' : p.status === 'solving' ? 'solving...' : '-';
+                    if (!r && current)
+                      pendingLabel = !p.connected ? 'offline' : p.status === 'inspecting' ? 'inspecting' : p.status === 'solving' ? 'solving...' : '-';
                     return (
                       <td key={p.id} className={`${isBest ? 'best' : ''}${r?.penalty === 'DNF' ? ' dnf' : ''}${!r ? ' pending' : ''}`}>
                         {r ? cellText(r, precision) : pendingLabel || '-'}
@@ -169,13 +174,30 @@ export function RaceChat({
   playerId,
   disabled,
   onSend,
+  reportHref,
 }: {
   chat: ChatMessage[];
   playerId: string | null;
   disabled: boolean;
   onSend: (text: string) => Promise<void>;
+  /** an email reporting the room (lib/moderation reportMailto) */
+  reportHref?: string;
 }) {
   const [text, setText] = useState('');
+  // players muted on this device: their messages show nowhere here (lib/moderation)
+  const [muted, setMuted] = useState<string[]>(mutedPlayers);
+  const mute = (id: string) => {
+    const next = [...muted.filter((x) => x !== id), id];
+    setMuted(next);
+    setMutedPlayers(next);
+  };
+  const mutedHere = new Set(chat.filter((m) => !m.system && muted.includes(m.playerId)).map((m) => m.playerId));
+  const unmuteHere = () => {
+    const next = muted.filter((x) => !mutedHere.has(x));
+    setMuted(next);
+    setMutedPlayers(next);
+  };
+  const shown = chat.filter((m) => m.system || !mutedHere.has(m.playerId));
   const [sending, setSending] = useState(false);
   const listRef = useRef<HTMLOListElement>(null);
   const stick = useRef(true);
@@ -202,9 +224,21 @@ export function RaceChat({
   return (
     <section className="card race-card race-chat" aria-labelledby="chat-title">
       <div className="live-section-title">
-        <h3 className="h3" id="chat-title">
+        <h2 className="h3" id="chat-title">
           <ChatBubbleLeftIcon /> chat
-        </h3>
+        </h2>
+        <span className="chat-tools">
+          {mutedHere.size > 0 && (
+            <button className="btn-text" onClick={unmuteHere} data-tip="show their messages again">
+              {mutedHere.size} muted - unmute
+            </button>
+          )}
+          {reportHref && (
+            <a className="btn-text" href={reportHref} data-tip="report this room by email" aria-label="report this room">
+              <FlagIcon width={14} height={14} />
+            </a>
+          )}
+        </span>
       </div>
       <ol
         className="chat-list"
@@ -215,8 +249,8 @@ export function RaceChat({
         }}
         aria-live="polite"
       >
-        {chat.length === 0 && <li className="chat-empty">no messages yet - say hi</li>}
-        {chat.map((m, i) =>
+        {shown.length === 0 && <li className="chat-empty">no messages yet - say hi</li>}
+        {shown.map((m, i) =>
           m.system ? (
             <li key={`${m.at}-${i}`} className="sys">
               {m.text}
@@ -226,6 +260,11 @@ export function RaceChat({
               <span className="t">{hhmm(m.at)}</span>
               <span className="n">{m.name}</span>
               <span className="m">{m.text}</span>
+              {m.playerId !== playerId && (
+                <button className="btn-text chat-mute" onClick={() => mute(m.playerId)} data-tip={`mute ${m.name} for you`} aria-label={`mute ${m.name}`}>
+                  <SpeakerXMarkIcon width={12} height={12} />
+                </button>
+              )}
             </li>
           ),
         )}

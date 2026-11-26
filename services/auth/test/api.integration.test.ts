@@ -99,10 +99,16 @@ describeIntegration('auth API', () => {
 
     it('refuses a taken username or email, whatever the case', async () => {
       await signUp({ username: 'Taken_Name', email: 'taken@example.com' });
-      const dupName = await s.request('POST', '/api/auth/register', { body: { username: 'taken_NAME', email: 'other@example.com', password: PASSWORD }, ip: freshIp() });
+      const dupName = await s.request('POST', '/api/auth/register', {
+        body: { username: 'taken_NAME', email: 'other@example.com', password: PASSWORD },
+        ip: freshIp(),
+      });
       expect(dupName.statusCode).toBe(409);
       expect(dupName.json().error.message).toBe('Username is already taken');
-      const dupEmail = await s.request('POST', '/api/auth/register', { body: { username: 'someone_new', email: 'TAKEN@example.com', password: PASSWORD }, ip: freshIp() });
+      const dupEmail = await s.request('POST', '/api/auth/register', {
+        body: { username: 'someone_new', email: 'TAKEN@example.com', password: PASSWORD },
+        ip: freshIp(),
+      });
       expect(dupEmail.statusCode).toBe(409);
       expect(dupEmail.json().error.message).toBe('Email is already registered');
     });
@@ -177,6 +183,19 @@ describeIntegration('auth API', () => {
       expect((await s.request('POST', '/api/auth/logout', { token })).statusCode).toBe(204);
       expect((await me(token)).statusCode).toBe(401);
       expect((await me(other)).statusCode).toBe(200);
+    });
+
+    it('signs out everywhere else: every other session ends, this one carries on with a fresh token', async () => {
+      const { token: here, user } = await signUp();
+      const there = (await login(user.username)).json().token as string; // another device
+      const res = await s.request('POST', '/api/auth/logout/everywhere', { token: here });
+      expect(res.statusCode, res.body).toBe(200);
+      const fresh = res.json().token as string;
+      expect(res.json().user).toMatchObject({ id: user.id, username: user.username });
+      expect((await me(there)).statusCode).toBe(401);
+      expect((await me(here)).statusCode).toBe(401); // the old token of this device too: it has the new one
+      expect((await me(fresh)).statusCode).toBe(200);
+      expect((await s.request('POST', '/api/auth/logout/everywhere', { token: there })).statusCode).toBe(401);
     });
 
     it('logs out with an empty JSON body (what fetch sends with a JSON content type)', async () => {
@@ -264,10 +283,15 @@ describeIntegration('auth API', () => {
     /** A reset link for `userId`, as if the email had arrived (the route only emails the token). */
     async function resetLinkFor(userId: string, minutes = 60): Promise<string> {
       const { token, hash } = newResetToken();
-      await s.pool.query(`insert into auth.password_resets (token_hash, user_id, expires_at) values ($1, $2, now() + make_interval(mins => $3))`, [hash, userId, minutes]);
+      await s.pool.query(`insert into auth.password_resets (token_hash, user_id, expires_at) values ($1, $2, now() + make_interval(mins => $3))`, [
+        hash,
+        userId,
+        minutes,
+      ]);
       return token;
     }
-    const linkCount = async (userId: string) => Number((await s.pool.query('select count(*) from auth.password_resets where user_id = $1', [userId])).rows[0].count);
+    const linkCount = async (userId: string) =>
+      Number((await s.pool.query('select count(*) from auth.password_resets where user_id = $1', [userId])).rows[0].count);
 
     it('answers 202 whether or not the address has an account, and stores a link only for real ones', async () => {
       const { user } = await signUp({ email: 'Forgetful@example.com' });
@@ -336,8 +360,12 @@ describeIntegration('auth API', () => {
     it('refuses an expired link and a malformed one', async () => {
       const { user } = await signUp();
       const expired = await resetLinkFor(user.id, -1);
-      expect((await s.request('POST', '/api/auth/password/reset', { body: { token: expired, password: 'brand new pass' }, ip: freshIp() })).statusCode).toBe(400);
-      expect((await s.request('POST', '/api/auth/password/reset', { body: { token: 'short', password: 'brand new pass' }, ip: freshIp() })).statusCode).toBe(400);
+      expect((await s.request('POST', '/api/auth/password/reset', { body: { token: expired, password: 'brand new pass' }, ip: freshIp() })).statusCode).toBe(
+        400,
+      );
+      expect((await s.request('POST', '/api/auth/password/reset', { body: { token: 'short', password: 'brand new pass' }, ip: freshIp() })).statusCode).toBe(
+        400,
+      );
       expect((await login(user.username)).statusCode).toBe(200);
     });
   });
@@ -367,7 +395,10 @@ describeIntegration('auth API', () => {
       await vi.waitFor(async () => expect(await s.redis.sismember(PRIVATE_USERS_KEY, user.id)).toBe(0));
       expect((await s.events('user.deleted')).some((e) => e.data.userId === user.id && e.data.username === user.username)).toBe(true);
       // the name is free again
-      expect((await s.request('POST', '/api/auth/register', { body: { username: user.username, email: 'again@example.com', password: PASSWORD }, ip: freshIp() })).statusCode).toBe(201);
+      expect(
+        (await s.request('POST', '/api/auth/register', { body: { username: user.username, email: 'again@example.com', password: PASSWORD }, ip: freshIp() }))
+          .statusCode,
+      ).toBe(201);
     });
 
     it('allows 5 attempts in 10 minutes', async () => {
@@ -406,7 +437,11 @@ describeIntegration('auth API', () => {
       const { token } = await signUp();
       const lying = await s.request('PUT', '/api/auth/me/avatar', { token, body: JPEG, headers: { 'content-type': 'image/png' } });
       expect(lying.statusCode).toBe(400);
-      const text = await s.request('PUT', '/api/auth/me/avatar', { token, body: Buffer.from('<svg onload=alert(1)>'), headers: { 'content-type': 'image/png' } });
+      const text = await s.request('PUT', '/api/auth/me/avatar', {
+        token,
+        body: Buffer.from('<svg onload=alert(1)>'),
+        headers: { 'content-type': 'image/png' },
+      });
       expect(text.statusCode).toBe(400);
       const svg = await s.request('PUT', '/api/auth/me/avatar', { token, body: Buffer.from('<svg/>'), headers: { 'content-type': 'image/svg+xml' } });
       expect(svg.statusCode).toBe(415);
@@ -423,7 +458,10 @@ describeIntegration('auth API', () => {
       const { token, user } = await signUp();
       const photo = await picture(800, 600)
         .jpeg()
-        .withExif({ IFD0: { ImageDescription: 'taken-at-home' }, IFD3: { GPSLatitudeRef: 'S', GPSLatitude: '27/1 28/1 3000/100', GPSLongitudeRef: 'E', GPSLongitude: '153/1 1/1 4800/100' } })
+        .withExif({
+          IFD0: { ImageDescription: 'taken-at-home' },
+          IFD3: { GPSLatitudeRef: 'S', GPSLatitude: '27/1 28/1 3000/100', GPSLongitudeRef: 'E', GPSLongitude: '153/1 1/1 4800/100' },
+        })
         .toBuffer();
       expect((await sharp(photo).metadata()).exif?.includes('taken-at-home')).toBe(true);
       const put = await s.request('PUT', '/api/auth/me/avatar', { token, body: photo, headers: { 'content-type': 'image/jpeg' } });
@@ -433,7 +471,9 @@ describeIntegration('auth API', () => {
       expect(meta).toMatchObject({ format: 'webp', width: 256, height: 256 });
       expect(meta.exif).toBeUndefined();
       expect(got.rawPayload.includes('taken-at-home')).toBe(false);
-      const { rows } = await s.pool.query<{ content_type: string; bytes: Buffer }>('select content_type, bytes from auth.avatars where user_id = $1', [user.id]);
+      const { rows } = await s.pool.query<{ content_type: string; bytes: Buffer }>('select content_type, bytes from auth.avatars where user_id = $1', [
+        user.id,
+      ]);
       expect(rows[0].content_type).toBe('image/webp');
       expect(rows[0].bytes.equals(got.rawPayload)).toBe(true);
     });
@@ -478,7 +518,8 @@ describeIntegration('auth API', () => {
           ...over,
         }),
       }).toString();
-    const post = (form: string, ip = freshIp()) => s.request('POST', '/api/supporters/kofi', { body: form, headers: { 'content-type': 'application/x-www-form-urlencoded' }, ip });
+    const post = (form: string, ip = freshIp()) =>
+      s.request('POST', '/api/supporters/kofi', { body: form, headers: { 'content-type': 'application/x-www-form-urlencoded' }, ip });
     const list = async () => (await s.request('GET', '/api/supporters')).json().supporters as { name: string; member: boolean }[];
 
     it('records a public supporter once per message, and lists names without the private details', async () => {
@@ -577,7 +618,10 @@ describeIntegration('auth API', () => {
     it('ends the pending password-reset links, which went to the old address', async () => {
       const { token, user } = await signUp();
       const reset = newResetToken();
-      await s.pool.query(`insert into auth.password_resets (token_hash, user_id, expires_at) values ($1, $2, now() + interval '1 hour')`, [reset.hash, user.id]);
+      await s.pool.query(`insert into auth.password_resets (token_hash, user_id, expires_at) values ($1, $2, now() + interval '1 hour')`, [
+        reset.hash,
+        user.id,
+      ]);
       await change(token, { email: 'moved@example.com', password: PASSWORD });
       expect((await confirm(await linkFor(user.id))).statusCode).toBe(200);
       const viaOld = await s.request('POST', '/api/auth/password/reset', { body: { token: reset.token, password: 'brand new pass' }, ip: freshIp() });
@@ -619,6 +663,181 @@ describeIntegration('auth API', () => {
     });
   });
 
+  describe('an address never confirmed within its 7 days', () => {
+    /** Ages an account's sign-up past the 7 days, and its link that confirms the address with it. */
+    async function expire(userId: string) {
+      await s.pool.query("update auth.users set created_at = now() - interval '8 days' where id = $1", [userId]);
+      await s.pool.query("update auth.email_changes set expires_at = now() - interval '1 minute' where user_id = $1", [userId]);
+    }
+    const register = (username: string, email: string) =>
+      s.request('POST', '/api/auth/register', { body: { username, email, password: PASSWORD }, ip: freshIp() });
+    const emailOf = async (userId: string) => (await s.pool.query<{ email: string }>('select email from auth.users where id = $1', [userId])).rows[0].email;
+
+    it('stays taken for 7 days, while a new link for it is open, once confirmed, and from before confirmation existed', async () => {
+      const fresh = await signUp({ email: 'fresh-hold@example.com' });
+      expect((await register('fresh_taker', 'FRESH-HOLD@example.com')).statusCode).toBe(409);
+      // past the 7 days, but a new link asked for since is still open
+      const relinked = await signUp({ email: 'relinked@example.com' });
+      await expire(relinked.user.id);
+      expect((await s.request('POST', '/api/auth/me/email/confirmation', { token: relinked.token, ip: freshIp() })).statusCode).toBe(202);
+      expect((await register('relinked_taker', 'relinked@example.com')).statusCode).toBe(409);
+      // confirmed, or from before confirmation: never freed
+      const confirmed = await signUp({ email: 'confirmed-hold@example.com' });
+      await expire(confirmed.user.id);
+      await confirmEmailOf(confirmed.user.id);
+      expect((await register('confirmed_taker', 'confirmed-hold@example.com')).statusCode).toBe(409);
+      const old = await signUp({ email: 'old-hold@example.com' });
+      await expire(old.user.id);
+      await s.pool.query('update auth.users set predates_email_confirmation = true where id = $1', [old.user.id]);
+      expect((await register('old_taker', 'old-hold@example.com')).statusCode).toBe(409);
+      expect(await emailOf(fresh.user.id)).toBe('fresh-hold@example.com');
+    });
+
+    it('is freed for a new account after that; the old account keeps working, without an email', async () => {
+      const stale = await signUp({ username: 'stale_holder', email: 'stale@example.com' });
+      await expire(stale.user.id);
+      const taker = await register('real_owner', 'Stale@example.com');
+      expect(taker.statusCode, taker.body).toBe(201);
+      expect(taker.json().user).toMatchObject({ email: 'Stale@example.com', emailVerified: false });
+      expect(taker.json().user.emailReleased).toBeUndefined();
+      // the old account: a placeholder that never receives mail, signs in by username, told it has no email
+      expect(await emailOf(stale.user.id)).toBe(`released-${stale.user.id}@cubr.invalid`);
+      const back = await login('stale_holder');
+      expect(back.statusCode).toBe(200);
+      expect((await me(back.json().token)).json().user).toMatchObject({ emailReleased: true, emailVerified: false });
+      // it can't ask for a link to an address it doesn't have, and gets no reset link for it
+      const link = await s.request('POST', '/api/auth/me/email/confirmation', { token: back.json().token, ip: freshIp() });
+      expect(link.statusCode).toBe(400);
+      expect(link.json().error.message).toBe('Your account has no email: add one');
+    });
+
+    it('is freed by a change of email to it, once that change is confirmed', async () => {
+      const stale = await signUp({ email: 'stale-change@example.com' });
+      await expire(stale.user.id);
+      const mover = await signUp();
+      expect(
+        (await s.request('POST', '/api/auth/me/email', { token: mover.token, body: { email: 'stale-change@example.com', password: PASSWORD }, ip: freshIp() }))
+          .statusCode,
+      ).toBe(202);
+      expect(await emailOf(stale.user.id)).toBe('stale-change@example.com'); // nothing changes before the link is opened
+      // the pending change's link, as if its email had arrived
+      const { token, hash } = newResetToken();
+      await s.pool.query('update auth.email_changes set token_hash = $1 where user_id = $2', [hash, mover.user.id]);
+      const res = await s.request('POST', '/api/auth/email/confirm', { body: { token }, ip: freshIp() });
+      expect(res.statusCode, res.body).toBe(200);
+      expect(res.json()).toEqual({ email: 'stale-change@example.com', changed: true });
+      expect(await emailOf(mover.user.id)).toBe('stale-change@example.com');
+      expect(await emailOf(stale.user.id)).toBe(`released-${stale.user.id}@cubr.invalid`);
+    });
+  });
+
+  describe('moderation (the internal routes deploy/vps/moderate.sh calls)', () => {
+    const mod = (method: 'GET' | 'POST', path: string, body?: unknown) =>
+      s.request(method, `/internal/moderation${path}`, { headers: { 'x-internal-token': s.config.internalToken }, ...(body === undefined ? {} : { body }) });
+
+    it('answers only with the internal token', async () => {
+      const { user } = await signUp();
+      expect((await s.request('GET', `/internal/moderation/users/${user.username}`)).statusCode).toBe(403);
+      expect(
+        (await s.request('POST', `/internal/moderation/users/${user.username}/suspend`, { headers: { 'x-internal-token': 'wrong-token-wrong-token' } }))
+          .statusCode,
+      ).toBe(403);
+      expect((await mod('GET', `/users/${user.username}`)).json().user.username).toBe(user.username);
+    });
+
+    it('suspends: every session ends, sign-in is refused, the profile turns private, no reset link goes out; lifting it lets it sign in', async () => {
+      const { token, user } = await signUp();
+      await confirmEmailOf(user.id);
+      const res = await mod('POST', `/users/${user.username}/suspend`, { note: 'spam in race chat' });
+      expect(res.statusCode, res.body).toBe(200);
+      expect(res.json().user).toMatchObject({
+        username: user.username,
+        private: true,
+        suspendedNote: 'spam in race chat',
+        email: expect.stringMatching(/^c\*\*\*@example\.com$/),
+      });
+      expect((await me(token)).statusCode).toBe(401);
+      const refused = await login(user.username);
+      expect(refused.statusCode).toBe(403);
+      expect(refused.json().error.message).toBe('This account is suspended. Questions: hello@cubr.dev');
+      // a wrong password gets the usual answer: a stranger can't tell a suspended account apart
+      expect((await login(user.username, 'not the password 1')).statusCode).toBe(401);
+      expect((await s.request('GET', `/api/users/${user.username}`)).json().user.private).toBe(true);
+      const sent = outbox.length;
+      expect((await s.request('POST', '/api/auth/password/forgot', { body: { email: user.email }, ip: freshIp() })).statusCode).toBe(202);
+      await new Promise((r) => setTimeout(r, 300));
+      expect(outbox.slice(sent).filter((m) => m.to === user.email)).toHaveLength(0);
+      const lifted = await mod('POST', `/users/${user.username}/unsuspend`);
+      expect(lifted.json().user).toMatchObject({ suspendedAt: null, private: true });
+      expect((await login(user.username)).statusCode).toBe(200);
+    });
+
+    it('records every action in the moderation log, newest first, and forgets records over 2 years old', async () => {
+      const { user } = await signUp();
+      const newName = `renamed_${Date.now() % 100_000}`;
+      await mod('POST', `/users/${user.username}/suspend`, { note: 'spam in race chat' });
+      await mod('POST', `/users/${user.username}/unsuspend`);
+      expect((await mod('POST', `/users/${user.username}/rename`, { to: newName })).statusCode).toBe(200);
+      await mod('POST', `/users/${newName}/clear-profile`);
+      await mod('POST', `/users/${newName}/remove-picture`);
+      expect((await mod('POST', '/log', { action: 'clear-chat', detail: 'room abcd1234' })).statusCode).toBe(204);
+      const log = (await mod('GET', '/log?limit=6')).json().log;
+      expect(log.map((e: { action: string; username: string | null; detail: string | null }) => [e.action, e.username, e.detail])).toEqual([
+        ['clear-chat', null, 'room abcd1234'],
+        ['remove-picture', newName, null],
+        ['clear-profile', newName, null],
+        ['rename', user.username, `${user.username} -> ${newName}`],
+        ['unsuspend', user.username, null],
+        ['suspend', user.username, 'spam in race chat'],
+      ]);
+      expect(log[1].userId).toBe(user.id);
+      // a record over 2 years old goes when the next one is written
+      await s.pool.query("insert into auth.moderation_log (at, action, username) values (now() - interval '731 days', 'suspend', 'long_ago')");
+      await mod('POST', '/log', { action: 'clear-chat', detail: 'room efgh5678' });
+      expect((await s.pool.query("select count(*)::int as n from auth.moderation_log where username = 'long_ago'")).rows[0].n).toBe(0);
+      expect((await mod('POST', '/log', { action: 'delete-everything' })).statusCode).toBe(400);
+      expect((await s.request('GET', '/internal/moderation/log')).statusCode).toBe(403);
+    });
+
+    it('refuses a reset link opened after the suspension, and keeps the link', async () => {
+      const { user } = await signUp();
+      const { token, hash } = newResetToken();
+      await s.pool.query("insert into auth.password_resets (token_hash, user_id, expires_at) values ($1, $2, now() + interval '1 hour')", [hash, user.id]);
+      // suspended in between: the suspension removes pending links, so put one back as if it raced
+      await mod('POST', `/users/${user.username}/suspend`);
+      await s.pool.query(
+        "insert into auth.password_resets (token_hash, user_id, expires_at) values ($1, $2, now() + interval '1 hour') on conflict do nothing",
+        [hash, user.id],
+      );
+      const res = await s.request('POST', '/api/auth/password/reset', { body: { token, password: 'a brand new one 1' }, ip: freshIp() });
+      expect(res.statusCode).toBe(403);
+      expect((await s.pool.query('select 1 from auth.password_resets where token_hash = $1', [hash])).rowCount).toBe(1);
+    });
+
+    it('renames, clears the display name and bio, and removes the picture, each told to the other services', async () => {
+      const { token, user } = await signUp();
+      await s.request('PATCH', '/api/auth/me', { token, body: { displayName: 'Loud Name', bio: 'a bio to remove' } });
+      await s.request('PUT', '/api/auth/me/avatar', { token, body: PNG, headers: { 'content-type': 'image/png' } });
+      const renamed = await mod('POST', `/users/${user.username}/rename`, { to: `${user.username}_x` });
+      expect(renamed.statusCode, renamed.body).toBe(200);
+      expect((await s.request('GET', `/api/users/${user.username}`)).statusCode).toBe(404);
+      expect((await mod('POST', `/users/${user.username}_x/clear-profile`)).json().user).toMatchObject({ displayName: null, bio: null });
+      expect((await mod('POST', `/users/${user.username}_x/remove-picture`)).json().user.picture).toBe(false);
+      const profile = (await s.request('GET', `/api/users/${user.username}_x`)).json().user;
+      expect(profile).toMatchObject({ username: `${user.username}_x`, displayName: null, bio: null, avatarUrl: null });
+      const updates = (await s.events('user.updated')).filter((e) => e.data.userId === user.id);
+      expect(updates.at(-1)!.data).toMatchObject({ username: `${user.username}_x` });
+    });
+
+    it('says when there is no such account, and refuses a reserved or taken new name', async () => {
+      expect((await mod('GET', '/users/nobody_here_9')).statusCode).toBe(404);
+      const a = await signUp();
+      const b = await signUp();
+      expect((await mod('POST', `/users/${a.user.username}/rename`, { to: 'admin_2' })).json().error.message).toBe('to: is reserved, choose another');
+      expect((await mod('POST', `/users/${a.user.username}/rename`, { to: b.user.username.toUpperCase() })).statusCode).toBe(409);
+    });
+  });
+
   describe('changing the password', () => {
     const changePassword = (token: string, body: Record<string, unknown>) => s.request('POST', '/api/auth/me/password', { token, body, ip: freshIp() });
 
@@ -645,7 +864,9 @@ describeIntegration('auth API', () => {
       expect(same.statusCode).toBe(400);
       expect(same.json().error.message).toMatch(/already your password/i);
       expect((await changePassword(token, { password: PASSWORD, newPassword: 'short' })).statusCode).toBe(400);
-      expect((await s.request('POST', '/api/auth/me/password', { body: { password: PASSWORD, newPassword: 'brand new pass' }, ip: freshIp() })).statusCode).toBe(401);
+      expect(
+        (await s.request('POST', '/api/auth/me/password', { body: { password: PASSWORD, newPassword: 'brand new pass' }, ip: freshIp() })).statusCode,
+      ).toBe(401);
       expect((await me(token)).statusCode).toBe(200);
       expect((await login(user.username)).statusCode).toBe(200); // the password is unchanged
     });
@@ -653,7 +874,10 @@ describeIntegration('auth API', () => {
     it('ends the pending password-reset links', async () => {
       const { token, user } = await signUp();
       const reset = newResetToken();
-      await s.pool.query(`insert into auth.password_resets (token_hash, user_id, expires_at) values ($1, $2, now() + interval '1 hour')`, [reset.hash, user.id]);
+      await s.pool.query(`insert into auth.password_resets (token_hash, user_id, expires_at) values ($1, $2, now() + interval '1 hour')`, [
+        reset.hash,
+        user.id,
+      ]);
       expect((await changePassword(token, { password: PASSWORD, newPassword: 'brand new pass' })).statusCode).toBe(200);
       const viaLink = await s.request('POST', '/api/auth/password/reset', { body: { token: reset.token, password: 'another pass 2' }, ip: freshIp() });
       expect(viaLink.statusCode).toBe(400);
@@ -708,7 +932,10 @@ describeIntegration('auth API', () => {
       expect(mail.text).toContain('Hi Fresh_Start,');
       expect(mail.text).toContain('for 7 days');
       // only the hash is stored, with the address it went to, for a week
-      const { rows } = await s.pool.query(`select token_hash, new_email, expires_at > now() + interval '6 days' as week from auth.email_changes where user_id = $1`, [user.id]);
+      const { rows } = await s.pool.query(
+        `select token_hash, new_email, expires_at > now() + interval '6 days' as week from auth.email_changes where user_id = $1`,
+        [user.id],
+      );
       expect(rows).toHaveLength(1);
       expect(Buffer.isBuffer(rows[0].token_hash)).toBe(true);
       expect(rows[0]).toMatchObject({ new_email: 'Fresh.Start@example.com', week: true });
@@ -759,7 +986,9 @@ describeIntegration('auth API', () => {
     it('ends the sign-up link when the account asks to move to another address', async () => {
       const { token, user } = await signUp();
       const fromSignUp = await emailedLink(user.email);
-      expect((await s.request('POST', '/api/auth/me/email', { token, body: { email: 'elsewhere@example.com', password: PASSWORD }, ip: freshIp() })).statusCode).toBe(202);
+      expect(
+        (await s.request('POST', '/api/auth/me/email', { token, body: { email: 'elsewhere@example.com', password: PASSWORD }, ip: freshIp() })).statusCode,
+      ).toBe(202);
       expect((await confirm(fromSignUp)).statusCode).toBe(400);
       expect((await me(token)).json().user).toMatchObject({ email: user.email, emailVerified: false });
     });
@@ -767,7 +996,14 @@ describeIntegration('auth API', () => {
 
   // what is logged, and that nothing ties it to an IP address: clientErrors.route.test.ts
   describe('front-end error reports', () => {
-    const report = { kind: 'unhandledrejection', message: 'Failed to fetch', route: '/leaderboards', build: 'index-D3oOLUDV.js', browser: 'Chrome 142 on Android', installed: true };
+    const report = {
+      kind: 'unhandledrejection',
+      message: 'Failed to fetch',
+      route: '/leaderboards',
+      build: 'index-D3oOLUDV.js',
+      browser: 'Chrome 142 on Android',
+      installed: true,
+    };
     const post = (body: unknown, ip = freshIp()) => s.request('POST', '/api/errors', { body, ip });
 
     it('takes a report, without signing in, and answers with no content', async () => {
@@ -786,6 +1022,40 @@ describeIntegration('auth API', () => {
       const ip = freshIp();
       for (let i = 0; i < 30; i++) expect((await post(report, ip)).statusCode).toBe(204);
       expect((await post(report, ip)).statusCode).toBe(429);
+    });
+  });
+
+  // what is logged, the daily cap, and that nothing ties a message to an IP address: feedback.route.test.ts
+  describe('the feedback form', () => {
+    const feedback = {
+      kind: 'idea',
+      message: 'a dark stackmat theme, please',
+      email: 'fan@example.com',
+      details: 'cubr v1.6.9 · Firefox 145 on Windows · 1280×800 · /',
+    };
+    const post = (body: unknown, ip = freshIp()) => s.request('POST', '/api/feedback', { body, ip });
+
+    it("emails the message to cubr's inbox, without signing in, a reply going to the sender", async () => {
+      const res = await post(feedback);
+      expect(res.statusCode, res.body).toBe(204);
+      expect(res.body).toBe('');
+      const mails = outbox.filter((m) => m.subject === 'cubr feedback (idea): a dark stackmat theme, please');
+      expect(mails).toHaveLength(1);
+      expect(mails[0]).toMatchObject({ to: 'hello@cubr.dev', replyTo: 'fan@example.com' });
+      expect(mails[0].text).toContain('sent from: cubr v1.6.9 · Firefox 145 on Windows · 1280×800 · /');
+    });
+
+    it('refuses a bad email, no message, other fields and a body over 32 KB', async () => {
+      expect((await post({ ...feedback, email: 'fan@' })).statusCode).toBe(400);
+      expect((await post({ ...feedback, message: '' })).statusCode).toBe(400);
+      expect((await post({ ...feedback, userId: 'someone' })).statusCode).toBe(400);
+      expect((await post({ ...feedback, message: 'x'.repeat(33 * 1024) })).statusCode).toBe(413);
+    });
+
+    it('limits one address to 3 per 10 minutes', async () => {
+      const ip = freshIp();
+      for (let i = 0; i < 3; i++) expect((await post(feedback, ip)).statusCode).toBe(204);
+      expect((await post(feedback, ip)).statusCode).toBe(429);
     });
   });
 });

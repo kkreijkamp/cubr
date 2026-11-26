@@ -70,10 +70,22 @@ function newServer(): FakeServer {
     seed(o) {
       const createdAt = new Date(Date.UTC(2025, 0, 1) + ++server.seq * 1000).toISOString();
       const id = `${o.name.replace(/\W/g, '')}-${crypto.randomUUID().slice(0, 8)}`;
-      const s: ServerSession = { id, userId: o.userId, name: o.name, event: o.event ?? '333', practice: o.practice ?? false, createdAt, updatedAt: createdAt, solveCount: 0 };
+      const s: ServerSession = {
+        id,
+        userId: o.userId,
+        name: o.name,
+        event: o.event ?? '333',
+        practice: o.practice ?? false,
+        createdAt,
+        updatedAt: createdAt,
+        solveCount: 0,
+      };
       server.sessions.push(s);
       const list = (o.solves ?? []).map((x, i) => solveRow(s, `${id}-s${i}`, x.timeMs, x.at, x.penalty));
-      server.solves.set(id, list.sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
+      server.solves.set(
+        id,
+        list.sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+      );
       return s;
     },
     solvesOf: (sid) => server.solves.get(sid) ?? [],
@@ -83,7 +95,19 @@ function newServer(): FakeServer {
 }
 
 function solveRow(s: Session, id: string, timeMs: number, createdAt: string, penalty: Penalty = 'OK'): Solve {
-  return { id, sessionId: s.id, event: s.event, timeMs, penalty, scramble: 'R U', comment: null, source: 'timer', createdAt, dailyDate: null, dailyIndex: null };
+  return {
+    id,
+    sessionId: s.id,
+    event: s.event,
+    timeMs,
+    penalty,
+    scramble: 'R U',
+    comment: null,
+    source: 'timer',
+    createdAt,
+    dailyDate: null,
+    dailyIndex: null,
+  };
 }
 
 const listOf = (server: FakeServer, uid: string) => server.sessions.filter((s) => s.userId === uid).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -114,7 +138,7 @@ function installServer(ApiError: ApiErrorClass, server: FakeServer): void {
   const sortList = (list: Solve[]) => list.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const { sessions, solves } = h.api;
   sessions.list.mockImplementation(async () => ({ sessions: listOf(server, caller()).map(view) }));
-  sessions.create.mockImplementation(async (body: { id: string; name: string; event: string; practice?: boolean; createdAt?: string }) => {
+  sessions.create.mockImplementation(async (body: { id: string; name: string; event: string; practice?: boolean; scramble?: string; createdAt?: string }) => {
     const uid = caller();
     const existing = server.sessions.find((s) => s.id === body.id);
     if (existing) {
@@ -122,7 +146,17 @@ function installServer(ApiError: ApiErrorClass, server: FakeServer): void {
       return { session: view(existing) };
     }
     const now = new Date().toISOString();
-    const s: ServerSession = { id: body.id, userId: uid, name: body.name, event: body.event, practice: body.practice ?? false, createdAt: body.createdAt ?? now, updatedAt: now, solveCount: 0 };
+    const s: ServerSession = {
+      id: body.id,
+      userId: uid,
+      name: body.name,
+      event: body.event,
+      practice: (body.practice ?? false) || !!body.scramble,
+      ...(body.scramble ? { scramble: body.scramble } : {}),
+      createdAt: body.createdAt ?? now,
+      updatedAt: now,
+      solveCount: 0,
+    };
     server.sessions.push(s);
     server.solves.set(s.id, []);
     return { session: view(s) };
@@ -143,18 +177,39 @@ function installServer(ApiError: ApiErrorClass, server: FakeServer): void {
     server.solves.delete(id);
   });
   sessions.solves.mockImplementation(async (id: string) => ({ solves: server.solvesOf(mine(id).id).map((x) => ({ ...x })) }));
-  sessions.import.mockImplementation(async (payload: { sessions: { name: string; event: string; practice?: boolean; solves: Omit<Solve, 'id' | 'sessionId' | 'event' | 'source'>[] }[] }) => {
-    const uid = caller();
-    let count = 0;
-    for (const p of payload.sessions) {
-      const now = new Date().toISOString();
-      const s: ServerSession = { id: crypto.randomUUID(), userId: uid, name: p.name, event: p.event, practice: p.practice ?? false, createdAt: now, updatedAt: now, solveCount: 0 };
-      server.sessions.push(s);
-      server.solves.set(s.id, sortList(p.solves.map((x) => ({ ...solveRow(s, crypto.randomUUID(), x.timeMs, x.createdAt, x.penalty), scramble: x.scramble, comment: x.comment ?? null, source: 'import' }))));
-      count += p.solves.length;
-    }
-    return { imported: { sessions: payload.sessions.length, solves: count } };
-  });
+  sessions.import.mockImplementation(
+    async (payload: { sessions: { name: string; event: string; practice?: boolean; solves: Omit<Solve, 'id' | 'sessionId' | 'event' | 'source'>[] }[] }) => {
+      const uid = caller();
+      let count = 0;
+      for (const p of payload.sessions) {
+        const now = new Date().toISOString();
+        const s: ServerSession = {
+          id: crypto.randomUUID(),
+          userId: uid,
+          name: p.name,
+          event: p.event,
+          practice: p.practice ?? false,
+          createdAt: now,
+          updatedAt: now,
+          solveCount: 0,
+        };
+        server.sessions.push(s);
+        server.solves.set(
+          s.id,
+          sortList(
+            p.solves.map((x) => ({
+              ...solveRow(s, crypto.randomUUID(), x.timeMs, x.createdAt, x.penalty),
+              scramble: x.scramble,
+              comment: x.comment ?? null,
+              source: 'import',
+            })),
+          ),
+        );
+        count += p.solves.length;
+      }
+      return { imported: { sessions: payload.sessions.length, solves: count } };
+    },
+  );
   sessions.merge.mockImplementation(async (targetId: string, sourceIds: string[]) => {
     const target = mine(targetId);
     const sources = sourceIds.map(mine);
@@ -169,22 +224,34 @@ function installServer(ApiError: ApiErrorClass, server: FakeServer): void {
     }
     return { session: view(target), merged: { sessions: sources.length, solves: moved } };
   });
-  solves.create.mockImplementation(async (body: { id: string; sessionId: string; timeMs: number; penalty: Penalty; scramble: string; comment?: string | null; source?: string; createdAt?: string; daily?: { date: string; index: number } }) => {
-    const s = mine(body.sessionId);
-    const list = server.solvesOf(s.id);
-    const same = list.find((x) => x.id === body.id); // idempotent on id
-    if (same) return { solve: same, rolling: { ao5: null, ao12: null } };
-    const solve: Solve = {
-      ...solveRow(s, body.id, body.timeMs, body.createdAt ?? new Date().toISOString(), body.penalty),
-      scramble: body.scramble,
-      comment: body.comment ?? null,
-      source: body.source ?? 'timer',
-      dailyDate: body.daily?.date ?? null,
-      dailyIndex: body.daily?.index ?? null,
-    };
-    server.solves.set(s.id, sortList([...list, solve]));
-    return { solve, rolling: { ao5: null, ao12: null } };
-  });
+  solves.create.mockImplementation(
+    async (body: {
+      id: string;
+      sessionId: string;
+      timeMs: number;
+      penalty: Penalty;
+      scramble: string;
+      comment?: string | null;
+      source?: string;
+      createdAt?: string;
+      daily?: { date: string; index: number };
+    }) => {
+      const s = mine(body.sessionId);
+      const list = server.solvesOf(s.id);
+      const same = list.find((x) => x.id === body.id); // idempotent on id
+      if (same) return { solve: same, rolling: { ao5: null, ao12: null } };
+      const solve: Solve = {
+        ...solveRow(s, body.id, body.timeMs, body.createdAt ?? new Date().toISOString(), body.penalty),
+        scramble: body.scramble,
+        comment: body.comment ?? null,
+        source: body.source ?? 'timer',
+        dailyDate: body.daily?.date ?? null,
+        dailyIndex: body.daily?.index ?? null,
+      };
+      server.solves.set(s.id, sortList([...list, solve]));
+      return { solve, rolling: { ao5: null, ao12: null } };
+    },
+  );
   solves.update.mockImplementation(async (id: string, patch: { penalty?: Penalty; comment?: string | null }) => {
     const { list, i } = solveOf(id);
     list[i] = { ...list[i], ...patch };
@@ -196,7 +263,10 @@ function installServer(ApiError: ApiErrorClass, server: FakeServer): void {
   });
   solves.export.mockImplementation(async () => {
     const uid = caller();
-    return { exportedAt: new Date().toISOString(), sessions: listOf(server, uid).map((s) => ({ ...view(s), solves: server.solvesOf(s.id).map((x) => ({ ...x })) })) };
+    return {
+      exportedAt: new Date().toISOString(),
+      sessions: listOf(server, uid).map((s) => ({ ...view(s), solves: server.solvesOf(s.id).map((x) => ({ ...x })) })),
+    };
   });
 }
 
@@ -316,9 +386,25 @@ function storedGuest() {
 }
 
 /** the fields a solve keeps everywhere (memory, localStorage, server) */
-const core = ({ id, sessionId, event, timeMs, penalty, scramble, comment, source, createdAt }: Solve) => ({ id, sessionId, event, timeMs, penalty, scramble, comment, source, createdAt });
+const core = ({ id, sessionId, event, timeMs, penalty, scramble, comment, source, createdAt }: Solve) => ({
+  id,
+  sessionId,
+  event,
+  timeMs,
+  penalty,
+  scramble,
+  comment,
+  source,
+  createdAt,
+});
 const queued = () => local.json<QueuedOp[]>(QUEUE_KEY) ?? [];
-const imp = (timeMs: number, createdAt: string, penalty: Penalty = 'OK', comment: string | null = null) => ({ timeMs, penalty, scramble: 'x', comment, createdAt });
+const imp = (timeMs: number, createdAt: string, penalty: Penalty = 'OK', comment: string | null = null) => ({
+  timeMs,
+  penalty,
+  scramble: 'x',
+  comment,
+  createdAt,
+});
 
 // ================================================================ guest mode
 
@@ -345,7 +431,16 @@ describe('guest mode (localStorage)', () => {
   it('saves a solve to localStorage shortly after it is added, and has it on the next visit', async () => {
     const s = await start();
     const solve = await s.addSolve({ timeMs: 9876.4, penalty: 'OK', scramble: "R U R'" });
-    expect(solve).toMatchObject({ timeMs: 9876, penalty: 'OK', scramble: "R U R'", comment: null, source: 'timer', event: '333', sessionId: s.state().currentSessionId, createdAt: NOW });
+    expect(solve).toMatchObject({
+      timeMs: 9876,
+      penalty: 'OK',
+      scramble: "R U R'",
+      comment: null,
+      source: 'timer',
+      event: '333',
+      sessionId: s.state().currentSessionId,
+      createdAt: NOW,
+    });
     expect(s.state().solves).toEqual([solve]);
     expect(s.getCurrentSession()?.solveCount).toBe(1);
     expect(local.getItem(LOCAL_KEY)).toBeNull(); // debounced, not written on every solve
@@ -395,7 +490,11 @@ describe('guest mode (localStorage)', () => {
     expect(s.state().solves.map((x) => x.id)).toEqual([b.id]);
     expect(s.getCurrentSession()?.solveCount).toBe(1);
     await advance(250);
-    expect(storedGuest().solves.get(b.sessionId)!.map((x) => x.id)).toEqual([b.id]);
+    expect(
+      storedGuest()
+        .solves.get(b.sessionId)!
+        .map((x) => x.id),
+    ).toEqual([b.id]);
   });
 
   it('adds a solve to another session when asked, and refuses an unknown one', async () => {
@@ -471,6 +570,46 @@ describe('guest mode (localStorage)', () => {
     expect(again.settingsStore.get().lastEvent).toBe('222');
   });
 
+  it('switches to a practice scramble: its own practice session, made once, remembered, and back to the default', async () => {
+    const s = await start();
+    await s.switchScramble('333', 'pll');
+    const pll = s.getCurrentSession()!;
+    expect(pll).toMatchObject({ name: '3x3 pll', event: '333', scramble: 'pll', practice: true });
+    await s.switchScramble('333', null);
+    expect(s.getCurrentSession()?.name).toBe('3x3');
+    await s.switchScramble('333', 'pll');
+    expect(s.getCurrentSession()?.id).toBe(pll.id); // the same session, not a second one
+    expect(s.state().sessions.filter((x) => x.scramble === 'pll')).toHaveLength(1);
+    // switching events and back returns to where you were, the practice scramble included
+    await s.switchEvent('222');
+    await s.switchEvent('333');
+    expect(s.getCurrentSession()?.id).toBe(pll.id);
+    // a practice scramble's session stays a practice session
+    await s.setSessionPractice(pll.id, false);
+    expect(s.getCurrentSession()?.practice).toBe(true);
+    // the daily challenge and races never use it
+    expect((await s.ensureSession('333', { counts: true })).scramble).toBeUndefined();
+    // unknown types fall back to the default
+    await s.switchScramble('333', 'nope');
+    expect(s.getCurrentSession()?.name).toBe('3x3');
+    await advance(250);
+    expect(storedGuest().sessions.find((x) => x.id === pll.id)).toMatchObject({ scramble: 'pll', practice: true });
+    await newPage();
+    const again = await start();
+    expect(again.state().sessions.find((x) => x.id === pll.id)).toMatchObject({ scramble: 'pll', practice: true });
+  });
+
+  it('merges only sessions of the same scramble type, and replaces a deleted one with its own kind', async () => {
+    const s = await start();
+    const main = s.state().sessions[0];
+    await s.switchScramble('333', 'pll');
+    const pll = s.getCurrentSession()!;
+    await expect(s.mergeSessions(main.id, [pll.id])).rejects.toThrow('only sessions of the same scramble type can be merged');
+    await s.deleteSession(pll.id);
+    expect(s.getCurrentSession()).toMatchObject({ name: '3x3 pll', scramble: 'pll' });
+    expect(s.getCurrentSession()?.id).not.toBe(pll.id);
+  });
+
   it('ensureSession finds a counting session for the daily challenge and races, without switching', async () => {
     const s = await start();
     const [main, practice] = s.state().sessions;
@@ -502,7 +641,7 @@ describe('guest mode (localStorage)', () => {
     expect(s.state().currentSessionId).toBe(only.id);
   });
 
-  it("deleting another session leaves the current one, and the event forgets it as its last session", async () => {
+  it('deleting another session leaves the current one, and the event forgets it as its last session', async () => {
     const s = await start();
     await s.switchEvent('222');
     const twoPractice = s.state().sessions[3];
@@ -605,7 +744,7 @@ describe('guest mode (localStorage)', () => {
       { name: '   ', event: '222', sourceType: '222so', practice: true, solves: [imp(1500, T(3))] },
       { name: 'n'.repeat(45), event: '333', sourceType: '333', solves: [imp(1600, T(4))] },
     ] satisfies ImportedSession[]);
-    expect(r).toEqual({ sessions: 3, solves: 4 });
+    expect(r).toEqual({ sessions: 3, solves: 4, skipped: 0, continued: 0 });
     const added = s.state().sessions.slice(2);
     expect(added.map((x) => [x.name, x.event, x.practice ?? false, x.solveCount])).toEqual([
       ['From csTimer', '444', false, 2],
@@ -618,6 +757,27 @@ describe('guest mode (localStorage)', () => {
     ]);
     expect(s.getCurrentSession()?.name).toBe('3x3');
     expect(storedGuest().sessions).toHaveLength(5); // saved at once
+  });
+
+  it('leaves out solves this browser already has: the same file again adds nothing, a later one continues its session', async () => {
+    const s = await start();
+    const first = [{ name: 'csTimer', event: '444', sourceType: '444wca', solves: [imp(3000, T(1)), imp(3100, T(2))] }] satisfies ImportedSession[];
+    expect(await s.importSessions(first)).toEqual({ sessions: 1, solves: 2, skipped: 0, continued: 0 });
+    expect(await s.importSessions(first)).toEqual({ sessions: 0, solves: 0, skipped: 2, continued: 0 });
+    const later = [
+      { name: 'csTimer', event: '444', sourceType: '444wca', solves: [imp(3000, T(1)), imp(3100, T(2)), imp(3200, T(3))] },
+      { name: 'csTimer', event: '444', sourceType: '444wca', solves: [imp(2900, T(4))] }, // none of its solves here: a session of its own
+      { name: 'plus two', event: '444', sourceType: '444wca', solves: [imp(3000, T(1), '+2')] }, // another penalty: another solve
+    ] satisfies ImportedSession[];
+    expect(await s.importSessions(later)).toEqual({ sessions: 2, solves: 3, skipped: 2, continued: 1 });
+    const fours = s.state().sessions.filter((x) => x.event === '444');
+    expect(fours.map((x) => [x.name, x.solveCount])).toEqual([
+      ['csTimer', 3],
+      ['csTimer', 1],
+      ['plus two', 1],
+    ]);
+    expect(s.getLoadedSolves(fours[0].id)!.map((x) => x.timeMs)).toEqual([3000, 3100, 3200]);
+    expect(storedGuest().sessions.filter((x) => x.event === '444')).toHaveLength(3); // saved
   });
 
   it('undoes an import that does not fit in browser storage', async () => {
@@ -635,17 +795,29 @@ describe('guest mode (localStorage)', () => {
   it('exports every session with its solves, as a file the importer reads back the same', async () => {
     const s = await start();
     const [, practice] = s.state().sessions;
+    // a second apart, as real solves are (the importer spreads solves of the same millisecond apart)
     await s.addSolve({ timeMs: 9000, penalty: 'OK', scramble: "R U R'", comment: 'first' });
+    vi.setSystemTime(new Date(Date.parse(NOW) + 1000));
     await s.addSolve({ timeMs: 9500, penalty: 'DNF', scramble: 'F2' });
+    vi.setSystemTime(new Date(Date.parse(NOW) + 2000));
     await s.addSolve({ timeMs: 7000, penalty: '+2', scramble: 'U', sessionId: practice.id });
+    vi.setSystemTime(new Date(NOW));
     const data = await s.exportAll();
     expect(data.exportedAt).toBe(NOW);
-    expect(data.sessions.map((x) => [x.name, x.solves.length])).toEqual([['3x3', 2], ['3x3 practice', 1]]);
+    expect(data.sessions.map((x) => [x.name, x.solves.length])).toEqual([
+      ['3x3', 2],
+      ['3x3 practice', 1],
+    ]);
     const back = parseTimerFile(JSON.stringify(data, null, 2));
     expect(back.format).toBe('cubr');
-    expect(back.sessions.map((x) => [x.name, x.event, x.practice ?? false])).toEqual([['3x3', '333', false], ['3x3 practice', '333', true]]);
+    expect(back.sessions.map((x) => [x.name, x.event, x.practice ?? false])).toEqual([
+      ['3x3', '333', false],
+      ['3x3 practice', '333', true],
+    ]);
     back.sessions.forEach((x, i) => {
-      expect(x.solves).toEqual(data.sessions[i].solves.map(({ timeMs, penalty, scramble, comment, createdAt }) => ({ timeMs, penalty, scramble, comment, createdAt })));
+      expect(x.solves).toEqual(
+        data.sessions[i].solves.map(({ timeMs, penalty, scramble, comment, createdAt }) => ({ timeMs, penalty, scramble, comment, createdAt })),
+      );
     });
   });
 
@@ -665,10 +837,18 @@ describe('guest mode (localStorage)', () => {
     const a = await s.addSolve({ timeMs: 1000, penalty: 'OK', scramble: '' });
     doc.visibilityState = 'hidden';
     doc.dispatchEvent(new Event('visibilitychange'));
-    expect(storedGuest().solves.get(a.sessionId)!.map((x) => x.id)).toEqual([a.id]);
+    expect(
+      storedGuest()
+        .solves.get(a.sessionId)!
+        .map((x) => x.id),
+    ).toEqual([a.id]);
     const b = await s.addSolve({ timeMs: 2000, penalty: 'OK', scramble: '' });
     win.dispatchEvent(new Event('pagehide'));
-    expect(storedGuest().solves.get(a.sessionId)!.map((x) => x.id)).toEqual([a.id, b.id]);
+    expect(
+      storedGuest()
+        .solves.get(a.sessionId)!
+        .map((x) => x.id),
+    ).toEqual([a.id, b.id]);
   });
 
   it('picks up guest solves saved by another tab', async () => {
@@ -676,7 +856,9 @@ describe('guest mode (localStorage)', () => {
     await advance(250);
     const sid = s.state().currentSessionId!;
     const db = storedGuest();
-    db.solves.set(sid, [{ id: 'from-another-tab', sessionId: sid, event: '333', timeMs: 4321, penalty: 'OK', scramble: 'U', comment: null, source: 'timer', createdAt: NOW }]);
+    db.solves.set(sid, [
+      { id: 'from-another-tab', sessionId: sid, event: '333', timeMs: 4321, penalty: 'OK', scramble: 'U', comment: null, source: 'timer', createdAt: NOW },
+    ]);
     local.setItem(LOCAL_KEY, encodeLocalDb(db));
     win.dispatchEvent(Object.assign(new Event('storage'), { key: 'cubr.settings' }));
     expect(s.state().solves).toEqual([]);
@@ -710,7 +892,10 @@ describe('guest mode (localStorage)', () => {
     local.setItem(`${LOCAL_KEY}.corrupt`, 'old backup');
     s.clearLocalData();
     expect(local.getItem(`${LOCAL_KEY}.corrupt`)).toBeNull();
-    expect(s.state().sessions.map((x) => [x.name, x.solveCount])).toEqual([['3x3', 0], ['3x3 practice', 0]]);
+    expect(s.state().sessions.map((x) => [x.name, x.solveCount])).toEqual([
+      ['3x3', 0],
+      ['3x3 practice', 0],
+    ]);
     expect(s.state().solves).toEqual([]);
     expect(s.localDataSummary()).toEqual({ sessions: 0, solves: 0 });
   });
@@ -739,7 +924,14 @@ describe('signed in (cloud)', () => {
   let main: ServerSession;
   let big: ServerSession;
   const seedU1 = (server: FakeServer) => {
-    main = server.seed({ userId: 'u1', name: '3x3', solves: [{ timeMs: 9000, at: T(2) }, { timeMs: 8000, at: T(1) }] });
+    main = server.seed({
+      userId: 'u1',
+      name: '3x3',
+      solves: [
+        { timeMs: 9000, at: T(2) },
+        { timeMs: 8000, at: T(1) },
+      ],
+    });
     big = server.seed({ userId: 'u1', name: '4x4', event: '444', solves: [{ timeMs: 60_000, at: T(3) }] });
     server.seed({ userId: 'u2', name: 'not yours', solves: [{ timeMs: 1, at: T(1) }] });
   };
@@ -750,7 +942,10 @@ describe('signed in (cloud)', () => {
   it("loads the account's sessions and only the current session's solves", async () => {
     const s = await start(U1, { seed: seedU1 });
     expect(s.state()).toMatchObject({ ready: true, mode: 'cloud', currentSessionId: main.id, pending: 0, syncError: null, loading: false });
-    expect(s.state().sessions.map((x) => [x.name, x.solveCount])).toEqual([['3x3', 2], ['4x4', 1]]);
+    expect(s.state().sessions.map((x) => [x.name, x.solveCount])).toEqual([
+      ['3x3', 2],
+      ['4x4', 1],
+    ]);
     expect(s.state().solves.map((x) => x.timeMs)).toEqual([8000, 9000]); // oldest first
     expect(h.api.sessions.solves.mock.calls).toEqual([[main.id]]);
   });
@@ -768,7 +963,16 @@ describe('signed in (cloud)', () => {
     expect(s.state().solves.map((x) => x.id)).toEqual([`${main.id}-s1`, `${main.id}-s0`, solve.id]);
     expect(s.state().pending).toBe(1);
     expect(s.getCurrentSession()?.solveCount).toBe(3);
-    expect(h.api.solves.create).toHaveBeenCalledWith({ id: solve.id, sessionId: main.id, timeMs: 7777, penalty: 'OK', scramble: 'R2', comment: null, source: 'timer', createdAt: NOW });
+    expect(h.api.solves.create).toHaveBeenCalledWith({
+      id: solve.id,
+      sessionId: main.id,
+      timeMs: 7777,
+      penalty: 'OK',
+      scramble: 'R2',
+      comment: null,
+      source: 'timer',
+      createdAt: NOW,
+    });
     gate.resolve();
     await flush();
     expect(s.state().pending).toBe(0);
@@ -783,7 +987,13 @@ describe('signed in (cloud)', () => {
     await flush();
     expect(s.state()).toMatchObject({ pending: 1, syncError: 'solve service unreachable' });
     expect(s.state().solves.map((x) => x.id)).toContain(solve.id);
-    expect(queued()).toEqual([expect.objectContaining({ userId: 'u1', attempts: 1, op: expect.objectContaining({ kind: 'createSolve', solve: expect.objectContaining({ id: solve.id }) }) })]);
+    expect(queued()).toEqual([
+      expect.objectContaining({
+        userId: 'u1',
+        attempts: 1,
+        op: expect.objectContaining({ kind: 'createSolve', solve: expect.objectContaining({ id: solve.id }) }),
+      }),
+    ]);
     await advance(999);
     expect(h.api.solves.create).toHaveBeenCalledTimes(1);
     await advance(1); // 1 s after the first failure
@@ -840,6 +1050,45 @@ describe('signed in (cloud)', () => {
     await advance(120_000);
     expect(h.api.solves.create).toHaveBeenCalledTimes(1); // never retried
     expect(queued()).toEqual([]);
+  });
+
+  it('moves queued solves whose session was merged away on another device into a new session, with one notice', async () => {
+    const s = await start(U1, { seed: seedU1 });
+    h.api.solves.create.mockRejectedValueOnce(offline(s));
+    const a = await add(s, 1111);
+    vi.setSystemTime(new Date(Date.parse(NOW) + 1000));
+    const b = await add(s, 2222);
+    await flush();
+    expect(queued().map((q) => q.op.kind)).toEqual(['createSolve', 'createSolve']);
+    // meanwhile 3x3 was merged into another session on another device: it's gone from the account
+    s.server.sessions = s.server.sessions.filter((x) => x.id !== main.id);
+    await advance(2000);
+    await flush();
+    const rec = s.server.sessions.find((x) => x.name === '3x3 (recovered)');
+    expect(rec).toMatchObject({ userId: 'u1', event: '333', practice: false }); // this device still knew 3x3: a normal session
+    expect(s.server.solvesOf(rec!.id).map((x) => x.id)).toEqual([a.id, b.id]);
+    expect(queued()).toEqual([]);
+    expect(s.toasts()).toEqual([['notice', '2 solves from a session merged or deleted on another device are in a new session, "3x3 (recovered)"']]);
+    expect(s.state().sessions.map((x) => x.name)).toContain('3x3 (recovered)');
+  });
+
+  it('drops, with an error, a solve that cannot go into the session it was moved to either', async () => {
+    const s = await start(U1, { seed: seedU1 });
+    h.api.solves.create.mockRejectedValueOnce(offline(s));
+    await add(s, 1111);
+    await flush();
+    s.server.sessions = s.server.sessions.filter((x) => x.id !== main.id);
+    const real = h.api.sessions.create.getMockImplementation()!;
+    // the new session is made, then removed again before the solve arrives
+    h.api.sessions.create.mockImplementationOnce(async (body: { id: string }) => {
+      const res = await real(body);
+      s.server.sessions = s.server.sessions.filter((x) => x.id !== body.id);
+      return res;
+    });
+    await advance(2000);
+    await flush();
+    expect(queued()).toEqual([]);
+    expect(s.toasts().map(([type]) => type)).toEqual(['notice', 'error']); // moved once, then given up: no loop
   });
 
   it('retries at once when the browser comes back online', async () => {
@@ -901,7 +1150,11 @@ describe('signed in (cloud)', () => {
     await s.setComment(a.id, 'bad');
     const b = await add(s, 6000);
     await s.deleteSolve(b.id);
-    expect(queued()).toEqual([expect.objectContaining({ op: expect.objectContaining({ kind: 'createSolve', solve: expect.objectContaining({ id: a.id, penalty: 'DNF', comment: 'bad' }) }) })]);
+    expect(queued()).toEqual([
+      expect.objectContaining({
+        op: expect.objectContaining({ kind: 'createSolve', solve: expect.objectContaining({ id: a.id, penalty: 'DNF', comment: 'bad' }) }),
+      }),
+    ]);
     await advance(1000);
     expect(h.api.solves.create).toHaveBeenCalledTimes(2);
     expect(h.api.solves.create).toHaveBeenLastCalledWith(expect.objectContaining({ id: a.id, penalty: 'DNF', comment: 'bad' }));
@@ -948,6 +1201,15 @@ describe('signed in (cloud)', () => {
     await flush();
     expect(h.api.sessions.create).toHaveBeenLastCalledWith({ id: warmUp.id, name: 'warm up', event: '333', practice: true });
     expect(s.state().pending).toBe(0);
+  });
+
+  it("sends a practice scramble's session with its type, as a practice session", async () => {
+    const s = await start(U1, { seed: seedU1 });
+    await s.switchScramble('333', 'oll');
+    const oll = s.getCurrentSession()!;
+    await flush();
+    expect(h.api.sessions.create).toHaveBeenLastCalledWith({ id: oll.id, name: '3x3 oll', event: '333', practice: true, scramble: 'oll' });
+    expect(s.server.sessions.find((x) => x.id === oll.id)).toMatchObject({ scramble: 'oll', practice: true });
   });
 
   it('treats changes to a session deleted on another device (404) as done, and skips edits to a session being deleted', async () => {
@@ -1051,7 +1313,15 @@ describe('signed in (cloud)', () => {
   });
 
   it("never shows another account's offline copy", async () => {
-    local.setItem(CACHE_KEY, JSON.stringify({ userId: 'u2', sessions: [{ id: 'u2s', name: "two's session", event: '333', createdAt: T(0), updatedAt: T(0), solveCount: 1 }], sessionId: 'u2s', solves: [['x', 1000, 0, '', null, 0]] }));
+    local.setItem(
+      CACHE_KEY,
+      JSON.stringify({
+        userId: 'u2',
+        sessions: [{ id: 'u2s', name: "two's session", event: '333', createdAt: T(0), updatedAt: T(0), solveCount: 1 }],
+        sessionId: 'u2s',
+        solves: [['x', 1000, 0, '', null, 0]],
+      }),
+    );
     const s = await start(U1, { before: ({ server }) => (server.down = true) });
     expect(s.state().sessions.map((x) => x.name)).toEqual(['3x3', '3x3 practice']); // made here, sent once the service is back
     expect(s.state().solves).toEqual([]);
@@ -1143,6 +1413,22 @@ describe('signed in (cloud)', () => {
     expect(data.sessions.map((x) => x.name)).toEqual(['3x3', '4x4']);
   });
 
+  it('adds up what the server left out and continued over all of an import’s requests', async () => {
+    const s = await start(U1, { seed: seedU1 });
+    h.api.sessions.import
+      .mockResolvedValueOnce({ imported: { sessions: 1, solves: 2 }, skipped: 3, continued: 1 })
+      .mockResolvedValueOnce({ imported: { sessions: 0, solves: 0 } }); // a server from before v1.6.72
+    const big = (name: string, n: number, from: number) => ({
+      name,
+      event: '333',
+      sourceType: '333',
+      solves: Array.from({ length: n }, (_, i) => imp(1000 + i, T(from + i))),
+    });
+    const r = await s.importSessions([big('a', 15_000, 0), big('b', 15_000, 20_000)]);
+    expect(h.api.sessions.import).toHaveBeenCalledTimes(2);
+    expect(r).toEqual({ sessions: 1, solves: 2, skipped: 3, continued: 1 });
+  });
+
   it('imports sessions in one request and shows them', async () => {
     const s = await start(U1, { seed: seedU1 });
     const r = await s.importSessions([
@@ -1150,7 +1436,7 @@ describe('signed in (cloud)', () => {
       { name: 'skip me', event: 'nope', sourceType: 'x', solves: [imp(1000, T(1))] },
       { name: '', event: '222', sourceType: '222so', practice: true, solves: [imp(1500, T(2))] },
     ]);
-    expect(r).toEqual({ sessions: 2, solves: 3 });
+    expect(r).toEqual({ sessions: 2, solves: 3, skipped: 0, continued: 0 });
     expect(h.api.sessions.import).toHaveBeenCalledTimes(1);
     expect(h.api.sessions.import.mock.calls[0][0]).toEqual({
       sessions: [
@@ -1158,14 +1444,33 @@ describe('signed in (cloud)', () => {
         { name: 'import', event: '222', practice: true, solves: [imp(1500, T(2))] },
       ],
     });
-    expect(s.state().sessions.map((x) => [x.name, x.solveCount])).toEqual([['3x3', 2], ['4x4', 1], ['Imported', 2], ['import', 1]]);
+    expect(s.state().sessions.map((x) => [x.name, x.solveCount])).toEqual([
+      ['3x3', 2],
+      ['4x4', 1],
+      ['Imported', 2],
+      ['import', 1],
+    ]);
   });
 
   describe('merging', () => {
     let other: ServerSession;
     const seedMerge = (server: FakeServer) => {
-      main = server.seed({ userId: 'u1', name: '3x3', solves: [{ timeMs: 1000, at: T(1) }, { timeMs: 3000, at: T(3) }] });
-      other = server.seed({ userId: 'u1', name: '3x3 B', solves: [{ timeMs: 2000, at: T(2) }, { timeMs: 4000, at: T(4) }] });
+      main = server.seed({
+        userId: 'u1',
+        name: '3x3',
+        solves: [
+          { timeMs: 1000, at: T(1) },
+          { timeMs: 3000, at: T(3) },
+        ],
+      });
+      other = server.seed({
+        userId: 'u1',
+        name: '3x3 B',
+        solves: [
+          { timeMs: 2000, at: T(2) },
+          { timeMs: 4000, at: T(4) },
+        ],
+      });
     };
 
     it('sends queued changes first, then merges on the server and shows the result', async () => {
@@ -1224,7 +1529,12 @@ describe('signed in (cloud)', () => {
       });
       const real = h.api.sessions.merge.getMockImplementation()!;
       h.api.sessions.merge.mockImplementationOnce(real).mockRejectedValueOnce(new s.ApiError(503, 'HTTP_503', 'down'));
-      await expect(s.mergeSessions(main.id, sources.map((x) => x.id))).rejects.toThrow("merged 50 of 60 sessions, then: couldn't reach the solve service - try again in a moment");
+      await expect(
+        s.mergeSessions(
+          main.id,
+          sources.map((x) => x.id),
+        ),
+      ).rejects.toThrow("merged 50 of 60 sessions, then: couldn't reach the solve service - try again in a moment");
       await flush();
       expect(h.api.sessions.merge.mock.calls.map((c) => c[1].length)).toEqual([50, 10]);
       expect(s.state().sessions).toHaveLength(11);
@@ -1254,6 +1564,119 @@ describe('signed in (cloud)', () => {
 
 // ================================================================ signing in and out
 
+describe("two tabs (the October review's #11)", () => {
+  let main: ServerSession;
+  const seed = (server: FakeServer) => {
+    main = server.seed({ userId: 'u1', name: '3x3', solves: [{ timeMs: 9000, at: T(1) }] });
+  };
+  const offline = (s: { ApiError: ApiErrorClass }) => new s.ApiError(0, 'NETWORK', 'Network error - is the server reachable?');
+  type Tab = Awaited<ReturnType<typeof start>>;
+  const add = (s: Tab, timeMs: number) => s.addSolve({ timeMs, penalty: 'OK', scramble: 'R' });
+  /** a browser delivers each write to localStorage to the other tabs as a 'storage' event */
+  const tell = (w: EventTarget, key: string) => w.dispatchEvent(Object.assign(new Event('storage'), { key }));
+  const timesQueued = () => queued().flatMap((q) => (q.op.kind === 'createSolve' ? [q.op.solve.timeMs] : []));
+
+  /** A second tab: the same browser storage and solve service, its own page and module instance. */
+  async function secondTab(server: FakeServer, opts: { offline?: boolean } = {}): Promise<{ tab: Tab; first: EventTarget; second: EventTarget }> {
+    const first = win;
+    vi.resetModules();
+    stubPage();
+    const tab = await start(U1, { server, before: opts.offline ? (ctx) => void h.api.solves.create.mockRejectedValue(offline(ctx)) : undefined });
+    return { tab, first, second: win };
+  }
+
+  /** navigator.locks for the tabs: one holder per name, ifAvailable answers null while it's held */
+  function stubLocks(): void {
+    const held = new Set<string>();
+    vi.stubGlobal('navigator', {
+      locks: {
+        request: async (name: string, _opts: unknown, fn: (lock: { name: string } | null) => Promise<void>) => {
+          if (held.has(name)) return fn(null);
+          held.add(name);
+          try {
+            return await fn({ name });
+          } finally {
+            held.delete(name);
+          }
+        },
+      },
+    });
+  }
+
+  it("keeps every tab's unsent changes, and sends them all once back online", async () => {
+    const a = await start(U1, { seed });
+    h.api.solves.create.mockRejectedValue(offline(a));
+    const one = await add(a, 1111);
+    await flush();
+    const { tab: b, first, second } = await secondTab(a.server, { offline: true });
+    const two = await add(b, 2222);
+    tell(first, QUEUE_KEY);
+    const three = await add(a, 3333); // tab A writes again: tab B's solve stays (it used to be overwritten)
+    tell(second, QUEUE_KEY);
+    expect(timesQueued()).toEqual([1111, 2222, 3333]);
+    b.reinstall(); // back online
+    first.dispatchEvent(new Event('online'));
+    second.dispatchEvent(new Event('online'));
+    await advance(5000);
+    expect(a.server.solvesOf(main.id).map((x) => x.id)).toEqual(expect.arrayContaining([one.id, two.id, three.id]));
+    expect(queued()).toEqual([]);
+  });
+
+  it('sends from one tab at a time', async () => {
+    stubLocks();
+    const a = await start(U1, { seed });
+    h.api.solves.create.mockRejectedValue(offline(a));
+    await add(a, 1111);
+    await add(a, 2222);
+    await flush();
+    const { tab: b, first, second } = await secondTab(a.server, { offline: true });
+    await add(b, 3333);
+    tell(first, QUEUE_KEY);
+    b.reinstall();
+    const real = h.api.solves.create.getMockImplementation()!;
+    let sending = 0;
+    let most = 0;
+    let calls = 0;
+    h.api.solves.create.mockImplementation(async (body: unknown) => {
+      calls++;
+      most = Math.max(most, ++sending);
+      await new Promise((r) => setTimeout(r, 100));
+      sending--;
+      return real(body);
+    });
+    first.dispatchEvent(new Event('online'));
+    second.dispatchEvent(new Event('online'));
+    await advance(5000);
+    expect(most).toBe(1);
+    expect(calls).toBe(3); // each once, back online
+    expect(queued()).toEqual([]);
+  });
+
+  it("never folds an edit into the solve another tab is sending, so the edit isn't lost", async () => {
+    stubLocks();
+    const a = await start(U1, { seed });
+    const gate = deferred();
+    const real = h.api.solves.create.getMockImplementation()!;
+    h.api.solves.create.mockImplementationOnce(async (body: unknown) => {
+      await gate.promise;
+      return real(body);
+    });
+    const solve = await add(a, 1111);
+    await flush(); // tab A is sending it
+    const { tab: b, first, second } = await secondTab(a.server);
+    const marking = b.setPenaltyIn(solve.id, 'DNF', main.id); // tab B marks it DNF meanwhile (it waits until that's sent)
+    await flush();
+    tell(first, QUEUE_KEY);
+    expect(queued().map((q) => q.op.kind)).toEqual(['createSolve', 'updateSolve']); // a separate edit, not folded in
+    gate.resolve();
+    await advance(5000); // tab A sends both
+    tell(second, QUEUE_KEY);
+    await marking; // tab B hears its edit went out
+    expect(a.server.solvesOf(main.id).find((x) => x.id === solve.id)?.penalty).toBe('DNF');
+    expect(queued()).toEqual([]);
+  });
+});
+
 describe('signing in and out', () => {
   it('switches to the account on login and back to the guest solves on logout, losing nothing', async () => {
     const s = await start();
@@ -1277,12 +1700,21 @@ describe('signing in and out', () => {
     expect(s.uploadOfferStore.get()).toEqual({ userId: 'u1', sessions: 1, solves: 2 });
     expect(await s.uploadLocalSolves()).toEqual({ sessions: 1, solves: 2 });
     expect(h.api.sessions.import.mock.calls[0][0]).toEqual({
-      sessions: [{ name: '3x3', event: '333', solves: [a, b].map(({ timeMs, penalty, scramble, comment, createdAt }) => ({ timeMs, penalty, scramble, comment, createdAt })) }],
+      sessions: [
+        {
+          name: '3x3',
+          event: '333',
+          solves: [a, b].map(({ timeMs, penalty, scramble, comment, createdAt }) => ({ timeMs, penalty, scramble, comment, createdAt })),
+        },
+      ],
     });
     expect(s.uploadOfferStore.get()).toBeNull();
     expect(s.localDataSummary()).toEqual({ sessions: 0, solves: 0 });
     expect(local.getItem(LOCAL_KEY)).toBeNull();
-    expect(s.state().sessions.map((x) => [x.name, x.solveCount])).toEqual([['3x3', 0], ['3x3', 2]]);
+    expect(s.state().sessions.map((x) => [x.name, x.solveCount])).toEqual([
+      ['3x3', 0],
+      ['3x3', 2],
+    ]);
   });
 
   it('keeps only the guest sessions not uploaded yet when an upload fails half way, so a retry adds no duplicates', async () => {
@@ -1356,7 +1788,7 @@ describe('signing in and out', () => {
   });
 
   // recently completed ops are re-applied on reads for a minute (read-after-write), but only the account's own
-  it("does not show sessions the previous account just created to the next account", async () => {
+  it('does not show sessions the previous account just created to the next account', async () => {
     const s = await start(U1, {
       seed: (server) => {
         server.seed({ userId: 'u1', name: '3x3' });

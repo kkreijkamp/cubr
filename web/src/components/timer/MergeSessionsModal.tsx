@@ -1,6 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { ArrowsPointingInIcon, CheckIcon, Square3Stack3DIcon } from '@heroicons/react/24/outline';
-import { formatTime, getEvent, sessionStats, type Penalty, type Precision } from '@cubr/cubestats';
+import { formatAverage, formatTime, getEvent, sessionStats, type Penalty, type Precision } from '@cubr/cubestats';
 import { Modal } from '../Modal';
 import { SessionName } from '../SessionName';
 import { Spinner } from '../Spinner';
@@ -9,7 +9,6 @@ import { formatDate, formatNumber } from '../../lib/format';
 import { getLoadedSolves, mergeSessions } from '../../lib/solves';
 import { toast } from '../../lib/toast';
 import type { Session, Solve } from '../../lib/types';
-import { fmtAvg } from './statsUtil';
 import './dialogs.css';
 import './merge-sessions.css';
 
@@ -154,7 +153,10 @@ export function MergeSessionsModal({ sessions, currentSessionId, event, mode, us
     const total = parts.reduce((n, p) => n + p!.length, 0);
     if (total === 0 || total > PREVIEW_MAX) return null;
     const before = sessionStats(parts[0]!, [5, 12]);
-    const after = sessionStats((parts as Entry[][]).flat().sort((a, b) => a.t - b.t), [5, 12]);
+    const after = sessionStats(
+      (parts as Entry[][]).flat().sort((a, b) => a.t - b.t),
+      [5, 12],
+    );
     return {
       count: after.count,
       hadSolves: before.count > 0,
@@ -198,7 +200,10 @@ export function MergeSessionsModal({ sessions, currentSessionId, event, mode, us
     setFrozen(eventSessions);
     setError(null);
     try {
-      const r = await mergeSessions(target.id, chosen.map((s) => s.id));
+      const r = await mergeSessions(
+        target.id,
+        chosen.map((s) => s.id),
+      );
       onClose();
       toast.success(`merged ${plural(r.sessions, 'session')} - ${plural(r.solves, 'solve')}`);
     } catch (err) {
@@ -250,6 +255,7 @@ export function MergeSessionsModal({ sessions, currentSessionId, event, mode, us
     // top-aligned (not centred): the dialog grows when the picker / preview appear, and a
     // re-centring jump would move rows under the pointer between two clicks
     <Modal title="merge sessions" onClose={close}>
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Enter on a checkbox confirms, as on the buttons */}
       <form className="merge" onSubmit={submit} onKeyDown={onKeyDown} aria-busy={busy}>
         <div className="merge-section">
           <div className="merge-label">into</div>
@@ -293,7 +299,10 @@ export function MergeSessionsModal({ sessions, currentSessionId, event, mode, us
         <div className="merge-section">
           <div className="merge-head">
             <span className="merge-label">
-              merge these {eventLabel} sessions <span className="merge-label-n">({chosen.length}/{candidates.length})</span>
+              merge these {eventLabel} sessions{' '}
+              <span className="merge-label-n">
+                ({chosen.length}/{candidates.length})
+              </span>
             </span>
             <button
               type="button"
@@ -329,9 +338,21 @@ export function MergeSessionsModal({ sessions, currentSessionId, event, mode, us
           <div className="merge-preview" aria-label="the merged session">
             <div className="merge-label merge-preview-title">after merging</div>
             <PreviewStat label="solves" now={formatNumber(preview.count)} />
-            <PreviewStat label="best single" now={formatTime(preview.single.now, precision)} was={preview.hadSolves ? formatTime(preview.single.was, precision) : undefined} />
-            <PreviewStat label="best ao5" now={fmtAvg(preview.ao5.now, precision)} was={preview.hadSolves ? fmtAvg(preview.ao5.was, precision) : undefined} />
-            <PreviewStat label="best ao12" now={fmtAvg(preview.ao12.now, precision)} was={preview.hadSolves ? fmtAvg(preview.ao12.was, precision) : undefined} />
+            <PreviewStat
+              label="best single"
+              now={formatTime(preview.single.now, precision)}
+              was={preview.hadSolves ? formatTime(preview.single.was, precision) : undefined}
+            />
+            <PreviewStat
+              label="best ao5"
+              now={formatAverage(preview.ao5.now, precision)}
+              was={preview.hadSolves ? formatAverage(preview.ao5.was, precision) : undefined}
+            />
+            <PreviewStat
+              label="best ao12"
+              now={formatAverage(preview.ao12.now, precision)}
+              was={preview.hadSolves ? formatAverage(preview.ao12.was, precision) : undefined}
+            />
           </div>
         )}
 

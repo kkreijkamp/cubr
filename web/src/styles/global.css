@@ -1,5 +1,6 @@
 /* cubr global styles - Monkeytype-inspired design system.
-   Only the 10 theme tokens below are used for colour, so every theme "just works". */
+   Only the theme's tokens below are used for colour (its 10 colours, and the timer's ready green made for its
+   background), so every theme "just works". */
 
 :root {
   /* white_cross, the default theme (lib/themes.ts) */
@@ -13,6 +14,8 @@
   --error-extra-color: #8f1920;
   --colorful-error-color: #ff6a13;
   --colorful-error-extra-color: #b34507;
+  /* the timer's "let go to start" green, deeper on backgrounds where this one would be faint (lib/themes.ts readyColor) */
+  --timer-ready: #3ec46d;
   /* the browser's own parts (scrollbars, dropdown lists, pickers) match the theme (lib/themes.ts themeColors) */
   color-scheme: light;
 
@@ -22,8 +25,7 @@
   --dur: 0.125s;
   --page-max: 1280px;
   --pad: 2rem;
-  /* timer state colours, derived from the theme */
-  --timer-ready: #3ec46d;
+  /* timer state colours, derived from the theme (--timer-ready is one of its colours, above) */
   --timer-holding: var(--error-color);
   --timer-inspect: var(--main-color);
 }
@@ -42,6 +44,7 @@
     --error-extra-color: #b3323a;
     --colorful-error-color: #ff6a13;
     --colorful-error-extra-color: #b34507;
+    --timer-ready: #3ec46d;
     color-scheme: dark;
   }
 }
@@ -72,7 +75,9 @@ body {
   font-size: 16px;
   color: var(--text-color);
   background: var(--bg-color);
-  transition: background var(--dur), color var(--dur);
+  transition:
+    background var(--dur),
+    color var(--dur);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -102,10 +107,17 @@ body {
 a {
   color: var(--sub-color);
   text-decoration: none;
-  transition: color var(--dur), opacity var(--dur), background var(--dur);
+  transition:
+    color var(--dur),
+    opacity var(--dur),
+    background var(--dur);
 }
 a:hover {
   color: var(--text-color);
+}
+/* a link in running text (no class: not a button, tab or nav item) is underlined with high contrast */
+a:not([class]) {
+  text-decoration-line: var(--hc-link-decoration, none);
 }
 a.link-main {
   color: var(--main-color);
@@ -379,7 +391,10 @@ kbd {
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
-  transition: background var(--dur) ease-in-out, color var(--dur) ease-in-out, opacity var(--dur);
+  transition:
+    background var(--dur) ease-in-out,
+    color var(--dur) ease-in-out,
+    opacity var(--dur);
 }
 .btn {
   background: var(--sub-alt-color);
@@ -446,8 +461,31 @@ kbd {
 a:focus-visible,
 input[type='checkbox']:focus-visible,
 input[type='radio']:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 0.1rem var(--bg-color), 0 0 0 0.2rem var(--text-color);
+  /* the ring is a shadow; the outline is transparent, so it shows only where the browser forces its own
+     colours (Windows high contrast), which drop shadows */
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow:
+    0 0 0 0.1rem var(--bg-color),
+    0 0 0 0.2rem var(--text-color);
+}
+
+/* Windows high contrast (forced colours): the theme's colours give way to the system's, so whatever only
+   colour told apart gets an outline: the chosen option, a pressed or checked item, the page you're on,
+   and the timer when it's ready to start (its green) */
+@media (forced-colors: active) {
+  .active,
+  [aria-pressed='true'],
+  [aria-checked='true'],
+  [aria-current='page'],
+  [aria-selected='true'] {
+    outline: 2px solid Highlight;
+    outline-offset: 1px;
+  }
+  .timer-display.ready {
+    outline: 3px solid Highlight;
+    outline-offset: 0.15em;
+  }
 }
 .btn svg,
 .btn-text svg {
@@ -507,7 +545,9 @@ select {
   font-size: 1em;
   line-height: 1.25em;
   caret-color: var(--main-color);
-  transition: background var(--dur), color var(--dur);
+  transition:
+    background var(--dur),
+    color var(--dur);
 }
 select {
   cursor: pointer;
@@ -596,6 +636,28 @@ input[type='checkbox'] {
 .mono-nums {
   font-variant-numeric: tabular-nums;
 }
+/* "skip to content": the first stop for the keyboard, shown only while it has focus */
+.skip-link {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 1000;
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--roundness);
+  background: var(--sub-alt-color);
+  color: var(--text-color);
+  transform: translateY(-200%);
+}
+.skip-link:focus {
+  transform: none;
+}
+/* the page and its heading take focus from a script (a new page, the skip link): they aren't controls,
+   so no ring */
+main[tabindex='-1']:focus,
+main h1[tabindex='-1']:focus {
+  outline: none;
+}
+
 /* read by screen readers and search engines, not shown: the timer page's heading */
 .sr-only {
   position: absolute;
@@ -820,7 +882,9 @@ table.table .secondary {
   white-space: pre;
   pointer-events: none;
   opacity: 0;
-  transition: opacity var(--dur), transform var(--dur);
+  transition:
+    opacity var(--dur),
+    transform var(--dur);
   z-index: 50;
 }
 [data-tip][data-tip-pos='down']::after {
@@ -937,6 +1001,10 @@ body.focus .toast:not(.important) {
 .modal-backdrop.previewing {
   background: transparent;
 }
+/* a dialog takes focus itself when nothing in it asks for it (Modal.tsx): it isn't a control, so no ring */
+.modal:focus {
+  outline: none;
+}
 .modal {
   background: var(--bg-color);
   border-radius: calc(var(--roundness) * 2);
@@ -1005,6 +1073,74 @@ body.focus .toast:not(.important) {
 }
 .patch-note-section li::marker {
   color: var(--sub-color);
+}
+
+/* feedback (the footer's feedback opens it): the form, or an email or a github issue, and what they come with */
+.feedback-text,
+.feedback-note {
+  margin: 0;
+  color: var(--sub-color);
+  line-height: 1.5;
+}
+.feedback-text {
+  font-size: 0.9rem;
+}
+.feedback-note {
+  font-size: 0.8rem;
+}
+.feedback-form {
+  display: grid;
+  gap: 0.75rem;
+}
+.feedback-form .field input,
+.feedback-form .field select,
+.feedback-form .field textarea {
+  width: 100%;
+}
+.feedback-form textarea {
+  min-height: 7.5rem;
+  line-height: 1.45;
+}
+.feedback-form .error-text {
+  color: var(--error-color);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+/* the email and the type side by side, one under the other on phones */
+.feedback-two {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 0.75rem;
+}
+@media (max-width: 480px) {
+  .feedback-two {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.feedback-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+/* between the form and the other two ways, like the sign-in page's (.lg-or) */
+.feedback-or {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--sub-color);
+  font-size: 0.75rem;
+}
+.feedback-or::before,
+.feedback-or::after {
+  content: '';
+  flex: 1;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--sub-alt-color);
+}
+.feedback-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
 }
 
 /* command palette */
@@ -1123,8 +1259,30 @@ body.focus .toast:not(.important) {
   background: var(--main-color);
 }
 
-/* scramble preview net (ScrambleNet): as big as the box allows, never wider; the face plates are
-   the theme's background darkened, so they stand apart from it on light and dark themes alike */
+/* csTimer's drawing as it came, when it can't be redrawn as a net (TwistyPreview), fitted to the box */
+.twisty-drawn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.twisty-drawn img {
+  display: block;
+  max-width: 100%;
+  object-fit: contain;
+  user-select: none;
+}
+/* a puzzle cubing.js can't draw (TwistyPreview): a quiet line where the net would be */
+.twisty-none {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sub-color);
+  font-size: 0.8rem;
+  text-align: center;
+}
+/* scramble preview net (ScrambleNet, and csTimer's drawings redrawn as nets: DrawnNet): as big as
+   the box allows, never wider; the face plates are the theme's background darkened, so they stand
+   apart from it on light and dark themes alike */
 .scramble-net {
   display: block;
   width: 100%;
@@ -1138,6 +1296,35 @@ body.focus .toast:not(.important) {
 .scramble-net .guide {
   stroke: var(--net-plate);
   stroke-linecap: round;
+}
+/* a sliding puzzle's numbers, in the plate's colour */
+.scramble-net .tile-number {
+  fill: var(--net-plate);
+  font-weight: 600;
+  user-select: none;
+}
+/* a relay (TwistyPreview): each puzzle's own preview under its label, as many to a row as fit best */
+.relay-preview {
+  display: grid;
+  width: 100%;
+  align-content: center;
+  align-items: start;
+  gap: 4px 0.5rem; /* rows: RELAY_ROW_GAP in TwistyPreview */
+}
+.relay-part {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.relay-label {
+  height: 16px; /* RELAY_LABEL in TwistyPreview */
+  line-height: 16px;
+  font-size: 0.7rem;
+  color: var(--sub-color);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ---------------------------------------------------------------- animations */

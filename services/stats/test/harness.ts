@@ -123,8 +123,17 @@ export class FakeSolveService {
     }
     const solves = /^\/internal\/users\/([^/]+)\/solves$/.exec(url.pathname);
     if (solves) {
-      const list = this.list(decodeURIComponent(solves[1]), url.searchParams.get('event'));
-      send(200, { solves: this.onList ? this.onList(list) : list });
+      const all = this.list(decodeURIComponent(solves[1]), url.searchParams.get('event'));
+      const list = this.onList ? this.onList(all) : all;
+      // in pages when asked, as solve-service does (the cursor here is just the next offset)
+      const limit = Number(url.searchParams.get('limit') ?? 0);
+      if (!limit) {
+        send(200, { solves: list });
+        return;
+      }
+      const from = Number(url.searchParams.get('after') ?? 0);
+      const page = list.slice(from, from + limit);
+      send(200, { solves: page, next: from + limit < list.length ? String(from + limit) : null });
       return;
     }
     const sessions = /^\/internal\/users\/([^/]+)\/sessions$/.exec(url.pathname);
@@ -193,8 +202,16 @@ export class FakeSolveService {
     const s = this.solves.get(solveId)!;
     this.solves.delete(solveId);
     return envelope('solve.deleted', {
-      userId: user.id, username: user.username, event: s.event, sessionId: s.sessionId, solveId: s.id,
-      timeMs: s.timeMs, penalty: s.penalty, createdAt: s.createdAt, tz: user.tz, source: 'timer',
+      userId: user.id,
+      username: user.username,
+      event: s.event,
+      sessionId: s.sessionId,
+      solveId: s.id,
+      timeMs: s.timeMs,
+      penalty: s.penalty,
+      createdAt: s.createdAt,
+      tz: user.tz,
+      source: 'timer',
     });
   }
 
@@ -214,7 +231,15 @@ export class FakeSolveService {
   setPractice(user: Cuber, sessionId: string, practice: boolean): EventEnvelope {
     const session = this.sessions.get(sessionId)!;
     session.practice = practice;
-    return envelope('session.updated', { userId: user.id, username: user.username, sessionId, event: session.event, name: session.name, practice, tz: user.tz });
+    return envelope('session.updated', {
+      userId: user.id,
+      username: user.username,
+      sessionId,
+      event: session.event,
+      name: session.name,
+      practice,
+      tz: user.tz,
+    });
   }
 
   /** Moves the sources' solves into the target and deletes the sources. */

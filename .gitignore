@@ -11,3 +11,8 @@ data/
 web/dist/
 coverage/
 .vite/
+
+# end-to-end tests: the saved account, reports and traces
+e2e/.auth/
+e2e/playwright-report/
+e2e/test-results/

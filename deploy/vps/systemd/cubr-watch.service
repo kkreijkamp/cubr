@@ -1,0 +1,8 @@
+[Unit]
+Description=cubr: check what needs a human (disk, containers, 5xx, backup, WCA import)
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /opt/cubr/deploy/vps/watch.sh

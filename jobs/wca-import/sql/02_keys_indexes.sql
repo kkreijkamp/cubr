@@ -18,6 +18,11 @@ BEGIN
   END IF;
 END $$;
 
+-- ---- what cubr doesn't keep ----------------------------------------------------------------
+-- The export's persons carry a gender, which cubr never shows: loaded (COPY matches the export's
+-- header) and dropped here, so it never reaches the live schema (data minimisation, 2026-11-26).
+ALTER TABLE wca_staging.persons DROP COLUMN gender;
+
 -- ---- primary keys -----------------------------------------------------------------------
 ALTER TABLE wca_staging.continents    ADD CONSTRAINT continents_pkey    PRIMARY KEY (id);
 ALTER TABLE wca_staging.countries     ADD CONSTRAINT countries_pkey     PRIMARY KEY (id);

@@ -483,7 +483,12 @@ export function ganCube(): BtModel<CubeCtx> & { battery(): Promise<number | null
         if (view && view.byteLength >= 6) {
           // the first 9 bytes; the MAC is the last six of them, the other way round
           const nine = new DataView(view.buffer.slice(view.byteOffset, view.byteOffset + Math.min(9, view.byteLength)));
-          deviceMac = Array.from({ length: 6 }, (_, i) => nine.getUint8(nine.byteLength - i - 1).toString(16).padStart(2, '0')).join(':');
+          deviceMac = Array.from({ length: 6 }, (_, i) =>
+            nine
+              .getUint8(nine.byteLength - i - 1)
+              .toString(16)
+              .padStart(2, '0'),
+          ).join(':');
         }
       } catch {
         /* no advertisements: saved or asked for */

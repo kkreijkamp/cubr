@@ -25,6 +25,7 @@ x-service-env: &service-env
   DATABASE_URL: postgres://cubr:cubr@postgres:5432/cubr
   REDIS_URL: redis://redis:6379
   JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}   # override with JWT_SECRET=... docker compose up
+  JWT_SECRET_PREVIOUS: ${JWT_SECRET_PREVIOUS:-}     # the key before a rotation: its tokens still verify (runbook)
   # Shared secret for /internal/* calls between services (X-Internal-Token); auth also lets the
   # seed job, which sends it too, skip its per-IP rate limits.
   INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-dev-internal-token-0123456789}
@@ -44,12 +45,16 @@ x-service-env: &service-env
 x-service: &service
   restart: unless-stopped            # come back after crashes / docker restarts
   environment: *service-env
+  # Every 30 s once up, every 2 s while starting (start_interval, Docker 25+), so a deploy still sees
+  # a service healthy within seconds; each check starts a process, and every 10 s for every container
+  # was much of the stack's idle CPU.
   healthcheck:                       # readiness = /readyz (deps reachable, migrations applied)
     test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/readyz"]
-    interval: 10s
+    interval: 30s
     timeout: 3s
     retries: 3
     start_period: 60s                # scramble/wca may need a while on first start
+    start_interval: 2s
   depends_on:
     postgres: { condition: service_healthy }
     redis: { condition: service_healthy }
@@ -72,9 +77,11 @@ services:
       - "127.0.0.1:55433:5432"            # psql / services on the host: localhost:55433
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U cubr -d cubr"]
-      interval: 5s
+      interval: 30s
       timeout: 3s
-      retries: 20
+      retries: 3
+      start_period: 60s                # the services wait for this: every second while it starts
+      start_interval: 1s
 
   redis:
     image: redis:7-alpine
@@ -86,9 +93,11 @@ services:
       - "127.0.0.1:56380:6379"            # redis-cli / services on the host: localhost:56380
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
+      interval: 30s
       timeout: 3s
-      retries: 20
+      retries: 3
+      start_period: 30s
+      start_interval: 1s
 
   # ---- microservices (build context = repo root: every image also needs packages/) ------------
   auth:
@@ -109,6 +118,12 @@ services:
     <<: *service
     image: cubr/solve:dev
     build: { context: ., dockerfile: services/solve/Dockerfile, args: *build-args }
+    environment:
+      <<: *service-env
+      # daily-challenge reminders (Web Push) are off without these; for a local try, put a pair from
+      # `node deploy/vps/vapid-keys.mjs` in .env
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
 
   stats:
     <<: *service
@@ -143,9 +158,11 @@ services:
       NODE_NAME: docker-compose       # shown by /_info
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
-      interval: 10s
+      interval: 30s
       timeout: 3s
       retries: 3
+      start_period: 20s
+      start_interval: 2s
 
   # ---- gateway: local stand-in for the GKE Ingress ----------------------------------------------
   gateway:
@@ -161,9 +178,11 @@ services:
       web: { condition: service_started }
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
-      interval: 10s
+      interval: 30s
       timeout: 3s
       retries: 3
+      start_period: 20s
+      start_interval: 2s
 
   # ---- one-off jobs (only with --profile jobs) ---------------------------------------------------
   # Equivalent of the K8s CronJob wca-import: downloads the WCA public export and loads it into

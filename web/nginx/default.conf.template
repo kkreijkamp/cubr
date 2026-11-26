@@ -4,7 +4,8 @@
 #
 # Headers: every response gets the same security headers, set once at server level. No location may
 # use add_header: nginx would then drop every inherited header for that location. What differs by path
-# (Cache-Control, X-Robots-Tag) comes from the two maps instead. web/src/__tests__/site.test.ts checks
+# (Cache-Control, X-Robots-Tag) comes from maps instead, and so does what differs by request (the analytics
+# beacon's hosts in the CSP). web/src/__tests__/site.test.ts checks
 # this, the CSP hash and the routes below.
 
 # Cache-Control by status and path ($uri is the file nginx ended up serving: index.html for the app's
@@ -18,14 +19,39 @@ map "$status:$uri" $cubr_cache_control {
   ~^(?:200|304):/\.well-known/              "public, max-age=3600";
 }
 
+# Cloudflare Web Analytics only for browsers that don't ask not to be tracked. Cloudflare injects its
+# beacon into every page it serves (automatic setup), and the beacon checks neither Global Privacy
+# Control (Sec-GPC: 1) nor Do Not Track (DNT: 1), so for a browser that sends either the CSP leaves the
+# beacon's hosts out and the browser refuses to load it (the app's own beacon, src/lib/analytics.ts,
+# already stays away). The key is "<Sec-GPC>:<DNT>".
+map "$http_sec_gpc:$http_dnt" $cubr_beacon_script {
+  default  "https://static.cloudflareinsights.com";
+  "~^1:"   "";
+  "~:1$"   "";
+}
+map "$http_sec_gpc:$http_dnt" $cubr_beacon_reports {
+  default  "https://cloudflareinsights.com";
+  "~^1:"   "";
+  "~:1$"   "";
+}
+
 # Pages search engines shouldn't list: personal and one-off pages (an empty value sends no header).
 # Matched on the request as sent, since $uri is index.html by the time headers go out. Crawlers may
 # still fetch them (robots.txt doesn't block them), or they couldn't see this.
+# The CSP: the site's policy, except for an SVG file, which is a document of its own when opened or used
+# as the favicon. Safari applies that response's CSP inside it, and the favicon's dark-mode <style> was
+# refused under style-src 'self'. An SVG gets no scripts, nothing from elsewhere, and its own styles.
+map $uri $cubr_csp {
+  "~*\.svg$"  "default-src 'none'; style-src 'unsafe-inline'; img-src data:; frame-ancestors 'none'";
+  default     "default-src 'self'; script-src 'self' 'sha256-kbWrCQcY5deeZriU+oYxYkCG4RR147XA28tK/0GtqOI=' $cubr_beacon_script; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' wss://$host $cubr_beacon_reports; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+}
+
 map $request_uri $cubr_robots {
   default                                                 "";
   ~^/(?:api|internal)(?:/|$)                              "noindex";   # data, not pages (the services say the same)
   ~*^/(?:account|settings|login|reset|confirm-email)(?:[/?]|$) "noindex";
   ~*^/race/[^/?]                                          "noindex";   # race rooms last two hours
+  ~*^/profile/[^/?]                                       "noindex";   # people: on cubr, not in search results
 }
 
 # One address per page (search engines split a page's ranking between its addresses): a page asked for
@@ -69,10 +95,11 @@ server {
     return 301 $cubr_canonical$is_args$args;
   }
 
-  gzip on;
-  gzip_comp_level 5;
-  gzip_min_length 1024;
-  gzip_types text/css application/javascript application/json application/manifest+json image/svg+xml text/plain text/xml;
+  # No compression here: Cloudflare compresses what it gets uncompressed, with Brotli for the browsers that
+  # take it (about 15 % less JavaScript than gzip) and gzip for the rest, but it passes gzip from the
+  # origin through as it is (checked 2026-11-26). Static files are cached at its edge, so the VM's
+  # extra outbound bytes are few. (Decided 2026-11-26.)
+  gzip off;
 
   # ---- security headers (every response, errors included) ----------------------------------------
   # Content-Security-Policy: only cubr.dev's own scripts (plus the inline theme script in index.html,
@@ -83,8 +110,9 @@ server {
   # scramble net reads cubing.js's puzzle drawings, whose stickers carry style="fill:..."; React sets
   # styles through the CSSOM, which needs nothing. One outside script: Cloudflare Web Analytics' beacon
   # (static.cloudflareinsights.com), which reports to cloudflareinsights.com when the app loads it, or
-  # to cubr.dev's own /cdn-cgi/rum when Cloudflare injects it (web/src/lib/analytics.ts).
-  add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-kbWrCQcY5deeZriU+oYxYkCG4RR147XA28tK/0GtqOI=' https://static.cloudflareinsights.com; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' wss://$host https://cloudflareinsights.com; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
+  # to cubr.dev's own /cdn-cgi/rum when Cloudflare injects it (web/src/lib/analytics.ts); left out for a
+  # browser that sends Global Privacy Control or Do Not Track ($cubr_beacon_script, $cubr_beacon_reports).
+  add_header Content-Security-Policy $cubr_csp always;
   add_header X-Content-Type-Options "nosniff" always;
   add_header X-Frame-Options "DENY" always;
   add_header Referrer-Policy "strict-origin-when-cross-origin" always;

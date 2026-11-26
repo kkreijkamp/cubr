@@ -46,7 +46,13 @@ type Fetcher = (url: string, opts?: FetchOptions) => Promise<unknown>;
 function best(b: unknown, where: string): PeriodBest | undefined {
   if (b === undefined || b === null) return undefined;
   const v = b as { valueMs?: unknown; achievedAt?: unknown };
-  if (typeof v.valueMs !== 'number' || !Number.isInteger(v.valueMs) || v.valueMs <= 0 || typeof v.achievedAt !== 'string' || Number.isNaN(Date.parse(v.achievedAt))) {
+  if (
+    typeof v.valueMs !== 'number' ||
+    !Number.isInteger(v.valueMs) ||
+    v.valueMs <= 0 ||
+    typeof v.achievedAt !== 'string' ||
+    Number.isNaN(Date.parse(v.achievedAt))
+  ) {
     throw new Error(`malformed best ${where}`);
   }
   return { valueMs: v.valueMs, achievedAt: v.achievedAt };
@@ -86,7 +92,13 @@ export function parsePeriodBests(json: unknown): PeriodBests {
         for (const kind of ['single', 'ao5'] as const) {
           const b = (raw as Record<string, unknown>)[kind] as { valueMs?: unknown; achievedAt?: unknown } | undefined;
           if (b === undefined || b === null) continue;
-          if (typeof b.valueMs !== 'number' || !Number.isInteger(b.valueMs) || b.valueMs <= 0 || typeof b.achievedAt !== 'string' || Number.isNaN(Date.parse(b.achievedAt))) {
+          if (
+            typeof b.valueMs !== 'number' ||
+            !Number.isInteger(b.valueMs) ||
+            b.valueMs <= 0 ||
+            typeof b.achievedAt !== 'string' ||
+            Number.isNaN(Date.parse(b.achievedAt))
+          ) {
             throw new Error(`malformed period-bests value ${where}.${kind}`);
           }
           v[kind] = { valueMs: b.valueMs, achievedAt: b.achievedAt };

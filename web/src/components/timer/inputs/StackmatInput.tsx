@@ -47,15 +47,16 @@ export function StackmatInput(p: Props) {
   const signalSince = useRef<number | null>(null);
   timer.inspection = p.inspection;
 
-  const clearAlerts = () => {
+  // the inspection's 8 s / 12 s calls: these read only refs, so they never change
+  const clearAlerts = useCallback(() => {
     alertTimers.current.forEach(clearTimeout);
     alertTimers.current = [];
-  };
-  const startAlerts = () => {
+  }, []);
+  const startAlerts = useCallback(() => {
     clearAlerts();
     const mode = props.current.alerts;
     if (mode !== 'off') alertTimers.current = [setTimeout(() => alertAt(8, mode), 8000), setTimeout(() => alertAt(12, mode), 12000)];
-  };
+  }, [clearAlerts]);
 
   const connect = useCallback(
     async (fromClick: boolean) => {
@@ -96,7 +97,7 @@ export function StackmatInput(p: Props) {
       mic.current = null;
       clearAlerts();
     };
-  }, [connect, p.kind]);
+  }, [connect, p.kind, clearAlerts]);
 
   // space starts inspection (with the timer at zero), esc stops it
   useEffect(() => {
@@ -127,7 +128,7 @@ export function StackmatInput(p: Props) {
       window.removeEventListener('keydown', down, true);
       window.removeEventListener('keyup', up, true);
     };
-  }, [p.enabled, timer]);
+  }, [p.enabled, timer, clearAlerts, startAlerts]);
 
   // the timer page's view of it (by value: `last` is a fresh object each render)
   const lastMs = p.last?.timeMs;
@@ -136,7 +137,12 @@ export function StackmatInput(p: Props) {
     void tick;
     const s = signal;
     const hard = timer.hardTime;
-    const shown = hard !== null && s?.on ? { timeMs: hard, penalty: (lastMs === hard ? lastPenalty : 'OK') ?? 'OK' } : lastMs !== undefined ? { timeMs: lastMs, penalty: lastPenalty ?? 'OK' } : null;
+    const shown =
+      hard !== null && s?.on
+        ? { timeMs: hard, penalty: (lastMs === hard ? lastPenalty : 'OK') ?? 'OK' }
+        : lastMs !== undefined
+          ? { timeMs: lastMs, penalty: lastPenalty ?? 'OK' }
+          : null;
     const hands = s?.on && s.leftHand && s.rightHand;
     if (timer.phase === 'running') return { phase: 'running', inInspection: false, startedAt: timer.startTime, inspectionStartedAt: null, result: null };
     if (timer.phase === 'inspecting') {
@@ -186,7 +192,12 @@ export function StackmatInput(p: Props) {
       <div className="tp-hardware-bar">
         {status}
         {conn.status === 'listening' && mics.length > 1 && (
-          <select className="tp-hardware-select" value={device.stackmatDevice} onChange={(e) => updateInput({ stackmatDevice: e.target.value })} aria-label="microphone input">
+          <select
+            className="tp-hardware-select"
+            value={device.stackmatDevice}
+            onChange={(e) => updateInput({ stackmatDevice: e.target.value })}
+            aria-label="microphone input"
+          >
             <option value="">default input</option>
             {mics.map((m) => (
               <option key={m.id} value={m.id}>

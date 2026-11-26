@@ -13,9 +13,13 @@ import { CLIENT_ERROR_LIMITS as L, clientErrorSchema, scrubClientError } from '.
  */
 const LEVELS: Record<string, number> = { trace: 10, debug: 20, info: 30, warn: 40, error: 50, fatal: 60, silent: Infinity };
 
+/** A route's log level that leaves out its request lines (info): warn, or the service's own level when that is stricter (error, silent). */
+export function quietLogLevel(serviceLevel: string): LogLevel {
+  return ((LEVELS[serviceLevel] ?? 30) > LEVELS.warn ? serviceLevel : 'warn') as LogLevel;
+}
+
 export async function registerClientErrorRoutes(app: FastifyInstance, { config, redis }: Deps) {
-  // warn, or the service's own level when that is stricter (error, silent)
-  const logLevel = ((LEVELS[config.logLevel] ?? 30) > LEVELS.warn ? config.logLevel : 'warn') as LogLevel;
+  const logLevel = quietLogLevel(config.logLevel);
   app.post('/api/errors', { bodyLimit: L.bodyBytes, logLevel }, async (req, reply) => {
     if (!(await allow(redis, `client-error:${req.ip}`, L.perIp, L.perIpWindowSec))) throw rateLimited('Too many error reports');
     const report = parse(clientErrorSchema, req.body);

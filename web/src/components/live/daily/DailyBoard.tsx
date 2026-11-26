@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { TrophyIcon } from '@heroicons/react/24/outline';
-import { formatTime, fromApiValue, type Precision } from '@cubr/cubestats';
+import { formatAverage, fromApiValue, type Precision } from '@cubr/cubestats';
 import { api, ApiError } from '../../../lib/api';
 import { flagEmoji, formatNumber } from '../../../lib/format';
 import { useAsync } from '../../../lib/useAsync';
@@ -45,9 +45,9 @@ export function DailyBoard({
   return (
     <section className="card daily-board" aria-labelledby="dboard-title">
       <div className="live-section-title">
-        <h3 className="h3" id="dboard-title">
+        <h2 className="h3" id="dboard-title">
           <TrophyIcon /> leaderboard
-        </h3>
+        </h2>
         <span className="meta">
           {lb.loading && data ? <Spinner size={12} /> : null} {data ? `${formatNumber(data.total)} ranked` : ''}
         </span>
@@ -74,12 +74,14 @@ export function DailyBoard({
             <tbody>
               {shown.map((e) => (
                 <tr key={e.userId} className={e.userId === userId ? 'me' : ''}>
-                  <td className="center">{e.rank === 1 ? <TrophyIcon width={14} height={14} aria-label="1st" aria-hidden={false} className="crown" /> : e.rank}</td>
+                  <td className="center">
+                    {e.rank === 1 ? <TrophyIcon width={14} height={14} aria-label="1st" aria-hidden={false} className="crown" /> : e.rank}
+                  </td>
                   <td className="left name">
                     {e.country && <span className="flag">{flagEmoji(e.country)}</span>}
                     <Link to={`/profile/${encodeURIComponent(e.username)}`}>{e.username}</Link>
                   </td>
-                  <td>{formatTime(fromApiValue(e.valueMs), precision)}</td>
+                  <td>{formatAverage(fromApiValue(e.valueMs), precision)}</td>
                 </tr>
               ))}
               {me && !meVisible && (
@@ -90,7 +92,7 @@ export function DailyBoard({
                   <tr className="me">
                     <td className="center">{me.rank}</td>
                     <td className="left name">{username ?? 'you'}</td>
-                    <td>{formatTime(fromApiValue(me.valueMs), precision)}</td>
+                    <td>{formatAverage(fromApiValue(me.valueMs), precision)}</td>
                   </tr>
                 </>
               )}

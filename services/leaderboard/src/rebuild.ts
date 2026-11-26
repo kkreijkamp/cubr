@@ -3,19 +3,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import { flagJson, isBelowFloor, type FloorSource } from './floors.js';
 import { applyAllTimeBests } from './ingest.js';
 import type { PeriodSource } from './periods.js';
-import {
-  DELETED_USERS_KEY,
-  KINDS,
-  META_BUILT_KEY,
-  REBUILD_LOCK_KEY,
-  USERS_KEY,
-  allTimeKey,
-  atKey,
-  flaggedKey,
-  hasBoards,
-  tsKey,
-  type Kind,
-} from './keys.js';
+import { DELETED_USERS_KEY, KINDS, META_BUILT_KEY, REBUILD_LOCK_KEY, USERS_KEY, allTimeKey, atKey, flaggedKey, hasBoards, tsKey, type Kind } from './keys.js';
 
 // ---------------------------------------------------------------------------------------------
 // Boards are a derived read model: if Redis loses its data, all-time boards are rebuilt from the

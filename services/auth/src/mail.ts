@@ -4,7 +4,8 @@ import type { FastifyBaseLogger } from 'fastify';
 // ---------------------------------------------------------------------------------------------
 // Outgoing email: the page every account email shares, and sending it through Resend's HTTPS API
 // (no SDK, no SMTP: GCP blocks port 25 anyway). Every email comes from "cubr <no-reply@cubr.dev>",
-// with replies going to hello@cubr.dev, in plain text and in HTML.
+// with replies going to hello@cubr.dev (the feedback form's, to hello@cubr.dev, are answered to the
+// sender), in plain text and in HTML.
 // Without RESEND_API_KEY (local stack, CI) nothing is sent: the message is logged instead, so the
 // password-reset and email-confirmation flows can be tried by reading the link from
 // `docker compose logs auth`. scripts/test-email.ts sends a real one to any address (mail-tester.com).
@@ -36,10 +37,11 @@ export interface Email {
 
 export interface Mail extends Email {
   to: string;
+  /** where replies go instead of MAIL_REPLY_TO: the feedback form's emails go to cubr's inbox, answered to the sender */
+  replyTo?: string;
 }
 
-export const escapeHtml = (s: string) =>
-  s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+export const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 /**
  * The emails' colours: white cross, the default theme, and white cross dark for mail apps in dark mode
@@ -121,7 +123,10 @@ export function maskEmail(email: string): string {
  * sending reputation.
  */
 export function isReservedDomain(email: string): boolean {
-  const domain = email.slice(email.lastIndexOf('@') + 1).toLowerCase().replace(/\.$/, '');
+  const domain = email
+    .slice(email.lastIndexOf('@') + 1)
+    .toLowerCase()
+    .replace(/\.$/, '');
   return /(^|\.)(example\.(com|net|org)|test|example|invalid|localhost)$/.test(domain);
 }
 
@@ -149,7 +154,7 @@ export async function sendMail(cfg: MailConfig, mail: Mail, log: FastifyBaseLogg
     body: JSON.stringify({
       from: cfg.from,
       to: [mail.to],
-      reply_to: cfg.replyTo,
+      reply_to: mail.replyTo ?? cfg.replyTo,
       subject: mail.subject,
       text: mail.text,
       html: mail.html,

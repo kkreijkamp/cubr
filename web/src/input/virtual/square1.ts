@@ -24,7 +24,32 @@ const CUT_AXIS: Vec = [Math.sin(15 * DEG), 0, -Math.cos(15 * DEG)];
 
 // cube scheme faces: white, green, red, blue, orange, yellow (lib/scrambleNet), as cubing.js colours them
 const C = { white: 0, green: 1, red: 2, blue: 3, orange: 4, yellow: 5 };
-const SIDE = [C.red, C.blue, C.blue, C.blue, C.orange, C.orange, C.orange, C.green, C.green, C.green, C.red, C.red, C.red, C.red, C.green, C.green, C.green, C.orange, C.orange, C.orange, C.blue, C.blue, C.blue, C.red];
+const SIDE = [
+  C.red,
+  C.blue,
+  C.blue,
+  C.blue,
+  C.orange,
+  C.orange,
+  C.orange,
+  C.green,
+  C.green,
+  C.green,
+  C.red,
+  C.red,
+  C.red,
+  C.red,
+  C.green,
+  C.green,
+  C.green,
+  C.orange,
+  C.orange,
+  C.orange,
+  C.blue,
+  C.blue,
+  C.blue,
+  C.red,
+];
 const EDGES = new Set([2, 5, 8, 11, 12, 15, 18, 21]);
 /** the two wedges of each corner */
 const PARTNER = new Map<number, number>();
@@ -205,7 +230,8 @@ export function cornerFaces(a: number, slotA: number, b: number, slotB: number, 
     return ap - aq;
   });
   // the two halves' inner faces against each other are hidden inside the piece
-  const shared = (f: Sq1Face, g: Sq1Face[]) => g.some((h) => h.color === null && Math.abs(dot(h.normal, f.normal) + 1) < 1e-6 && Math.abs(dot(f.normal, sub(centroid(h.poly), centroid(f.poly)))) < 1e-6);
+  const shared = (f: Sq1Face, g: Sq1Face[]) =>
+    g.some((h) => h.color === null && Math.abs(dot(h.normal, f.normal) + 1) < 1e-6 && Math.abs(dot(f.normal, sub(centroid(h.poly), centroid(f.poly)))) < 1e-6);
   const keep = (fs: Sq1Face[], others: Sq1Face[]) => fs.slice(1).filter((f) => !(f.color === null && shared(f, others)));
   return [{ poly: kite, color: fa[0].color, normal: n }, ...keep(fa, fb), ...keep(fb, fa)];
 }

@@ -42,7 +42,10 @@ export async function openMicrophone(deviceId: string, onSamples: (s: Float32Arr
   } catch (e) {
     void ctx.close();
     const name = (e as Error).name;
-    throw new MicrophoneError(name === 'NotAllowedError' || name === 'SecurityError' ? 'microphone access was blocked' : (e as Error).message || 'no microphone', name === 'NotAllowedError' || name === 'SecurityError' ? 'denied' : 'failed');
+    throw new MicrophoneError(
+      name === 'NotAllowedError' || name === 'SecurityError' ? 'microphone access was blocked' : (e as Error).message || 'no microphone',
+      name === 'NotAllowedError' || name === 'SecurityError' ? 'denied' : 'failed',
+    );
   }
   if (ctx.state !== 'running') {
     await ctx.resume().catch(() => undefined);
