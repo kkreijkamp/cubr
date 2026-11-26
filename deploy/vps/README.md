@@ -54,6 +54,18 @@ The gateway is also on the VM's `127.0.0.1:8080`, so `curl http://127.0.0.1:8080
 works over SSH. Docker restarts crashed containers and starts the stack on boot
 (`restart: unless-stopped`).
 
+## Dependencies (the supply-chain guards, 2026-11-26)
+
+- **No install scripts:** `.npmrc` and `web/.npmrc` set `ignore-scripts=true` (the 2025 npm worms spread
+  through them). esbuild and fsevents work without theirs. A new dependency that needs its script runs
+  it by hand (`npm rebuild <package>`), after reading it.
+- **Only versions a week old:** Dependabot (`.github/dependabot.yml`, read from `main`) opens weekly,
+  grouped PRs onto `dev` with a 7-day cooldown. By hand: `npm install <pkg> --before "$(date -v-7d +%F)"`
+  (npm 10 has no `min-release-age`; npm 11.10+ does).
+- **CI:** `npm audit --omit=dev --audit-level=high` fails the build; actions are pinned to commit SHAs;
+  Trivy scans the scramble and auth images (it reports without failing until its first reports are
+  clean, then drop `continue-on-error`).
+
 ## Security headers and crawler files
 
 The web container sends a Content-Security-Policy and the other security headers on every page, and

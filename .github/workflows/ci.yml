@@ -10,6 +10,11 @@ concurrency:
 permissions:
   contents: read
 
+# Actions are pinned to commit SHAs (a moved tag can't change what runs); Dependabot proposes updates.
+env:
+  # the image scanner, pinned by digest (its own image: no third-party action)
+  TRIVY: aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
+
 jobs:
   services:
     name: Services, jobs and shared packages
@@ -31,12 +36,14 @@ jobs:
       TEST_DATABASE_URL: postgres://postgres:test@localhost:5432/postgres
       TEST_REDIS_URL: redis://localhost:6379
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 22
           cache: npm
       - run: npm ci --no-audit --no-fund
+      - name: Known vulnerabilities in what ships (fails on high)
+        run: npm audit --omit=dev --audit-level=high
       - name: Typecheck
         run: npm run typecheck
       - name: Tests (unit and integration)
@@ -52,13 +59,15 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: npm ci --no-audit --no-fund
+      - name: Known vulnerabilities in what ships (fails on high)
+        run: npm audit --omit=dev --audit-level=high
       - name: Typecheck
         run: npm run typecheck
       - name: Unit tests
@@ -71,7 +80,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - name: Render every kustomization
         run: |
           for dir in $(find deploy/k8s -name kustomization.yaml -exec dirname {} \; | sort); do
@@ -97,7 +106,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - name: Gateway (deploy/gateway/nginx.conf)
         run: docker run --rm -v "$PWD/deploy/gateway/nginx.conf:/etc/nginx/nginx.conf:ro" nginx:1.27-alpine nginx -t
       - name: Web container (web/nginx/default.conf.template)
@@ -115,11 +124,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - name: Build
         run: docker build -f services/scramble/Dockerfile -t cubr/scramble:ci .
       - name: cubing.js resolves inside the image
         run: docker run --rm cubr/scramble:ci node -e "import('cubing/scramble').then(() => console.log('cubing ok'))"
+      - name: Vulnerabilities in the image (Trivy; reports, doesn't block yet)
+        # node:22-alpine plus the bundle is what every service image is, so this covers their base too.
+        # It turns blocking (drop continue-on-error) once its first reports are clean.
+        continue-on-error: true
+        run: >-
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$TRIVY"
+          image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --no-progress cubr/scramble:ci
 
   auth-image:
     # auth re-encodes profile pictures with sharp, whose native libvips the Dockerfile installs for
@@ -128,7 +144,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - name: Build
         run: docker build -f services/auth/Dockerfile -t cubr/auth:ci .
       - name: sharp re-encodes a picture inside the image
@@ -137,3 +153,9 @@ jobs:
           const png = await sharp({ create: { width: 64, height: 32, channels: 3, background: '#00a04d' } }).png().toBuffer();
           const out = await sharp(png).resize(16, 16).webp().toBuffer();
           console.log('sharp ok', (await sharp(out).metadata()).format)"
+      - name: Vulnerabilities in the image (Trivy; reports, doesn't block yet)
+        # sharp's libvips is the one native library cubr ships
+        continue-on-error: true
+        run: >-
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$TRIVY"
+          image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --no-progress cubr/auth:ci
