@@ -8,6 +8,7 @@ import { EVENT_IDS } from '@cubr/cubestats';
 import { describeIntegration, startTestServer, type TestServer } from '@cubr/testkit';
 import { createCache } from '../src/cache.js';
 import { createDataset } from '../src/dataset.js';
+import { createRankIndex } from '../src/rankIndex.js';
 import { createRepo } from '../src/repo.js';
 import { registerRoutes } from '../src/routes/index.js';
 import { createService } from '../src/service.js';
@@ -89,6 +90,26 @@ describeIntegration('wca API', () => {
       expect(again.headers['x-cache']).toBe('HIT');
       expect(again.headers['cache-control']).toBe('public, max-age=300');
     });
+  });
+
+  it('ranks from the in-memory lists exactly as the SQL counts do, for every event and value of the export', async () => {
+    const repo = createRepo(s.pool);
+    const ranks = createRankIndex(repo);
+    const { rows } = await s.pool.query<{ event_id: string; best: number }>('SELECT DISTINCT event_id, best FROM wca.ranks_single ORDER BY 1, 2');
+    for (const { event_id: event, best } of rows)
+      for (const raw of [best - 1, best, best + 1]) {
+        const sql = await repo.worldCounts('single', event, raw, raw);
+        expect(await ranks.world('v', 'single', event, raw, raw), `${event} ${raw}`).toMatchObject({
+          faster: Number(sql.faster),
+          notSlower: Number(sql.notSlower),
+        });
+        const country = await repo.countryCounts('single', event, 'Australia', raw, raw);
+        expect(await ranks.country('v', 'single', event, 'Australia', raw, raw), `${event} ${raw} in Australia`).toEqual({
+          faster: Number(country.faster),
+          notSlower: Number(country.notSlower),
+          total: Number(country.total),
+        });
+      }
   });
 
   describe('rank', () => {

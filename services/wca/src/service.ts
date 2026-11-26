@@ -1,3 +1,4 @@
+import { createRankIndex } from './rankIndex.js';
 import { notFound } from '@cubr/common';
 import type { EventInfo } from '@cubr/cubestats';
 import type { CacheFn } from './cache.js';
@@ -44,6 +45,7 @@ function personOut(event: string, kind: Kind, r: RankedRow) {
 
 export function createService(deps: { repo: Repo; dataset: Dataset; cache: CacheFn }) {
   const { repo, dataset, cache } = deps;
+  const ranks = createRankIndex(repo);
 
   async function percentileMap(meta: DatasetMeta) {
     const { value } = await cache(meta.cacheVersion, 'percentiles', HOUR, () => repo.percentiles(EVENT_IDS));
@@ -82,14 +84,14 @@ export function createService(deps: { repo: Repo; dataset: Dataset; cache: Cache
     const total = stats?.total ?? 0;
 
     const [world, country, near] = await Promise.all([
-      repo.worldCounts(q.kind, q.event, fasterBelow, slowerAbove),
+      ranks.world(meta.cacheVersion, q.kind, q.event, fasterBelow, slowerAbove),
       q.country ? repo.findCountry(q.country) : Promise.resolve(null),
       repo.neighbours(q.kind, q.event, fasterBelow),
     ]);
 
     let countryOut = null;
     if (country) {
-      const cc = await repo.countryCounts(q.kind, q.event, country.id, fasterBelow, slowerAbove);
+      const cc = await ranks.country(meta.cacheVersion, q.kind, q.event, country.id, fasterBelow, slowerAbove);
       countryOut = {
         rank: rankFromCounts(cc.faster),
         total: cc.total,
