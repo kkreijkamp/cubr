@@ -891,9 +891,9 @@ The web container's nginx (`web/nginx/default.conf.template`) serves the app and
     keep their case. The canonical forms are listed first and never redirect, and every target is
     one of them, so nothing loops (`site.test.ts`).
   - **the app** adds `<link rel="canonical" href="https://cubr.dev/...">` to each page search engines
-    may list (`lib/canonical.ts`): the path itself; the home page without a query; a profile with
-    its name as stored; a board with only its event, kind and period (the default board is plain
-    `/leaderboards`, as in the sitemap). Pages with `noindex` get none.
+    may list (`lib/canonical.ts`): the path itself; the home page without a query; a board with only
+    its event, kind and period (the default board is plain `/leaderboards`, as in the sitemap). Pages
+    with `noindex` get none, profiles included.
 - **Real 404s.** The app's routes (section 10, case-insensitive, optional trailing slash) get
   `index.html` with 200 (the public pages: their own copy of it, above). Usernames and room ids must look like `USERNAME_RE` and `ROOM_ID_RE`.
   Everything else is a file of the build or a 404 whose body is still `index.html`, so people see
@@ -901,14 +901,19 @@ The web container's nginx (`web/nginx/default.conf.template`) serves the app and
   profile) still answers 200; its view adds `<meta name="robots" content="noindex">`, as does the
   not-found page (`lib/useNoIndex.ts`).
 - **Crawlers.**
-  - `robots.txt` lets them fetch everything but `/internal/`, and names `sitemap.xml` (the public
-    pages: timer, daily, leaderboards, race, WCA, about, terms, privacy). The API stays crawlable on
-    purpose: Google renders pages without whatever robots.txt blocks, and the leaderboards, profiles,
-    the daily board and About load their content from it. API answers say `X-Robots-Tag: noindex`
-    (`ROBOTS_HEADERS` in common), so they never show up in results.
+  - `robots.txt` lets search engines and AI search (OAI-SearchBot, ChatGPT-User, Claude-SearchBot,
+    Claude-User, PerplexityBot...) fetch everything but `/internal/`, and names `sitemap.xml` (the
+    public pages: timer, daily, leaderboards, race, WCA, about, terms, privacy). Crawlers that collect
+    pages to train AI models (GPTBot, ClaudeBot, anthropic-ai, CCBot, Google-Extended,
+    Applebot-Extended, Bytespider, meta-externalagent) are turned away from everything (decided
+    2026-11-26). The API stays crawlable on purpose: Google renders pages without whatever
+    robots.txt blocks, and the leaderboards, the daily board and About load their content from it.
+    API answers say `X-Robots-Tag: noindex` (`ROBOTS_HEADERS` in common), so they never show up in
+    results.
   - Personal and short-lived pages answer `X-Robots-Tag: noindex`: `/account`, `/settings`,
-    `/login*`, `/reset` and `/race/<id>`. They aren't blocked in robots.txt, or crawlers couldn't
-    see the tag.
+    `/login*`, `/reset`, `/race/<id>`, and people's profiles (`/profile/<name>`, decided 2026-11-26:
+    on cubr, not in search results; the page adds the meta tag too). They aren't blocked in
+    robots.txt, or crawlers couldn't see the tag.
 - **security.txt** (RFC 9116) at `/.well-known/security.txt`: contact `hello@cubr.dev`, the policy
   in `SECURITY.md`. `/security.txt` redirects to it. Its `Expires` must stay under a year ahead; a
   test fails 30 days before it passes.

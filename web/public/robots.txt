@@ -1,9 +1,24 @@
-# https://cubr.dev - every page may be crawled.
-# The API stays crawlable on purpose: pages like the leaderboards and profiles load their content from
-# it, and Google renders a page without whatever robots.txt blocks. Its answers say
-# "X-Robots-Tag: noindex", so they never show up in search themselves. The same header keeps personal
-# and short-lived pages (account, settings, sign-in, race rooms) out of results; a crawler can only see
-# it on pages it may fetch.
+# https://cubr.dev - search engines and AI search may crawl every page; AI training crawlers may not.
+# The API stays crawlable on purpose: pages like the leaderboards load their content from it, and
+# Google renders a page without whatever robots.txt blocks. Its answers say "X-Robots-Tag: noindex",
+# so they never show up in search themselves. The same header keeps personal and short-lived pages
+# (account, settings, sign-in, race rooms) and people's profiles out of results; a crawler can only
+# see it on pages it may fetch.
+#
+# Crawlers that collect pages to train AI models are turned away. The ones that fetch pages for search
+# results and AI answers (OAI-SearchBot, ChatGPT-User, Claude-SearchBot, Claude-User, PerplexityBot,
+# Perplexity-User...) follow the rules for everyone below. Google-Extended and Applebot-Extended only
+# opt out of training: Google Search and Applebot still crawl.
+User-agent: GPTBot
+User-agent: ClaudeBot
+User-agent: anthropic-ai
+User-agent: CCBot
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+User-agent: Bytespider
+User-agent: meta-externalagent
+Disallow: /
+
 User-agent: *
 Disallow: /internal/
 

@@ -317,10 +317,28 @@ const noindex = (path: string) => mapLookup('$cubr_robots', path) === 'noindex';
 describe('for crawlers', () => {
   it('robots.txt lets them fetch everything public, the API included, and names the sitemap', () => {
     const lines = robotsTxt.split('\n').filter((l) => l && !l.startsWith('#'));
-    expect(lines).toEqual(['User-agent: *', 'Disallow: /internal/', 'Sitemap: https://cubr.dev/sitemap.xml']);
+    const everyone = lines.slice(lines.indexOf('User-agent: *'));
+    expect(everyone).toEqual(['User-agent: *', 'Disallow: /internal/', 'Sitemap: https://cubr.dev/sitemap.xml']);
     // Google renders pages without whatever robots.txt blocks: the leaderboards, profiles, the daily
     // board and About load their content from the API
     for (const l of lines) expect(l).not.toMatch(/^Disallow: \/api/);
+  });
+
+  it('robots.txt turns AI training crawlers away, and leaves search engines and AI search to the rules for everyone', () => {
+    // a crawler follows the one group that names it (RFC 9309), so the training bots get only "Disallow: /"
+    const groups: { agents: string[]; rules: string[] }[] = [];
+    for (const line of robotsTxt.split('\n').filter((l) => l && !l.startsWith('#'))) {
+      const [field, value] = [line.slice(0, line.indexOf(':')), line.slice(line.indexOf(':') + 1).trim()];
+      if (field === 'User-agent') {
+        if (!groups.length || groups[groups.length - 1].rules.length) groups.push({ agents: [], rules: [] });
+        groups[groups.length - 1].agents.push(value.toLowerCase());
+      } else if (field !== 'Sitemap') groups[groups.length - 1].rules.push(line);
+    }
+    const rulesFor = (bot: string) => (groups.find((g) => g.agents.includes(bot.toLowerCase())) ?? groups.find((g) => g.agents.includes('*'))!).rules;
+    for (const bot of ['GPTBot', 'ClaudeBot', 'anthropic-ai', 'CCBot', 'Google-Extended', 'Applebot-Extended', 'Bytespider', 'meta-externalagent']) expect(rulesFor(bot), bot).toEqual(['Disallow: /']);
+    for (const bot of ['Googlebot', 'Bingbot', 'Applebot', 'OAI-SearchBot', 'ChatGPT-User', 'Claude-SearchBot', 'Claude-User', 'PerplexityBot', 'Perplexity-User', 'DuckDuckBot']) {
+      expect(rulesFor(bot), bot).toEqual(['Disallow: /internal/']);
+    }
   });
 
   it('API answers (data, not pages) ask not to be listed, wherever they come from', () => {
@@ -329,8 +347,8 @@ describe('for crawlers', () => {
   });
 
   it('personal and short-lived pages ask not to be listed, and the public ones don\'t', () => {
-    for (const p of ['/account', '/settings', '/settings?tab=app', '/login', '/login/sso', '/reset', '/Account', '/race/abcd1234']) expect(noindex(p), p).toBe(true);
-    for (const p of ['/', '/daily', '/leaderboards', '/race', '/race/', '/wca', '/about', '/profile/koen_k', '/loginx', '/terms', '/privacy']) expect(noindex(p), p).toBe(false);
+    for (const p of ['/account', '/settings', '/settings?tab=app', '/login', '/login/sso', '/reset', '/Account', '/race/abcd1234', '/profile/koen_k', '/Profile/Koen_K']) expect(noindex(p), p).toBe(true);
+    for (const p of ['/', '/daily', '/leaderboards', '/race', '/race/', '/wca', '/about', '/profile', '/loginx', '/terms', '/privacy']) expect(noindex(p), p).toBe(false);
   });
 
   it('the sitemap lists public pages of the app, each once, as absolute cubr.dev URLs', () => {
@@ -348,8 +366,10 @@ describe('for crawlers', () => {
   });
 
   it('robots.txt never blocks a page that relies on noindex (a crawler has to fetch it to see that)', () => {
-    const disallowed = robotsTxt.split('\n').filter((l) => l.startsWith('Disallow:')).map((l) => l.slice('Disallow:'.length).trim());
-    for (const p of ['/account', '/settings', '/login', '/reset', '/race/abcd1234']) expect(disallowed.some((d) => p.startsWith(d)), p).toBe(false);
+    // the rules for everyone (the AI training crawlers are turned away from everything, noindex or not)
+    const lines = robotsTxt.split('\n');
+    const disallowed = lines.slice(lines.indexOf('User-agent: *')).filter((l) => l.startsWith('Disallow:')).map((l) => l.slice('Disallow:'.length).trim());
+    for (const p of ['/account', '/settings', '/login', '/reset', '/race/abcd1234', '/profile/koen_k']) expect(disallowed.some((d) => p.startsWith(d)), p).toBe(false);
   });
 });
 

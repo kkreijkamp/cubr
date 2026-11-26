@@ -130,6 +130,7 @@ export function PrivacyPage() {
           <li>
             You can switch between the two at any time: <Link to="/account">account</Link> &gt; edit profile.
           </li>
+          <li>Search engines are asked not to list profiles, public or private, so your profile shows on cubr, not in search results.</li>
         </ul>
       </Section>
 

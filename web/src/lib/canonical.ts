@@ -9,8 +9,8 @@ export function canonicalUrl(path: string): string {
 /**
  * One address per page for search engines: a `<link rel="canonical">` with the page's own address while
  * it shows, removed again on leaving. nginx already sends capitals and trailing slashes there (301,
- * map $cubr_canonical); this covers what nginx can't know: a profile's name as stored, a board's
- * query, a query added to the home page. `null`: no link (still loading, or a page search engines
+ * map $cubr_canonical); this covers what nginx can't know: a board's query, a query added to the home
+ * page. (Profiles have none: they stay out of search results.) `null`: no link (still loading, or a page search engines
  * shouldn't list). Only pages call this, so there's never more than one.
  */
 export function useCanonical(path: string | null): void {

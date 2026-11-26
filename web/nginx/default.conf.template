@@ -43,6 +43,7 @@ map $request_uri $cubr_robots {
   ~^/(?:api|internal)(?:/|$)                              "noindex";   # data, not pages (the services say the same)
   ~*^/(?:account|settings|login|reset|confirm-email)(?:[/?]|$) "noindex";
   ~*^/race/[^/?]                                          "noindex";   # race rooms last two hours
+  ~*^/profile/[^/?]                                       "noindex";   # people: on cubr, not in search results
 }
 
 # One address per page (search engines split a page's ranking between its addresses): a page asked for
