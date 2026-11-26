@@ -23,7 +23,8 @@ export interface PageMeta {
 /** The home page: the timer. Its heading is read by screen readers and search engines, not shown. */
 export const HOME: PageMeta = {
   title: 'cubr | a minimalist cube timer for speedcubers',
-  description: "a minimalist speedcube timer for cubers, from the rubik's cube to every wca event: csTimer-grade stats, a daily challenge and live races with other speedcubers.",
+  description:
+    "a minimalist speedcube timer for cubers, from the rubik's cube to every wca event: csTimer-grade stats, a daily challenge and live races with other speedcubers.",
   heading: 'cubr: a minimalist speedcube timer',
 };
 
@@ -37,7 +38,8 @@ export const PAGE_META = {
   },
   '/race': {
     title: 'live speedcubing races with friends | cubr',
-    description: "race other cubers in real time: open a room, share the link and solve the same scrambles, with everyone's times live and results for every round.",
+    description:
+      "race other cubers in real time: open a room, share the link and solve the same scrambles, with everyone's times live and results for every round.",
     heading: 'race',
   },
   '/leaderboards': {
@@ -53,7 +55,8 @@ export const PAGE_META = {
   },
   '/about': {
     title: 'about cubr, a minimalist speedcube timer',
-    description: "cubr is a minimalist speedcube timer for the rubik's cube and other puzzles: csTimer-grade stats, a daily challenge, live races and an app that works offline.",
+    description:
+      "cubr is a minimalist speedcube timer for the rubik's cube and other puzzles: csTimer-grade stats, a daily challenge, live races and an app that works offline.",
     heading: 'about cubr',
   },
   '/terms': {
@@ -63,7 +66,8 @@ export const PAGE_META = {
   },
   '/privacy': {
     title: 'privacy policy | cubr',
-    description: "how cubr, a minimalist speedcube timer, handles your data: what it collects and why, what is public, who helps run it, how long it's kept, your rights.",
+    description:
+      "how cubr, a minimalist speedcube timer, handles your data: what it collects and why, what is public, who helps run it, how long it's kept, your rights.",
     heading: 'privacy policy',
   },
 } as const satisfies Record<string, PageMeta>;

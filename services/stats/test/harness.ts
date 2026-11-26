@@ -193,8 +193,16 @@ export class FakeSolveService {
     const s = this.solves.get(solveId)!;
     this.solves.delete(solveId);
     return envelope('solve.deleted', {
-      userId: user.id, username: user.username, event: s.event, sessionId: s.sessionId, solveId: s.id,
-      timeMs: s.timeMs, penalty: s.penalty, createdAt: s.createdAt, tz: user.tz, source: 'timer',
+      userId: user.id,
+      username: user.username,
+      event: s.event,
+      sessionId: s.sessionId,
+      solveId: s.id,
+      timeMs: s.timeMs,
+      penalty: s.penalty,
+      createdAt: s.createdAt,
+      tz: user.tz,
+      source: 'timer',
     });
   }
 
@@ -214,7 +222,15 @@ export class FakeSolveService {
   setPractice(user: Cuber, sessionId: string, practice: boolean): EventEnvelope {
     const session = this.sessions.get(sessionId)!;
     session.practice = practice;
-    return envelope('session.updated', { userId: user.id, username: user.username, sessionId, event: session.event, name: session.name, practice, tz: user.tz });
+    return envelope('session.updated', {
+      userId: user.id,
+      username: user.username,
+      sessionId,
+      event: session.event,
+      name: session.name,
+      practice,
+      tz: user.tz,
+    });
   }
 
   /** Moves the sources' solves into the target and deletes the sources. */

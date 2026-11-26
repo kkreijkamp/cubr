@@ -57,7 +57,15 @@ export interface RankParams {
   country: string;
 }
 
-export function RankCalculator({ params, onChange, onPerson }: { params: RankParams; onChange: (p: Partial<RankParams>) => void; onPerson: (id: string) => void }) {
+export function RankCalculator({
+  params,
+  onChange,
+  onPerson,
+}: {
+  params: RankParams;
+  onChange: (p: Partial<RankParams>) => void;
+  onPerson: (id: string) => void;
+}) {
   const { user } = useAuth();
   const { event, kind, country } = params;
   const [input, setInput] = useState(params.t);
@@ -96,14 +104,16 @@ export function RankCalculator({ params, onChange, onPerson }: { params: RankPar
 
   const neighbours = useMemo(() => {
     if (!r || value === null) return [];
-    const list: { key: string; you?: boolean; personId?: string; name: string; iso2: string | null; value: number; rank: number | null }[] = r.neighbours.map((n) => ({
-      key: n.personId,
-      personId: n.personId,
-      name: n.name,
-      iso2: n.countryIso2,
-      value: n.value,
-      rank: n.worldRank,
-    }));
+    const list: { key: string; you?: boolean; personId?: string; name: string; iso2: string | null; value: number; rank: number | null }[] = r.neighbours.map(
+      (n) => ({
+        key: n.personId,
+        personId: n.personId,
+        name: n.name,
+        iso2: n.countryIso2,
+        value: n.value,
+        rank: n.worldRank,
+      }),
+    );
     list.push({ key: 'you', you: true, name: user?.username ? `${user.username} (you)` : 'you', iso2: country || null, value, rank: r.world.rank });
     return list.sort((a, b) => a.value - b.value || (a.you ? -1 : b.you ? 1 : 0));
   }, [r, value, user?.username, country]);
@@ -138,7 +148,7 @@ export function RankCalculator({ params, onChange, onPerson }: { params: RankPar
               className={invalid ? 'invalid' : ''}
               autoFocus
             />
-            <span className={`unit${fmc ? '' : ' unit-event'}`}>{fmc ? 'moves' : ev?.name ?? event}</span>
+            <span className={`unit${fmc ? '' : ' unit-event'}`}>{fmc ? 'moves' : (ev?.name ?? event)}</span>
           </div>
           <select value={country} onChange={(e) => onChange({ country: e.target.value })} aria-label="country" className="wca-country">
             <option value="">worldwide only</option>
@@ -149,7 +159,11 @@ export function RankCalculator({ params, onChange, onPerson }: { params: RankPar
             ))}
           </select>
         </div>
-        {invalid && <div className="small error">{fmc ? 'enter a number of moves (1-100' + (kind === 'average' ? ', up to 2 decimals)' : ')') : 'enter a time like 12.34, 1:05.21 or 1234'}</div>}
+        {invalid && (
+          <div className="small error">
+            {fmc ? 'enter a number of moves (1-100' + (kind === 'average' ? ', up to 2 decimals)' : ')') : 'enter a time like 12.34, 1:05.21 or 1234'}
+          </div>
+        )}
       </div>
 
       {importing ? (
@@ -162,7 +176,8 @@ export function RankCalculator({ params, onChange, onPerson }: { params: RankPar
         />
       ) : value === null ? (
         <div className="wca-hint sub">
-          enter your {kind === 'average' ? (fmc ? 'mean' : 'average') : 'single'} to see where it would rank among every WCA competitor{country ? ` and in ${countryName(country)}` : ''}.
+          enter your {kind === 'average' ? (fmc ? 'mean' : 'average') : 'single'} to see where it would rank among every WCA competitor
+          {country ? ` and in ${countryName(country)}` : ''}.
         </div>
       ) : rank.error ? (
         <WcaError error={rank.error} onRetry={rank.reload} what="your rank" />
@@ -172,7 +187,9 @@ export function RankCalculator({ params, onChange, onPerson }: { params: RankPar
         <div className={`wca-rank${rank.loading ? ' refreshing' : ''}`}>
           <div className="wca-rank-main">
             {r.world.total === 0 ? (
-              <div className="sub">nobody has an official {kind} in {ev?.name ?? event} yet.</div>
+              <div className="sub">
+                nobody has an official {kind} in {ev?.name ?? event} yet.
+              </div>
             ) : (
               <>
                 <div className="stat lg">
@@ -184,7 +201,8 @@ export function RankCalculator({ params, onChange, onPerson }: { params: RankPar
                 </div>
                 {r.country && (
                   <div className="wca-country-rank">
-                    <Flag iso2={r.country.countryIso2} /> #{formatNumber(r.country.rank)} in {(r.country as { countryName?: string }).countryName ?? countryName(r.country.countryIso2) ?? r.country.countryId}
+                    <Flag iso2={r.country.countryIso2} /> #{formatNumber(r.country.rank)} in{' '}
+                    {(r.country as { countryName?: string }).countryName ?? countryName(r.country.countryIso2) ?? r.country.countryId}
                     <span className="sub">
                       {' '}
                       - faster than {formatPercent(r.country.percentile)} of {formatNumber(r.country.total)}
@@ -261,7 +279,11 @@ export function RecordsTable({ onPerson }: { onPerson: (id: string) => void }) {
   const rows = rec.data.records ?? [];
   if (!rows.length) return <div className="empty">no records found.</div>;
 
-  const Holder = ({ v }: { v: NonNullable<(typeof rows)[number]['single']> & { holders?: { personId: string; personName: string; countryIso2: string | null }[] } }) => {
+  const Holder = ({
+    v,
+  }: {
+    v: NonNullable<(typeof rows)[number]['single']> & { holders?: { personId: string; personName: string; countryIso2: string | null }[] };
+  }) => {
     const others = v.holders && v.holders.length > 1 ? v.holders.filter((h) => h.personId !== v.personId) : [];
     return (
       <>
@@ -324,7 +346,13 @@ export function PeopleSearch({ initialQuery, onQuery, onPerson }: { initialQuery
     <div className="stack">
       <div className="wca-search">
         <MagnifyingGlassIcon width={16} height={16} className="sub" />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="search by name or WCA ID (e.g. 2009ZEMD01)" aria-label="search WCA competitors" autoFocus />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="search by name or WCA ID (e.g. 2009ZEMD01)"
+          aria-label="search WCA competitors"
+          autoFocus
+        />
         {res.loading && dq.length >= 2 && <Spinner size={14} />}
       </div>
       {dq.length < 2 ? (
@@ -374,7 +402,11 @@ export function PersonCard({ wcaId, onBack }: { wcaId: string; onBack: () => voi
     return (
       <div className="stack">
         {back}
-        {wcaErrorKind(res.error) === 'notfound' ? <div className="empty">no WCA competitor with id {wcaId}.</div> : <WcaError error={res.error} onRetry={res.reload} what="this person" />}
+        {wcaErrorKind(res.error) === 'notfound' ? (
+          <div className="empty">no WCA competitor with id {wcaId}.</div>
+        ) : (
+          <WcaError error={res.error} onRetry={res.reload} what="this person" />
+        )}
       </div>
     );
   }

@@ -6,12 +6,33 @@ const req = (path: string, mode = 'cors', method = 'GET') => ({ url: path.starts
 
 describe('shouldPrecache', () => {
   it('caches the page, the code, the styles, the fonts the browser uses and the small site files', () => {
-    for (const f of ['index.html', 'assets/index-d3oOLUDV.js', 'assets/index-BxQ1.css', 'assets/lexend-deca-latin-400-normal-Cs_IAxDy.woff2', 'favicon.svg', 'manifest.webmanifest']) {
+    for (const f of [
+      'index.html',
+      'assets/index-d3oOLUDV.js',
+      'assets/index-BxQ1.css',
+      'assets/lexend-deca-latin-400-normal-Cs_IAxDy.woff2',
+      'favicon.svg',
+      'manifest.webmanifest',
+    ]) {
       expect(shouldPrecache(f), f).toBe(true);
     }
   });
   it('leaves out the worker, source maps, the .woff fallbacks, the icons, the screenshots and the files for other sites and crawlers', () => {
-    for (const f of ['sw.js', 'assets/index-d3oOLUDV.js.map', 'assets/lexend-deca-latin-400-normal-x.woff', 'icons/icon-512.png', 'screenshots/timer-wide.png', 'launch/apple-launch-1179x2556.png', 'apple-touch-icon.png', 'og.png', 'robots.txt', 'sitemap.xml', '.well-known/security.txt', 'pages/daily.html', '.DS_Store']) {
+    for (const f of [
+      'sw.js',
+      'assets/index-d3oOLUDV.js.map',
+      'assets/lexend-deca-latin-400-normal-x.woff',
+      'icons/icon-512.png',
+      'screenshots/timer-wide.png',
+      'launch/apple-launch-1179x2556.png',
+      'apple-touch-icon.png',
+      'og.png',
+      'robots.txt',
+      'sitemap.xml',
+      '.well-known/security.txt',
+      'pages/daily.html',
+      '.DS_Store',
+    ]) {
       expect(shouldPrecache(f), f).toBe(false);
     }
   });
@@ -41,7 +62,11 @@ describe('routeFor', () => {
     expect(routeFor(req('/.well-known/security.txt', 'navigate'), ORIGIN)).toBe('pass');
   });
   it("leaves /.well-known/ to the server: a password manager's change-password link is a redirect there, not a page of the app", () => {
-    for (const p of ['/.well-known/change-password', '/.well-known/resource-that-should-not-exist-whose-status-code-should-not-be-200', '/.well-known/security.txt']) {
+    for (const p of [
+      '/.well-known/change-password',
+      '/.well-known/resource-that-should-not-exist-whose-status-code-should-not-be-200',
+      '/.well-known/security.txt',
+    ]) {
       expect(routeFor(req(p, 'navigate'), ORIGIN), p).toBe('pass');
       expect(routeFor(req(p), ORIGIN), `${p} (fetch)`).toBe('pass');
     }

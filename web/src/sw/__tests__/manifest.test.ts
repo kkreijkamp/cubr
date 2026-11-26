@@ -54,7 +54,7 @@ async function corner(path: string): Promise<string> {
   const bytes = pngBytes(path);
   expect([bytes[24], bytes[25]], `${path}: 8-bit RGB`).toEqual([8, 2]);
   const data: Uint8Array<ArrayBuffer>[] = [];
-  for (let at = 8; at < bytes.length; ) {
+  for (let at = 8; at < bytes.length;) {
     const length = new DataView(bytes.buffer).getUint32(at);
     if (String.fromCharCode(...bytes.slice(at + 4, at + 8)) === 'IDAT') data.push(bytes.slice(at + 8, at + 8 + length));
     at += 12 + length;
@@ -119,7 +119,11 @@ describe('the web app manifest', () => {
     }
   });
   it("has screenshots that Chrome's install dialog accepts", () => {
-    for (const form of ['wide', 'narrow']) expect(manifest.screenshots.some((s) => s.form_factor === form), form).toBe(true);
+    for (const form of ['wide', 'narrow'])
+      expect(
+        manifest.screenshots.some((s) => s.form_factor === form),
+        form,
+      ).toBe(true);
     const ratios = new Map<string, number>();
     for (const shot of manifest.screenshots) {
       const { width, height } = png(shot.src);

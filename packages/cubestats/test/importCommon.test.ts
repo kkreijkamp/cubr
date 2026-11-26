@@ -61,7 +61,7 @@ describe('finishImport: text fields', () => {
   });
 });
 
-describe('sessionDates: the session keeps its order (the October review\'s #9)', () => {
+describe("sessionDates: the session keeps its order (the October review's #9)", () => {
   const T = Date.UTC(2020, 0, 1);
   const iso = (...ms: number[]) => ms.map((v) => new Date(v).toISOString());
 

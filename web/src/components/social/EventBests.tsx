@@ -91,7 +91,11 @@ export function EventBests({
           const text = pbText(pb, k, precision);
           const rank = rankOf(k);
           return (
-            <div key={k} className={`pf-avg${text ? '' : ' none'}`} data-tip={pb && text ? `set ${formatDate(pb.achievedAt)} - ${timeAgo(pb.achievedAt)}` : undefined}>
+            <div
+              key={k}
+              className={`pf-avg${text ? '' : ' none'}`}
+              data-tip={pb && text ? `set ${formatDate(pb.achievedAt)} - ${timeAgo(pb.achievedAt)}` : undefined}
+            >
               <span className="v">{text ?? '-'}</span>
               <span className="k">
                 {k}

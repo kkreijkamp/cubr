@@ -62,21 +62,34 @@ describeIntegration('sign-in with Google, Apple and GitHub', () => {
 
   /** POST start: the provider page's URL and the browser's cookie for the flow. */
   async function begin(provider: Provider, opts: { mode?: 'signin' | 'link'; token?: string; next?: string } = {}) {
-    const res = await s.request('POST', `/api/auth/oauth/${provider}/start`, { body: { mode: opts.mode ?? 'signin', next: opts.next }, token: opts.token, ip: freshIp() });
+    const res = await s.request('POST', `/api/auth/oauth/${provider}/start`, {
+      body: { mode: opts.mode ?? 'signin', next: opts.next },
+      token: opts.token,
+      ip: freshIp(),
+    });
     expect(res.statusCode, res.body).toBe(200);
     const url = new URL(res.json().url);
     return { url, state: url.searchParams.get('state')!, cookie: `cubr_oauth=${cookieOf(res)}`, setCookie: String(res.headers['set-cookie']) };
   }
 
   /** The provider sends the browser back: the redirect into the SPA, its fragment and new cookie. */
-  async function back(provider: Provider, flow: Awaited<ReturnType<typeof begin>>, who: Person, opts: { cookie?: string | null; tamper?: Tamper; params?: Record<string, string> } = {}) {
+  async function back(
+    provider: Provider,
+    flow: Awaited<ReturnType<typeof begin>>,
+    who: Person,
+    opts: { cookie?: string | null; tamper?: Tamper; params?: Record<string, string> } = {},
+  ) {
     const code = fake.issue(provider, flow.url, who, opts.tamper);
     const params = { code, state: flow.state, ...opts.params };
     const cookie = opts.cookie === undefined ? flow.cookie : opts.cookie;
     const headers: Record<string, string> = cookie ? { cookie } : {};
     const res =
       provider === 'apple'
-        ? await s.request('POST', '/api/auth/oauth/apple/callback', { body: new URLSearchParams(params).toString(), headers: { ...headers, 'content-type': 'application/x-www-form-urlencoded' }, ip: freshIp() })
+        ? await s.request('POST', '/api/auth/oauth/apple/callback', {
+            body: new URLSearchParams(params).toString(),
+            headers: { ...headers, 'content-type': 'application/x-www-form-urlencoded' },
+            ip: freshIp(),
+          })
         : await s.request('GET', `/api/auth/oauth/${provider}/callback?${new URLSearchParams(params)}`, { headers, ip: freshIp() });
     expect(res.statusCode, res.body).toBe(303);
     const [path, hash] = String(res.headers.location).split('#');
@@ -90,7 +103,11 @@ describeIntegration('sign-in with Google, Apple and GitHub', () => {
     expect(r.fragment.get('signup'), r.fragment.toString()).toBeTruthy();
     const info = await s.request('GET', `/api/auth/oauth/signup/${r.fragment.get('signup')}`, { headers: { cookie: r.cookie! } });
     const chosen = username ?? info.json().username;
-    const res = await s.request('POST', '/api/auth/oauth/signup', { body: { id: r.fragment.get('signup'), username: chosen }, headers: { cookie: r.cookie! }, ip: freshIp() });
+    const res = await s.request('POST', '/api/auth/oauth/signup', {
+      body: { id: r.fragment.get('signup'), username: chosen },
+      headers: { cookie: r.cookie! },
+      ip: freshIp(),
+    });
     expect(res.statusCode, res.body).toBe(201);
     return res.json() as { token: string; user: { id: string; username: string; email: string; hasPassword: boolean } };
   }
@@ -159,7 +176,11 @@ describeIntegration('sign-in with Google, Apple and GitHub', () => {
       expect(r.fragment.get('next')).toBe('/daily');
       const info = (await s.request('GET', `/api/auth/oauth/signup/${r.fragment.get('signup')}`, { headers: { cookie: r.cookie! } })).json();
       expect(info).toEqual({ provider: 'google', email: who.email, username: 'Zoe_Speedcuber' });
-      const res = await s.request('POST', '/api/auth/oauth/signup', { body: { id: r.fragment.get('signup'), username: 'zoe_cubes' }, headers: { cookie: r.cookie! }, ip: freshIp() });
+      const res = await s.request('POST', '/api/auth/oauth/signup', {
+        body: { id: r.fragment.get('signup'), username: 'zoe_cubes' },
+        headers: { cookie: r.cookie! },
+        ip: freshIp(),
+      });
       expect(res.statusCode, res.body).toBe(201);
       const { token, user } = res.json();
       // the provider verified the address, so it starts confirmed
@@ -167,7 +188,10 @@ describeIntegration('sign-in with Google, Apple and GitHub', () => {
       expect((await s.request('GET', '/api/auth/me', { token })).json().user.id).toBe(user.id);
       expect((await s.events('user.registered')).some((e) => e.data.userId === user.id)).toBe(true);
       // the sign-up is used up
-      expect((await s.request('POST', '/api/auth/oauth/signup', { body: { id: r.fragment.get('signup'), username: 'zoe_again' }, headers: { cookie: r.cookie! } })).statusCode).toBe(404);
+      expect(
+        (await s.request('POST', '/api/auth/oauth/signup', { body: { id: r.fragment.get('signup'), username: 'zoe_again' }, headers: { cookie: r.cookie! } }))
+          .statusCode,
+      ).toBe(404);
     });
 
     it('then signs in straight away with the same Google account', async () => {
@@ -181,7 +205,8 @@ describeIntegration('sign-in with Google, Apple and GitHub', () => {
     it('keeps the sign-up when the username is taken, so another one can be tried', async () => {
       const taken = await passwordAccount();
       const r = await back('google', await begin('google'), person());
-      const post = (username: string) => s.request('POST', '/api/auth/oauth/signup', { body: { id: r.fragment.get('signup'), username }, headers: { cookie: r.cookie! }, ip: freshIp() });
+      const post = (username: string) =>
+        s.request('POST', '/api/auth/oauth/signup', { body: { id: r.fragment.get('signup'), username }, headers: { cookie: r.cookie! }, ip: freshIp() });
       const clash = await post(taken.user.username.toUpperCase());
       expect(clash.statusCode).toBe(409);
       expect(clash.json().error.message).toBe('Username is already taken');
@@ -222,10 +247,12 @@ describeIntegration('sign-in with Google, Apple and GitHub', () => {
 
     it('refuses a provider account without a verified email (cubr needs one for password resets)', async () => {
       expect((await back('google', await begin('google'), person({ emailVerified: false }))).fragment.get('error')).toBe('no_email');
-      expect((await back('github', await begin('github'), person({ emails: [{ email: 'x@example.com', primary: true, verified: false }] }))).fragment.get('error')).toBe('no_email');
+      expect(
+        (await back('github', await begin('github'), person({ emails: [{ email: 'x@example.com', primary: true, verified: false }] }))).fragment.get('error'),
+      ).toBe('no_email');
     });
 
-    it("does not hand an existing account to a provider account with the same email", async () => {
+    it('does not hand an existing account to a provider account with the same email', async () => {
       // its email may not be confirmed yet: whoever registered this address may not own it
       const existing = await passwordAccount();
       const r = await back('google', await begin('google'), person({ email: existing.user.email.toUpperCase() }));
@@ -304,11 +331,15 @@ describeIntegration('sign-in with Google, Apple and GitHub', () => {
       expect(r.path).toBe('/account');
       expect(r.fragment.get('linked')).toBe('google');
       const methods = (await s.request('GET', '/api/auth/me/sign-in', { token: acct.token })).json();
-      expect(methods).toMatchObject({ password: true, providers: ['google', 'apple', 'github'], identities: [{ provider: 'google', email: 'different@example.com' }] });
+      expect(methods).toMatchObject({
+        password: true,
+        providers: ['google', 'apple', 'github'],
+        identities: [{ provider: 'google', email: 'different@example.com' }],
+      });
       expect((await signInWith('google', who)).user.id).toBe(acct.user.id);
     });
 
-    it("refuses a provider account that belongs to someone else, and a second account of the same provider", async () => {
+    it('refuses a provider account that belongs to someone else, and a second account of the same provider', async () => {
       const owner = await passwordAccount();
       const who = person();
       await back('github', await begin('github', { mode: 'link', token: owner.token }), who);
@@ -334,7 +365,11 @@ describeIntegration('sign-in with Google, Apple and GitHub', () => {
       const acct = await passwordAccount();
       await s.pool.query('update auth.users set email_verified_at = now() where id = $1', [acct.user.id]);
       const since = outbox.length; // the sign-up's own confirmation email came before
-      const mails = () => outbox.slice(since).filter((m) => m.to === acct.user.email).map((m) => m.subject);
+      const mails = () =>
+        outbox
+          .slice(since)
+          .filter((m) => m.to === acct.user.email)
+          .map((m) => m.subject);
       await back('github', await begin('github', { mode: 'link', token: acct.token }), person());
       await vi.waitFor(() => expect(mails()).toEqual(['GitHub was connected to your cubr account']));
       expect((await s.request('DELETE', '/api/auth/me/identities/github', { token: acct.token })).statusCode).toBe(204);
@@ -354,7 +389,9 @@ describeIntegration('sign-in with Google, Apple and GitHub', () => {
       await back('github', await begin('github', { mode: 'link', token: made.token }), person());
       expect((await del('google')).statusCode).toBe(204);
       expect((await del('google')).statusCode).toBe(404);
-      expect((await s.request('GET', '/api/auth/me/sign-in', { token: made.token })).json().identities.map((i: { provider: string }) => i.provider)).toEqual(['github']);
+      expect((await s.request('GET', '/api/auth/me/sign-in', { token: made.token })).json().identities.map((i: { provider: string }) => i.provider)).toEqual([
+        'github',
+      ]);
       expect((await del('github')).statusCode).toBe(409);
     });
   });
@@ -378,7 +415,9 @@ describeIntegration('sign-in with Google, Apple and GitHub', () => {
       const reset = await s.request('POST', '/api/auth/password/reset', { body: { token: link, password: 'my new password' }, ip: freshIp() });
       expect(reset.statusCode).toBe(200);
       expect(reset.json().user.hasPassword).toBe(true);
-      expect((await s.request('POST', '/api/auth/login', { body: { login: made.user.email, password: 'my new password' }, ip: freshIp() })).statusCode).toBe(200);
+      expect((await s.request('POST', '/api/auth/login', { body: { login: made.user.email, password: 'my new password' }, ip: freshIp() })).statusCode).toBe(
+        200,
+      );
       expect((await signInWith('google', who)).user.id).toBe(made.user.id);
     });
   });

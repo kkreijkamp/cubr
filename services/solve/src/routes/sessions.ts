@@ -67,13 +67,23 @@ export function registerSessionRoutes(app: FastifyInstance, { pool, auth }: Rout
       // read models that show session names (stats) learn about the rename via the outbox
       if (name !== undefined) {
         await enqueue(client, 'session.renamed', {
-          userId: user.id, username: user.username, sessionId: r.id, event: r.event, name: r.name,
+          userId: user.id,
+          username: user.username,
+          sessionId: r.id,
+          event: r.event,
+          name: r.name,
         });
       }
       // its solves now count for PBs, or no longer do: stats recomputes the event
       if (practice !== undefined && practice !== before.rows[0].practice) {
         await enqueue(client, 'session.updated', {
-          userId: user.id, username: user.username, sessionId: r.id, event: r.event, name: r.name, practice: r.practice, tz,
+          userId: user.id,
+          username: user.username,
+          sessionId: r.id,
+          event: r.event,
+          name: r.name,
+          practice: r.practice,
+          tz,
         });
       }
       return r;
@@ -87,13 +97,17 @@ export function registerSessionRoutes(app: FastifyInstance, { pool, auth }: Rout
     const { id } = parse(idParams, req.params);
     const tz = tzFrom(req);
     await withTx(pool, async (client) => {
-      const { rows } = await client.query<{ id: string; event: string }>(
-        'DELETE FROM solve.sessions WHERE id = $1 AND user_id = $2 RETURNING id, event',
-        [id, user.id],
-      );
+      const { rows } = await client.query<{ id: string; event: string }>('DELETE FROM solve.sessions WHERE id = $1 AND user_id = $2 RETURNING id, event', [
+        id,
+        user.id,
+      ]);
       if (!rows[0]) throw notFound('session not found');
       await enqueue(client, 'session.deleted', {
-        userId: user.id, username: user.username, sessionId: rows[0].id, event: rows[0].event, tz,
+        userId: user.id,
+        username: user.username,
+        sessionId: rows[0].id,
+        event: rows[0].event,
+        tz,
       });
     });
     return reply.code(204).send();
@@ -125,12 +139,14 @@ export function registerSessionRoutes(app: FastifyInstance, { pool, auth }: Rout
       if (missing) throw notFound(`session not found: ${missing}`);
       if (sourceIds.some((s) => byId.get(s)!.event !== target.event)) throw conflict('can only merge sessions of the same event');
       // a PLL session's times would land among the 3x3 ones (or the other way round)
-      if (sourceIds.some((s) => (byId.get(s)!.scramble ?? null) !== (target.scramble ?? null))) throw conflict('can only merge sessions of the same scramble type');
+      if (sourceIds.some((s) => (byId.get(s)!.scramble ?? null) !== (target.scramble ?? null)))
+        throw conflict('can only merge sessions of the same scramble type');
 
-      const moved = await client.query(
-        'UPDATE solve.solves SET session_id = $1 WHERE user_id = $2 AND session_id = ANY($3::uuid[])',
-        [targetId, user.id, sourceIds],
-      );
+      const moved = await client.query('UPDATE solve.solves SET session_id = $1 WHERE user_id = $2 AND session_id = ANY($3::uuid[])', [
+        targetId,
+        user.id,
+        sourceIds,
+      ]);
       await client.query('DELETE FROM solve.sessions WHERE user_id = $1 AND id = ANY($2::uuid[])', [user.id, sourceIds]);
       const { rows: updated } = await client.query<SessionRow>(
         `UPDATE solve.sessions s SET updated_at = now() WHERE s.id = $1
@@ -140,7 +156,13 @@ export function registerSessionRoutes(app: FastifyInstance, { pool, auth }: Rout
       );
       const solves = moved.rowCount ?? 0;
       await enqueue(client, 'sessions.merged', {
-        userId: user.id, username: user.username, event: target.event, targetId, sourceIds, solves, tz,
+        userId: user.id,
+        username: user.username,
+        event: target.event,
+        targetId,
+        sourceIds,
+        solves,
+        tz,
       });
       return { session: updated[0], solves };
     });

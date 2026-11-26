@@ -70,7 +70,13 @@ export async function startPod(base: Redis, name: string, jwtSecret: string): Pr
   const presence = new PodPresence(redis, store, name, app.log);
   const scrambles = fakeScrambles();
   const sockets = registerSocketHandlers({ io, store, scrambles, redis, jwtSecret, pod: name, log: app.log });
-  registerRoutes(app, { store, redis, auth: makeAuth(jwtSecret, redis), internalToken: config.internalToken, onChatCleared: (roomId) => io.to(roomId).emit('chat:cleared', {}) });
+  registerRoutes(app, {
+    store,
+    redis,
+    auth: makeAuth(jwtSecret, redis),
+    internalToken: config.internalToken,
+    onChatCleared: (roomId) => io.to(roomId).emit('chat:cleared', {}),
+  });
   app.addHook('preClose', async () => {
     await sockets.drain();
     await presence.stop();

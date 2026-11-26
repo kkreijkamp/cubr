@@ -26,11 +26,12 @@ describeIntegration('stats projector', () => {
   const count = async (sql: string, params: unknown[]) => Number((await rows(sql, params))[0].n);
   const totals = async (u: Cuber) =>
     (await rows('SELECT username, tz, solves, total_ms FROM stats.user_totals WHERE user_id = $1', [u.id]))[0] as
-      | { username: string; tz: string; solves: number; total_ms: number }
-      | undefined;
+      { username: string; tz: string; solves: number; total_ms: number } | undefined;
   /** The user's PB values for one event, by kind. */
   const pbs = async (u: Cuber, event = '333') =>
-    Object.fromEntries((await rows('SELECT kind, value_ms FROM stats.personal_bests WHERE user_id = $1 AND event = $2', [u.id, event])).map((r) => [r.kind, r.value_ms]));
+    Object.fromEntries(
+      (await rows('SELECT kind, value_ms FROM stats.personal_bests WHERE user_id = $1 AND event = $2', [u.id, event])).map((r) => [r.kind, r.value_ms]),
+    );
   /** pb.updated events published for the user, oldest first. */
   const pbEvents = async (u: Cuber) => (await s.events('pb.updated')).filter((e) => e.data.userId === u.id).map((e) => e.data);
   const history = async (u: Cuber) => (await s.request('GET', `/api/stats/users/${u.id}/pb-history`)).json().history;
@@ -43,7 +44,13 @@ describeIntegration('stats projector', () => {
       const faster = s.solve.solve(u, session, 11_000, '2026-10-01T10:01:00.000Z');
       const slower = s.solve.solve(u, session, 13_000, '2026-10-01T10:02:00.000Z');
       await s.feed(first.event, faster.event, slower.event);
-      const common = { eventId: expect.stringMatching(/^stats-[0-9a-f-]{36}$/), occurredAt: expect.any(String), userId: u.id, username: u.username, event: '333' };
+      const common = {
+        eventId: expect.stringMatching(/^stats-[0-9a-f-]{36}$/),
+        occurredAt: expect.any(String),
+        userId: u.id,
+        username: u.username,
+        event: '333',
+      };
       expect(await pbEvents(u)).toEqual([
         { ...common, kind: 'single', valueMs: 12_000, previousMs: null, achievedAt: first.solve.createdAt },
         { ...common, kind: 'single', valueMs: 11_000, previousMs: 12_000, achievedAt: faster.solve.createdAt },
@@ -196,10 +203,7 @@ describeIntegration('stats projector', () => {
       const u = newCuber();
       const keep = s.solve.session(u, '333', { name: 'Keep' });
       const gone = s.solve.session(u, '333', { name: 'Gone' });
-      await s.feed(
-        s.solve.solve(u, keep, 12_000, '2026-10-09T10:00:00Z').event,
-        s.solve.solve(u, gone, 9_000, '2026-10-09T10:05:00Z').event,
-      );
+      await s.feed(s.solve.solve(u, keep, 12_000, '2026-10-09T10:00:00Z').event, s.solve.solve(u, gone, 9_000, '2026-10-09T10:05:00Z').event);
       const late = s.solve.solve(u, gone, 8_000, '2026-10-09T10:06:00Z'); // still on its way when the session goes
       await s.feed(s.solve.deleteSession(u, gone.id), late.event);
       expect(await pbs(u)).toEqual({ single: 12_000 });
@@ -214,7 +218,9 @@ describeIntegration('stats projector', () => {
       await s.feed(s.solve.solve(u, session, 10_000, '2026-10-10T10:00:00Z').event);
       await s.feed(s.solve.rename(u, session.id, 'New name'));
       expect(s.solve.recomputes(u.id)).toEqual([]);
-      expect((await s.request('GET', `/api/stats/users/${u.id}/solves`)).json().sessions).toEqual([expect.objectContaining({ id: session.id, name: 'New name' })]);
+      expect((await s.request('GET', `/api/stats/users/${u.id}/solves`)).json().sessions).toEqual([
+        expect.objectContaining({ id: session.id, name: 'New name' }),
+      ]);
     });
 
     it("session.updated takes a session's solves out of the PBs when it becomes practice, and back when it stops", async () => {
@@ -255,7 +261,9 @@ describeIntegration('stats projector', () => {
       expect(await count('SELECT count(*) AS n FROM stats.sessions WHERE session_id = $1', [source.id])).toBe(0);
       expect(await count('SELECT count(*) AS n FROM stats.deleted_sessions WHERE session_id = $1', [source.id])).toBe(1);
       // a late solve for the merged-away session stays out
-      await s.feed(envelope('solve.created', { ...fromSource.event.data, eventId: `test-${randomUUID()}`, solveId: randomUUID(), createdAt: '2026-10-12T10:03:00.000Z' }));
+      await s.feed(
+        envelope('solve.created', { ...fromSource.event.data, eventId: `test-${randomUUID()}`, solveId: randomUUID(), createdAt: '2026-10-12T10:03:00.000Z' }),
+      );
       expect(await totals(u)).toMatchObject({ solves: 3 });
       expect((await s.request('GET', `/api/stats/users/${u.id}/solves`)).json().sessions.map((x: { id: string }) => x.id)).toEqual([target.id]);
     });
@@ -329,7 +337,15 @@ describeIntegration('stats projector', () => {
       );
       // a pb.updated still waiting in the outbox (Redis was down, say)
       await withTx(s.pool, (c) =>
-        queuePbUpdated(c, { userId: u.id, username: u.username, event: '333', kind: 'single', valueMs: 10_000, previousMs: null, achievedAt: '2026-10-13T10:00:00.000Z' }),
+        queuePbUpdated(c, {
+          userId: u.id,
+          username: u.username,
+          event: '333',
+          kind: 'single',
+          valueMs: 10_000,
+          previousMs: null,
+          achievedAt: '2026-10-13T10:00:00.000Z',
+        }),
       );
       await s.redis.set(CACHE_KEY, '{"users":1}');
       for (const table of USER_TABLES) {

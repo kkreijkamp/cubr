@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  computePbs, isImprovement, replayHistory, rollingFromPayload, tailAverages, type ListSolve,
-} from '../src/domain/pbs.js';
+import { computePbs, isImprovement, replayHistory, rollingFromPayload, tailAverages, type ListSolve } from '../src/domain/pbs.js';
 
 const S1 = '11111111-1111-4111-8111-111111111111';
 const S2 = '22222222-2222-4222-8222-222222222222';
@@ -81,8 +79,12 @@ describe('computePbs', () => {
 describe('replayHistory', () => {
   it('records each improvement chronologically across sessions', () => {
     const list = [
-      solve(S1, 0, 12000), solve(S1, 1, 11000), solve(S1, 2, 13000), // mo3 12000 at minute 2
-      solve(S2, 5, 10500), solve(S2, 6, 10000), solve(S2, 7, 9500), // mo3 10000 at minute 7
+      solve(S1, 0, 12000),
+      solve(S1, 1, 11000),
+      solve(S1, 2, 13000), // mo3 12000 at minute 2
+      solve(S2, 5, 10500),
+      solve(S2, 6, 10000),
+      solve(S2, 7, 9500), // mo3 10000 at minute 7
     ];
     const h = replayHistory(list);
     expect(h.filter((e) => e.kind === 'single').map((e) => e.valueMs)).toEqual([12000, 11000, 10500, 10000, 9500]);
@@ -126,7 +128,11 @@ describe('practice sessions', () => {
 
   it('leave no mark on the PB history', () => {
     const list = [solve(S1, 0, 12000), practice(solve(S2, 1, 8000)), solve(S1, 2, 11000)];
-    expect(replayHistory(list).filter((h) => h.kind === 'single').map((h) => h.valueMs)).toEqual([12000, 11000]);
+    expect(
+      replayHistory(list)
+        .filter((h) => h.kind === 'single')
+        .map((h) => h.valueMs),
+    ).toEqual([12000, 11000]);
   });
 });
 

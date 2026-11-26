@@ -129,7 +129,17 @@ export function Sparkline({ values, height = 22, max: maxIn, className }: { valu
 }
 
 /** Banner for a service that is temporarily unavailable. */
-export function Notice({ icon, children, tone = 'sub', action }: { icon?: ReactNode; children: ReactNode; tone?: 'sub' | 'error' | 'main'; action?: ReactNode }) {
+export function Notice({
+  icon,
+  children,
+  tone = 'sub',
+  action,
+}: {
+  icon?: ReactNode;
+  children: ReactNode;
+  tone?: 'sub' | 'error' | 'main';
+  action?: ReactNode;
+}) {
   return (
     <div className={`live-notice ${tone}`} role="status">
       {icon}

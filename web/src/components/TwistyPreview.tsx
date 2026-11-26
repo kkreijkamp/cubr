@@ -55,7 +55,17 @@ export function TwistyPreview(props: Props) {
   const translated = visualization === '3D' && event && untranslatable !== scramble ? preview3D(event, scrambleType, scramble) : null;
   if (translated) {
     const p = translated.puzzle;
-    return <TwistyPlayerPreview key={'id' in p ? p.id : p.description} puzzle={p} scramble={translated.alg} visualization="3D" height={height} fit={fit} onUnreadable={onUntranslatable} />;
+    return (
+      <TwistyPlayerPreview
+        key={'id' in p ? p.id : p.description}
+        puzzle={p}
+        scramble={translated.alg}
+        visualization="3D"
+        height={height}
+        fit={fit}
+        onUnreadable={onUntranslatable}
+      />
+    );
   }
   if (puzzle === null || unreadable === `${puzzle}\n${scramble}`) {
     const relay = puzzle === null && event ? splitRelay(event, scramble) : null;
@@ -69,7 +79,9 @@ export function TwistyPreview(props: Props) {
   if ((visualization === '2D' || NO_3D_MODEL.has(puzzle)) && puzzle !== 'clock' && netFailed !== puzzle) {
     return <ScrambleNet puzzle={puzzle} scramble={scramble} height={height} fit={fit} onError={onNetError} onUnreadable={onUnreadable} />;
   }
-  return <TwistyPlayerPreview puzzle={{ id: puzzle }} scramble={scramble} visualization={visualization} height={height} fit={fit} onUnreadable={onUnreadable} />;
+  return (
+    <TwistyPlayerPreview puzzle={{ id: puzzle }} scramble={scramble} visualization={visualization} height={height} fit={fit} onUnreadable={onUnreadable} />
+  );
 }
 
 function NoPreview({ what, height }: { what: 'puzzle' | 'scramble'; height: number }) {
@@ -122,7 +134,15 @@ function useWidth(ref: RefObject<HTMLElement>): number {
 }
 
 /** A relay: each puzzle's own preview under its label (as its scramble line starts), as many to a row as fit best. */
-function RelayPreview({ parts, height, visualization }: { parts: { label: string; event: string; scramble: string }[]; height: number; visualization: '2D' | '3D' }) {
+function RelayPreview({
+  parts,
+  height,
+  visualization,
+}: {
+  parts: { label: string; event: string; scramble: string }[];
+  height: number;
+  visualization: '2D' | '3D';
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const width = useWidth(ref);
   const cols = relayColumns(parts.length, width || 2 * height, height, RELAY_LABEL + RELAY_ROW_GAP, visualization === '3D' ? 1 : 0.75);

@@ -19,7 +19,16 @@ const square = (x: number, y: number, s = 1): Point[] => [
   [x, y + s],
 ];
 /** a path's corners, loop by loop ("M1,2L3,4Z") */
-const loopsOf = (d: string): Point[][] => d.split('Z').filter(Boolean).map((l) => l.slice(1).split('L').map((p) => p.split(',').map(Number) as Point));
+const loopsOf = (d: string): Point[][] =>
+  d
+    .split('Z')
+    .filter(Boolean)
+    .map((l) =>
+      l
+        .slice(1)
+        .split('L')
+        .map((p) => p.split(',').map(Number) as Point),
+    );
 
 describe('parseDrawing', () => {
   it("reads the filled shapes and the words, with their groups' transforms", () => {
@@ -59,7 +68,11 @@ describe('parseDrawing', () => {
       expect(d.shapes.length, event).toBe(svg.match(/<polygon/g)!.length);
       for (const s of d.shapes) expect(s.fill, event).toMatch(/^#[0-9a-f]{6}$/);
     }
-    expect(parseDrawing(fixture('8p')).texts.map((t) => t.text).sort()).toEqual(['1', '2', '3', '4', '5', '6', '7', '8']);
+    expect(
+      parseDrawing(fixture('8p'))
+        .texts.map((t) => t.text)
+        .sort(),
+    ).toEqual(['1', '2', '3', '4', '5', '6', '7', '8']);
   });
 
   it('spells colours one way', () => {
@@ -141,7 +154,7 @@ describe('buildDrawnNet', () => {
     expect(net.stickers).toHaveLength(52);
   });
 
-  it("draws a sliding puzzle as a board: one plate, the tiles grown to their squares, the space empty, the numbers kept", () => {
+  it('draws a sliding puzzle as a board: one plate, the tiles grown to their squares, the space empty, the numbers kept', () => {
     const d = parseDrawing(fixture('8p'));
     const net = buildDrawnNet(d, 'board')!;
     expect(net.plates).toHaveLength(1);
@@ -199,7 +212,17 @@ describe('drawnColour', () => {
   });
 
   it('redraws the sliding puzzles as boards, the square-1s flat, and leaves the clock as csTimer draws it', () => {
-    expect(['15p', '8p', 'sq1', 'sq2', 'ssq1', 'bsq', 'mrbl', 'prc', '888'].map(drawnKind)).toEqual(['board', 'board', 'flat', 'flat', 'flat', 'flat', 'net', 'net', 'net']);
+    expect(['15p', '8p', 'sq1', 'sq2', 'ssq1', 'bsq', 'mrbl', 'prc', '888'].map(drawnKind)).toEqual([
+      'board',
+      'board',
+      'flat',
+      'flat',
+      'flat',
+      'flat',
+      'net',
+      'net',
+      'net',
+    ]);
     expect(redrawable('clock')).toBe(false);
     expect(redrawable('15p')).toBe(true);
   });

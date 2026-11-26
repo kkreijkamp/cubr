@@ -127,7 +127,9 @@ export function ScrambleBar({ scramble, onNext, onPrev, hasPrev, onCustom, editi
     <div className="tp-scramble-wrap fade-on-focus">
       {scramble?.unavailable ? (
         <div className="tp-scramble tp-scramble-loading">
-          {scramble.busy ? 'too many new scrambles in the last minute: one moment, then tab for a new one' : 'no connection: this kind of scramble needs the scramble service'}
+          {scramble.busy
+            ? 'too many new scrambles in the last minute: one moment, then tab for a new one'
+            : 'no connection: this kind of scramble needs the scramble service'}
         </div>
       ) : scramble ? (
         <div
@@ -139,9 +141,7 @@ export function ScrambleBar({ scramble, onNext, onPrev, hasPrev, onCustom, editi
           {hint && !hint.pending ? <HintedMoves hint={hint} /> : scramble.text}
         </div>
       ) : (
-        <div className="tp-scramble tp-scramble-loading">
-          generating scramble...
-        </div>
+        <div className="tp-scramble tp-scramble-loading">generating scramble...</div>
       )}
       <div className="tp-scramble-actions">
         {hasPrev && (
@@ -169,7 +169,9 @@ export function ScrambleBar({ scramble, onNext, onPrev, hasPrev, onCustom, editi
             read from the cube
           </span>
         )}
-        {hint && (hint.fix || hint.pending) && <span className="tp-scramble-hint">{hint.pending ? 'off the scramble' : 'off the scramble - these turns lead back'}</span>}
+        {hint && (hint.fix || hint.pending) && (
+          <span className="tp-scramble-hint">{hint.pending ? 'off the scramble' : 'off the scramble - these turns lead back'}</span>
+        )}
       </div>
     </div>
   );
@@ -183,7 +185,9 @@ function HintedMoves({ hint }: { hint: ScrambleHint }) {
       {hint.moves.map((m, i) => (
         <Fragment key={i}>
           {i > 0 && ' '}
-          <span className={complete ? undefined : i < hint.done ? 'sm-done' : i === hint.done ? 'sm-current' : undefined}>{i === hint.done && hint.rest ? hint.rest : m}</span>
+          <span className={complete ? undefined : i < hint.done ? 'sm-done' : i === hint.done ? 'sm-current' : undefined}>
+            {i === hint.done && hint.rest ? hint.rest : m}
+          </span>
         </Fragment>
       ))}
       {complete && (

@@ -296,10 +296,13 @@ export function useTimerEngine(opts: TimerEngineOptions) {
   }, [press, release, stop, cancel, publish]);
 
   // cleanup timers on unmount; cancel if disabled mid-way
-  useEffect(() => () => {
-    clearHold();
-    clearAlerts();
-  }, []);
+  useEffect(
+    () => () => {
+      clearHold();
+      clearAlerts();
+    },
+    [],
+  );
   useEffect(() => {
     if (!opts.enabled && st.current.phase !== 'running') cancel();
   }, [opts.enabled, cancel]);

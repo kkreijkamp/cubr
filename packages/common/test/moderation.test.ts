@@ -8,7 +8,20 @@ describe('words cubr does not allow', () => {
   });
 
   it('leaves innocent words that contain one alone', () => {
-    for (const t of ['assassin', 'classic cuber', 'Scunthorpe', 'cocktail', 'passionate', 'bassist', 'therapist', 'analysis', 'Dickens', 'Feliks', 'koen_k', 'sub-10 ao5']) {
+    for (const t of [
+      'assassin',
+      'classic cuber',
+      'Scunthorpe',
+      'cocktail',
+      'passionate',
+      'bassist',
+      'therapist',
+      'analysis',
+      'Dickens',
+      'Feliks',
+      'koen_k',
+      'sub-10 ao5',
+    ]) {
       expect(hasBlockedWord(t), t).toBe(false);
     }
   });
@@ -20,7 +33,7 @@ describe('words cubr does not allow', () => {
 });
 
 describe('reserved usernames', () => {
-  it('are the site\'s and its staff\'s, whatever the case, underscores or trailing digits', () => {
+  it("are the site's and its staff's, whatever the case, underscores or trailing digits", () => {
     for (const u of ['admin', 'Admin_1', 'cubr', 'CUBR_official', 'support2', 'moderator_99', 'wca', 'no_reply']) expect(isReservedUsername(u), u).toBe(true);
     for (const u of ['koen', 'adminx', 'cubrfan', 'feliks_z', 'helpful_cuber']) expect(isReservedUsername(u), u).toBe(false);
   });

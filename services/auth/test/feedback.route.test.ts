@@ -71,7 +71,12 @@ async function app() {
 }
 
 const IP = '203.0.113.77';
-const feedback = { kind: 'bug', message: 'the timer stops at 10 seconds\nevery time', email: 'jo@example.com', details: 'cubr v1.6.9 · Chrome 142 on macOS · 1280×800 · /daily' };
+const feedback = {
+  kind: 'bug',
+  message: 'the timer stops at 10 seconds\nevery time',
+  email: 'jo@example.com',
+  details: 'cubr v1.6.9 · Chrome 142 on macOS · 1280×800 · /daily',
+};
 const post = (a: Awaited<ReturnType<typeof app>>['a'], payload: unknown = feedback, ip = IP) =>
   a.inject({ method: 'POST', url: '/api/feedback', payload: payload as object, headers: { 'x-forwarded-for': ip } });
 
@@ -111,7 +116,13 @@ describe('POST /api/feedback', () => {
 
   it('refuses a missing or blank message, an unknown type, a bad email and other fields, and sends nothing', async () => {
     const { a, lines } = await app();
-    const bodies = [{ ...feedback, message: '  ' }, { kind: 'bug' }, { ...feedback, kind: 'praise' }, { ...feedback, email: 'jo@' }, { ...feedback, username: 'jo' }];
+    const bodies = [
+      { ...feedback, message: '  ' },
+      { kind: 'bug' },
+      { ...feedback, kind: 'praise' },
+      { ...feedback, email: 'jo@' },
+      { ...feedback, username: 'jo' },
+    ];
     for (const [i, body] of bodies.entries()) {
       // each from its own address: refused ones count toward the limit too
       expect((await post(a, body, `198.51.100.${i + 1}`)).statusCode, JSON.stringify(body)).toBe(400);
@@ -123,7 +134,12 @@ describe('POST /api/feedback', () => {
 
   it('refuses a body over 32 KB', async () => {
     const { a } = await app();
-    const res = await a.inject({ method: 'POST', url: '/api/feedback', payload: { ...feedback, message: 'x'.repeat(33 * 1024) }, headers: { 'x-forwarded-for': IP } });
+    const res = await a.inject({
+      method: 'POST',
+      url: '/api/feedback',
+      payload: { ...feedback, message: 'x'.repeat(33 * 1024) },
+      headers: { 'x-forwarded-for': IP },
+    });
     expect(res.statusCode).toBe(413);
     expect(outbox.mails).toHaveLength(0);
     await a.close();

@@ -43,9 +43,9 @@ export function LocalUploadOffer() {
     <Modal title="keep your guest solves?" onClose={() => !busy && dismissUploadOffer()} center>
       <div className="dialog-message">
         <p style={{ margin: 0 }}>
-          This browser has <span className="main">{solvesText(offer.solves)}</span> in {offer.sessions} session{offer.sessions === 1 ? '' : 's'} from
-          before you signed in. {one ? 'Upload it to your account so it syncs' : 'Upload them to your account so they sync'} across devices and{' '}
-          {one ? 'counts' : 'count'} towards your stats.
+          This browser has <span className="main">{solvesText(offer.solves)}</span> in {offer.sessions} session{offer.sessions === 1 ? '' : 's'} from before you
+          signed in. {one ? 'Upload it to your account so it syncs' : 'Upload them to your account so they sync'} across devices and {one ? 'counts' : 'count'}{' '}
+          towards your stats.
         </p>
         <p className="sub" style={{ margin: '0.75rem 0 0' }}>
           They are added as new sessions; the local copy is removed once the upload succeeds.

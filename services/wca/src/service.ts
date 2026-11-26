@@ -116,7 +116,22 @@ export function createService(deps: { repo: Repo; dataset: Dataset; cache: Cache
       const p = (await percentileMap(meta)).get(`${q.event}:${q.kind}`);
       const unit = requireEvent(q.event).unit;
       if (!p) {
-        return { event: q.event, kind: q.kind, unit, total: 0, p10: null, p25: null, p50: null, p75: null, p90: null, p99: null, min: null, below: 0, above: 0, buckets: [] };
+        return {
+          event: q.event,
+          kind: q.kind,
+          unit,
+          total: 0,
+          p10: null,
+          p25: null,
+          p50: null,
+          p75: null,
+          p90: null,
+          p99: null,
+          min: null,
+          below: 0,
+          above: 0,
+          buckets: [],
+        };
       }
       const fine = await repo.distribution(q.event, q.kind);
       const conv = (raw: number) => wcaToApi(q.event, q.kind, raw);
@@ -146,10 +161,7 @@ export function createService(deps: { repo: Repo; dataset: Dataset; cache: Cache
   /** Raw record holders for both kinds, grouped by event (shared by /records and /internal/records). */
   async function recordRows(meta: DatasetMeta) {
     return cache(meta.cacheVersion, 'records', HOUR, async () => {
-      const [single, average] = await Promise.all([
-        repo.recordHolders('single', EVENT_IDS),
-        repo.recordHolders('average', EVENT_IDS),
-      ]);
+      const [single, average] = await Promise.all([repo.recordHolders('single', EVENT_IDS), repo.recordHolders('average', EVENT_IDS)]);
       return { single, average };
     });
   }
@@ -228,9 +240,7 @@ export function createService(deps: { repo: Repo; dataset: Dataset; cache: Cache
       const pbs = WCA_EVENTS.flatMap((e) => {
         const entry = (kind: Kind) => {
           const r = ranks.find((x) => x.eventId === e.id && x.kind === kind);
-          return r
-            ? { value: wcaToApi(e.id, kind, r.best), worldRank: r.worldRank, continentRank: r.continentRank, countryRank: r.countryRank }
-            : null;
+          return r ? { value: wcaToApi(e.id, kind, r.best), worldRank: r.worldRank, continentRank: r.continentRank, countryRank: r.countryRank } : null;
         };
         const single = entry('single');
         const average = entry('average');

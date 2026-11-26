@@ -1,8 +1,40 @@
 import { describe, expect, it } from 'vitest';
-import { ALL_EVENT_IDS, ALL_EVENTS, RELAY_EVENTS, RELAY_PARTS, DAILY_EVENTS, defaultSessionName, EVENT_IDS, EVENTS, getEvent, isEventId, isWcaEvent, OTHER_EVENTS, practiceSessionName, splitRelay } from '../src/events.js';
+import {
+  ALL_EVENT_IDS,
+  ALL_EVENTS,
+  RELAY_EVENTS,
+  RELAY_PARTS,
+  DAILY_EVENTS,
+  defaultSessionName,
+  EVENT_IDS,
+  EVENTS,
+  getEvent,
+  isEventId,
+  isWcaEvent,
+  OTHER_EVENTS,
+  practiceSessionName,
+  splitRelay,
+} from '../src/events.js';
 
 // the puzzle ids <twisty-player> understands for these events
-const TWISTY_PUZZLES = ['2x2x2', '3x3x3', '4x4x4', '5x5x5', '6x6x6', '7x7x7', 'clock', 'megaminx', 'pyraminx', 'skewb', 'square1', 'fto', 'kilominx', 'gigaminx', 'master_tetraminx', 'redi_cube'];
+const TWISTY_PUZZLES = [
+  '2x2x2',
+  '3x3x3',
+  '4x4x4',
+  '5x5x5',
+  '6x6x6',
+  '7x7x7',
+  'clock',
+  'megaminx',
+  'pyraminx',
+  'skewb',
+  'square1',
+  'fto',
+  'kilominx',
+  'gigaminx',
+  'master_tetraminx',
+  'redi_cube',
+];
 
 describe('events', () => {
   it('lists the 17 WCA events (FTO from 2027; no multi-blind, no feet) with unique ids', () => {
@@ -87,7 +119,7 @@ describe('events', () => {
       { label: '3x3', event: '333', scramble: 'D2 L' },
       { label: '4x4', event: '444', scramble: 'Rw2 U' },
     ]);
-    const mini = splitRelay('rmngf', 'clock: UR3+ DR2- ALL1+ y2\nmega: R++ D-- U\nR-- D++ U\'\nR++ D++ U');
+    const mini = splitRelay('rmngf', "clock: UR3+ DR2- ALL1+ y2\nmega: R++ D-- U\nR-- D++ U'\nR++ D++ U");
     expect(mini?.map((p) => p.label)).toEqual(['clock', 'mega']);
     expect(mini?.[1].scramble).toBe("R++ D-- U\nR-- D++ U'\nR++ D++ U");
     expect(splitRelay('r3', '1: R\n2: U')?.map((p) => [p.label, p.event])).toEqual([

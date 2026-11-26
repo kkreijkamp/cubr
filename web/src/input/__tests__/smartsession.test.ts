@@ -143,7 +143,7 @@ describe('smart cube timing (csTimer giiker.js)', () => {
     const s = new SmartCubeSession();
     const hand = new Hand(s);
     s.hinter.setScramble("R U' F2");
-    const evs = ["R", "U'", 'F2'].map((m, i) => hand.turn(m, i * 100, '222'));
+    const evs = ['R', "U'", 'F2'].map((m, i) => hand.turn(m, i * 100, '222'));
     expect(evs[2].markIn).toBe(0);
     s.markScrambled(300);
     hand.turn('F2', 1000, '222');
@@ -162,7 +162,7 @@ describe("the scramble line (csTimer's scrHinter)", () => {
     expect(hint(h, scrambleCube('R')!).hint).toMatchObject({ done: 1, rest: null });
     expect(hint(h, scrambleCube('R U')!).hint).toMatchObject({ done: 1, rest: 'U' });
     expect(hint(h, scrambleCube("R U'")!).hint).toMatchObject({ done: 1, rest: "U'" });
-    expect(hint(h, scrambleCube("R U2 F")!).hint).toMatchObject({ done: 2, rest: 'F2' });
+    expect(hint(h, scrambleCube('R U2 F')!).hint).toMatchObject({ done: 2, rest: 'F2' });
     expect(hint(h, scrambleCube("R U2 F' D")!).hint).toMatchObject({ done: 4 });
     expect(h.matches(scrambleCube("R U2 F' D")!, false)).toBe(true);
   });

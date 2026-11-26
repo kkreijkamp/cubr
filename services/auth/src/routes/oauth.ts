@@ -150,13 +150,18 @@ export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, 
   /** The provider vouches for `email`: if it's the account's email, it's confirmed. */
   const confirmByProvider = async (userId: string, email: string | null) => {
     if (!email) return;
-    await pool.query('update auth.users set email_verified_at = now() where id = $1 and email_verified_at is null and lower(email) = lower($2)', [userId, email]);
+    await pool.query('update auth.users set email_verified_at = now() where id = $1 and email_verified_at is null and lower(email) = lower($2)', [
+      userId,
+      email,
+    ]);
   };
 
   /** A free username close to the provider's (null if 50 tries are all taken); never a reserved or refused one. */
   async function freeUsername(identity: Pick<ProviderIdentity, 'login' | 'name' | 'email'>): Promise<string | null> {
     const candidates = usernameCandidates(suggestUsername(identity)).filter((c) => usernameSchema.safeParse(c).success);
-    const { rows } = await pool.query<{ u: string }>('select lower(username) as u from auth.users where lower(username) = any($1)', [candidates.map((c) => c.toLowerCase())]);
+    const { rows } = await pool.query<{ u: string }>('select lower(username) as u from auth.users where lower(username) = any($1)', [
+      candidates.map((c) => c.toLowerCase()),
+    ]);
     const taken = new Set(rows.map((r) => r.u));
     return candidates.find((c) => !taken.has(c.toLowerCase())) ?? null;
   }
@@ -175,7 +180,11 @@ export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, 
     const nonce = randomToken(16);
     const { verifier, challenge } = pkce();
     const flow: Flow = { provider, verifier, nonce, mode, userId: mode === 'link' ? req.user!.id.toLowerCase() : null, next: safeNext(next) };
-    const stored = await withTimeout(redis.set(flowKey(state), JSON.stringify(flow), 'EX', FLOW_TTL_SEC).then(() => true), 2000, false);
+    const stored = await withTimeout(
+      redis.set(flowKey(state), JSON.stringify(flow), 'EX', FLOW_TTL_SEC).then(() => true),
+      2000,
+      false,
+    );
     if (!stored) throw unavailable('Sign-in with a provider is unavailable right now, please retry');
     reply.header('set-cookie', bindCookie(state, FLOW_TTL_SEC)).header('cache-control', 'no-store');
     return { url: authorizeUrl(cfg, { redirectUri: redirectUri(provider), state, nonce, challenge }) };
@@ -208,7 +217,12 @@ export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, 
       if (linked && linked.user_id !== flow.userId) return fail(reply, flow, provider, 'linked_elsewhere');
       if (!linked) {
         try {
-          await pool.query('insert into auth.user_identities (provider, subject, user_id, email) values ($1, $2, $3, $4)', [provider, identity.subject, flow.userId, identity.email]);
+          await pool.query('insert into auth.user_identities (provider, subject, user_id, email) values ($1, $2, $3, $4)', [
+            provider,
+            identity.subject,
+            flow.userId,
+            identity.email,
+          ]);
         } catch (err) {
           // the unique (user_id, provider): this account already has another account of this provider
           if ((err as { code?: string }).code === '23505') return fail(reply, flow, provider, 'already_linked');
@@ -230,7 +244,11 @@ export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, 
       await pool.query('update auth.user_identities set last_used_at = now() where provider = $1 and subject = $2', [provider, identity.subject]);
       await confirmByProvider(linked.user_id, identity.email);
       const code = randomToken();
-      const ok = await withTimeout(redis.set(loginKey(code), JSON.stringify({ userId: linked.user_id }), 'EX', LOGIN_CODE_TTL_SEC).then(() => true), 2000, false);
+      const ok = await withTimeout(
+        redis.set(loginKey(code), JSON.stringify({ userId: linked.user_id }), 'EX', LOGIN_CODE_TTL_SEC).then(() => true),
+        2000,
+        false,
+      );
       if (!ok) return fail(reply, flow, provider, 'busy');
       return toSpa(reply, '/login/sso', { code, next: flow.next }, [code, LOGIN_CODE_TTL_SEC]);
     }
@@ -242,7 +260,11 @@ export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, 
     if (taken.rowCount) return fail(reply, flow, provider, 'email_taken');
     const id = randomToken();
     const pending: PendingSignup = { provider, subject: identity.subject, email: identity.email, name: identity.name, login: identity.login };
-    const ok = await withTimeout(redis.set(signupKey(id), JSON.stringify(pending), 'EX', SIGNUP_TTL_SEC).then(() => true), 2000, false);
+    const ok = await withTimeout(
+      redis.set(signupKey(id), JSON.stringify(pending), 'EX', SIGNUP_TTL_SEC).then(() => true),
+      2000,
+      false,
+    );
     if (!ok) return fail(reply, flow, provider, 'busy');
     return toSpa(reply, '/login/sso', { signup: id, next: flow.next }, [id, SIGNUP_TTL_SEC]);
   }
@@ -305,10 +327,10 @@ export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, 
         const freed = await releaseUnconfirmed(c, pending.email);
         if (freed) req.log.info({ userId: freed, provider: pending.provider }, 'an email never confirmed in 7 days was freed for a new account');
         // the provider verified the address, so it starts confirmed
-        const { rows } = await c.query<UserRow>(`insert into auth.users (username, email, password_hash, email_verified_at) values ($1, $2, null, now()) returning ${USER_COLUMNS}`, [
-          username,
-          pending.email,
-        ]);
+        const { rows } = await c.query<UserRow>(
+          `insert into auth.users (username, email, password_hash, email_verified_at) values ($1, $2, null, now()) returning ${USER_COLUMNS}`,
+          [username, pending.email],
+        );
         await c.query('insert into auth.user_settings (user_id) values ($1)', [rows[0].id]);
         await c.query('insert into auth.user_identities (provider, subject, user_id, email, last_used_at) values ($1, $2, $3, $4, now())', [
           pending.provider,
@@ -336,9 +358,10 @@ export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, 
     if (!UUID_RE.test(userId)) throw unauthorized();
     const [user, ids] = await Promise.all([
       pool.query<{ has_password: boolean }>('select password_hash is not null as has_password from auth.users where id = $1', [userId]),
-      pool.query<{ provider: Provider; email: string | null; created_at: Date }>('select provider, email, created_at from auth.user_identities where user_id = $1 order by created_at', [
-        userId,
-      ]),
+      pool.query<{ provider: Provider; email: string | null; created_at: Date }>(
+        'select provider, email, created_at from auth.user_identities where user_id = $1 order by created_at',
+        [userId],
+      ),
     ]);
     if (!user.rows[0]) throw unauthorized('Account no longer exists');
     return {
@@ -354,10 +377,13 @@ export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, 
     if (!isProvider(req.params.provider)) throw notFound('Not connected');
     const provider = req.params.provider;
     await withTx(pool, async (c) => {
-      const { rows } = await c.query<{ has_password: boolean }>('select password_hash is not null as has_password from auth.users where id = $1 for update', [userId]);
+      const { rows } = await c.query<{ has_password: boolean }>('select password_hash is not null as has_password from auth.users where id = $1 for update', [
+        userId,
+      ]);
       if (!rows[0]) throw unauthorized('Account no longer exists');
       const others = await c.query('select 1 from auth.user_identities where user_id = $1 and provider <> $2', [userId, provider]);
-      if (!rows[0].has_password && !others.rowCount) throw conflict('This is your only way to sign in: set a password first (sign out, then "forgot password?")');
+      if (!rows[0].has_password && !others.rowCount)
+        throw conflict('This is your only way to sign in: set a password first (sign out, then "forgot password?")');
       const del = await c.query('delete from auth.user_identities where user_id = $1 and provider = $2', [userId, provider]);
       if (!del.rowCount) throw notFound('Not connected');
     });
@@ -366,4 +392,3 @@ export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, 
     return reply.status(204).send();
   });
 }
-

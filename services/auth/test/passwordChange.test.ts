@@ -6,7 +6,13 @@ describe('changing the password', () => {
     expect(changePasswordSchema.parse({ password: 'old secret', newPassword: 'new secret' })).toEqual({ password: 'old secret', newPassword: 'new secret' });
     expect(changePasswordSchema.parse({ newPassword: 'n'.repeat(8) })).toEqual({ newPassword: 'n'.repeat(8) });
     expect(changePasswordSchema.parse({ newPassword: 'n'.repeat(128) }).newPassword).toHaveLength(128);
-    for (const bad of [{}, { password: 'old secret' }, { newPassword: 'n'.repeat(7) }, { newPassword: 'n'.repeat(129) }, { password: '', newPassword: 'new secret' }]) {
+    for (const bad of [
+      {},
+      { password: 'old secret' },
+      { newPassword: 'n'.repeat(7) },
+      { newPassword: 'n'.repeat(129) },
+      { password: '', newPassword: 'new secret' },
+    ]) {
       expect(changePasswordSchema.safeParse(bad).success, JSON.stringify(bad)).toBe(false);
     }
   });

@@ -277,7 +277,9 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background var(--dur), color var(--dur);
+  transition:
+    background var(--dur),
+    color var(--dur);
 }
 .tp-menu-item:hover {
   background: var(--sub-alt-color);
@@ -779,7 +781,9 @@
   color: inherit;
   font: inherit;
   cursor: pointer;
-  transition: background var(--dur), color var(--dur);
+  transition:
+    background var(--dur),
+    color var(--dur);
 }
 .tp-cell-btn:hover {
   background: var(--text-color);
@@ -867,7 +871,9 @@
   border-radius: var(--roundness);
   color: var(--text-color);
   cursor: pointer;
-  transition: background var(--dur), color var(--dur);
+  transition:
+    background var(--dur),
+    color var(--dur);
 }
 .tp-solve-row > span:not(.idx):not(.time):not(.pb) {
   color: var(--sub-color);
@@ -1137,7 +1143,9 @@
   font-size: 0.85rem;
   text-align: left;
   cursor: pointer;
-  transition: background var(--dur), color var(--dur);
+  transition:
+    background var(--dur),
+    color var(--dur);
 }
 .tp-avg-row:nth-child(odd) {
   background: var(--sub-alt-color);

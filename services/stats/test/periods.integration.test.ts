@@ -16,7 +16,11 @@ describeIntegration('stats day and week bests', () => {
   });
 
   const bests = (u: Cuber, query: Record<string, string | number>, token: string | null = s.config.internalToken) =>
-    s.request('GET', `/internal/users/${u.id}/period-bests?${new URLSearchParams(Object.fromEntries(Object.entries(query).map(([k, v]) => [k, String(v)])))}`, token === null ? {} : { headers: { 'x-internal-token': token } });
+    s.request(
+      'GET',
+      `/internal/users/${u.id}/period-bests?${new URLSearchParams(Object.fromEntries(Object.entries(query).map(([k, v]) => [k, String(v)])))}`,
+      token === null ? {} : { headers: { 'x-internal-token': token } },
+    );
   const read = async (u: Cuber, query: Record<string, string | number>) => {
     const res = await bests(u, query);
     expect(res.statusCode, res.body).toBe(200);
@@ -66,7 +70,9 @@ describeIntegration('stats day and week bests', () => {
       expect((await bests(u, { ...ok, event: 'bogus' })).statusCode).toBe(400);
       expect((await bests(u, { ...ok, from: 'yesterday' })).statusCode).toBe(400);
       expect((await bests(u, { ...ok, minSingle: -1 })).statusCode).toBe(400);
-      const res = await s.request('GET', `/internal/users/not-a-uuid/period-bests?event=333&from=2026-11-02T00:00:00.000Z`, { headers: { 'x-internal-token': s.config.internalToken } });
+      const res = await s.request('GET', `/internal/users/not-a-uuid/period-bests?event=333&from=2026-11-02T00:00:00.000Z`, {
+        headers: { 'x-internal-token': s.config.internalToken },
+      });
       expect(res.statusCode).toBe(400);
     });
 
@@ -160,7 +166,7 @@ describeIntegration('stats day and week bests', () => {
     });
   });
   describe('GET /internal/users/:id/all-time-bests', () => {
-    it("answers the best real single, ao5 and ao12 of all time and the refused ones apart (Barry), practice left out", async () => {
+    it('answers the best real single, ao5 and ao12 of all time and the refused ones apart (Barry), practice left out', async () => {
       const u = newCuber();
       const session = s.solve.session(u, '333');
       const taps = [648, 612, 418, 481, 239].map((t, i) => s.solve.solve(u, session, t, `2026-11-16T11:10:3${i}.000Z`));

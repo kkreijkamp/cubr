@@ -7,7 +7,14 @@ function fakeDoc(alreadyInjected = false) {
   const doc: BeaconDoc = {
     querySelector: (sel) => (alreadyInjected && sel.includes('static.cloudflareinsights.com') ? {} : null),
     createElement: () => {
-      const el = { src: '', defer: false, attrs: {} as Record<string, string>, setAttribute(k: string, v: string) { this.attrs[k] = v; } };
+      const el = {
+        src: '',
+        defer: false,
+        attrs: {} as Record<string, string>,
+        setAttribute(k: string, v: string) {
+          this.attrs[k] = v;
+        },
+      };
       return el as unknown as HTMLScriptElement;
     },
     head: { append: (el) => void added.push(el as unknown as (typeof added)[number]) },
@@ -23,7 +30,8 @@ describe('shouldMeasure', () => {
     expect(shouldMeasure({ ...onSite, globalPrivacyControl: false })).toBe(true);
   });
   it('never measures the local stack, previews or other hosts', () => {
-    for (const hostname of ['localhost', '127.0.0.1', 'www.cubr.dev', 'cubr.dev.evil.example', 'staging.cubr.dev']) expect(shouldMeasure({ ...onSite, hostname }), hostname).toBe(false);
+    for (const hostname of ['localhost', '127.0.0.1', 'www.cubr.dev', 'cubr.dev.evil.example', 'staging.cubr.dev'])
+      expect(shouldMeasure({ ...onSite, hostname }), hostname).toBe(false);
   });
   it('respects Global Privacy Control and Do Not Track', () => {
     expect(shouldMeasure({ ...onSite, globalPrivacyControl: true })).toBe(false);
@@ -47,7 +55,11 @@ describe('startAnalytics', () => {
     expect(added).toHaveLength(0);
   });
   it('adds nothing off cubr.dev or when the browser asks not to be tracked', () => {
-    for (const env of [{ ...onSite, hostname: 'localhost' }, { ...onSite, globalPrivacyControl: true }, { ...onSite, doNotTrack: '1' }]) {
+    for (const env of [
+      { ...onSite, hostname: 'localhost' },
+      { ...onSite, globalPrivacyControl: true },
+      { ...onSite, doNotTrack: '1' },
+    ]) {
       const { doc, added } = fakeDoc();
       expect(startAnalytics(doc, env)).toBe(false);
       expect(added).toHaveLength(0);

@@ -258,9 +258,21 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
     'account',
     () => [
       { id: 'account-edit', label: 'Edit profile', icon: <PencilIcon />, run: onEdit },
-      { id: 'account-import', label: 'Import solves...', icon: <DocumentArrowUpIcon />, keywords: ['cstimer', 'twisty', 'cubedesk', 'block keeper', 'upload', 'restore'], run: pickFile },
+      {
+        id: 'account-import',
+        label: 'Import solves...',
+        icon: <DocumentArrowUpIcon />,
+        keywords: ['cstimer', 'twisty', 'cubedesk', 'block keeper', 'upload', 'restore'],
+        run: pickFile,
+      },
       { id: 'account-export', label: 'Export data (json)', icon: <ArrowDownTrayIcon />, keywords: ['backup', 'download'], run: () => void doExport('json') },
-      { id: 'account-export-cstimer', label: 'Export for csTimer', icon: <ArrowDownTrayIcon />, keywords: ['cstimer', 'backup', 'download'], run: () => void doExport('cstimer') },
+      {
+        id: 'account-export-cstimer',
+        label: 'Export for csTimer',
+        icon: <ArrowDownTrayIcon />,
+        keywords: ['cstimer', 'backup', 'download'],
+        run: () => void doExport('cstimer'),
+      },
       { id: 'account-email', label: 'Change email...', icon: <EnvelopeIcon />, keywords: ['address', 'account'], run: () => setChangingEmail(true) },
       {
         id: 'account-password',
@@ -277,7 +289,15 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
         run: () => void doLogoutElsewhere(),
       },
       ...(unconfirmed
-        ? [{ id: 'account-email-confirm', label: 'Send email confirmation link', icon: <PaperAirplaneIcon />, keywords: ['confirm', 'verify', 'address'], run: () => void sendConfirmation() }]
+        ? [
+            {
+              id: 'account-email-confirm',
+              label: 'Send email confirmation link',
+              icon: <PaperAirplaneIcon />,
+              keywords: ['confirm', 'verify', 'address'],
+              run: () => void sendConfirmation(),
+            },
+          ]
         : []),
     ],
     [onEdit, unconfirmed, hasPassword],
@@ -351,16 +371,16 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
             <div className="d">
               {released ? (
                 <>
-                  <span className="main">no email</span>: the address you signed up with wasn&apos;t confirmed within 7 days, so it was freed for
-                  whoever owns it. add one: password-reset links only go to a confirmed email.
+                  <span className="main">no email</span>: the address you signed up with wasn&apos;t confirmed within 7 days, so it was freed for whoever owns
+                  it. add one: password-reset links only go to a confirmed email.
                 </>
               ) : (
                 <span className="text">{user.email}</span>
               )}
               {released ? null : unconfirmed ? (
                 <>
-                  , <span className="main">not confirmed yet</span>. open the link we sent there, or send a new one: password-reset links only go
-                  to a confirmed email.
+                  , <span className="main">not confirmed yet</span>. open the link we sent there, or send a new one: password-reset links only go to a confirmed
+                  email.
                 </>
               ) : (
                 <>. password-reset links and notices about your account go here.</>
@@ -389,7 +409,9 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
             <div className="t">
               <ComputerDesktopIcon /> devices
             </div>
-            <div className="d">signed in somewhere you shouldn&apos;t be, or on a shared computer? sign out every other browser and device. this one stays signed in.</div>
+            <div className="d">
+              signed in somewhere you shouldn&apos;t be, or on a shared computer? sign out every other browser and device. this one stays signed in.
+            </div>
           </div>
           <div className="ac-actions">
             <button className="btn" onClick={() => void doLogoutElsewhere()} disabled={signingOutElsewhere}>
@@ -436,9 +458,12 @@ export function AccountSection({ user, onEdit }: { user: PrivateUser; onEdit: ()
           onClose={() => setChangingPassword(false)}
           onDone={() => {
             setChangingPassword(false);
-            toast.success(hasPassword ? 'you are still signed in here, and signed out everywhere else.' : 'you can now sign in with your username or email too.', {
-              title: hasPassword ? 'password changed' : 'password set',
-            });
+            toast.success(
+              hasPassword ? 'you are still signed in here, and signed out everywhere else.' : 'you can now sign in with your username or email too.',
+              {
+                title: hasPassword ? 'password changed' : 'password set',
+              },
+            );
           }}
         />
       )}

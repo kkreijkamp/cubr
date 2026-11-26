@@ -114,9 +114,7 @@ export async function writeImport(client: PoolClient, userId: string, plan: Impo
   let inserted = 0;
   for (const part of chunk(plan.rows, chunkSize)) {
     const c = toColumns(part);
-    const res = await client.query(INSERT_CHUNK_SQL, [
-      userId, c.id, c.sessionId, c.event, c.timeMs, c.penalty, c.scramble, c.comment, c.createdAt,
-    ]);
+    const res = await client.query(INSERT_CHUNK_SQL, [userId, c.id, c.sessionId, c.event, c.timeMs, c.penalty, c.scramble, c.comment, c.createdAt]);
     inserted += res.rowCount ?? 0;
   }
   return inserted;

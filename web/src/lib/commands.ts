@@ -58,7 +58,11 @@ export function closePalette(): void {
 }
 
 /** Words for matching: letters and digits, with + . : kept inside them (+2, 1:30.00); the rest separates. */
-const words = (text: string) => text.toLowerCase().split(/[^a-z0-9+.:]+/).filter(Boolean);
+const words = (text: string) =>
+  text
+    .toLowerCase()
+    .split(/[^a-z0-9+.:]+/)
+    .filter(Boolean);
 
 /**
  * Monkeytype-style matching: every typed word must prefix some word of the label/keywords. The query splits

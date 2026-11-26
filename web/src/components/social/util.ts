@@ -104,5 +104,4 @@ export function csTimerFileName(now = new Date()): string {
   return `cstimer_${localDateKey(now).replace(/-/g, '')}_cubr.txt`;
 }
 
-export const prefersReducedMotion = (): boolean =>
-  typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+export const prefersReducedMotion = (): boolean => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;

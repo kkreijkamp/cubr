@@ -52,7 +52,7 @@ describe('your own virtual puzzle keys', () => {
 
   it('stays whole swaps however many keys are moved', () => {
     let seed = 7;
-    const rnd = (n: number) => ((seed = (seed * 16807) % 2147483647) % n);
+    const rnd = (n: number) => (seed = (seed * 16807) % 2147483647) % n;
     let map: KeyMap = {};
     for (let i = 0; i < 500; i++) {
       map = bind(map, ALL[rnd(ALL.length)], ALL[rnd(ALL.length)]);

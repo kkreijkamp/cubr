@@ -239,7 +239,11 @@ function readCloudCache(uid: string): { sessions: Session[]; sessionId: string |
   if (session && Array.isArray(c.solves)) {
     // reuse the local codec for the cached solves
     const { db } = decodeLocalDb(
-      { v: 1, sessions: [{ id: session.id, name: session.name, event: session.event, createdAt: session.createdAt, updatedAt: session.updatedAt }], solves: { [session.id]: c.solves } },
+      {
+        v: 1,
+        sessions: [{ id: session.id, name: session.name, event: session.event, createdAt: session.createdAt, updatedAt: session.updatedAt }],
+        solves: { [session.id]: c.solves },
+      },
       isEventId,
     );
     solves = db.solves.get(session.id) ?? [];
@@ -548,7 +552,14 @@ function rehomeSolves(lost: string, uid: string, event: string): void {
   const base = old?.name ?? 'session';
   const name = `${base.slice(0, 40 - RECOVERED.length).trimEnd()}${RECOVERED}`;
   const practice = old ? old.practice === true : true;
-  const session = { id: uuid(), name, event, ...(practice ? { practice: true } : {}), ...(old?.scramble ? { scramble: old.scramble } : {}), createdAt: new Date().toISOString() };
+  const session = {
+    id: uuid(),
+    name,
+    event,
+    ...(practice ? { practice: true } : {}),
+    ...(old?.scramble ? { scramble: old.scramble } : {}),
+    createdAt: new Date().toISOString(),
+  };
   rehomed.add(session.id);
   let moved = 0;
   queue = readQueue().map((q) => {
@@ -564,7 +575,9 @@ function rehomeSolves(lost: string, uid: string, event: string): void {
   const first = queue.findIndex((q) => q.userId === uid && q.op.kind === 'createSolve' && q.op.solve.sessionId === session.id);
   queue = first < 0 ? [...queue, item] : [...queue.slice(0, first), item, ...queue.slice(first)];
   saveQueue();
-  toast.notice(`${moved} ${moved === 1 ? 'solve' : 'solves'} from a session merged or deleted on another device ${moved === 1 ? 'is' : 'are'} in a new session, "${name}"`);
+  toast.notice(
+    `${moved} ${moved === 1 ? 'solve' : 'solves'} from a session merged or deleted on another device ${moved === 1 ? 'is' : 'are'} in a new session, "${name}"`,
+  );
   void refreshCloud();
 }
 
@@ -633,9 +646,7 @@ function suggestSessionNameFor(event: string): string {
  */
 function createDefaultSessions(event: string): Session {
   const t = Date.now();
-  const created = defaultSessionsPlan(event, model.sessions).map((p, i) =>
-    createSessionInternal(p.name, event, p.practice, new Date(t + i).toISOString()),
-  );
+  const created = defaultSessionsPlan(event, model.sessions).map((p, i) => createSessionInternal(p.name, event, p.practice, new Date(t + i).toISOString()));
   return created[0];
 }
 
@@ -654,10 +665,13 @@ async function loadCloudScope(uid: string, g: number, keepCurrent = false): Prom
     if (e instanceof ApiError && e.status === 401) return; // auth layer switches to local
     loadError = errorMessage(e);
     if (loadRetryTimer) clearTimeout(loadRetryTimer);
-    loadRetryTimer = setTimeout(() => {
-      loadRetryTimer = null;
-      if (g === gen && loadError) void refreshCloud();
-    }, backoffDelay(loadAttempts++ + 1));
+    loadRetryTimer = setTimeout(
+      () => {
+        loadRetryTimer = null;
+        if (g === gen && loadError) void refreshCloud();
+      },
+      backoffDelay(loadAttempts++ + 1),
+    );
   }
   if (g !== gen) return;
   const last = readLastSession(uid);
@@ -1100,7 +1114,14 @@ export async function clearSession(sessionId: string): Promise<void> {
   for (const [ev, id] of Object.entries(model.lastByEvent)) if (id === sessionId) model.lastByEvent[ev] = fresh.id;
   enqueue({
     kind: 'createSession',
-    session: { id: fresh.id, name: fresh.name, event: fresh.event, ...(fresh.practice ? { practice: true } : {}), ...(fresh.scramble ? { scramble: fresh.scramble } : {}), createdAt: fresh.createdAt },
+    session: {
+      id: fresh.id,
+      name: fresh.name,
+      event: fresh.event,
+      ...(fresh.practice ? { practice: true } : {}),
+      ...(fresh.scramble ? { scramble: fresh.scramble } : {}),
+      createdAt: fresh.createdAt,
+    },
     keepCreatedAt: true,
   });
   enqueue({ kind: 'deleteSession', id: sessionId });

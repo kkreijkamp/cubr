@@ -60,7 +60,7 @@ function unmatched(a: string[][], b: string[][]): number {
 /** a random scramble of `n` moves from `moves`, each as is, ' or 2 */
 function randomAlg(moves: string[], n: number, seed: number): string {
   let s = seed;
-  const next = () => ((s = (s * 1103515245 + 12345) % 2147483648) / 2147483648);
+  const next = () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648;
   return Array.from({ length: n }, () => moves[Math.floor(next() * moves.length)] + ['', "'", '2'][Math.floor(next() * 3)]).join(' ');
 }
 
@@ -94,7 +94,7 @@ describe('the cuboid model', () => {
     expect(grids(CUBE, 'S')).toEqual(grids(CUBE, '2F'));
   });
 
-  it('gives cubing.js\'s 3x3x3 and 4x4x4, sticker for sticker, after random face, wide and slice turns', () => {
+  it("gives cubing.js's 3x3x3 and 4x4x4, sticker for sticker, after random face, wide and slice turns", () => {
     for (const [d, description, moves] of [
       [CUBE, '3x3x3', ['U', 'D', 'R', 'L', 'F', 'B', 'u', 'r', 'f', '2U', '2R', '2F']],
       [FOUR, '4x4x4', ['U', 'D', 'R', 'L', 'F', 'B', 'u', 'r', 'f', 'd', '2U', '2R', '2F', '3u', '3r', '3f']],
@@ -106,12 +106,19 @@ describe('the cuboid model', () => {
       expect(ours[0]).toHaveLength(cubed[0].length);
       expect(unmatched(ours, cubed), description).toBe(0);
       // a test that can fail: every move turned the other way
-      const back = algs.map((a) => flat(grids(d, a.replace(/(\S+?)('?)(?=\s|$)/g, (_, m: string, p: string) => (m.endsWith('2') ? m : p ? m : `${m}'`)))));
+      const back = algs.map((a) =>
+        flat(
+          grids(
+            d,
+            a.replace(/(\S+?)('?)(?=\s|$)/g, (_, m: string, p: string) => (m.endsWith('2') ? m : p ? m : `${m}'`)),
+          ),
+        ),
+      );
       expect(unmatched(back, cubed), `${description} reversed`).toBeGreaterThan(ours[0].length / 4);
     }
   }, 60_000);
 
-  it("draws a tower or a domino as a 3x3x3 turned the same way, wherever the two have the same stickers", () => {
+  it('draws a tower or a domino as a 3x3x3 turned the same way, wherever the two have the same stickers', () => {
     // the tower is a 3x3x3 without its middle slices; the domino, without its middle layer
     const towerMoves = ['U', "U'", 'U2', 'D', "D'", 'D2', 'R2', 'F2'];
     const dominoMoves = ['U', "U'", 'U2', 'R2', 'L2', 'F2', 'B2'];
@@ -121,7 +128,7 @@ describe('the cuboid model', () => {
       const tower = Array.from({ length: 25 }, () => pick(towerMoves)).join(' ');
       const domino = Array.from({ length: 25 }, () => pick(dominoMoves)).join(' ');
       const [t, c1] = [grids(CUBOIDS['223'], tower), grids(CUBE, tower)];
-      const keep = <T,>(xs: T[], at: number[]) => at.map((i) => xs[i]);
+      const keep = <T>(xs: T[], at: number[]) => at.map((i) => xs[i]);
       for (const f of ['U', 'D'] as const) expect(t[f], tower).toEqual(keep(c1[f], [0, 2]).map((row) => keep(row, [0, 2])));
       for (const f of ['F', 'B', 'R', 'L'] as const) expect(t[f], tower).toEqual(c1[f].map((row) => keep(row, [0, 2])));
       const [dm, c2] = [grids(CUBOIDS['233'], domino), grids(CUBE, domino)];

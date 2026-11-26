@@ -157,7 +157,11 @@ export function faceGrids(d: Dims, stickers: Sticker[]): Faces {
   // index from the low end (left, bottom, back) and from the high end
   const lo = (v: number, n: number) => (v + n - 1) / 2;
   const hi = (v: number, n: number) => (n - 1 - v) / 2;
-  for (const { at: [x, y, z], facing, colour } of stickers) {
+  for (const {
+    at: [x, y, z],
+    facing,
+    colour,
+  } of stickers) {
     const face = (Object.keys(FACES) as FaceName[]).find((f) => facing[FACES[f].axis] === FACES[f].side)!;
     const [row, col] = {
       U: [lo(z, d.z), lo(x, d.x)],
@@ -184,7 +188,15 @@ export function netDrawing(d: Dims, faces: Faces): Drawing {
     faces[face].forEach((row, r) =>
       row.forEach((fill, c) => {
         const [x, y] = [left[face] + c, top[face] + r];
-        shapes.push({ fill, points: [[x, y], [x + 1, y], [x + 1, y + 1], [x, y + 1]] });
+        shapes.push({
+          fill,
+          points: [
+            [x, y],
+            [x + 1, y],
+            [x + 1, y + 1],
+            [x, y + 1],
+          ],
+        });
       }),
     );
   }

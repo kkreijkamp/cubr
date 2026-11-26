@@ -18,7 +18,19 @@ describeIntegration('dead letters', () => {
   let redis: Redis;
   /** A dead letter as the consumer writes it (events.ts recordFailure). */
   const dead = (group: string, type: string, eventId: string, extra: string[] = []) =>
-    redis.xadd(DLQ_STREAM, '*', 'group', group, 'type', type, 'data', JSON.stringify(data(eventId)), 'error', `cannot handle ${type}`, ...extra) as Promise<string>;
+    redis.xadd(
+      DLQ_STREAM,
+      '*',
+      'group',
+      group,
+      'type',
+      type,
+      'data',
+      JSON.stringify(data(eventId)),
+      'error',
+      `cannot handle ${type}`,
+      ...extra,
+    ) as Promise<string>;
 
   beforeAll(async () => {
     redis = await createTestRedis();

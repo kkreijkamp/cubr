@@ -72,7 +72,12 @@ export type Feedback = z.infer<typeof feedbackSchema>;
 export function firstLine(message: string, max = 60): string {
   const line = message.split('\n').find((l) => l.trim() !== '') ?? '';
   const chars = Array.from(line.replace(/\s+/g, ' ').trim());
-  return chars.length <= max ? chars.join('') : `${chars.slice(0, max - 1).join('').trimEnd()}…`;
+  return chars.length <= max
+    ? chars.join('')
+    : `${chars
+        .slice(0, max - 1)
+        .join('')
+        .trimEnd()}…`;
 }
 
 /**

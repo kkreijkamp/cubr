@@ -53,10 +53,7 @@ export function computeStandings(players: { id: string; name: string }[], result
 
   return standings.sort(
     (a, b) =>
-      b.wins - a.wins ||
-      (a.meanMs ?? Number.POSITIVE_INFINITY) - (b.meanMs ?? Number.POSITIVE_INFINITY) ||
-      b.solves - a.solves ||
-      a.name.localeCompare(b.name),
+      b.wins - a.wins || (a.meanMs ?? Number.POSITIVE_INFINITY) - (b.meanMs ?? Number.POSITIVE_INFINITY) || b.solves - a.solves || a.name.localeCompare(b.name),
   );
 }
 

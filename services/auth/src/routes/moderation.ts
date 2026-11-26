@@ -1,6 +1,18 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { PRIVATE_USERS_KEY, TOKEN_TTL_SEC, conflict, notFound, parse, requireInternal, revokedUserKey, unavailable, withTx, type Pool, type PoolClient } from '@cubr/common';
+import {
+  PRIVATE_USERS_KEY,
+  TOKEN_TTL_SEC,
+  conflict,
+  notFound,
+  parse,
+  requireInternal,
+  revokedUserKey,
+  unavailable,
+  withTx,
+  type Pool,
+  type PoolClient,
+} from '@cubr/common';
 import type { Deps } from './index.js';
 import { maskEmail } from '../mail.js';
 import { publishSafely, withTimeout } from '../safe.js';
@@ -21,7 +33,12 @@ export const MODERATION_LOG_DAYS = 730;
 
 /** Records what moderation did, and forgets records older than MODERATION_LOG_DAYS. */
 async function record(db: Pool | PoolClient, action: string, who: { id: string; username: string } | null, detail?: string | null): Promise<void> {
-  await db.query('insert into auth.moderation_log (action, user_id, username, detail) values ($1, $2, $3, $4)', [action, who?.id ?? null, who?.username ?? null, detail ?? null]);
+  await db.query('insert into auth.moderation_log (action, user_id, username, detail) values ($1, $2, $3, $4)', [
+    action,
+    who?.id ?? null,
+    who?.username ?? null,
+    detail ?? null,
+  ]);
   await db.query(`delete from auth.moderation_log where at < now() - interval '${MODERATION_LOG_DAYS} days'`);
 }
 
@@ -115,7 +132,9 @@ export async function registerModerationRoutes(app: FastifyInstance, { config, p
     const user = await find(req.params.username);
     let row: Row;
     try {
-      ({ rows: [row] } = await pool.query<Row>(`update auth.users set username = $2 where id = $1 returning ${COLUMNS}`, [user.id, to]));
+      ({
+        rows: [row],
+      } = await pool.query<Row>(`update auth.users set username = $2 where id = $1 returning ${COLUMNS}`, [user.id, to]));
     } catch (err) {
       if ((err as { code?: string }).code === '23505') throw conflict('Username is already taken');
       throw err;

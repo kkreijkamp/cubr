@@ -70,10 +70,22 @@ function newServer(): FakeServer {
     seed(o) {
       const createdAt = new Date(Date.UTC(2025, 0, 1) + ++server.seq * 1000).toISOString();
       const id = `${o.name.replace(/\W/g, '')}-${crypto.randomUUID().slice(0, 8)}`;
-      const s: ServerSession = { id, userId: o.userId, name: o.name, event: o.event ?? '333', practice: o.practice ?? false, createdAt, updatedAt: createdAt, solveCount: 0 };
+      const s: ServerSession = {
+        id,
+        userId: o.userId,
+        name: o.name,
+        event: o.event ?? '333',
+        practice: o.practice ?? false,
+        createdAt,
+        updatedAt: createdAt,
+        solveCount: 0,
+      };
       server.sessions.push(s);
       const list = (o.solves ?? []).map((x, i) => solveRow(s, `${id}-s${i}`, x.timeMs, x.at, x.penalty));
-      server.solves.set(id, list.sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
+      server.solves.set(
+        id,
+        list.sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+      );
       return s;
     },
     solvesOf: (sid) => server.solves.get(sid) ?? [],
@@ -83,7 +95,19 @@ function newServer(): FakeServer {
 }
 
 function solveRow(s: Session, id: string, timeMs: number, createdAt: string, penalty: Penalty = 'OK'): Solve {
-  return { id, sessionId: s.id, event: s.event, timeMs, penalty, scramble: 'R U', comment: null, source: 'timer', createdAt, dailyDate: null, dailyIndex: null };
+  return {
+    id,
+    sessionId: s.id,
+    event: s.event,
+    timeMs,
+    penalty,
+    scramble: 'R U',
+    comment: null,
+    source: 'timer',
+    createdAt,
+    dailyDate: null,
+    dailyIndex: null,
+  };
 }
 
 const listOf = (server: FakeServer, uid: string) => server.sessions.filter((s) => s.userId === uid).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -153,18 +177,39 @@ function installServer(ApiError: ApiErrorClass, server: FakeServer): void {
     server.solves.delete(id);
   });
   sessions.solves.mockImplementation(async (id: string) => ({ solves: server.solvesOf(mine(id).id).map((x) => ({ ...x })) }));
-  sessions.import.mockImplementation(async (payload: { sessions: { name: string; event: string; practice?: boolean; solves: Omit<Solve, 'id' | 'sessionId' | 'event' | 'source'>[] }[] }) => {
-    const uid = caller();
-    let count = 0;
-    for (const p of payload.sessions) {
-      const now = new Date().toISOString();
-      const s: ServerSession = { id: crypto.randomUUID(), userId: uid, name: p.name, event: p.event, practice: p.practice ?? false, createdAt: now, updatedAt: now, solveCount: 0 };
-      server.sessions.push(s);
-      server.solves.set(s.id, sortList(p.solves.map((x) => ({ ...solveRow(s, crypto.randomUUID(), x.timeMs, x.createdAt, x.penalty), scramble: x.scramble, comment: x.comment ?? null, source: 'import' }))));
-      count += p.solves.length;
-    }
-    return { imported: { sessions: payload.sessions.length, solves: count } };
-  });
+  sessions.import.mockImplementation(
+    async (payload: { sessions: { name: string; event: string; practice?: boolean; solves: Omit<Solve, 'id' | 'sessionId' | 'event' | 'source'>[] }[] }) => {
+      const uid = caller();
+      let count = 0;
+      for (const p of payload.sessions) {
+        const now = new Date().toISOString();
+        const s: ServerSession = {
+          id: crypto.randomUUID(),
+          userId: uid,
+          name: p.name,
+          event: p.event,
+          practice: p.practice ?? false,
+          createdAt: now,
+          updatedAt: now,
+          solveCount: 0,
+        };
+        server.sessions.push(s);
+        server.solves.set(
+          s.id,
+          sortList(
+            p.solves.map((x) => ({
+              ...solveRow(s, crypto.randomUUID(), x.timeMs, x.createdAt, x.penalty),
+              scramble: x.scramble,
+              comment: x.comment ?? null,
+              source: 'import',
+            })),
+          ),
+        );
+        count += p.solves.length;
+      }
+      return { imported: { sessions: payload.sessions.length, solves: count } };
+    },
+  );
   sessions.merge.mockImplementation(async (targetId: string, sourceIds: string[]) => {
     const target = mine(targetId);
     const sources = sourceIds.map(mine);
@@ -179,22 +224,34 @@ function installServer(ApiError: ApiErrorClass, server: FakeServer): void {
     }
     return { session: view(target), merged: { sessions: sources.length, solves: moved } };
   });
-  solves.create.mockImplementation(async (body: { id: string; sessionId: string; timeMs: number; penalty: Penalty; scramble: string; comment?: string | null; source?: string; createdAt?: string; daily?: { date: string; index: number } }) => {
-    const s = mine(body.sessionId);
-    const list = server.solvesOf(s.id);
-    const same = list.find((x) => x.id === body.id); // idempotent on id
-    if (same) return { solve: same, rolling: { ao5: null, ao12: null } };
-    const solve: Solve = {
-      ...solveRow(s, body.id, body.timeMs, body.createdAt ?? new Date().toISOString(), body.penalty),
-      scramble: body.scramble,
-      comment: body.comment ?? null,
-      source: body.source ?? 'timer',
-      dailyDate: body.daily?.date ?? null,
-      dailyIndex: body.daily?.index ?? null,
-    };
-    server.solves.set(s.id, sortList([...list, solve]));
-    return { solve, rolling: { ao5: null, ao12: null } };
-  });
+  solves.create.mockImplementation(
+    async (body: {
+      id: string;
+      sessionId: string;
+      timeMs: number;
+      penalty: Penalty;
+      scramble: string;
+      comment?: string | null;
+      source?: string;
+      createdAt?: string;
+      daily?: { date: string; index: number };
+    }) => {
+      const s = mine(body.sessionId);
+      const list = server.solvesOf(s.id);
+      const same = list.find((x) => x.id === body.id); // idempotent on id
+      if (same) return { solve: same, rolling: { ao5: null, ao12: null } };
+      const solve: Solve = {
+        ...solveRow(s, body.id, body.timeMs, body.createdAt ?? new Date().toISOString(), body.penalty),
+        scramble: body.scramble,
+        comment: body.comment ?? null,
+        source: body.source ?? 'timer',
+        dailyDate: body.daily?.date ?? null,
+        dailyIndex: body.daily?.index ?? null,
+      };
+      server.solves.set(s.id, sortList([...list, solve]));
+      return { solve, rolling: { ao5: null, ao12: null } };
+    },
+  );
   solves.update.mockImplementation(async (id: string, patch: { penalty?: Penalty; comment?: string | null }) => {
     const { list, i } = solveOf(id);
     list[i] = { ...list[i], ...patch };
@@ -206,7 +263,10 @@ function installServer(ApiError: ApiErrorClass, server: FakeServer): void {
   });
   solves.export.mockImplementation(async () => {
     const uid = caller();
-    return { exportedAt: new Date().toISOString(), sessions: listOf(server, uid).map((s) => ({ ...view(s), solves: server.solvesOf(s.id).map((x) => ({ ...x })) })) };
+    return {
+      exportedAt: new Date().toISOString(),
+      sessions: listOf(server, uid).map((s) => ({ ...view(s), solves: server.solvesOf(s.id).map((x) => ({ ...x })) })),
+    };
   });
 }
 
@@ -326,9 +386,25 @@ function storedGuest() {
 }
 
 /** the fields a solve keeps everywhere (memory, localStorage, server) */
-const core = ({ id, sessionId, event, timeMs, penalty, scramble, comment, source, createdAt }: Solve) => ({ id, sessionId, event, timeMs, penalty, scramble, comment, source, createdAt });
+const core = ({ id, sessionId, event, timeMs, penalty, scramble, comment, source, createdAt }: Solve) => ({
+  id,
+  sessionId,
+  event,
+  timeMs,
+  penalty,
+  scramble,
+  comment,
+  source,
+  createdAt,
+});
 const queued = () => local.json<QueuedOp[]>(QUEUE_KEY) ?? [];
-const imp = (timeMs: number, createdAt: string, penalty: Penalty = 'OK', comment: string | null = null) => ({ timeMs, penalty, scramble: 'x', comment, createdAt });
+const imp = (timeMs: number, createdAt: string, penalty: Penalty = 'OK', comment: string | null = null) => ({
+  timeMs,
+  penalty,
+  scramble: 'x',
+  comment,
+  createdAt,
+});
 
 // ================================================================ guest mode
 
@@ -355,7 +431,16 @@ describe('guest mode (localStorage)', () => {
   it('saves a solve to localStorage shortly after it is added, and has it on the next visit', async () => {
     const s = await start();
     const solve = await s.addSolve({ timeMs: 9876.4, penalty: 'OK', scramble: "R U R'" });
-    expect(solve).toMatchObject({ timeMs: 9876, penalty: 'OK', scramble: "R U R'", comment: null, source: 'timer', event: '333', sessionId: s.state().currentSessionId, createdAt: NOW });
+    expect(solve).toMatchObject({
+      timeMs: 9876,
+      penalty: 'OK',
+      scramble: "R U R'",
+      comment: null,
+      source: 'timer',
+      event: '333',
+      sessionId: s.state().currentSessionId,
+      createdAt: NOW,
+    });
     expect(s.state().solves).toEqual([solve]);
     expect(s.getCurrentSession()?.solveCount).toBe(1);
     expect(local.getItem(LOCAL_KEY)).toBeNull(); // debounced, not written on every solve
@@ -405,7 +490,11 @@ describe('guest mode (localStorage)', () => {
     expect(s.state().solves.map((x) => x.id)).toEqual([b.id]);
     expect(s.getCurrentSession()?.solveCount).toBe(1);
     await advance(250);
-    expect(storedGuest().solves.get(b.sessionId)!.map((x) => x.id)).toEqual([b.id]);
+    expect(
+      storedGuest()
+        .solves.get(b.sessionId)!
+        .map((x) => x.id),
+    ).toEqual([b.id]);
   });
 
   it('adds a solve to another session when asked, and refuses an unknown one', async () => {
@@ -552,7 +641,7 @@ describe('guest mode (localStorage)', () => {
     expect(s.state().currentSessionId).toBe(only.id);
   });
 
-  it("deleting another session leaves the current one, and the event forgets it as its last session", async () => {
+  it('deleting another session leaves the current one, and the event forgets it as its last session', async () => {
     const s = await start();
     await s.switchEvent('222');
     const twoPractice = s.state().sessions[3];
@@ -694,12 +783,20 @@ describe('guest mode (localStorage)', () => {
     vi.setSystemTime(new Date(NOW));
     const data = await s.exportAll();
     expect(data.exportedAt).toBe(NOW);
-    expect(data.sessions.map((x) => [x.name, x.solves.length])).toEqual([['3x3', 2], ['3x3 practice', 1]]);
+    expect(data.sessions.map((x) => [x.name, x.solves.length])).toEqual([
+      ['3x3', 2],
+      ['3x3 practice', 1],
+    ]);
     const back = parseTimerFile(JSON.stringify(data, null, 2));
     expect(back.format).toBe('cubr');
-    expect(back.sessions.map((x) => [x.name, x.event, x.practice ?? false])).toEqual([['3x3', '333', false], ['3x3 practice', '333', true]]);
+    expect(back.sessions.map((x) => [x.name, x.event, x.practice ?? false])).toEqual([
+      ['3x3', '333', false],
+      ['3x3 practice', '333', true],
+    ]);
     back.sessions.forEach((x, i) => {
-      expect(x.solves).toEqual(data.sessions[i].solves.map(({ timeMs, penalty, scramble, comment, createdAt }) => ({ timeMs, penalty, scramble, comment, createdAt })));
+      expect(x.solves).toEqual(
+        data.sessions[i].solves.map(({ timeMs, penalty, scramble, comment, createdAt }) => ({ timeMs, penalty, scramble, comment, createdAt })),
+      );
     });
   });
 
@@ -719,10 +816,18 @@ describe('guest mode (localStorage)', () => {
     const a = await s.addSolve({ timeMs: 1000, penalty: 'OK', scramble: '' });
     doc.visibilityState = 'hidden';
     doc.dispatchEvent(new Event('visibilitychange'));
-    expect(storedGuest().solves.get(a.sessionId)!.map((x) => x.id)).toEqual([a.id]);
+    expect(
+      storedGuest()
+        .solves.get(a.sessionId)!
+        .map((x) => x.id),
+    ).toEqual([a.id]);
     const b = await s.addSolve({ timeMs: 2000, penalty: 'OK', scramble: '' });
     win.dispatchEvent(new Event('pagehide'));
-    expect(storedGuest().solves.get(a.sessionId)!.map((x) => x.id)).toEqual([a.id, b.id]);
+    expect(
+      storedGuest()
+        .solves.get(a.sessionId)!
+        .map((x) => x.id),
+    ).toEqual([a.id, b.id]);
   });
 
   it('picks up guest solves saved by another tab', async () => {
@@ -730,7 +835,9 @@ describe('guest mode (localStorage)', () => {
     await advance(250);
     const sid = s.state().currentSessionId!;
     const db = storedGuest();
-    db.solves.set(sid, [{ id: 'from-another-tab', sessionId: sid, event: '333', timeMs: 4321, penalty: 'OK', scramble: 'U', comment: null, source: 'timer', createdAt: NOW }]);
+    db.solves.set(sid, [
+      { id: 'from-another-tab', sessionId: sid, event: '333', timeMs: 4321, penalty: 'OK', scramble: 'U', comment: null, source: 'timer', createdAt: NOW },
+    ]);
     local.setItem(LOCAL_KEY, encodeLocalDb(db));
     win.dispatchEvent(Object.assign(new Event('storage'), { key: 'cubr.settings' }));
     expect(s.state().solves).toEqual([]);
@@ -764,7 +871,10 @@ describe('guest mode (localStorage)', () => {
     local.setItem(`${LOCAL_KEY}.corrupt`, 'old backup');
     s.clearLocalData();
     expect(local.getItem(`${LOCAL_KEY}.corrupt`)).toBeNull();
-    expect(s.state().sessions.map((x) => [x.name, x.solveCount])).toEqual([['3x3', 0], ['3x3 practice', 0]]);
+    expect(s.state().sessions.map((x) => [x.name, x.solveCount])).toEqual([
+      ['3x3', 0],
+      ['3x3 practice', 0],
+    ]);
     expect(s.state().solves).toEqual([]);
     expect(s.localDataSummary()).toEqual({ sessions: 0, solves: 0 });
   });
@@ -793,7 +903,14 @@ describe('signed in (cloud)', () => {
   let main: ServerSession;
   let big: ServerSession;
   const seedU1 = (server: FakeServer) => {
-    main = server.seed({ userId: 'u1', name: '3x3', solves: [{ timeMs: 9000, at: T(2) }, { timeMs: 8000, at: T(1) }] });
+    main = server.seed({
+      userId: 'u1',
+      name: '3x3',
+      solves: [
+        { timeMs: 9000, at: T(2) },
+        { timeMs: 8000, at: T(1) },
+      ],
+    });
     big = server.seed({ userId: 'u1', name: '4x4', event: '444', solves: [{ timeMs: 60_000, at: T(3) }] });
     server.seed({ userId: 'u2', name: 'not yours', solves: [{ timeMs: 1, at: T(1) }] });
   };
@@ -804,7 +921,10 @@ describe('signed in (cloud)', () => {
   it("loads the account's sessions and only the current session's solves", async () => {
     const s = await start(U1, { seed: seedU1 });
     expect(s.state()).toMatchObject({ ready: true, mode: 'cloud', currentSessionId: main.id, pending: 0, syncError: null, loading: false });
-    expect(s.state().sessions.map((x) => [x.name, x.solveCount])).toEqual([['3x3', 2], ['4x4', 1]]);
+    expect(s.state().sessions.map((x) => [x.name, x.solveCount])).toEqual([
+      ['3x3', 2],
+      ['4x4', 1],
+    ]);
     expect(s.state().solves.map((x) => x.timeMs)).toEqual([8000, 9000]); // oldest first
     expect(h.api.sessions.solves.mock.calls).toEqual([[main.id]]);
   });
@@ -822,7 +942,16 @@ describe('signed in (cloud)', () => {
     expect(s.state().solves.map((x) => x.id)).toEqual([`${main.id}-s1`, `${main.id}-s0`, solve.id]);
     expect(s.state().pending).toBe(1);
     expect(s.getCurrentSession()?.solveCount).toBe(3);
-    expect(h.api.solves.create).toHaveBeenCalledWith({ id: solve.id, sessionId: main.id, timeMs: 7777, penalty: 'OK', scramble: 'R2', comment: null, source: 'timer', createdAt: NOW });
+    expect(h.api.solves.create).toHaveBeenCalledWith({
+      id: solve.id,
+      sessionId: main.id,
+      timeMs: 7777,
+      penalty: 'OK',
+      scramble: 'R2',
+      comment: null,
+      source: 'timer',
+      createdAt: NOW,
+    });
     gate.resolve();
     await flush();
     expect(s.state().pending).toBe(0);
@@ -837,7 +966,13 @@ describe('signed in (cloud)', () => {
     await flush();
     expect(s.state()).toMatchObject({ pending: 1, syncError: 'solve service unreachable' });
     expect(s.state().solves.map((x) => x.id)).toContain(solve.id);
-    expect(queued()).toEqual([expect.objectContaining({ userId: 'u1', attempts: 1, op: expect.objectContaining({ kind: 'createSolve', solve: expect.objectContaining({ id: solve.id }) }) })]);
+    expect(queued()).toEqual([
+      expect.objectContaining({
+        userId: 'u1',
+        attempts: 1,
+        op: expect.objectContaining({ kind: 'createSolve', solve: expect.objectContaining({ id: solve.id }) }),
+      }),
+    ]);
     await advance(999);
     expect(h.api.solves.create).toHaveBeenCalledTimes(1);
     await advance(1); // 1 s after the first failure
@@ -994,7 +1129,11 @@ describe('signed in (cloud)', () => {
     await s.setComment(a.id, 'bad');
     const b = await add(s, 6000);
     await s.deleteSolve(b.id);
-    expect(queued()).toEqual([expect.objectContaining({ op: expect.objectContaining({ kind: 'createSolve', solve: expect.objectContaining({ id: a.id, penalty: 'DNF', comment: 'bad' }) }) })]);
+    expect(queued()).toEqual([
+      expect.objectContaining({
+        op: expect.objectContaining({ kind: 'createSolve', solve: expect.objectContaining({ id: a.id, penalty: 'DNF', comment: 'bad' }) }),
+      }),
+    ]);
     await advance(1000);
     expect(h.api.solves.create).toHaveBeenCalledTimes(2);
     expect(h.api.solves.create).toHaveBeenLastCalledWith(expect.objectContaining({ id: a.id, penalty: 'DNF', comment: 'bad' }));
@@ -1153,7 +1292,15 @@ describe('signed in (cloud)', () => {
   });
 
   it("never shows another account's offline copy", async () => {
-    local.setItem(CACHE_KEY, JSON.stringify({ userId: 'u2', sessions: [{ id: 'u2s', name: "two's session", event: '333', createdAt: T(0), updatedAt: T(0), solveCount: 1 }], sessionId: 'u2s', solves: [['x', 1000, 0, '', null, 0]] }));
+    local.setItem(
+      CACHE_KEY,
+      JSON.stringify({
+        userId: 'u2',
+        sessions: [{ id: 'u2s', name: "two's session", event: '333', createdAt: T(0), updatedAt: T(0), solveCount: 1 }],
+        sessionId: 'u2s',
+        solves: [['x', 1000, 0, '', null, 0]],
+      }),
+    );
     const s = await start(U1, { before: ({ server }) => (server.down = true) });
     expect(s.state().sessions.map((x) => x.name)).toEqual(['3x3', '3x3 practice']); // made here, sent once the service is back
     expect(s.state().solves).toEqual([]);
@@ -1260,14 +1407,33 @@ describe('signed in (cloud)', () => {
         { name: 'import', event: '222', practice: true, solves: [imp(1500, T(2))] },
       ],
     });
-    expect(s.state().sessions.map((x) => [x.name, x.solveCount])).toEqual([['3x3', 2], ['4x4', 1], ['Imported', 2], ['import', 1]]);
+    expect(s.state().sessions.map((x) => [x.name, x.solveCount])).toEqual([
+      ['3x3', 2],
+      ['4x4', 1],
+      ['Imported', 2],
+      ['import', 1],
+    ]);
   });
 
   describe('merging', () => {
     let other: ServerSession;
     const seedMerge = (server: FakeServer) => {
-      main = server.seed({ userId: 'u1', name: '3x3', solves: [{ timeMs: 1000, at: T(1) }, { timeMs: 3000, at: T(3) }] });
-      other = server.seed({ userId: 'u1', name: '3x3 B', solves: [{ timeMs: 2000, at: T(2) }, { timeMs: 4000, at: T(4) }] });
+      main = server.seed({
+        userId: 'u1',
+        name: '3x3',
+        solves: [
+          { timeMs: 1000, at: T(1) },
+          { timeMs: 3000, at: T(3) },
+        ],
+      });
+      other = server.seed({
+        userId: 'u1',
+        name: '3x3 B',
+        solves: [
+          { timeMs: 2000, at: T(2) },
+          { timeMs: 4000, at: T(4) },
+        ],
+      });
     };
 
     it('sends queued changes first, then merges on the server and shows the result', async () => {
@@ -1326,7 +1492,12 @@ describe('signed in (cloud)', () => {
       });
       const real = h.api.sessions.merge.getMockImplementation()!;
       h.api.sessions.merge.mockImplementationOnce(real).mockRejectedValueOnce(new s.ApiError(503, 'HTTP_503', 'down'));
-      await expect(s.mergeSessions(main.id, sources.map((x) => x.id))).rejects.toThrow("merged 50 of 60 sessions, then: couldn't reach the solve service - try again in a moment");
+      await expect(
+        s.mergeSessions(
+          main.id,
+          sources.map((x) => x.id),
+        ),
+      ).rejects.toThrow("merged 50 of 60 sessions, then: couldn't reach the solve service - try again in a moment");
       await flush();
       expect(h.api.sessions.merge.mock.calls.map((c) => c[1].length)).toEqual([50, 10]);
       expect(s.state().sessions).toHaveLength(11);
@@ -1356,7 +1527,7 @@ describe('signed in (cloud)', () => {
 
 // ================================================================ signing in and out
 
-describe('two tabs (the October review\'s #11)', () => {
+describe("two tabs (the October review's #11)", () => {
   let main: ServerSession;
   const seed = (server: FakeServer) => {
     main = server.seed({ userId: 'u1', name: '3x3', solves: [{ timeMs: 9000, at: T(1) }] });
@@ -1492,12 +1663,21 @@ describe('signing in and out', () => {
     expect(s.uploadOfferStore.get()).toEqual({ userId: 'u1', sessions: 1, solves: 2 });
     expect(await s.uploadLocalSolves()).toEqual({ sessions: 1, solves: 2 });
     expect(h.api.sessions.import.mock.calls[0][0]).toEqual({
-      sessions: [{ name: '3x3', event: '333', solves: [a, b].map(({ timeMs, penalty, scramble, comment, createdAt }) => ({ timeMs, penalty, scramble, comment, createdAt })) }],
+      sessions: [
+        {
+          name: '3x3',
+          event: '333',
+          solves: [a, b].map(({ timeMs, penalty, scramble, comment, createdAt }) => ({ timeMs, penalty, scramble, comment, createdAt })),
+        },
+      ],
     });
     expect(s.uploadOfferStore.get()).toBeNull();
     expect(s.localDataSummary()).toEqual({ sessions: 0, solves: 0 });
     expect(local.getItem(LOCAL_KEY)).toBeNull();
-    expect(s.state().sessions.map((x) => [x.name, x.solveCount])).toEqual([['3x3', 0], ['3x3', 2]]);
+    expect(s.state().sessions.map((x) => [x.name, x.solveCount])).toEqual([
+      ['3x3', 0],
+      ['3x3', 2],
+    ]);
   });
 
   it('keeps only the guest sessions not uploaded yet when an upload fails half way, so a retry adds no duplicates', async () => {
@@ -1571,7 +1751,7 @@ describe('signing in and out', () => {
   });
 
   // recently completed ops are re-applied on reads for a minute (read-after-write), but only the account's own
-  it("does not show sessions the previous account just created to the next account", async () => {
+  it('does not show sessions the previous account just created to the next account', async () => {
     const s = await start(U1, {
       seed: (server) => {
         server.seed({ userId: 'u1', name: '3x3' });

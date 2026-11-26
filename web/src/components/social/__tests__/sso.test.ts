@@ -68,12 +68,19 @@ describe('the sign-in API', () => {
 
   it('reads how the account signs in, and disconnects a provider', async () => {
     setToken('tok-2');
-    const methods = { password: false, providers: ['google', 'github'], identities: [{ provider: 'google', email: 'x@example.com', createdAt: '2026-11-17T00:00:00.000Z' }] };
+    const methods = {
+      password: false,
+      providers: ['google', 'github'],
+      identities: [{ provider: 'google', email: 'x@example.com', createdAt: '2026-11-17T00:00:00.000Z' }],
+    };
     vi.stubGlobal('fetch', answer(200, methods));
     await expect(api.auth.oauth.methods()).resolves.toEqual(methods);
     vi.stubGlobal('fetch', answer(204));
     await api.auth.oauth.disconnect('github');
-    expect(calls.map((c) => `${c.method} ${c.url} ${c.authorization}`)).toEqual(['GET /api/auth/me/sign-in Bearer tok-2', 'DELETE /api/auth/me/identities/github Bearer tok-2']);
+    expect(calls.map((c) => `${c.method} ${c.url} ${c.authorization}`)).toEqual([
+      'GET /api/auth/me/sign-in Bearer tok-2',
+      'DELETE /api/auth/me/identities/github Bearer tok-2',
+    ]);
   });
 
   it('deletes an account with its password, or with its username when it has none', async () => {
@@ -107,7 +114,9 @@ describe('ssoErrorMessage', () => {
   it('names the provider and says what to do for each failure', () => {
     expect(ssoErrorMessage('cancelled', 'google')).toBe('sign-in with Google was cancelled.');
     expect(ssoErrorMessage('no_email', 'github')).toBe('your GitHub account has no verified email address. cubr needs one, for password resets.');
-    expect(ssoErrorMessage('email_taken', 'apple')).toBe('an account already uses the email of that Apple account. sign in with your password, then connect Apple on your account page.');
+    expect(ssoErrorMessage('email_taken', 'apple')).toBe(
+      'an account already uses the email of that Apple account. sign in with your password, then connect Apple on your account page.',
+    );
     expect(ssoErrorMessage('linked_elsewhere', 'github')).toBe('that GitHub account is already connected to another cubr account.');
     expect(ssoErrorMessage('already_linked', 'google')).toBe('your account is already connected to a different Google account. disconnect it first.');
     expect(ssoErrorMessage('expired', 'apple')).toContain('took too long');

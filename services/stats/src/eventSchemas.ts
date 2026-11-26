@@ -45,10 +45,7 @@ export const solveCreatedSchema = z.object({
   penalty,
   createdAt: isoDate,
   tz: optTz,
-  rolling: z
-    .object({ ao5: z.number().nullish(), ao12: z.number().nullish() })
-    .partial()
-    .nullish(),
+  rolling: z.object({ ao5: z.number().nullish(), ao12: z.number().nullish() }).partial().nullish(),
   sessionName: z.string().max(200).nullish(),
   /** a practice session's solve: counted, but never a PB */
   practice: z.boolean().nullish(),

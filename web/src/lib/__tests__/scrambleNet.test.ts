@@ -42,10 +42,13 @@ describe('parseTransform', () => {
     close([transformPoint(m, [1, 2])], [[45, 120]]);
     // rotate about a point keeps that point fixed
     const r = parseTransform('rotate(90 10 0)');
-    close([transformPoint(r, [10, 0]), transformPoint(r, [11, 0])], [
-      [10, 0],
-      [10, 1],
-    ]);
+    close(
+      [transformPoint(r, [10, 0]), transformPoint(r, [11, 0])],
+      [
+        [10, 0],
+        [10, 1],
+      ],
+    );
     // square-1's chain: translate, rotate about a point, translate back, translate
     const sq = parseTransform('translate(130.000000, 88.588457) rotate(120.000000) translate(-130.000000, -88.588457) translate(82.000000, 22.588457)');
     const step = parseTransform('rotate(120 130 88.588457)');
@@ -255,21 +258,24 @@ describe('polygonDistance / closeUp', () => {
 describe('stickerSources (cubing.js puzzles)', () => {
   const ids = (svg: string) => [...svg.matchAll(/id="([A-Z0-9]+-l\d+-o\d+)"[^>]*style="fill: ?([^;"]+)/g)];
 
-  it.each(['2x2x2', '3x3x3', '4x4x4', '7x7x7', 'megaminx', 'pyraminx', 'skewb', 'square1'])('%s: solved shows the solved colours, a scramble moves them around', async (id) => {
-    const kpuzzle = await puzzles[id].kpuzzle();
-    const { orbits } = kpuzzle.definition;
-    const colours = new Map(ids(await puzzles[id].svg()).map(([, sid, fill]) => [sid, fill]));
-    // big cubes' same-coloured centres are interchangeable, so solved is "every colour in place"
-    const solved = stickerSources(orbits, kpuzzle.defaultPattern().patternData);
-    for (const sid of colours.keys()) expect(colours.get(solved.get(sid)!), sid).toBe(colours.get(sid));
+  it.each(['2x2x2', '3x3x3', '4x4x4', '7x7x7', 'megaminx', 'pyraminx', 'skewb', 'square1'])(
+    '%s: solved shows the solved colours, a scramble moves them around',
+    async (id) => {
+      const kpuzzle = await puzzles[id].kpuzzle();
+      const { orbits } = kpuzzle.definition;
+      const colours = new Map(ids(await puzzles[id].svg()).map(([, sid, fill]) => [sid, fill]));
+      // big cubes' same-coloured centres are interchangeable, so solved is "every colour in place"
+      const solved = stickerSources(orbits, kpuzzle.defaultPattern().patternData);
+      for (const sid of colours.keys()) expect(colours.get(solved.get(sid)!), sid).toBe(colours.get(sid));
 
-    const alg = { '2x2x2': "R U F'", megaminx: 'R++ D-- U', pyraminx: "R U L' b", skewb: "R U L' B", square1: '(1,0) / (3,3) /' }[id] ?? "R U F' Rw";
-    const scrambled = stickerSources(orbits, kpuzzle.defaultPattern().applyAlg(alg).patternData);
-    expect([...colours.keys()].some((sid) => colours.get(scrambled.get(sid)!) !== colours.get(sid))).toBe(true);
-    // the same stickers, moved around: as many of each colour as before
-    const count = (pick: (sid: string) => string | undefined) => [...colours.keys()].map(pick).sort().join();
-    expect(count((sid) => colours.get(scrambled.get(sid)!))).toBe(count((sid) => colours.get(sid)));
-  });
+      const alg = { '2x2x2': "R U F'", megaminx: 'R++ D-- U', pyraminx: "R U L' b", skewb: "R U L' B", square1: '(1,0) / (3,3) /' }[id] ?? "R U F' Rw";
+      const scrambled = stickerSources(orbits, kpuzzle.defaultPattern().applyAlg(alg).patternData);
+      expect([...colours.keys()].some((sid) => colours.get(scrambled.get(sid)!) !== colours.get(sid))).toBe(true);
+      // the same stickers, moved around: as many of each colour as before
+      const count = (pick: (sid: string) => string | undefined) => [...colours.keys()].map(pick).sort().join();
+      expect(count((sid) => colours.get(scrambled.get(sid)!))).toBe(count((sid) => colours.get(sid)));
+    },
+  );
 
   it("undoing a scramble's moves brings every sticker back", async () => {
     const kpuzzle = await puzzles['3x3x3'].kpuzzle();
@@ -288,7 +294,23 @@ describe('stickerSources (cubing.js puzzles)', () => {
 });
 
 describe('stickerColour / schemes', () => {
-  const ALL = ['2x2x2', '3x3x3', '4x4x4', '5x5x5', '6x6x6', '7x7x7', 'megaminx', 'pyraminx', 'skewb', 'square1', 'fto', 'kilominx', 'gigaminx', 'master_tetraminx', 'redi_cube'];
+  const ALL = [
+    '2x2x2',
+    '3x3x3',
+    '4x4x4',
+    '5x5x5',
+    '6x6x6',
+    '7x7x7',
+    'megaminx',
+    'pyraminx',
+    'skewb',
+    'square1',
+    'fto',
+    'kilominx',
+    'gigaminx',
+    'master_tetraminx',
+    'redi_cube',
+  ];
   const fills = async (id: string) => [...(await puzzles[id].svg()).matchAll(/id="([A-Z0-9]+-l\d+-o\d+)"[^>]*style="fill: ?([^;"]+)/g)].map((m) => m[2]);
 
   it('every sticker net has a scheme, and every face of it is a colour on the net', async () => {
@@ -297,8 +319,16 @@ describe('stickerColour / schemes', () => {
       expect(scheme, id).toBeDefined();
       const seen = new Set((await fills(id)).map((f) => f.trim().toLowerCase()));
       // each colour on the net belongs to exactly one face, and each face's colour is on the net
-      for (const c of seen) expect(scheme!.faces.filter((f) => f.cubing.includes(c)), `${id} ${c}`).toHaveLength(1);
-      for (const f of scheme!.faces) expect(f.cubing.some((c) => seen.has(c)), `${id} ${f.name}`).toBe(true);
+      for (const c of seen)
+        expect(
+          scheme!.faces.filter((f) => f.cubing.includes(c)),
+          `${id} ${c}`,
+        ).toHaveLength(1);
+      for (const f of scheme!.faces)
+        expect(
+          f.cubing.some((c) => seen.has(c)),
+          `${id} ${f.name}`,
+        ).toBe(true);
     }
     expect(SCHEMES.flatMap((s) => s.puzzles).sort()).toEqual([...ALL].sort());
   });
@@ -329,7 +359,10 @@ describe('stickerColour / schemes', () => {
   it("knows csTimer's colours for each face too, and every colour means one face of its scheme", () => {
     for (const scheme of SCHEMES) {
       for (const c of new Set(scheme.faces.flatMap((f) => [...f.cubing, ...(f.cstimer ?? [])]))) {
-        expect(scheme.faces.filter((f) => f.cubing.includes(c) || f.cstimer?.includes(c)), `${scheme.id} ${c}`).toHaveLength(1);
+        expect(
+          scheme.faces.filter((f) => f.cubing.includes(c) || f.cstimer?.includes(c)),
+          `${scheme.id} ${c}`,
+        ).toHaveLength(1);
       }
       for (const f of scheme.faces) for (const c of f.cstimer ?? []) expect(c, `${scheme.id} ${f.name}`).toMatch(/^#[0-9a-f]{6}$/);
     }
@@ -340,11 +373,19 @@ describe('stickerColour / schemes', () => {
     );
     // its megaminx colours ('#fff#d00#060#81f#fc0#00b#ffb#8df#f83#7e0#f9f#999'), square-1's and the FTO's, face for face
     const mega = SCHEMES.find((s) => s.id === 'megaminx')!;
-    expect(['#ffffff', '#dd0000', '#006600', '#8811ff', '#ffcc00', '#0000bb', '#ffffbb', '#88ddff', '#ff8833', '#77ee00', '#ff99ff', '#999999'].map((c) => stickerColour(c, mega))).toEqual(
-      ['#ffffff', '#ff0000', '#008800', '#8800dd', '#f4f400', '#0000ff', '#e8d0a0', '#3399ff', '#ff8000', '#99ff00', '#ff66cc', '#888888'].map((c) => stickerColour(c, mega)),
+    expect(
+      ['#ffffff', '#dd0000', '#006600', '#8811ff', '#ffcc00', '#0000bb', '#ffffbb', '#88ddff', '#ff8833', '#77ee00', '#ff99ff', '#999999'].map((c) =>
+        stickerColour(c, mega),
+      ),
+    ).toEqual(
+      ['#ffffff', '#ff0000', '#008800', '#8800dd', '#f4f400', '#0000ff', '#e8d0a0', '#3399ff', '#ff8000', '#99ff00', '#ff66cc', '#888888'].map((c) =>
+        stickerColour(c, mega),
+      ),
     );
     const sq1 = schemeFor('square1')!;
-    expect(['#ffff00', '#ff8800', '#00ff00', '#ffffff', '#ff0000', '#0000ff'].map((c) => stickerColour(c, sq1))).toEqual(['yellow', 'orange', 'limegreen', 'white', 'red', '#26f'].map((c) => stickerColour(c, sq1)));
+    expect(['#ffff00', '#ff8800', '#00ff00', '#ffffff', '#ff0000', '#0000ff'].map((c) => stickerColour(c, sq1))).toEqual(
+      ['yellow', 'orange', 'limegreen', 'white', 'red', '#26f'].map((c) => stickerColour(c, sq1)),
+    );
     const fto = schemeFor('fto')!;
     expect(['#ffffff', '#880088', '#00dd00', '#ff0000', '#0000ff', '#bbbbbb', '#ffff00', '#ffaa00'].map((c) => stickerColour(c, fto))).toEqual(
       ['#ffffff', '#8800dd', '#44ee00', 'red', '#2266ff', '#aaaaaa', '#f4f400', '#ff8000'].map((c) => stickerColour(c, fto)),

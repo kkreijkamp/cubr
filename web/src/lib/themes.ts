@@ -16,6 +16,7 @@ export interface Theme {
   colorfulErrorExtra: string;
 }
 
+// prettier-ignore
 export const THEMES: Theme[] = [
   {"name":"white_cross","bg":"#ffffff","main":"#00a04d","caret":"#0046ad","sub":"#959aa1","subAlt":"#e5e8eb","text":"#1d2024","error":"#d0252f","errorExtra":"#8f1920","colorfulError":"#ff6a13","colorfulErrorExtra":"#b34507"},
   {"name":"square_one","bg":"#fafafa","main":"#0037f7","caret":"#ee1118","sub":"#808080","subAlt":"#e6e6e6","text":"#121212","error":"#d8151e","errorExtra":"#95000c","colorfulError":"#d8151e","colorfulErrorExtra":"#95000c"},
@@ -105,7 +106,13 @@ export function readyColor(theme: Theme): string {
   const channel = (hex: string, i: number) => parseInt(hex.slice(i, i + 2), 16);
   for (let step = 1; step <= 50; step++) {
     const t = step / 50;
-    const mixed = `#${[1, 3, 5].map((i) => Math.round(channel(READY_GREEN, i) + (channel(READY_DEEP, i) - channel(READY_GREEN, i)) * t).toString(16).padStart(2, '0')).join('')}`;
+    const mixed = `#${[1, 3, 5]
+      .map((i) =>
+        Math.round(channel(READY_GREEN, i) + (channel(READY_DEEP, i) - channel(READY_GREEN, i)) * t)
+          .toString(16)
+          .padStart(2, '0'),
+      )
+      .join('')}`;
     if (contrast(mixed, theme.bg) >= 3) return mixed;
   }
   return READY_DEEP;
@@ -117,7 +124,13 @@ export const HIGH_CONTRAST_RATIO = 4.5;
 /** The colour `t` of the way from `a` to `b` (0 to 1), channel by channel. */
 function mixHex(a: string, b: string, t: number): string {
   const channel = (hex: string, i: number) => parseInt(hex.slice(i, i + 2), 16);
-  return `#${[1, 3, 5].map((i) => Math.round(channel(a, i) + (channel(b, i) - channel(a, i)) * t).toString(16).padStart(2, '0')).join('')}`;
+  return `#${[1, 3, 5]
+    .map((i) =>
+      Math.round(channel(a, i) + (channel(b, i) - channel(a, i)) * t)
+        .toString(16)
+        .padStart(2, '0'),
+    )
+    .join('')}`;
 }
 
 /** `colour`, moved toward `towards` only as far as it takes to read at `ratio` on every one of `on` (`towards` itself if nothing short of it does). */

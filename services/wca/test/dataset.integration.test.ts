@@ -52,8 +52,13 @@ describeIntegration('wca dataset and cache', () => {
       const app = await wcaApp();
       try {
         const urls = [
-          '/api/wca/meta', '/api/wca/records', '/api/wca/rank?event=333&value=12000', '/api/wca/distribution?event=333',
-          '/api/wca/persons?q=ada', '/api/wca/persons/2010AAAA01', '/api/wca/countries',
+          '/api/wca/meta',
+          '/api/wca/records',
+          '/api/wca/rank?event=333&value=12000',
+          '/api/wca/distribution?event=333',
+          '/api/wca/persons?q=ada',
+          '/api/wca/persons/2010AAAA01',
+          '/api/wca/countries',
         ];
         for (const url of urls) {
           const res = await app.inject({ url });

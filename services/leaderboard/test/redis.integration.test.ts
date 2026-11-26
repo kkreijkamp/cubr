@@ -217,9 +217,23 @@ describeIntegration('leaderboard Redis scripts and rebuild', () => {
     /** stats' GET /internal/pbs?kind=, answering from these rows. */
     const statsPbs = (byKind: Partial<Record<Kind, unknown[]>>) =>
       vi.fn(async (url: string, _opts?: FetchOptions) => ({ pbs: byKind[new URL(url).searchParams.get('kind') as Kind] ?? [] }));
-    const deps = (fetcher: (url: string, opts?: FetchOptions) => Promise<unknown>) => ({ redis, statsUrl: 'http://stats', internalToken: 'internal-secret', podName: 'pod-a', floors, log, fetcher });
-    const row = (userId: string, username: string, event: string, kind: string, valueMs: number | null, achievedAt = '2026-10-01T00:00:00.000Z'): StatsPb =>
-      ({ userId, username, event, kind, valueMs, achievedAt });
+    const deps = (fetcher: (url: string, opts?: FetchOptions) => Promise<unknown>) => ({
+      redis,
+      statsUrl: 'http://stats',
+      internalToken: 'internal-secret',
+      podName: 'pod-a',
+      floors,
+      log,
+      fetcher,
+    });
+    const row = (userId: string, username: string, event: string, kind: string, valueMs: number | null, achievedAt = '2026-10-01T00:00:00.000Z'): StatsPb => ({
+      userId,
+      username,
+      event,
+      kind,
+      valueMs,
+      achievedAt,
+    });
 
     it('fills the all-time boards and names from stats, skipping rows no board takes and times below the floor', async () => {
       const [a, b, c] = [randomUUID(), randomUUID(), randomUUID()];
@@ -248,7 +262,10 @@ describeIntegration('leaderboard Redis scripts and rebuild', () => {
     it("puts a refused PB on the flagged hash and, with stats' all-time bests, the person's real best on the board", async () => {
       const cy = randomUUID();
       const fetcher = statsPbs({ single: [row(cy, 'cy', '444', 'single', 1_000, '2026-10-03T00:00:00.000Z')] });
-      const allTime = vi.fn(async () => ({ single: { valueMs: 45_000, achievedAt: '2026-10-04T00:00:00.000Z' }, flagged: { single: { valueMs: 1_000, achievedAt: '2026-10-03T00:00:00.000Z' } } }));
+      const allTime = vi.fn(async () => ({
+        single: { valueMs: 45_000, achievedAt: '2026-10-04T00:00:00.000Z' },
+        flagged: { single: { valueMs: 1_000, achievedAt: '2026-10-03T00:00:00.000Z' } },
+      }));
       expect(await rebuildOnce({ ...deps(fetcher), periods: { bests: vi.fn(), allTime } })).toEqual({ entries: 0, skipped: 0, flagged: 1 });
       expect(allTime).toHaveBeenCalledWith({ userId: cy, event: '444', minSingle: 11_300, minAverage: 13_900 });
       const board = allTimeKey('444', 'single');

@@ -174,7 +174,9 @@
 }
 .link-btn:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 0.1rem var(--bg-color), 0 0 0 0.2rem var(--text-color);
+  box-shadow:
+    0 0 0 0.1rem var(--bg-color),
+    0 0 0 0.2rem var(--text-color);
   border-radius: 2px;
 }
 

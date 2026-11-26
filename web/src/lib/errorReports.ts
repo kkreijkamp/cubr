@@ -37,7 +37,22 @@ export function scrubText(text: string): string {
 }
 
 // the app's routes (App.tsx); the tests keep this list in step with it
-const STATIC_ROUTES = new Set(['/', '/leaderboards', '/daily', '/race', '/account', '/settings', '/wca', '/about', '/login', '/login/sso', '/reset', '/confirm-email', '/terms', '/privacy']);
+const STATIC_ROUTES = new Set([
+  '/',
+  '/leaderboards',
+  '/daily',
+  '/race',
+  '/account',
+  '/settings',
+  '/wca',
+  '/about',
+  '/login',
+  '/login/sso',
+  '/reset',
+  '/confirm-email',
+  '/terms',
+  '/privacy',
+]);
 
 /** A path as its route's pattern: the page type, never a username or room id. Anything else is "(other)". */
 export function routePattern(pathname: string): string {

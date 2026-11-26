@@ -27,12 +27,33 @@ function evt(type: string, data: Record<string, unknown>): EventEnvelope {
 }
 /** pb.updated as stats publishes it (valueMs null = the PB is gone). */
 const pb = (u: User, event: string, kind: string, valueMs: number | null, occurredAt = new Date().toISOString()) =>
-  evt('pb.updated', { userId: u.id, username: u.username, event, kind, valueMs, previousMs: null, achievedAt: valueMs === null ? null : occurredAt, occurredAt });
+  evt('pb.updated', {
+    userId: u.id,
+    username: u.username,
+    event,
+    kind,
+    valueMs,
+    previousMs: null,
+    achievedAt: valueMs === null ? null : occurredAt,
+    occurredAt,
+  });
 /** solve.created as solve-service publishes it (effectiveMs null = DNF). */
 const solve = (u: User, event: string, effectiveMs: number | null, createdAt: string, extra: Record<string, unknown> = {}) =>
   evt('solve.created', {
-    userId: u.id, username: u.username, event, sessionId: randomUUID(), solveId: randomUUID(), timeMs: effectiveMs ?? 10_000,
-    penalty: effectiveMs === null ? 'DNF' : 'OK', effectiveMs, createdAt, tz: 'UTC', source: 'timer', rolling: { ao5: null, ao12: null }, practice: false, ...extra,
+    userId: u.id,
+    username: u.username,
+    event,
+    sessionId: randomUUID(),
+    solveId: randomUUID(),
+    timeMs: effectiveMs ?? 10_000,
+    penalty: effectiveMs === null ? 'DNF' : 'OK',
+    effectiveMs,
+    createdAt,
+    tz: 'UTC',
+    source: 'timer',
+    rolling: { ao5: null, ao12: null },
+    practice: false,
+    ...extra,
   });
 /** daily.completed / daily.updated (ao5 -1 = DNF). */
 const daily = (u: User, date: string, event: string, ao5: number, occurredAt: string, type = 'daily.completed') =>
@@ -88,7 +109,15 @@ describeIntegration('leaderboard API', () => {
         pb(c, '555', 'single', 45_000, '2026-10-03T10:00:00.000Z'),
       );
       expect(await board('555/single')).toEqual({
-        event: '555', kind: 'single', period: 'all', periodKey: 'all', total: 3, page: 1, size: 50, me: null, flagged: null,
+        event: '555',
+        kind: 'single',
+        period: 'all',
+        periodKey: 'all',
+        total: 3,
+        page: 1,
+        size: 50,
+        me: null,
+        flagged: null,
         entries: [
           { rank: 1, userId: b.id, username: b.username, country: null, avatarUrl: null, valueMs: 40_000, achievedAt: '2026-10-02T10:00:00.000Z' },
           { rank: 2, userId: c.id, username: c.username, country: null, avatarUrl: null, valueMs: 45_000, achievedAt: '2026-10-03T10:00:00.000Z' },
@@ -102,7 +131,11 @@ describeIntegration('leaderboard API', () => {
       await feed(...users.map((u, i) => pb(u, '666', 'single', 100_000 + i * 1_000)));
       const second = await board('666/single?page=2&size=3');
       expect(second).toMatchObject({ total: 7, page: 2, size: 3 });
-      expect(second.entries.map((e: { rank: number; userId: string }) => [e.rank, e.userId])).toEqual([[4, users[3].id], [5, users[4].id], [6, users[5].id]]);
+      expect(second.entries.map((e: { rank: number; userId: string }) => [e.rank, e.userId])).toEqual([
+        [4, users[3].id],
+        [5, users[4].id],
+        [6, users[5].id],
+      ]);
       expect((await board('666/single?page=3&size=3')).entries.map((e: { rank: number }) => e.rank)).toEqual([7]);
       expect(await board('666/single?page=4&size=3')).toMatchObject({ total: 7, entries: [] });
     });
@@ -110,7 +143,11 @@ describeIntegration('leaderboard API', () => {
     it('order equal times by user id without sharing ranks', async () => {
       const tied = ['f0000000-0000-4000-8000-000000000000', '00000000-0000-4000-8000-00000000000a', 'a0000000-0000-4000-8000-000000000000'];
       await feed(...tied.map((id, i) => pb({ id, username: `tied_${i}` }, '777', 'single', 300_000)));
-      expect((await board('777/single')).entries.map((e: { rank: number; userId: string }) => [e.rank, e.userId])).toEqual([[1, tied[1]], [2, tied[2]], [3, tied[0]]]);
+      expect((await board('777/single')).entries.map((e: { rank: number; userId: string }) => [e.rank, e.userId])).toEqual([
+        [1, tied[1]],
+        [2, tied[2]],
+        [3, tied[0]],
+      ]);
     });
 
     it("add the signed-in user's own rank and time as `me`, wherever they are on the board", async () => {
@@ -131,7 +168,9 @@ describeIntegration('leaderboard API', () => {
         pb(u, '333oh', 'single', 25_000, '2026-10-02T10:00:00.000Z'),
         pb(u, '333oh', 'single', 28_000, '2026-10-03T10:00:00.000Z'), // the 25 s solve was deleted
       );
-      expect((await board('333oh/single')).entries).toEqual([expect.objectContaining({ userId: u.id, valueMs: 28_000, achievedAt: '2026-10-03T10:00:00.000Z' })]);
+      expect((await board('333oh/single')).entries).toEqual([
+        expect.objectContaining({ userId: u.id, valueMs: 28_000, achievedAt: '2026-10-03T10:00:00.000Z' }),
+      ]);
       await feed(pb(u, '333oh', 'single', null, '2026-10-04T10:00:00.000Z'));
       expect((await board('333oh/single')).total).toBe(0);
       expect(await s.redis.hget(atKey(allTimeKey('333oh', 'single')), u.id)).toBeNull();
@@ -167,14 +206,22 @@ describeIntegration('leaderboard API', () => {
         solve(u, 'pyram', 5_500, '2026-10-14T10:02:00.000Z', { rolling: { ao5: 6_200, ao12: null } }),
         solve(u, 'pyram', 5_000, '2026-10-14T10:03:00.000Z', { rolling: { ao5: 6_300, ao12: null } }), // ties the best: the first keeps it
       );
-      for (const [period, periodKey] of [['daily', '2026-10-14'], ['weekly', '2026-W42']]) {
+      for (const [period, periodKey] of [
+        ['daily', '2026-10-14'],
+        ['weekly', '2026-W42'],
+      ]) {
         const single = await board(`pyram/single?period=${period}`);
         expect(single.periodKey).toBe(periodKey);
         expect(single.entries).toEqual([expect.objectContaining({ userId: u.id, valueMs: 5_000, achievedAt: '2026-10-14T10:01:00.000Z' })]);
-        expect((await board(`pyram/ao5?period=${period}`)).entries).toEqual([expect.objectContaining({ valueMs: 6_200, achievedAt: '2026-10-14T10:02:00.000Z' })]);
+        expect((await board(`pyram/ao5?period=${period}`)).entries).toEqual([
+          expect.objectContaining({ valueMs: 6_200, achievedAt: '2026-10-14T10:02:00.000Z' }),
+        ]);
       }
       // daily boards live 3 days, weekly ones 15 days
-      for (const [key, ttl] of [[dailyKey('pyram', 'single', '2026-10-14'), 3 * 86_400], [weeklyKey('pyram', 'ao5', '2026-W42'), 15 * 86_400]] as const) {
+      for (const [key, ttl] of [
+        [dailyKey('pyram', 'single', '2026-10-14'), 3 * 86_400],
+        [weeklyKey('pyram', 'ao5', '2026-W42'), 15 * 86_400],
+      ] as const) {
         expect(await s.redis.ttl(key)).toBeGreaterThan(ttl - 60);
         expect(await s.redis.ttl(atKey(key))).toBeGreaterThan(ttl - 60);
       }
@@ -199,8 +246,15 @@ describeIntegration('leaderboard API', () => {
         solve(u, 'clock', 7_000, '2026-10-13T23:50:00.000Z'), // 40 minutes earlier: yesterday in UTC
         solve(u, 'clock', 8_000, '2026-10-14T00:10:00.000Z'),
       );
-      expect(await board('clock/single?period=daily')).toMatchObject({ periodKey: '2026-10-14', total: 1, entries: [expect.objectContaining({ valueMs: 8_000 })] });
-      expect(await board('clock/single?period=daily&key=2026-10-13')).toMatchObject({ periodKey: '2026-10-13', entries: [expect.objectContaining({ valueMs: 7_000 })] });
+      expect(await board('clock/single?period=daily')).toMatchObject({
+        periodKey: '2026-10-14',
+        total: 1,
+        entries: [expect.objectContaining({ valueMs: 8_000 })],
+      });
+      expect(await board('clock/single?period=daily&key=2026-10-13')).toMatchObject({
+        periodKey: '2026-10-13',
+        entries: [expect.objectContaining({ valueMs: 7_000 })],
+      });
       // both days are in ISO week 42 (Monday 12 to Sunday 18 October)
       expect(await board('clock/single?period=weekly')).toMatchObject({ periodKey: '2026-W42', entries: [expect.objectContaining({ valueMs: 7_000 })] });
       expect(await board('clock/single?key=2026-10-13')).toMatchObject({ period: 'all', periodKey: 'all', total: 0 }); // no key on all-time boards
@@ -219,7 +273,15 @@ describeIntegration('leaderboard API', () => {
         daily(c, '2026-10-14', '222', 3_000, '2026-10-14T09:15:00.000Z', 'daily.updated'), // older than c's result: ignored
       );
       expect(await board('daily-challenge?date=2026-10-14&event=222')).toEqual({
-        event: '222', kind: 'ao5', period: 'challenge', periodKey: '2026-10-14', total: 2, page: 1, size: 50, me: null, flagged: null,
+        event: '222',
+        kind: 'ao5',
+        period: 'challenge',
+        periodKey: '2026-10-14',
+        total: 2,
+        page: 1,
+        size: 50,
+        me: null,
+        flagged: null,
         entries: [
           { rank: 1, userId: a.id, username: a.username, country: null, avatarUrl: null, valueMs: 4_500, achievedAt: '2026-10-14T10:00:00.000Z' },
           { rank: 2, userId: c.id, username: c.username, country: null, avatarUrl: null, valueMs: 5_000, achievedAt: '2026-10-14T09:30:00.000Z' },
@@ -233,7 +295,12 @@ describeIntegration('leaderboard API', () => {
       pinNow('2026-10-20T23:30:00Z');
       const [u, v] = [newUser(), newUser()];
       await feed(daily(u, '2026-10-20', '333', 9_000, '2026-10-20T23:00:00.000Z'), daily(v, '2026-10-20', '333', 8_000, '2026-10-20T23:10:00.000Z'));
-      expect(await board('daily-challenge', await s.token(u))).toMatchObject({ event: '333', periodKey: '2026-10-20', total: 2, me: { rank: 2, valueMs: 9_000 } });
+      expect(await board('daily-challenge', await s.token(u))).toMatchObject({
+        event: '333',
+        periodKey: '2026-10-20',
+        total: 2,
+        me: { rank: 2, valueMs: 9_000 },
+      });
     });
   });
 
@@ -241,9 +308,12 @@ describeIntegration('leaderboard API', () => {
     it("list the user's place on every all-time board they are on", async () => {
       const [u, faster, slower] = [newUser(), newUser(), newUser()];
       await feed(
-        pb(faster, 'minx', 'single', 30_000), pb(u, 'minx', 'single', 35_000), pb(slower, 'minx', 'single', 40_000),
+        pb(faster, 'minx', 'single', 30_000),
+        pb(u, 'minx', 'single', 35_000),
+        pb(slower, 'minx', 'single', 40_000),
         pb(u, 'minx', 'ao5', 38_000),
-        pb(slower, 'minx', 'ao12', 41_000), pb(u, 'minx', 'ao12', 42_000),
+        pb(slower, 'minx', 'ao12', 41_000),
+        pb(u, 'minx', 'ao12', 42_000),
       );
       expect((await s.request('GET', `/api/leaderboards/users/${u.id}/ranks`)).json()).toEqual({
         ranks: [
@@ -255,7 +325,7 @@ describeIntegration('leaderboard API', () => {
       expect((await s.request('GET', `/api/leaderboards/users/${randomUUID()}/ranks`)).json()).toEqual({ ranks: [] });
     });
 
-    it("answer 403 for a private profile unless its owner asks, while the boards still list them", async () => {
+    it('answer 403 for a private profile unless its owner asks, while the boards still list them', async () => {
       const u = newUser();
       await feed(pb(u, '444bf', 'single', 120_000));
       await s.redis.sadd(PRIVATE_USERS_KEY, u.id);
@@ -311,7 +381,9 @@ describeIntegration('leaderboard API', () => {
     it('shows a user it has no display info for as "unknown"', async () => {
       const id = randomUUID();
       await s.redis.zadd(allTimeKey('333bf', 'ao5'), 70_000, id);
-      expect((await board('333bf/ao5')).entries).toEqual([{ rank: 1, userId: id, username: 'unknown', country: null, avatarUrl: null, valueMs: 70_000, achievedAt: null }]);
+      expect((await board('333bf/ao5')).entries).toEqual([
+        { rank: 1, userId: id, username: 'unknown', country: null, avatarUrl: null, valueMs: 70_000, achievedAt: null },
+      ]);
     });
   });
 
@@ -321,7 +393,13 @@ describeIntegration('leaderboard API', () => {
       const u = newUser();
       const fast = solve(u, 'sq1', 4_000, '2026-10-14T10:00:00.000Z', { rolling: { ao5: 5_500, ao12: null } });
       await feed(fast, pb(u, 'sq1', 'single', 4_000));
-      const boards = [dailyKey('sq1', 'single', '2026-10-14'), weeklyKey('sq1', 'single', '2026-W42'), dailyKey('sq1', 'ao5', '2026-10-14'), weeklyKey('sq1', 'ao5', '2026-W42'), allTimeKey('sq1', 'single')];
+      const boards = [
+        dailyKey('sq1', 'single', '2026-10-14'),
+        weeklyKey('sq1', 'single', '2026-W42'),
+        dailyKey('sq1', 'ao5', '2026-10-14'),
+        weeklyKey('sq1', 'ao5', '2026-W42'),
+        allTimeKey('sq1', 'single'),
+      ];
       expect(await s.redis.exists(...boards)).toBe(0);
       const flagged = (await s.redis.lrange(FLAGGED_KEY, 0, -1)).map((x) => JSON.parse(x)).filter((f) => f.userId === u.id);
       // newest first; the solve fed a daily and a weekly board, but each value is flagged once
@@ -356,7 +434,10 @@ describeIntegration('leaderboard API', () => {
       const u = newUser();
       const token = await s.token(u);
       await feed(solve(u, 'sq1', 400, '2026-10-14T10:00:00.000Z'));
-      expect(await board('sq1/single?period=daily', token)).toMatchObject({ me: null, flagged: { valueMs: 400, floorMs: 5_000, achievedAt: '2026-10-14T10:00:00.000Z' } });
+      expect(await board('sq1/single?period=daily', token)).toMatchObject({
+        me: null,
+        flagged: { valueMs: 400, floorMs: 5_000, achievedAt: '2026-10-14T10:00:00.000Z' },
+      });
       await feed(solve(u, 'sq1', 300, '2026-10-14T10:01:00.000Z'), solve(u, 'sq1', 900, '2026-10-14T10:02:00.000Z'));
       expect((await board('sq1/single?period=weekly', token)).flagged).toMatchObject({ valueMs: 300 });
       await feed(solve(u, 'sq1', 15_000, '2026-10-14T10:03:00.000Z'));
@@ -367,7 +448,10 @@ describeIntegration('leaderboard API', () => {
     it('does the same on the daily challenge board', async () => {
       const u = newUser();
       await feed(daily(u, '2026-10-22', '333', 1_000, '2026-10-22T10:00:00.000Z'));
-      expect(await board('daily-challenge?date=2026-10-22&event=333', await s.token(u))).toMatchObject({ me: null, flagged: { valueMs: 1_000, floorMs: 2_600 } });
+      expect(await board('daily-challenge?date=2026-10-22&event=333', await s.token(u))).toMatchObject({
+        me: null,
+        flagged: { valueMs: 1_000, floorMs: 2_600 },
+      });
     });
   });
 
@@ -384,8 +468,12 @@ describeIntegration('leaderboard API', () => {
         solve(gone, 'sq1', 1_000, '2026-10-14T10:40:00.000Z'), // flagged
       );
       const boards = [
-        allTimeKey('555bf', 'single'), dailyKey('555bf', 'single', '2026-10-14'), weeklyKey('555bf', 'single', '2026-W42'),
-        dailyKey('555bf', 'ao5', '2026-10-14'), weeklyKey('555bf', 'ao5', '2026-W42'), challengeKey('2026-10-14', '333'),
+        allTimeKey('555bf', 'single'),
+        dailyKey('555bf', 'single', '2026-10-14'),
+        weeklyKey('555bf', 'single', '2026-W42'),
+        dailyKey('555bf', 'ao5', '2026-10-14'),
+        weeklyKey('555bf', 'ao5', '2026-W42'),
+        challengeKey('2026-10-14', '333'),
       ];
       for (const key of boards) expect(await s.redis.zscore(key, gone.id), `${key} before`).not.toBeNull();
 
@@ -457,7 +545,10 @@ describeIntegration('leaderboard API', () => {
       );
       expect(ids(await board('666/single?period=weekly'))).toEqual([koen.id, other.id]);
 
-      answer = { days: { '2026-11-16': { single: best(77_711, '2026-11-16T02:56:18.483Z') } }, weeks: { '2026-W47': { single: best(77_711, '2026-11-16T02:56:18.483Z') } } };
+      answer = {
+        days: { '2026-11-16': { single: best(77_711, '2026-11-16T02:56:18.483Z') } },
+        weeks: { '2026-W47': { single: best(77_711, '2026-11-16T02:56:18.483Z') } },
+      };
       await feedStats(changed(koen, '666', '2026-11-16T14:01:26.500Z'));
       // stats was asked from the Monday of the oldest live week, with the anti-cheat floors
       expect(asked.at(-1)).toEqual({ userId: koen.id, event: '666', from: '2026-11-02T00:00:00.000Z', minSingle: 43_200, minAverage: 46_300 });
@@ -519,7 +610,10 @@ describeIntegration('leaderboard API', () => {
     it('ignore a solve.created from before the change that is handled late, but take newer solves as usual', async () => {
       pinNow('2026-11-17T09:00:00Z');
       const u = newUser();
-      answer = { days: { '2026-11-17': { single: best(95_000, '2026-11-17T07:00:00.000Z') } }, weeks: { '2026-W47': { single: best(95_000, '2026-11-17T07:00:00.000Z') } } };
+      answer = {
+        days: { '2026-11-17': { single: best(95_000, '2026-11-17T07:00:00.000Z') } },
+        weeks: { '2026-W47': { single: best(95_000, '2026-11-17T07:00:00.000Z') } },
+      };
       await feedStats(changed(u, '777', '2026-11-17T08:30:00.000Z'));
       // e.g. on another replica: a slip from 08:00 whose deletion the change above already knew of
       await feedStats(solve(u, '777', 85_000, '2026-11-17T08:00:00.000Z', { occurredAt: '2026-11-17T08:00:00.100Z' }));
@@ -529,9 +623,15 @@ describeIntegration('leaderboard API', () => {
       expect(rows(await board('777/single?period=weekly'))).toEqual([[u.id, 92_000, '2026-11-17T08:45:00.000Z']]);
       // stats then sends a change with the new solve in; a change older than that one, handled
       // late with what was true then, can't undo it
-      answer = { days: { '2026-11-17': { single: best(92_000, '2026-11-17T08:45:00.000Z') } }, weeks: { '2026-W47': { single: best(92_000, '2026-11-17T08:45:00.000Z') } } };
+      answer = {
+        days: { '2026-11-17': { single: best(92_000, '2026-11-17T08:45:00.000Z') } },
+        weeks: { '2026-W47': { single: best(92_000, '2026-11-17T08:45:00.000Z') } },
+      };
       await feedStats(changed(u, '777', '2026-11-17T08:45:00.200Z'));
-      answer = { days: { '2026-11-17': { single: best(95_000, '2026-11-17T07:00:00.000Z') } }, weeks: { '2026-W47': { single: best(95_000, '2026-11-17T07:00:00.000Z') } } };
+      answer = {
+        days: { '2026-11-17': { single: best(95_000, '2026-11-17T07:00:00.000Z') } },
+        weeks: { '2026-W47': { single: best(95_000, '2026-11-17T07:00:00.000Z') } },
+      };
       await feedStats(changed(u, '777', '2026-11-17T08:40:00.000Z'));
       expect(rows(await board('777/single?period=daily'))).toEqual([[u.id, 92_000, '2026-11-17T08:45:00.000Z']]);
     });

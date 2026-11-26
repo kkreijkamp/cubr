@@ -99,10 +99,16 @@ describeIntegration('auth API', () => {
 
     it('refuses a taken username or email, whatever the case', async () => {
       await signUp({ username: 'Taken_Name', email: 'taken@example.com' });
-      const dupName = await s.request('POST', '/api/auth/register', { body: { username: 'taken_NAME', email: 'other@example.com', password: PASSWORD }, ip: freshIp() });
+      const dupName = await s.request('POST', '/api/auth/register', {
+        body: { username: 'taken_NAME', email: 'other@example.com', password: PASSWORD },
+        ip: freshIp(),
+      });
       expect(dupName.statusCode).toBe(409);
       expect(dupName.json().error.message).toBe('Username is already taken');
-      const dupEmail = await s.request('POST', '/api/auth/register', { body: { username: 'someone_new', email: 'TAKEN@example.com', password: PASSWORD }, ip: freshIp() });
+      const dupEmail = await s.request('POST', '/api/auth/register', {
+        body: { username: 'someone_new', email: 'TAKEN@example.com', password: PASSWORD },
+        ip: freshIp(),
+      });
       expect(dupEmail.statusCode).toBe(409);
       expect(dupEmail.json().error.message).toBe('Email is already registered');
     });
@@ -277,10 +283,15 @@ describeIntegration('auth API', () => {
     /** A reset link for `userId`, as if the email had arrived (the route only emails the token). */
     async function resetLinkFor(userId: string, minutes = 60): Promise<string> {
       const { token, hash } = newResetToken();
-      await s.pool.query(`insert into auth.password_resets (token_hash, user_id, expires_at) values ($1, $2, now() + make_interval(mins => $3))`, [hash, userId, minutes]);
+      await s.pool.query(`insert into auth.password_resets (token_hash, user_id, expires_at) values ($1, $2, now() + make_interval(mins => $3))`, [
+        hash,
+        userId,
+        minutes,
+      ]);
       return token;
     }
-    const linkCount = async (userId: string) => Number((await s.pool.query('select count(*) from auth.password_resets where user_id = $1', [userId])).rows[0].count);
+    const linkCount = async (userId: string) =>
+      Number((await s.pool.query('select count(*) from auth.password_resets where user_id = $1', [userId])).rows[0].count);
 
     it('answers 202 whether or not the address has an account, and stores a link only for real ones', async () => {
       const { user } = await signUp({ email: 'Forgetful@example.com' });
@@ -349,8 +360,12 @@ describeIntegration('auth API', () => {
     it('refuses an expired link and a malformed one', async () => {
       const { user } = await signUp();
       const expired = await resetLinkFor(user.id, -1);
-      expect((await s.request('POST', '/api/auth/password/reset', { body: { token: expired, password: 'brand new pass' }, ip: freshIp() })).statusCode).toBe(400);
-      expect((await s.request('POST', '/api/auth/password/reset', { body: { token: 'short', password: 'brand new pass' }, ip: freshIp() })).statusCode).toBe(400);
+      expect((await s.request('POST', '/api/auth/password/reset', { body: { token: expired, password: 'brand new pass' }, ip: freshIp() })).statusCode).toBe(
+        400,
+      );
+      expect((await s.request('POST', '/api/auth/password/reset', { body: { token: 'short', password: 'brand new pass' }, ip: freshIp() })).statusCode).toBe(
+        400,
+      );
       expect((await login(user.username)).statusCode).toBe(200);
     });
   });
@@ -380,7 +395,10 @@ describeIntegration('auth API', () => {
       await vi.waitFor(async () => expect(await s.redis.sismember(PRIVATE_USERS_KEY, user.id)).toBe(0));
       expect((await s.events('user.deleted')).some((e) => e.data.userId === user.id && e.data.username === user.username)).toBe(true);
       // the name is free again
-      expect((await s.request('POST', '/api/auth/register', { body: { username: user.username, email: 'again@example.com', password: PASSWORD }, ip: freshIp() })).statusCode).toBe(201);
+      expect(
+        (await s.request('POST', '/api/auth/register', { body: { username: user.username, email: 'again@example.com', password: PASSWORD }, ip: freshIp() }))
+          .statusCode,
+      ).toBe(201);
     });
 
     it('allows 5 attempts in 10 minutes', async () => {
@@ -419,7 +437,11 @@ describeIntegration('auth API', () => {
       const { token } = await signUp();
       const lying = await s.request('PUT', '/api/auth/me/avatar', { token, body: JPEG, headers: { 'content-type': 'image/png' } });
       expect(lying.statusCode).toBe(400);
-      const text = await s.request('PUT', '/api/auth/me/avatar', { token, body: Buffer.from('<svg onload=alert(1)>'), headers: { 'content-type': 'image/png' } });
+      const text = await s.request('PUT', '/api/auth/me/avatar', {
+        token,
+        body: Buffer.from('<svg onload=alert(1)>'),
+        headers: { 'content-type': 'image/png' },
+      });
       expect(text.statusCode).toBe(400);
       const svg = await s.request('PUT', '/api/auth/me/avatar', { token, body: Buffer.from('<svg/>'), headers: { 'content-type': 'image/svg+xml' } });
       expect(svg.statusCode).toBe(415);
@@ -436,7 +458,10 @@ describeIntegration('auth API', () => {
       const { token, user } = await signUp();
       const photo = await picture(800, 600)
         .jpeg()
-        .withExif({ IFD0: { ImageDescription: 'taken-at-home' }, IFD3: { GPSLatitudeRef: 'S', GPSLatitude: '27/1 28/1 3000/100', GPSLongitudeRef: 'E', GPSLongitude: '153/1 1/1 4800/100' } })
+        .withExif({
+          IFD0: { ImageDescription: 'taken-at-home' },
+          IFD3: { GPSLatitudeRef: 'S', GPSLatitude: '27/1 28/1 3000/100', GPSLongitudeRef: 'E', GPSLongitude: '153/1 1/1 4800/100' },
+        })
         .toBuffer();
       expect((await sharp(photo).metadata()).exif?.includes('taken-at-home')).toBe(true);
       const put = await s.request('PUT', '/api/auth/me/avatar', { token, body: photo, headers: { 'content-type': 'image/jpeg' } });
@@ -446,7 +471,9 @@ describeIntegration('auth API', () => {
       expect(meta).toMatchObject({ format: 'webp', width: 256, height: 256 });
       expect(meta.exif).toBeUndefined();
       expect(got.rawPayload.includes('taken-at-home')).toBe(false);
-      const { rows } = await s.pool.query<{ content_type: string; bytes: Buffer }>('select content_type, bytes from auth.avatars where user_id = $1', [user.id]);
+      const { rows } = await s.pool.query<{ content_type: string; bytes: Buffer }>('select content_type, bytes from auth.avatars where user_id = $1', [
+        user.id,
+      ]);
       expect(rows[0].content_type).toBe('image/webp');
       expect(rows[0].bytes.equals(got.rawPayload)).toBe(true);
     });
@@ -491,7 +518,8 @@ describeIntegration('auth API', () => {
           ...over,
         }),
       }).toString();
-    const post = (form: string, ip = freshIp()) => s.request('POST', '/api/supporters/kofi', { body: form, headers: { 'content-type': 'application/x-www-form-urlencoded' }, ip });
+    const post = (form: string, ip = freshIp()) =>
+      s.request('POST', '/api/supporters/kofi', { body: form, headers: { 'content-type': 'application/x-www-form-urlencoded' }, ip });
     const list = async () => (await s.request('GET', '/api/supporters')).json().supporters as { name: string; member: boolean }[];
 
     it('records a public supporter once per message, and lists names without the private details', async () => {
@@ -590,7 +618,10 @@ describeIntegration('auth API', () => {
     it('ends the pending password-reset links, which went to the old address', async () => {
       const { token, user } = await signUp();
       const reset = newResetToken();
-      await s.pool.query(`insert into auth.password_resets (token_hash, user_id, expires_at) values ($1, $2, now() + interval '1 hour')`, [reset.hash, user.id]);
+      await s.pool.query(`insert into auth.password_resets (token_hash, user_id, expires_at) values ($1, $2, now() + interval '1 hour')`, [
+        reset.hash,
+        user.id,
+      ]);
       await change(token, { email: 'moved@example.com', password: PASSWORD });
       expect((await confirm(await linkFor(user.id))).statusCode).toBe(200);
       const viaOld = await s.request('POST', '/api/auth/password/reset', { body: { token: reset.token, password: 'brand new pass' }, ip: freshIp() });
@@ -638,7 +669,8 @@ describeIntegration('auth API', () => {
       await s.pool.query("update auth.users set created_at = now() - interval '8 days' where id = $1", [userId]);
       await s.pool.query("update auth.email_changes set expires_at = now() - interval '1 minute' where user_id = $1", [userId]);
     }
-    const register = (username: string, email: string) => s.request('POST', '/api/auth/register', { body: { username, email, password: PASSWORD }, ip: freshIp() });
+    const register = (username: string, email: string) =>
+      s.request('POST', '/api/auth/register', { body: { username, email, password: PASSWORD }, ip: freshIp() });
     const emailOf = async (userId: string) => (await s.pool.query<{ email: string }>('select email from auth.users where id = $1', [userId])).rows[0].email;
 
     it('stays taken for 7 days, while a new link for it is open, once confirmed, and from before confirmation existed', async () => {
@@ -683,7 +715,10 @@ describeIntegration('auth API', () => {
       const stale = await signUp({ email: 'stale-change@example.com' });
       await expire(stale.user.id);
       const mover = await signUp();
-      expect((await s.request('POST', '/api/auth/me/email', { token: mover.token, body: { email: 'stale-change@example.com', password: PASSWORD }, ip: freshIp() })).statusCode).toBe(202);
+      expect(
+        (await s.request('POST', '/api/auth/me/email', { token: mover.token, body: { email: 'stale-change@example.com', password: PASSWORD }, ip: freshIp() }))
+          .statusCode,
+      ).toBe(202);
       expect(await emailOf(stale.user.id)).toBe('stale-change@example.com'); // nothing changes before the link is opened
       // the pending change's link, as if its email had arrived
       const { token, hash } = newResetToken();
@@ -703,7 +738,10 @@ describeIntegration('auth API', () => {
     it('answers only with the internal token', async () => {
       const { user } = await signUp();
       expect((await s.request('GET', `/internal/moderation/users/${user.username}`)).statusCode).toBe(403);
-      expect((await s.request('POST', `/internal/moderation/users/${user.username}/suspend`, { headers: { 'x-internal-token': 'wrong-token-wrong-token' } })).statusCode).toBe(403);
+      expect(
+        (await s.request('POST', `/internal/moderation/users/${user.username}/suspend`, { headers: { 'x-internal-token': 'wrong-token-wrong-token' } }))
+          .statusCode,
+      ).toBe(403);
       expect((await mod('GET', `/users/${user.username}`)).json().user.username).toBe(user.username);
     });
 
@@ -712,7 +750,12 @@ describeIntegration('auth API', () => {
       await confirmEmailOf(user.id);
       const res = await mod('POST', `/users/${user.username}/suspend`, { note: 'spam in race chat' });
       expect(res.statusCode, res.body).toBe(200);
-      expect(res.json().user).toMatchObject({ username: user.username, private: true, suspendedNote: 'spam in race chat', email: expect.stringMatching(/^c\*\*\*@example\.com$/) });
+      expect(res.json().user).toMatchObject({
+        username: user.username,
+        private: true,
+        suspendedNote: 'spam in race chat',
+        email: expect.stringMatching(/^c\*\*\*@example\.com$/),
+      });
       expect((await me(token)).statusCode).toBe(401);
       const refused = await login(user.username);
       expect(refused.statusCode).toBe(403);
@@ -762,7 +805,10 @@ describeIntegration('auth API', () => {
       await s.pool.query("insert into auth.password_resets (token_hash, user_id, expires_at) values ($1, $2, now() + interval '1 hour')", [hash, user.id]);
       // suspended in between: the suspension removes pending links, so put one back as if it raced
       await mod('POST', `/users/${user.username}/suspend`);
-      await s.pool.query("insert into auth.password_resets (token_hash, user_id, expires_at) values ($1, $2, now() + interval '1 hour') on conflict do nothing", [hash, user.id]);
+      await s.pool.query(
+        "insert into auth.password_resets (token_hash, user_id, expires_at) values ($1, $2, now() + interval '1 hour') on conflict do nothing",
+        [hash, user.id],
+      );
       const res = await s.request('POST', '/api/auth/password/reset', { body: { token, password: 'a brand new one 1' }, ip: freshIp() });
       expect(res.statusCode).toBe(403);
       expect((await s.pool.query('select 1 from auth.password_resets where token_hash = $1', [hash])).rowCount).toBe(1);
@@ -818,7 +864,9 @@ describeIntegration('auth API', () => {
       expect(same.statusCode).toBe(400);
       expect(same.json().error.message).toMatch(/already your password/i);
       expect((await changePassword(token, { password: PASSWORD, newPassword: 'short' })).statusCode).toBe(400);
-      expect((await s.request('POST', '/api/auth/me/password', { body: { password: PASSWORD, newPassword: 'brand new pass' }, ip: freshIp() })).statusCode).toBe(401);
+      expect(
+        (await s.request('POST', '/api/auth/me/password', { body: { password: PASSWORD, newPassword: 'brand new pass' }, ip: freshIp() })).statusCode,
+      ).toBe(401);
       expect((await me(token)).statusCode).toBe(200);
       expect((await login(user.username)).statusCode).toBe(200); // the password is unchanged
     });
@@ -826,7 +874,10 @@ describeIntegration('auth API', () => {
     it('ends the pending password-reset links', async () => {
       const { token, user } = await signUp();
       const reset = newResetToken();
-      await s.pool.query(`insert into auth.password_resets (token_hash, user_id, expires_at) values ($1, $2, now() + interval '1 hour')`, [reset.hash, user.id]);
+      await s.pool.query(`insert into auth.password_resets (token_hash, user_id, expires_at) values ($1, $2, now() + interval '1 hour')`, [
+        reset.hash,
+        user.id,
+      ]);
       expect((await changePassword(token, { password: PASSWORD, newPassword: 'brand new pass' })).statusCode).toBe(200);
       const viaLink = await s.request('POST', '/api/auth/password/reset', { body: { token: reset.token, password: 'another pass 2' }, ip: freshIp() });
       expect(viaLink.statusCode).toBe(400);
@@ -881,7 +932,10 @@ describeIntegration('auth API', () => {
       expect(mail.text).toContain('Hi Fresh_Start,');
       expect(mail.text).toContain('for 7 days');
       // only the hash is stored, with the address it went to, for a week
-      const { rows } = await s.pool.query(`select token_hash, new_email, expires_at > now() + interval '6 days' as week from auth.email_changes where user_id = $1`, [user.id]);
+      const { rows } = await s.pool.query(
+        `select token_hash, new_email, expires_at > now() + interval '6 days' as week from auth.email_changes where user_id = $1`,
+        [user.id],
+      );
       expect(rows).toHaveLength(1);
       expect(Buffer.isBuffer(rows[0].token_hash)).toBe(true);
       expect(rows[0]).toMatchObject({ new_email: 'Fresh.Start@example.com', week: true });
@@ -932,7 +986,9 @@ describeIntegration('auth API', () => {
     it('ends the sign-up link when the account asks to move to another address', async () => {
       const { token, user } = await signUp();
       const fromSignUp = await emailedLink(user.email);
-      expect((await s.request('POST', '/api/auth/me/email', { token, body: { email: 'elsewhere@example.com', password: PASSWORD }, ip: freshIp() })).statusCode).toBe(202);
+      expect(
+        (await s.request('POST', '/api/auth/me/email', { token, body: { email: 'elsewhere@example.com', password: PASSWORD }, ip: freshIp() })).statusCode,
+      ).toBe(202);
       expect((await confirm(fromSignUp)).statusCode).toBe(400);
       expect((await me(token)).json().user).toMatchObject({ email: user.email, emailVerified: false });
     });
@@ -940,7 +996,14 @@ describeIntegration('auth API', () => {
 
   // what is logged, and that nothing ties it to an IP address: clientErrors.route.test.ts
   describe('front-end error reports', () => {
-    const report = { kind: 'unhandledrejection', message: 'Failed to fetch', route: '/leaderboards', build: 'index-D3oOLUDV.js', browser: 'Chrome 142 on Android', installed: true };
+    const report = {
+      kind: 'unhandledrejection',
+      message: 'Failed to fetch',
+      route: '/leaderboards',
+      build: 'index-D3oOLUDV.js',
+      browser: 'Chrome 142 on Android',
+      installed: true,
+    };
     const post = (body: unknown, ip = freshIp()) => s.request('POST', '/api/errors', { body, ip });
 
     it('takes a report, without signing in, and answers with no content', async () => {
@@ -964,7 +1027,12 @@ describeIntegration('auth API', () => {
 
   // what is logged, the daily cap, and that nothing ties a message to an IP address: feedback.route.test.ts
   describe('the feedback form', () => {
-    const feedback = { kind: 'idea', message: 'a dark stackmat theme, please', email: 'fan@example.com', details: 'cubr v1.6.9 · Firefox 145 on Windows · 1280×800 · /' };
+    const feedback = {
+      kind: 'idea',
+      message: 'a dark stackmat theme, please',
+      email: 'fan@example.com',
+      details: 'cubr v1.6.9 · Firefox 145 on Windows · 1280×800 · /',
+    };
     const post = (body: unknown, ip = freshIp()) => s.request('POST', '/api/feedback', { body, ip });
 
     it("emails the message to cubr's inbox, without signing in, a reply going to the sender", async () => {

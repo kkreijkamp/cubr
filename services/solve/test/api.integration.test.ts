@@ -59,14 +59,18 @@ describeIntegration('solve API', () => {
   async function addSolve(u: User, sessionId: string, timeMs: number, over: Record<string, unknown> = {}) {
     const res = await as(u).post('/api/solves', { id: randomUUID(), sessionId, timeMs, scramble: "R U R' U'", ...over });
     expect([200, 201], res.body).toContain(res.statusCode);
-    return res.json() as { solve: { id: string; timeMs: number; penalty: string; event: string; sessionId: string; createdAt: string }; rolling: { ao5: number | null; ao12: number | null } };
+    return res.json() as {
+      solve: { id: string; timeMs: number; penalty: string; event: string; sessionId: string; createdAt: string };
+      rolling: { ao5: number | null; ao12: number | null };
+    };
   }
   /** Events written to the outbox (the relay isn't running here), oldest first. */
   async function outbox(type?: string, userId?: string) {
     const { rows } = await s.pool.query<{ type: string; payload: Record<string, unknown> }>('SELECT type, payload FROM solve.outbox ORDER BY id');
     return rows.filter((r) => (!type || r.type === type) && (!userId || r.payload.userId === userId));
   }
-  const solveCount = async (sessionId: string) => Number((await s.pool.query('SELECT count(*) FROM solve.solves WHERE session_id = $1', [sessionId])).rows[0].count);
+  const solveCount = async (sessionId: string) =>
+    Number((await s.pool.query('SELECT count(*) FROM solve.solves WHERE session_id = $1', [sessionId])).rows[0].count);
 
   it('answers 401 to every route without a token', async () => {
     const id = randomUUID();
@@ -168,7 +172,7 @@ describeIntegration('solve API', () => {
       expect((await as(u).del(`/api/sessions/${sess.id}`)).statusCode).toBe(404);
     });
 
-    it('lists a session\'s solves oldest first', async () => {
+    it("lists a session's solves oldest first", async () => {
       const u = await newUser();
       const sess = await newSession(u);
       const t0 = Date.now() - 60_000;
@@ -180,7 +184,7 @@ describeIntegration('solve API', () => {
   });
 
   describe('merging sessions', () => {
-    it('moves every solve into the target, deletes the sources and keeps the target\'s practice flag', async () => {
+    it("moves every solve into the target, deletes the sources and keeps the target's practice flag", async () => {
       const u = await newUser();
       const target = await newSession(u, { practice: true });
       const a = await newSession(u);
@@ -214,7 +218,7 @@ describeIntegration('solve API', () => {
   });
 
   describe('solves', () => {
-    it('creates a solve in its session\'s event, with the rolling ao5 and ao12', async () => {
+    it("creates a solve in its session's event, with the rolling ao5 and ao12", async () => {
       const u = await newUser();
       const sess = await newSession(u, { event: '222' });
       let last;
@@ -226,7 +230,7 @@ describeIntegration('solve API', () => {
       expect(created.at(-1)?.payload).toMatchObject({ event: '222', sessionName: sess.name, practice: false, rolling: { ao5: 5000 } });
     });
 
-    it('gives a back-dated solve the ao5 ending at it, not the session\'s latest, so its day\'s board gets its own', async () => {
+    it("gives a back-dated solve the ao5 ending at it, not the session's latest, so its day's board gets its own", async () => {
       const u = await newUser();
       const sess = await newSession(u);
       const at = (min: number) => new Date(Date.now() - (60 - min) * 60_000).toISOString();
@@ -353,7 +357,7 @@ describeIntegration('solve API', () => {
       expect(overview.events['333']).toMatchObject({ solves: [], attempts: [{ index: 0, timeMs: 10_000, penalty: 'OK', solveId: id }] });
     });
 
-    it('records when an attempt starts, and makes a second start of it a DNF (the October review\'s #18)', async () => {
+    it("records when an attempt starts, and makes a second start of it a DNF (the October review's #18)", async () => {
       const u = await newUser();
       const sess = await newSession(u);
       const start = (index: number, event = '333', date = today()) => as(u).post('/api/solves/daily/start', { date, event, index });
@@ -427,8 +431,20 @@ describeIntegration('solve API', () => {
       const u = await newUser();
       const body = {
         sessions: [
-          { name: 'imported 3x3', event: '333', solves: [{ timeMs: 9_000, createdAt: '2026-01-01T10:00:00Z' }, { timeMs: 10_000, penalty: '+2', createdAt: '2026-01-01T10:01:00Z' }] },
-          { name: 'imported practice', event: '222', practice: true, solves: [{ timeMs: 3_000, penalty: 'DNF', comment: 'pop', createdAt: '2026-01-02T10:00:00Z' }] },
+          {
+            name: 'imported 3x3',
+            event: '333',
+            solves: [
+              { timeMs: 9_000, createdAt: '2026-01-01T10:00:00Z' },
+              { timeMs: 10_000, penalty: '+2', createdAt: '2026-01-01T10:01:00Z' },
+            ],
+          },
+          {
+            name: 'imported practice',
+            event: '222',
+            practice: true,
+            solves: [{ timeMs: 3_000, penalty: 'DNF', comment: 'pop', createdAt: '2026-01-02T10:00:00Z' }],
+          },
         ],
       };
       const res = await as(u).post('/api/sessions/import', body);
@@ -442,7 +458,13 @@ describeIntegration('solve API', () => {
       expect(exported.statusCode).toBe(200);
       const doc = exported.json();
       const byName = new Map(doc.sessions.map((x: { name: string }) => [x.name, x]));
-      expect(byName.get('imported 3x3')).toMatchObject({ event: '333', solves: [{ timeMs: 9_000, penalty: 'OK' }, { timeMs: 10_000, penalty: '+2' }] });
+      expect(byName.get('imported 3x3')).toMatchObject({
+        event: '333',
+        solves: [
+          { timeMs: 9_000, penalty: 'OK' },
+          { timeMs: 10_000, penalty: '+2' },
+        ],
+      });
       expect(byName.get('imported practice')).toMatchObject({ event: '222', practice: true, solves: [{ timeMs: 3_000, penalty: 'DNF', comment: 'pop' }] });
     });
 
@@ -489,7 +511,9 @@ describeIntegration('solve API', () => {
       await as(u).del(`/api/solves/${solve.id}`);
       const relay = startOutboxRelay({ pool: s.pool, redis: s.redis, log: s.app.log, intervalMs: 20 });
       try {
-        await expect.poll(async () => (await s.pool.query('SELECT count(*) FROM solve.outbox WHERE published_at IS NULL')).rows[0].count, { timeout: 5000 }).toBe(0);
+        await expect
+          .poll(async () => (await s.pool.query('SELECT count(*) FROM solve.outbox WHERE published_at IS NULL')).rows[0].count, { timeout: 5000 })
+          .toBe(0);
       } finally {
         await relay.stop();
       }
@@ -536,10 +560,15 @@ describeIntegration('solve API', () => {
         await as(u).post('/api/solves/daily/start', { date: utcDay(Date.now()), event: '333', index: 1 });
       }
       const purge = makeUserPurge({ pool: s.pool, log: s.app.log });
-      const evt: EventEnvelope = { id: '1-0', type: 'user.deleted', data: { userId: gone.id, username: gone.username, eventId: 'auth-x', occurredAt: new Date().toISOString() } };
+      const evt: EventEnvelope = {
+        id: '1-0',
+        type: 'user.deleted',
+        data: { userId: gone.id, username: gone.username, eventId: 'auth-x', occurredAt: new Date().toISOString() },
+      };
       await purge(evt);
       await purge(evt); // a redelivery finds nothing left
-      const count = async (table: string, userId: string) => Number((await s.pool.query(`SELECT count(*) FROM solve.${table} WHERE user_id = $1`, [userId])).rows[0].count);
+      const count = async (table: string, userId: string) =>
+        Number((await s.pool.query(`SELECT count(*) FROM solve.${table} WHERE user_id = $1`, [userId])).rows[0].count);
       for (const table of ['sessions', 'solves', 'daily_attempts', 'daily_starts']) {
         expect(await count(table, gone.id), table).toBe(0);
         expect(await count(table, stays.id), table).toBeGreaterThan(0);

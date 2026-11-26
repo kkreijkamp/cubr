@@ -54,7 +54,8 @@ export interface FlaggedValue {
   achievedAt: string | null;
 }
 
-export const flagJson = (valueMs: number, floorMs: number, achievedAt: string | null): string => JSON.stringify({ valueMs, floorMs, achievedAt } satisfies FlaggedValue);
+export const flagJson = (valueMs: number, floorMs: number, achievedAt: string | null): string =>
+  JSON.stringify({ valueMs, floorMs, achievedAt } satisfies FlaggedValue);
 
 /** Reads a flagged-hash value back (null for anything malformed). */
 export function parseFlag(raw: string | null | undefined): FlaggedValue | null {
@@ -139,10 +140,7 @@ export class FloorProvider implements FloorSource {
       this.log.info({ events: Object.keys(recs).length }, 'anti-cheat: loaded WCA records');
     } catch (err) {
       this.retryAt = Date.now() + this.retryMs;
-      this.log.warn(
-        { err: (err as Error).message },
-        `anti-cheat: WCA records unavailable, using ${this.records ? 'cached records' : 'fallback floors'}`,
-      );
+      this.log.warn({ err: (err as Error).message }, `anti-cheat: WCA records unavailable, using ${this.records ? 'cached records' : 'fallback floors'}`);
     }
   }
 }

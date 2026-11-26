@@ -14,7 +14,9 @@
   padding: 1rem 1.25rem;
   border: 2px dashed var(--sub-alt-color);
   border-radius: calc(var(--roundness) * 1.5);
-  transition: border-color var(--dur), background var(--dur);
+  transition:
+    border-color var(--dur),
+    background var(--dur);
 }
 .ae.dragging .ae-drop {
   border-color: var(--main-color);
@@ -95,7 +97,9 @@
   cursor: grabbing;
 }
 .ae-viewport:focus-visible {
-  box-shadow: 0 0 0 0.1rem var(--bg-color), 0 0 0 0.2rem var(--text-color);
+  box-shadow:
+    0 0 0 0.1rem var(--bg-color),
+    0 0 0 0.2rem var(--text-color);
 }
 .ae.dragging .ae-viewport {
   box-shadow: 0 0 0 0.2rem var(--main-color);
@@ -214,10 +218,14 @@
   box-shadow: none;
 }
 .ae-zoom input[type='range']:focus-visible::-webkit-slider-thumb {
-  box-shadow: 0 0 0 0.1rem var(--bg-color), 0 0 0 0.2rem var(--text-color);
+  box-shadow:
+    0 0 0 0.1rem var(--bg-color),
+    0 0 0 0.2rem var(--text-color);
 }
 .ae-zoom input[type='range']:focus-visible::-moz-range-thumb {
-  box-shadow: 0 0 0 0.1rem var(--bg-color), 0 0 0 0.2rem var(--text-color);
+  box-shadow:
+    0 0 0 0.1rem var(--bg-color),
+    0 0 0 0.2rem var(--text-color);
 }
 .ae-zoom input[type='range']:disabled {
   opacity: 0.4;

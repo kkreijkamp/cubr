@@ -165,8 +165,7 @@ export default function RaceLobbyPage() {
             <FlagIcon /> {PAGE_META['/race'].heading}
           </h1>
           <div className="subtitle" data-nosnippet>
-            real-time races with friends - same scramble, live status, results per round. rooms live in redis and websockets are spread across all
-            race pods.
+            real-time races with friends - same scramble, live status, results per round. rooms live in redis and websockets are spread across all race pods.
           </div>
         </div>
       </div>
@@ -268,7 +267,11 @@ export default function RaceLobbyPage() {
                 join
               </button>
             </form>
-            {codeError && <div className="small error" style={{ marginTop: '0.5rem' }}>{codeError}</div>}
+            {codeError && (
+              <div className="small error" style={{ marginTop: '0.5rem' }}>
+                {codeError}
+              </div>
+            )}
           </section>
         </div>
       </div>

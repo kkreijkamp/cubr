@@ -146,7 +146,13 @@ export const SCRAMBLE_TYPES: Record<string, ScrambleType[]> = {
     T('pyrnb', 'no bar', 'steps'),
   ],
   skewb: [T('skbso', 'wca'), T('skbo', 'optimal', C), T('skb', 'random move', C), T('skbnb', 'no bar', 'steps'), P('skbll', 'last layer', 'steps')],
-  sq1: [T('sqrs', 'wca'), T('sqrcsp', 'csp', 'steps'), T('sq1pll', 'pll', 'steps'), T('sq1h', 'face turn metric', NOTATION), T('sq1t', 'twist metric', NOTATION)],
+  sq1: [
+    T('sqrs', 'wca'),
+    T('sqrcsp', 'csp', 'steps'),
+    T('sq1pll', 'pll', 'steps'),
+    T('sq1h', 'face turn metric', NOTATION),
+    T('sq1t', 'twist metric', NOTATION),
+  ],
   fto: [
     T('ftoso', 'wca'),
     T('fto', 'random move', C),

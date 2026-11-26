@@ -17,7 +17,20 @@ import {
   TrophyIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
-import { ALL_EVENTS, EVENTS, RELAY_EVENTS, effectiveMs, formatAverage, formatResult, getEvent, isEventReady, rollingAverage, scrambleSessionName, sessionStats, type Penalty } from '@cubr/cubestats';
+import {
+  ALL_EVENTS,
+  EVENTS,
+  RELAY_EVENTS,
+  effectiveMs,
+  formatAverage,
+  formatResult,
+  getEvent,
+  isEventReady,
+  rollingAverage,
+  scrambleSessionName,
+  sessionStats,
+  type Penalty,
+} from '@cubr/cubestats';
 import { TimerDisplay } from '../timer/TimerDisplay';
 import { useTimerEngine, type TimerResult, type TimerState } from '../timer/useTimerEngine';
 import { peekScramble, useScrambleQueue } from '../timer/useScrambleQueue';
@@ -128,11 +141,7 @@ const SmartCubeInput = lazy(() => import('../components/timer/inputs/SmartCubeIn
 
 /** A control that has keyboard focus (it matches :focus-visible): Tab moves on from it instead of giving a new scramble. */
 function isKeyboardOnControl(el: Element | null): boolean {
-  return (
-    el instanceof HTMLElement &&
-    el.matches('a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])') &&
-    el.matches(':focus-visible')
-  );
+  return el instanceof HTMLElement && el.matches('a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])') && el.matches(':focus-visible');
 }
 
 export default function TimerPage() {
@@ -403,7 +412,9 @@ export default function TimerPage() {
     if (!session) return;
     const on = !session.practice;
     void setSessionPractice(session.id, on);
-    toast.notice(on ? `${session.name} is a practice session: no pbs or leaderboards` : `${session.name} counts for pbs and leaderboards again`, { durationMs: 2500 });
+    toast.notice(on ? `${session.name} is a practice session: no pbs or leaderboards` : `${session.name} counts for pbs and leaderboards again`, {
+      durationMs: 2500,
+    });
   }, [session]);
 
   // ---------------------------------------------------------------- palette commands
@@ -477,11 +488,23 @@ export default function TimerPage() {
           },
           { id: 'timer-comment-last', label: 'Comment last solve', icon: <ChatBubbleLeftIcon />, run: commentLast },
           { id: 'timer-delete-last', label: 'Delete last solve', icon: <TrashIcon />, run: deleteLast },
-          { id: 'timer-clear-session', label: 'Clear session (delete all its solves)', icon: <TrashIcon />, keywords: ['reset', 'empty'], run: () => setModal({ kind: 'clearSession' }) },
+          {
+            id: 'timer-clear-session',
+            label: 'Clear session (delete all its solves)',
+            icon: <TrashIcon />,
+            keywords: ['reset', 'empty'],
+            run: () => setModal({ kind: 'clearSession' }),
+          },
         );
       }
       cmds.push(
-        { id: 'timer-toggle-list', label: settings.showSolveList ? 'Hide solve list' : 'Show solve list', icon: <ListBulletIcon />, keywords: ['toggle'], run: () => updateSettings({ showSolveList: !settings.showSolveList }) },
+        {
+          id: 'timer-toggle-list',
+          label: settings.showSolveList ? 'Hide solve list' : 'Show solve list',
+          icon: <ListBulletIcon />,
+          keywords: ['toggle'],
+          run: () => updateSettings({ showSolveList: !settings.showSolveList }),
+        },
         {
           id: 'timer-input',
           label: 'Enter times with...',
@@ -495,13 +518,30 @@ export default function TimerPage() {
               run: () => setInput(m.id),
             })),
         },
-        { id: 'timer-inspection-toggle', label: settings.inspection ? 'Turn inspection off' : 'Turn inspection on', icon: <EyeIcon />, keywords: ['toggle', 'wca'], run: () => updateSettings({ inspection: !settings.inspection }) },
+        {
+          id: 'timer-inspection-toggle',
+          label: settings.inspection ? 'Turn inspection off' : 'Turn inspection on',
+          icon: <EyeIcon />,
+          keywords: ['toggle', 'wca'],
+          run: () => updateSettings({ inspection: !settings.inspection }),
+        },
       );
       return cmds;
     },
-    [st.sessions, event, session?.id, session?.practice, togglePractice, last?.id, last?.penalty, settings.showSolveList, settings.inspection, input, deleteLast],
+    [
+      st.sessions,
+      event,
+      session?.id,
+      session?.practice,
+      togglePractice,
+      last?.id,
+      last?.penalty,
+      settings.showSolveList,
+      settings.inspection,
+      input,
+      deleteLast,
+    ],
   );
-
 
   // ---------------------------------------------------------------- display
   // idle: show the latest solve of this session (with its current penalty), like csTimer
@@ -595,7 +635,11 @@ export default function TimerPage() {
           hint={input === 'smartcube' ? smartHint : null}
         />
 
-        <div className={`tp-timer-area input-${input}`} {...(input === 'timer' ? engine.touchHandlers : {})} aria-label={input !== 'timer' ? undefined : touch ? 'timer: hold to get ready, release to start' : 'timer'}>
+        <div
+          className={`tp-timer-area input-${input}`}
+          {...(input === 'timer' ? engine.touchHandlers : {})}
+          aria-label={input !== 'timer' ? undefined : touch ? 'timer: hold to get ready, release to start' : 'timer'}
+        >
           <Suspense fallback={<Loading label="loading the input" />}>
             {manual ? (
               <ManualEntry onSubmit={(r) => record(r, 'manual')} disabled={modal !== null || paletteOpen} />
@@ -678,7 +722,13 @@ export default function TimerPage() {
               />
             ) : (
               <div key={pbKey}>
-                <TimerDisplay state={displayState} precision={settings.precision} timerUpdate={settings.timerUpdate} sizeRem={settings.timerSize} pb={pb && isIdle} />
+                <TimerDisplay
+                  state={displayState}
+                  precision={settings.precision}
+                  timerUpdate={settings.timerUpdate}
+                  sizeRem={settings.timerSize}
+                  pb={pb && isIdle}
+                />
               </div>
             )}
           </Suspense>
@@ -741,7 +791,16 @@ export default function TimerPage() {
             </section>
           )}
           {settings.showSolveList && (
-            <SolveList solves={solves} ao5={ao5} ao12={ao12} pbs={pbs} bestIndex={stats.bestIndex} precision={settings.precision} loading={st.loading || !st.ready} onOpen={openSolve} />
+            <SolveList
+              solves={solves}
+              ao5={ao5}
+              ao12={ao12}
+              pbs={pbs}
+              bestIndex={stats.bestIndex}
+              precision={settings.precision}
+              loading={st.loading || !st.ready}
+              onOpen={openSolve}
+            />
           )}
         </div>
 
@@ -829,7 +888,8 @@ export default function TimerPage() {
             title="clear session"
             message={
               <>
-                Delete all {session.solveCount} solve{session.solveCount === 1 ? '' : 's'} in <span className="main">{session.name}</span>? The session stays. This can't be undone.
+                Delete all {session.solveCount} solve{session.solveCount === 1 ? '' : 's'} in <span className="main">{session.name}</span>? The session stays.
+                This can't be undone.
               </>
             }
             confirmLabel="clear session"

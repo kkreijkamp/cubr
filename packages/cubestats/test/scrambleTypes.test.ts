@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { ALL_EVENTS } from '../src/events.js';
 import { RANDOM_MOVE_TYPES, randomMoveScramble } from '../src/randomMoves.js';
-import { defaultScrambleType, getScrambleType, isEventReady, isPracticeScramble, scrambleSessionName, scrambleTypesFor, SCRAMBLE_TYPES } from '../src/scrambleTypes.js';
+import {
+  defaultScrambleType,
+  getScrambleType,
+  isEventReady,
+  isPracticeScramble,
+  scrambleSessionName,
+  scrambleTypesFor,
+  SCRAMBLE_TYPES,
+} from '../src/scrambleTypes.js';
 
 describe('scramble types', () => {
   it('gives every event at least its default, ids unique within an event', () => {
@@ -37,7 +45,11 @@ describe('scramble types', () => {
   it('can scramble every event (csTimer makes what cubing.js and cubr do not); only three types wait', () => {
     for (const e of ALL_EVENTS) expect(isEventReady(e.id), e.id).toBe(true);
     expect(isEventReady('nope')).toBe(false);
-    const waiting = ALL_EVENTS.flatMap((e) => scrambleTypesFor(e.id).filter((t) => t.pending).map((t) => t.id));
+    const waiting = ALL_EVENTS.flatMap((e) =>
+      scrambleTypesFor(e.id)
+        .filter((t) => t.pending)
+        .map((t) => t.id),
+    );
     expect(waiting.sort()).toEqual(['mgms2l', 'pyrtop', 'skbll']);
   });
 
@@ -63,7 +75,9 @@ describe('random-move scrambles', () => {
 
   it('never turns the same layer twice in a row', () => {
     for (let i = 0; i < 20; i++) {
-      const m = randomMoveScramble('333o')!.split(' ').map((x) => x[0]);
+      const m = randomMoveScramble('333o')!
+        .split(' ')
+        .map((x) => x[0]);
       for (let j = 1; j < m.length; j++) expect(m[j]).not.toBe(m[j - 1]);
     }
   });

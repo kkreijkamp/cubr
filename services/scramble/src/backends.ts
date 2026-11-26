@@ -48,7 +48,8 @@ export async function createInProcessBackend(): Promise<ScrambleBackend> {
     if (state.pre) pattern = pattern.applyAlg(state.pre);
     pattern = pattern.applyTransformation(new KTransformation(k as never, transformationData(k, state)) as never);
     if (state.post) pattern = pattern.applyAlg(state.post);
-    const solution = puzzle === '2x2x2' ? await search.experimentalSolve2x2x2(pattern as never) : await search.experimentalSolve3x3x3IgnoringCenters(pattern as never);
+    const solution =
+      puzzle === '2x2x2' ? await search.experimentalSolve2x2x2(pattern as never) : await search.experimentalSolve3x3x3IgnoringCenters(pattern as never);
     return backwards(solution.invert().toString());
   };
   return {

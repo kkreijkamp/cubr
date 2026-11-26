@@ -30,7 +30,11 @@ export function isPageLoad(request: Request): boolean {
 // The logo as in the app's header (web/src/components/CubeLogo.tsx): a 3x3 face, its centre in the
 // text colour.
 const CUBE = [0, 1, 2]
-  .flatMap((r) => [0, 1, 2].map((c) => `<rect x="${1 + c * 8.25}" y="${1 + r * 8.25}" width="7.25" height="7.25" rx="1.8"${r === 1 && c === 1 ? ' style="fill:var(--text)"' : ''}/>`))
+  .flatMap((r) =>
+    [0, 1, 2].map(
+      (c) => `<rect x="${1 + c * 8.25}" y="${1 + r * 8.25}" width="7.25" height="7.25" rx="1.8"${r === 1 && c === 1 ? ' style="fill:var(--text)"' : ''}/>`,
+    ),
+  )
   .join('');
 
 // web/public/favicon.svg
@@ -95,7 +99,8 @@ export const DOWN_HEADERS: Record<string, string> = {
   'Cache-Control': 'no-store',
   'Retry-After': String(RETRY_SEC),
   'X-Robots-Tag': 'noindex',
-  'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; font-src data:; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+  'Content-Security-Policy':
+    "default-src 'none'; style-src 'unsafe-inline'; font-src data:; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'strict-origin-when-cross-origin',

@@ -104,7 +104,12 @@ export function computePbs(solves: ListSolve[]): PbSet {
  * recompute / import.
  */
 export function replayHistory(solves: ListSolve[]): HistoryEntry[] {
-  interface Candidate { at: number; order: number; kind: PbKind; value: number }
+  interface Candidate {
+    at: number;
+    order: number;
+    kind: PbKind;
+    value: number;
+  }
   const candidates: Candidate[] = [];
   for (const session of groupBySession(countsForPbs(solves))) {
     const times = session.map((p) => p.eff);

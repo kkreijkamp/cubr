@@ -37,9 +37,12 @@ export function SolveModal({ solve, index, total, precision, preview, scrambleTy
     setArmed(false);
   }, [solve.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => () => {
-    if (armTimer.current) clearTimeout(armTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (armTimer.current) clearTimeout(armTimer.current);
+    },
+    [],
+  );
 
   const saveComment = () => {
     if ((solve.comment ?? '') !== comment.trim()) void setComment(solve.id, comment);

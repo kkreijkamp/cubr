@@ -57,11 +57,14 @@ describeIntegration('daily challenge', () => {
   const getDaily = (date?: string) => s.request('GET', date === undefined ? '/api/scrambles/daily' : `/api/scrambles/daily?date=${encodeURIComponent(date)}`);
   /** What the table holds for a day, event -> scrambles. */
   async function stored(date: string): Promise<Record<string, string[]>> {
-    const { rows } = await s.pool.query<{ event: string; scrambles: string[] }>('select event, scrambles from scramble.daily_challenges where day = $1', [date]);
+    const { rows } = await s.pool.query<{ event: string; scrambles: string[] }>('select event, scrambles from scramble.daily_challenges where day = $1', [
+      date,
+    ]);
     return Object.fromEntries(rows.map((r) => [r.event, r.scrambles]));
   }
   /** Another replica: the same database, but its own generator and an empty cache. */
-  const replica = (gen: ScrambleGenerator = generator, pool: Pool = s.pool) => new DailyChallenges({ pool, generator: gen, isMigrated: () => true, log: silent });
+  const replica = (gen: ScrambleGenerator = generator, pool: Pool = s.pool) =>
+    new DailyChallenges({ pool, generator: gen, isMigrated: () => true, log: silent });
   const generatedEvents = () => generateMany.mock.calls.map(([event]) => event);
 
   it('generates five scrambles per daily event on the first request of a day, stores them and serves that set from then on', async () => {
@@ -183,7 +186,11 @@ describeIntegration('daily challenge', () => {
   it('answers 503 and stores nothing when the generator is overloaded', async () => {
     const tiny = new ScrambleGenerator(fakeBackend(), { timeoutMs: 5000, maxQueue: 3 });
     const date = daysAgo(9);
-    await expect(replica(tiny).get(date)).rejects.toMatchObject({ statusCode: 503, code: 'UNAVAILABLE', message: expect.stringMatching(/could not be generated/) });
+    await expect(replica(tiny).get(date)).rejects.toMatchObject({
+      statusCode: 503,
+      code: 'UNAVAILABLE',
+      message: expect.stringMatching(/could not be generated/),
+    });
     expect(await stored(date)).toEqual({});
     await tiny.close();
   });

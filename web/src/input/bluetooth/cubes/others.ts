@@ -36,7 +36,10 @@ const GIIKER_E_FACELET = [
   [46, 1],
   [50, 39],
 ];
-const GIIKER_KEY = [176, 81, 104, 224, 86, 137, 237, 119, 38, 26, 193, 161, 210, 126, 150, 81, 93, 13, 236, 249, 89, 235, 88, 24, 113, 81, 214, 131, 130, 199, 2, 169, 39, 165, 171, 41];
+const GIIKER_KEY = [
+  176, 81, 104, 224, 86, 137, 237, 119, 38, 26, 193, 161, 210, 126, 150, 81, 93, 13, 236, 249, 89, 235, 88, 24, 113, 81, 214, 131, 130, 199, 2, 169, 39, 165,
+  171, 41,
+];
 
 /** a Giiker state notification as [facelets, latest moves] */
 export function parseGiiker(bytes: number[]): [string, string[]] {
@@ -54,7 +57,7 @@ export function parseGiiker(bytes: number[]): [string, string[]] {
   for (let i = 0; i < 3; i++) for (let mask = 8; mask !== 0; mask >>= 1) eo.push(hex[i + 28] & mask ? 1 : 0);
   const cc = new CubieCube();
   const coMask = [-1, 1, -1, 1, 1, -1, 1, -1];
-  for (let i = 0; i < 8; i++) cc.ca[i] = (hex[i] - 1) | ((3 + hex[i + 8] * coMask[i]) % 3 << 3);
+  for (let i = 0; i < 8; i++) cc.ca[i] = (hex[i] - 1) | (((3 + hex[i + 8] * coMask[i]) % 3) << 3);
   for (let i = 0; i < 12; i++) cc.ea[i] = ((hex[i + 16] - 1) << 1) | eo[i];
   const facelet = cc.toFaceCube(GIIKER_C_FACELET, GIIKER_E_FACELET);
   const moves = hex.slice(32, 40);
@@ -419,7 +422,13 @@ function moyu32(): CubeModel & { debug: Record<string, unknown> } {
       let found: string | null = null;
       try {
         const view = manufacturerBytes(await group.waitForAdvertisement(), MOYU32_CICS);
-        if (view && view.byteLength >= 6) found = Array.from({ length: 6 }, (_, i) => view.getUint8(view.byteLength - i - 1).toString(16).padStart(2, '0')).join(':');
+        if (view && view.byteLength >= 6)
+          found = Array.from({ length: 6 }, (_, i) =>
+            view
+              .getUint8(view.byteLength - i - 1)
+              .toString(16)
+              .padStart(2, '0'),
+          ).join(':');
       } catch {
         /* saved or asked for */
       }
@@ -596,7 +605,13 @@ function qiyi(): CubeModel & { debug: Record<string, unknown> } {
       let found: string | null = null;
       try {
         const view = manufacturerBytes(await group.waitForAdvertisement(), QY_CICS);
-        if (view && view.byteLength >= 6) found = Array.from({ length: 6 }, (_, i) => view.getUint8(5 - i).toString(16).padStart(2, '0')).join(':');
+        if (view && view.byteLength >= 6)
+          found = Array.from({ length: 6 }, (_, i) =>
+            view
+              .getUint8(5 - i)
+              .toString(16)
+              .padStart(2, '0'),
+          ).join(':');
       } catch {
         /* saved or asked for */
       }

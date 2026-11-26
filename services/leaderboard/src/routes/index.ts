@@ -3,17 +3,7 @@ import { z } from 'zod';
 import { badRequest, canViewProfile, forbidden, parse, type Redis, type makeAuth } from '@cubr/common';
 import { DAILY_EVENTS, isWcaEvent } from '@cubr/cubestats';
 import { readBoard, readUserRanks } from '../board.js';
-import {
-  PERIODS,
-  PERIOD_KINDS,
-  boardKey,
-  challengeKey,
-  currentPeriodKey,
-  isKind,
-  isValidDay,
-  isValidWeek,
-  utcDay,
-} from '../keys.js';
+import { PERIODS, PERIOD_KINDS, boardKey, challengeKey, currentPeriodKey, isKind, isValidDay, isValidWeek, utcDay } from '../keys.js';
 
 export interface Deps {
   redis: Redis;
@@ -50,7 +40,18 @@ export async function registerRoutes(app: FastifyInstance, { redis, auth }: Deps
     const date = q.date ?? utcDay(new Date());
     if (!isValidDay(date)) throw badRequest('date: expected YYYY-MM-DD');
     const board = await readBoard(redis, challengeKey(date, q.event), q.page, q.size, req.user?.id);
-    return { event: q.event, kind: 'ao5', period: 'challenge', periodKey: date, total: board.total, page: q.page, size: q.size, entries: board.entries, me: board.me, flagged: board.flagged };
+    return {
+      event: q.event,
+      kind: 'ao5',
+      period: 'challenge',
+      periodKey: date,
+      total: board.total,
+      page: q.page,
+      size: q.size,
+      entries: board.entries,
+      me: board.me,
+      flagged: board.flagged,
+    };
   });
 
   // GET /api/leaderboards/users/:userId/ranks -> positions on every all-time board. A private
@@ -63,27 +64,34 @@ export async function registerRoutes(app: FastifyInstance, { redis, auth }: Deps
   });
 
   // GET /api/leaderboards/:event/:kind?period=all|weekly|daily&page=1&size=50[&key=...]
-  app.get<{ Params: { event: string; kind: string } }>(
-    '/api/leaderboards/:event/:kind',
-    { preHandler: auth.optionalAuth },
-    async (req) => {
-      const { event, kind } = req.params;
-      const q = parse(boardQuery, req.query);
-      if (!isWcaEvent(event)) throw badRequest(`event: no leaderboards for '${event}' (WCA events only)`);
-      if (!isKind(kind)) throw badRequest(`kind: expected one of single, ao5, ao12`);
-      if (!PERIOD_KINDS[q.period].includes(kind)) {
-        throw badRequest(`kind: ${q.period} boards exist for ${PERIOD_KINDS[q.period].join(', ')} only`);
-      }
+  app.get<{ Params: { event: string; kind: string } }>('/api/leaderboards/:event/:kind', { preHandler: auth.optionalAuth }, async (req) => {
+    const { event, kind } = req.params;
+    const q = parse(boardQuery, req.query);
+    if (!isWcaEvent(event)) throw badRequest(`event: no leaderboards for '${event}' (WCA events only)`);
+    if (!isKind(kind)) throw badRequest(`kind: expected one of single, ao5, ao12`);
+    if (!PERIOD_KINDS[q.period].includes(kind)) {
+      throw badRequest(`kind: ${q.period} boards exist for ${PERIOD_KINDS[q.period].join(', ')} only`);
+    }
 
-      let periodKey = currentPeriodKey(q.period);
-      if (q.key !== undefined && q.period !== 'all') {
-        const ok = q.period === 'daily' ? isValidDay(q.key) : isValidWeek(q.key);
-        if (!ok) throw badRequest(`key: expected ${q.period === 'daily' ? 'YYYY-MM-DD' : 'YYYY-Www'}`);
-        periodKey = q.key;
-      }
+    let periodKey = currentPeriodKey(q.period);
+    if (q.key !== undefined && q.period !== 'all') {
+      const ok = q.period === 'daily' ? isValidDay(q.key) : isValidWeek(q.key);
+      if (!ok) throw badRequest(`key: expected ${q.period === 'daily' ? 'YYYY-MM-DD' : 'YYYY-Www'}`);
+      periodKey = q.key;
+    }
 
-      const board = await readBoard(redis, boardKey(event, kind, q.period, periodKey), q.page, q.size, req.user?.id);
-      return { event, kind, period: q.period, periodKey, total: board.total, page: q.page, size: q.size, entries: board.entries, me: board.me, flagged: board.flagged };
-    },
-  );
+    const board = await readBoard(redis, boardKey(event, kind, q.period, periodKey), q.page, q.size, req.user?.id);
+    return {
+      event,
+      kind,
+      period: q.period,
+      periodKey,
+      total: board.total,
+      page: q.page,
+      size: q.size,
+      entries: board.entries,
+      me: board.me,
+      flagged: board.flagged,
+    };
+  });
 }

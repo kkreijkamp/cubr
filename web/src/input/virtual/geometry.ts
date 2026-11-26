@@ -25,7 +25,17 @@ export function rotation(axis: Vec, angle: number): Mat {
   const c = Math.cos(angle);
   const s = Math.sin(angle);
   const t = 1 - c;
-  return [t * x * x + c, t * x * y - s * z, t * x * z + s * y, t * x * y + s * z, t * y * y + c, t * y * z - s * x, t * x * z - s * y, t * y * z + s * x, t * z * z + c];
+  return [
+    t * x * x + c,
+    t * x * y - s * z,
+    t * x * z + s * y,
+    t * x * y + s * z,
+    t * y * y + c,
+    t * y * z - s * x,
+    t * x * z - s * y,
+    t * y * z + s * x,
+    t * z * z + c,
+  ];
 }
 
 export function mulMat(a: Mat, b: Mat): Mat {
@@ -34,7 +44,11 @@ export function mulMat(a: Mat, b: Mat): Mat {
   return out;
 }
 
-export const apply = (m: Mat, v: Vec): Vec => [m[0] * v[0] + m[1] * v[1] + m[2] * v[2], m[3] * v[0] + m[4] * v[1] + m[5] * v[2], m[6] * v[0] + m[7] * v[1] + m[8] * v[2]];
+export const apply = (m: Mat, v: Vec): Vec => [
+  m[0] * v[0] + m[1] * v[1] + m[2] * v[2],
+  m[3] * v[0] + m[4] * v[1] + m[5] * v[2],
+  m[6] * v[0] + m[7] * v[1] + m[8] * v[2],
+];
 
 /** points p with dot(n, p) = d; n is a unit vector and the "outside" is dot(n, p) > d */
 export interface Plane {
@@ -147,7 +161,12 @@ export function basis(n: Vec): [Vec, Vec] {
 export function facePolygon(plane: Plane, others: Plane[], size = 100): Vec[] | null {
   const [u, v] = basis(plane.n);
   const c = scale(plane.n, plane.d);
-  let poly: Vec[] | null = [add(c, add(scale(u, -size), scale(v, -size))), add(c, add(scale(u, size), scale(v, -size))), add(c, add(scale(u, size), scale(v, size))), add(c, add(scale(u, -size), scale(v, size)))];
+  let poly: Vec[] | null = [
+    add(c, add(scale(u, -size), scale(v, -size))),
+    add(c, add(scale(u, size), scale(v, -size))),
+    add(c, add(scale(u, size), scale(v, size))),
+    add(c, add(scale(u, -size), scale(v, size))),
+  ];
   for (const o of others) {
     if (!poly) return null;
     poly = clip(poly, o);

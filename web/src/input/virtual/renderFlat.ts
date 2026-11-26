@@ -137,7 +137,15 @@ export interface NetLayout {
 }
 
 /** a polyhedral puzzle as an unfolded net */
-export function drawNet(ctx: CanvasRenderingContext2D, width: number, height: number, puzzle: PolyPuzzle, layout: NetLayout, colorOf: (slot: number) => string, palette: Palette) {
+export function drawNet(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  puzzle: PolyPuzzle,
+  layout: NetLayout,
+  colorOf: (slot: number) => string,
+  palette: Palette,
+) {
   // every slot in 2D, piece by piece
   const shapes: { piece: number; plate: Pt[]; sticker: Pt[]; slot: number }[] = [];
   layout.pieces.forEach((pc, idx) => {
@@ -160,7 +168,12 @@ export function drawNet(ctx: CanvasRenderingContext2D, width: number, height: nu
   // lay the pieces out left to right and fit everything
   const boxes = layout.pieces.map((_, idx) => {
     const pts = shapes.filter((s) => s.piece === idx).flatMap((s) => s.plate);
-    return { x0: Math.min(...pts.map((p) => p[0])), x1: Math.max(...pts.map((p) => p[0])), y0: Math.min(...pts.map((p) => p[1])), y1: Math.max(...pts.map((p) => p[1])) };
+    return {
+      x0: Math.min(...pts.map((p) => p[0])),
+      x1: Math.max(...pts.map((p) => p[0])),
+      y0: Math.min(...pts.map((p) => p[1])),
+      y1: Math.max(...pts.map((p) => p[1])),
+    };
   });
   const gapU = 0.08 * Math.max(...boxes.map((b) => b.y1 - b.y0));
   const totalW = boxes.reduce((s, b) => s + (b.x1 - b.x0), 0) + gapU * (boxes.length - 1);
@@ -252,4 +265,3 @@ function shrink(pts: Pt[], px: number): Pt[] {
     return [cx + (x - cx) * k, cy + (y - cy) * k];
   });
 }
-

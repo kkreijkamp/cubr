@@ -33,7 +33,10 @@ const CHECK_EVERY_MS = 30 * 60_000;
 
 function isStandalone(): boolean {
   if (typeof window === 'undefined' || typeof matchMedia !== 'function') return false;
-  return ['standalone', 'fullscreen', 'minimal-ui', 'window-controls-overlay'].some((m) => matchMedia(`(display-mode: ${m})`).matches) || (navigator as { standalone?: boolean }).standalone === true;
+  return (
+    ['standalone', 'fullscreen', 'minimal-ui', 'window-controls-overlay'].some((m) => matchMedia(`(display-mode: ${m})`).matches) ||
+    (navigator as { standalone?: boolean }).standalone === true
+  );
 }
 
 export const pwaStore = createStore<PwaState>({ offline: 'off', update: false, canInstall: false, standalone: isStandalone() });

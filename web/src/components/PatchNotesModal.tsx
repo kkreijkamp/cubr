@@ -1,8 +1,7 @@
 import { Modal } from './Modal';
 import { PATCH_NOTES, releaseFor } from '../content/patchNotes';
 
-const fmtDate = (iso: string) =>
-  new Date(`${iso}T00:00:00`).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }).toLowerCase();
+const fmtDate = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }).toLowerCase();
 
 /** Release notes, newest first (opened from the version in the footer). The release the running
  *  version belongs to is marked "current"; in development (version "dev") none is. */

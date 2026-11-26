@@ -95,18 +95,30 @@ describeIntegration('scramble API', () => {
     expect(pll.statusCode).toBe(200);
     expect(pll.json()).toMatchObject({ event: '333', type: 'pll', source: 'generated' });
     // the fake backend echoes the job: a 3x3 practice state to solve
-    expect(pll.json().scrambles).toEqual([expect.stringMatching(/^solve:3x3x3:\{.*\} scramble \d+$/), expect.stringMatching(/^solve:3x3x3:\{.*\} scramble \d+$/)]);
+    expect(pll.json().scrambles).toEqual([
+      expect.stringMatching(/^solve:3x3x3:\{.*\} scramble \d+$/),
+      expect.stringMatching(/^solve:3x3x3:\{.*\} scramble \d+$/),
+    ]);
     expect(await s.redis.llen(poolKey('333'))).toBe(2); // the pool's wca scrambles stay for wca solves
     const moves = await get('/api/scrambles/333?type=333o');
     expect(moves.json().scrambles[0].split(' ')).toHaveLength(25);
     // a relay takes its parts from the pools
-    await stock('222', 'two'); await stock('444', 'four');
+    await stock('222', 'two');
+    await stock('444', 'four');
     expect((await get('/api/scrambles/r234')).json().scrambles).toEqual(['2x2: two\n3x3: pool A\n4x4: four']);
   });
 
   it("asks csTimer for the rest, at its lengths: other puzzles' defaults and their practice types", async () => {
-    expect((await get('/api/scrambles/15p')).json()).toMatchObject({ event: '15p', type: '15prp', scrambles: [expect.stringMatching(/^15prp cstimer \d+$/)], source: 'generated' });
-    expect((await get('/api/scrambles/sq1?type=sqrcsp&count=2')).json().scrambles).toEqual([expect.stringMatching(/^sqrcsp cstimer/), expect.stringMatching(/^sqrcsp cstimer/)]);
+    expect((await get('/api/scrambles/15p')).json()).toMatchObject({
+      event: '15p',
+      type: '15prp',
+      scrambles: [expect.stringMatching(/^15prp cstimer \d+$/)],
+      source: 'generated',
+    });
+    expect((await get('/api/scrambles/sq1?type=sqrcsp&count=2')).json().scrambles).toEqual([
+      expect.stringMatching(/^sqrcsp cstimer/),
+      expect.stringMatching(/^sqrcsp cstimer/),
+    ]);
     expect((await get('/api/scrambles/333?type=2gen')).json().scrambles[0]).toMatch(/^2gen cstimer/);
     expect(cstimer.calls).toContain('15prp:0');
   });
@@ -233,7 +245,12 @@ describeIntegration('scramble API', () => {
   describe('ScramblePool', () => {
     it('trims a pool to its target when pushing, pops the oldest first and reports the size of every pool', async () => {
       const pool = new ScramblePool(s.redis);
-      expect(await pool.push('sq1', Array.from({ length: 60 }, (_, i) => `sq1 #${i}`))).toBe(50); // target 50
+      expect(
+        await pool.push(
+          'sq1',
+          Array.from({ length: 60 }, (_, i) => `sq1 #${i}`),
+        ),
+      ).toBe(50); // target 50
       expect(await pool.take('sq1', 3)).toEqual(['sq1 #0', 'sq1 #1', 'sq1 #2']);
       const sizes = await pool.sizes();
       expect(Object.keys(sizes).sort()).toEqual([...EVENT_IDS].sort());

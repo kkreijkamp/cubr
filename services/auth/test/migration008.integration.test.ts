@@ -21,10 +21,21 @@ describeIntegration('auth migration 008 on existing accounts', () => {
   });
 
   const add = async (username: string, email: string, withPassword = true) =>
-    (await s.pool.query<{ id: string }>('insert into auth.users (username, email, password_hash) values ($1, $2, $3) returning id', [username, email, withPassword ? '$2a$10$hash' : null]))
-      .rows[0].id;
+    (
+      await s.pool.query<{ id: string }>('insert into auth.users (username, email, password_hash) values ($1, $2, $3) returning id', [
+        username,
+        email,
+        withPassword ? '$2a$10$hash' : null,
+      ])
+    ).rows[0].id;
   const link = (provider: string, userId: string, email: string | null, createdAt = new Date()) =>
-    s.pool.query('insert into auth.user_identities (provider, subject, user_id, email, created_at) values ($1, $2, $3, $4, $5)', [provider, `${provider}-${userId}`, userId, email, createdAt]);
+    s.pool.query('insert into auth.user_identities (provider, subject, user_id, email, created_at) values ($1, $2, $3, $4, $5)', [
+      provider,
+      `${provider}-${userId}`,
+      userId,
+      email,
+      createdAt,
+    ]);
 
   it('keeps reset links for every existing account, and confirms the addresses a provider vouched for', async () => {
     await add('a_password', 'password.only@example.com');
@@ -37,7 +48,9 @@ describeIntegration('auth migration 008 on existing accounts', () => {
 
     await migrate(s.pool, 'auth', migrations); // applies 008 only
 
-    const { rows } = await s.pool.query('select username, predates_email_confirmation as predates, email_verified_at as verified from auth.users order by username');
+    const { rows } = await s.pool.query(
+      'select username, predates_email_confirmation as predates, email_verified_at as verified from auth.users order by username',
+    );
     expect(rows).toEqual([
       { username: 'a_password', predates: true, verified: null },
       { username: 'b_google', predates: true, verified: new Date('2026-11-16T10:00:00Z') },

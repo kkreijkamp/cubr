@@ -19,7 +19,10 @@ const timeMs = z.number().int().min(1).max(MAX_TIME_MS);
 const scramble = z.string().max(2000);
 const comment = z.string().max(500);
 const isoDateTime = z.string().datetime({ offset: true });
-const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD').refine(isRealDate, 'invalid date');
+const ymd = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD')
+  .refine(isRealDate, 'invalid date');
 
 /** Sources a client may set; `source` is only a label (statistics treat every solve the same). */
 export const SOLVE_SOURCES = ['timer', 'manual', 'race', 'daily', 'import', 'seed'] as const;
@@ -27,7 +30,10 @@ export const SOLVE_SOURCES = ['timer', 'manual', 'race', 'daily', 'import', 'see
 export const idParams = z.object({ id: uuid });
 
 /** a practice scramble type id (checked against the event in practiceScrambleRule) */
-const scrambleType = z.string().regex(/^[A-Za-z0-9_]{1,32}$/, 'scramble: a scramble type id').nullish();
+const scrambleType = z
+  .string()
+  .regex(/^[A-Za-z0-9_]{1,32}$/, 'scramble: a scramble type id')
+  .nullish();
 /** `scramble` must be one of the event's practice scramble types (never its default) */
 const isEventsPracticeScramble = (b: { event: string; scramble?: string | null }) => !b.scramble || isPracticeScramble(b.event, b.scramble);
 const notPracticeScramble = { message: "scramble: not one of this event's practice scramble types", path: ['scramble'] };
@@ -95,7 +101,13 @@ export const importBody = z
     sessions: z
       .array(
         z
-          .object({ name: sessionName, event: eventId, practice: z.boolean().default(false), scramble: scrambleType, solves: z.array(importSolve).max(MAX_IMPORT_SOLVES) })
+          .object({
+            name: sessionName,
+            event: eventId,
+            practice: z.boolean().default(false),
+            scramble: scrambleType,
+            solves: z.array(importSolve).max(MAX_IMPORT_SOLVES),
+          })
           .refine(isEventsPracticeScramble, notPracticeScramble),
       )
       .min(1)

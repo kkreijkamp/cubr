@@ -58,9 +58,18 @@ export function eventForScrType(scrType: string | undefined): string {
   if (exact) return exact;
   for (const e of ALL_EVENTS) if (scrambleTypesFor(e.id).some((t) => t.id === scrType)) return e.id;
   const prefixes: [string, string][] = [
-    ['222', '222'], ['444', '444'], ['555', '555'], ['666', '666'], ['777', '777'],
-    ['pyr', 'pyram'], ['skb', 'skewb'], ['sq1', 'sq1'], ['sqr', 'sq1'], ['clk', 'clock'],
-    ['mgm', 'minx'], ['minx', 'minx'],
+    ['222', '222'],
+    ['444', '444'],
+    ['555', '555'],
+    ['666', '666'],
+    ['777', '777'],
+    ['pyr', 'pyram'],
+    ['skb', 'skewb'],
+    ['sq1', 'sq1'],
+    ['sqr', 'sq1'],
+    ['clk', 'clock'],
+    ['mgm', 'minx'],
+    ['minx', 'minx'],
   ];
   for (const [p, e] of prefixes) if (scrType.startsWith(p)) return e;
   return '333';

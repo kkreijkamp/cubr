@@ -71,7 +71,9 @@
   background: var(--sub-alt-color);
   font-variant-numeric: tabular-nums;
   min-width: 0;
-  transition: box-shadow var(--dur), background var(--dur);
+  transition:
+    box-shadow var(--dur),
+    background var(--dur);
 }
 .daily-strip .n {
   color: var(--sub-color);

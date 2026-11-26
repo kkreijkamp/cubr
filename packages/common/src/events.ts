@@ -23,11 +23,7 @@ export function newEventId(service: string): string {
 }
 
 /** Appends a domain event to the stream. `data.eventId` defaults to a fresh id. */
-export async function publishEvent(
-  redis: Redis,
-  type: string,
-  data: Record<string, unknown>,
-): Promise<string> {
+export async function publishEvent(redis: Redis, type: string, data: Record<string, unknown>): Promise<string> {
   const payload = {
     ...data,
     eventId: (data.eventId as string | undefined) ?? newEventId('evt'),
@@ -164,7 +160,25 @@ export function consumeEvents(redis: Redis, opts: ConsumerOptions): Consumer {
     if (n >= maxAttempts && now - first >= deadLetterAfterMs) {
       await conn
         .multi()
-        .xadd(DLQ_STREAM, 'MAXLEN', '~', '10000', '*', 'group', opts.group, 'type', evt.type, 'data', JSON.stringify(evt.data), 'error', err.message, 'attempts', String(n), 'firstFailedAt', new Date(first).toISOString())
+        .xadd(
+          DLQ_STREAM,
+          'MAXLEN',
+          '~',
+          '10000',
+          '*',
+          'group',
+          opts.group,
+          'type',
+          evt.type,
+          'data',
+          JSON.stringify(evt.data),
+          'error',
+          err.message,
+          'attempts',
+          String(n),
+          'firstFailedAt',
+          new Date(first).toISOString(),
+        )
         .xack(EVENT_STREAM, opts.group, evt.id)
         .hdel(attemptsKey, evt.id)
         .exec();

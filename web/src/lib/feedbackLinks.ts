@@ -56,9 +56,7 @@ export interface FeedbackContext {
 /** "cubr v1.6.3 · Chrome 142 on macOS · installed app · 1280×800 · /daily" */
 export function feedbackDetails(c: FeedbackContext): string {
   const version = c.version === null ? 'cubr (version unknown)' : `cubr ${/^\d/.test(c.version) ? `v${c.version}` : c.version}`;
-  return [version, c.browser, c.installed ? 'installed app' : null, `${Math.round(c.width)}×${Math.round(c.height)}`, c.page]
-    .filter(Boolean)
-    .join(' · ');
+  return [version, c.browser, c.installed ? 'installed app' : null, `${Math.round(c.width)}×${Math.round(c.height)}`, c.page].filter(Boolean).join(' · ');
 }
 
 export const FEEDBACK_SUBJECT = 'cubr feedback';

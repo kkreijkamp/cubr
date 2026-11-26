@@ -119,12 +119,7 @@ export function registerSocketHandlers(deps: SocketDeps) {
    * Registers a client->server event: zod-validates the payload, runs the handler in order and
    * always answers the ack with {ok:true,...} or {ok:false,error,code}. Never throws.
    */
-  function on<S extends z.ZodTypeAny>(
-    socket: RaceSocket,
-    event: string,
-    schema: S,
-    handler: (data: z.output<S>) => Promise<Record<string, unknown> | void>,
-  ) {
+  function on<S extends z.ZodTypeAny>(socket: RaceSocket, event: string, schema: S, handler: (data: z.output<S>) => Promise<Record<string, unknown> | void>) {
     socket.on(event, (...args: unknown[]) => {
       const ack = (typeof args[args.length - 1] === 'function' ? args.pop() : undefined) as Ack | undefined;
       const payload = args[0];
@@ -246,9 +241,7 @@ export function registerSocketHandlers(deps: SocketDeps) {
       const expectedN = fromRound ?? current;
       // Network call happens outside the room lock; startRound re-checks host + round number.
       const { scramble, source } = await scrambles.get(loaded.room.event);
-      const { state } = await store.mutateRoom(roomId, (room) =>
-        startRound(room, me.playerId, expectedN, scramble, source, Date.now()),
-      );
+      const { state } = await store.mutateRoom(roomId, (room) => startRound(room, me.playerId, expectedN, scramble, source, Date.now()));
       return { round: state.round };
     });
 

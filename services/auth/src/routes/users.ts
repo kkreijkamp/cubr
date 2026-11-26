@@ -27,10 +27,7 @@ export async function registerUserRoutes(app: FastifyInstance, { pool, auth }: D
   app.get<{ Params: { username: string } }>('/api/users/:username', { preHandler: auth.optionalAuth }, async (req) => {
     const { username } = req.params;
     if (!USERNAME_RE.test(username)) throw notFound('User not found');
-    const { rows } = await pool.query<UserRow>(
-      `select ${USER_COLUMNS} from auth.users where lower(username) = lower($1)`,
-      [username],
-    );
+    const { rows } = await pool.query<UserRow>(`select ${USER_COLUMNS} from auth.users where lower(username) = lower($1)`, [username]);
     if (!rows[0]) throw notFound('User not found');
     return { user: toPublicUser(rows[0], req.user?.id) };
   });

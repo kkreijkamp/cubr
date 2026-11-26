@@ -13,7 +13,10 @@ export const GUEST_KEY_RE = /^[a-z0-9]{24,64}$/;
  */
 export function guestIdFor(key: string, secret: string): string {
   const mac = createHmac('sha256', secret).update(`race-guest:${key}`).digest();
-  return `gst-${BigInt(`0x${mac.subarray(0, 8).toString('hex')}`).toString(36).padStart(12, '0').slice(-12)}`;
+  return `gst-${BigInt(`0x${mac.subarray(0, 8).toString('hex')}`)
+    .toString(36)
+    .padStart(12, '0')
+    .slice(-12)}`;
 }
 
 /**

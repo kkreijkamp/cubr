@@ -7,7 +7,18 @@ import { SOLVE_COLUMNS, toSolve, type Solve, type SolveRow } from '../mapping.js
 import { enqueue } from '../outbox.js';
 import { sessionRolling, solveDeletedPayload, solveEventPayload } from '../repo.js';
 import { dailyOverview, dailyResult, type Rolling } from '../rolling.js';
-import { MAX_TIME_MS, assertDailyAllowed, createSolveBody, dailyQuery, dailyStartBody, idParams, isDailyOpen, patchSolveBody, resolveCreatedAt, utcDay } from '../schemas.js';
+import {
+  MAX_TIME_MS,
+  assertDailyAllowed,
+  createSolveBody,
+  dailyQuery,
+  dailyStartBody,
+  idParams,
+  isDailyOpen,
+  patchSolveBody,
+  resolveCreatedAt,
+  utcDay,
+} from '../schemas.js';
 
 /** Translates constraint violations raised inside a solve transaction into API errors. */
 function mapPgError(err: unknown): never {
@@ -119,8 +130,20 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
          ON CONFLICT (id) DO NOTHING
          RETURNING ${SOLVE_COLUMNS}`,
-        [id, user.id, body.sessionId, event, body.timeMs, body.penalty, body.scramble, body.comment ?? null, source,
-          daily?.date ?? null, daily?.index ?? null, createdAt],
+        [
+          id,
+          user.id,
+          body.sessionId,
+          event,
+          body.timeMs,
+          body.penalty,
+          body.scramble,
+          body.comment ?? null,
+          source,
+          daily?.date ?? null,
+          daily?.index ?? null,
+          createdAt,
+        ],
       );
 
       if (!ins.rows[0]) {
@@ -137,7 +160,9 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
       // sessionName lets read models (stats) label sessions without querying this service;
       // practice keeps the solve off personal bests (stats) and the boards (leaderboard)
       await enqueue(client, 'solve.created', {
-        ...solveEventPayload(user, row, tz, rolling), sessionName: session.rows[0].name, practice: session.rows[0].practice,
+        ...solveEventPayload(user, row, tz, rolling),
+        sessionName: session.rows[0].name,
+        practice: session.rows[0].practice,
       });
       if (daily && newAttempt) await queueDailyResult(client, user, daily.date, event, tz, 'daily.completed');
       return { created: true, row, rolling };
@@ -153,10 +178,7 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
     const tz = tzFrom(req);
 
     return withTx(pool, async (client): Promise<{ solve: Solve; rolling?: Rolling }> => {
-      const cur = await client.query<SolveRow>(
-        `SELECT ${SOLVE_COLUMNS} FROM solve.solves WHERE id = $1 AND user_id = $2 FOR UPDATE`,
-        [id, user.id],
-      );
+      const cur = await client.query<SolveRow>(`SELECT ${SOLVE_COLUMNS} FROM solve.solves WHERE id = $1 AND user_id = $2 FOR UPDATE`, [id, user.id]);
       const before = cur.rows[0];
       if (!before) throw notFound('solve not found');
       const penalty = body.penalty ?? before.penalty;
@@ -164,10 +186,12 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
       // No-op edits don't emit events (consumers recompute the event on every solve.updated).
       if (penalty === before.penalty && comment === before.comment) return { solve: toSolve(before) };
 
-      const upd = await client.query<SolveRow>(
-        `UPDATE solve.solves SET penalty = $3, comment = $4 WHERE id = $1 AND user_id = $2 RETURNING ${SOLVE_COLUMNS}`,
-        [id, user.id, penalty, comment],
-      );
+      const upd = await client.query<SolveRow>(`UPDATE solve.solves SET penalty = $3, comment = $4 WHERE id = $1 AND user_id = $2 RETURNING ${SOLVE_COLUMNS}`, [
+        id,
+        user.id,
+        penalty,
+        comment,
+      ]);
       const row = upd.rows[0];
       const rolling = await sessionRolling(client, row.session_id);
       await enqueue(client, 'solve.updated', solveEventPayload(user, row, tz, rolling));
@@ -181,10 +205,7 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
     const { id } = parse(idParams, req.params);
     const tz = tzFrom(req);
     await withTx(pool, async (client) => {
-      const { rows } = await client.query<SolveRow>(
-        `DELETE FROM solve.solves WHERE id = $1 AND user_id = $2 RETURNING ${SOLVE_COLUMNS}`,
-        [id, user.id],
-      );
+      const { rows } = await client.query<SolveRow>(`DELETE FROM solve.solves WHERE id = $1 AND user_id = $2 RETURNING ${SOLVE_COLUMNS}`, [id, user.id]);
       if (!rows[0]) throw notFound('solve not found');
       await enqueue(client, 'solve.deleted', solveDeletedPayload(user, rows[0], tz));
     });
@@ -239,10 +260,7 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
     const q = parse(dailyQuery, req.query ?? {});
     const date = q.date ?? utcDay(Date.now());
     const [solves, attempts] = await Promise.all([
-      pool.query<SolveRow>(
-        `SELECT ${SOLVE_COLUMNS} FROM solve.solves WHERE user_id = $1 AND daily_date = $2 ORDER BY event, daily_index`,
-        [user.id, date],
-      ),
+      pool.query<SolveRow>(`SELECT ${SOLVE_COLUMNS} FROM solve.solves WHERE user_id = $1 AND daily_date = $2 ORDER BY event, daily_index`, [user.id, date]),
       pool.query<{ event: string; daily_index: number; solve_id: string; time_ms: number; penalty: Penalty }>(
         'SELECT event, daily_index, solve_id, time_ms, penalty FROM solve.daily_attempts WHERE user_id = $1 AND daily_date = $2 ORDER BY event, daily_index',
         [user.id, date],

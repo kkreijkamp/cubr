@@ -57,7 +57,7 @@ function buildCalendar(from: string, to: string, today: string, days: ActivityDa
     for (let d = 0; d < 7; d++) {
       const key = addDaysKey(first, w * 7 + d);
       const visible = key >= from && key <= last;
-      const count = visible ? counts.get(key) ?? 0 : null;
+      const count = visible ? (counts.get(key) ?? 0) : null;
       if (count !== null) inRange.push(count);
       cells.push({ key, week: w, dow: d, count, level: 0 });
     }
@@ -162,7 +162,6 @@ export function ActivityHeatmap({ userId, event, years = [] }: { userId: string;
         </span>
       }
     >
-
       {activity.error && !data ? (
         <WidgetError error={activity.error} what="activity data" onRetry={activity.reload} />
       ) : (
@@ -215,11 +214,11 @@ export function ActivityHeatmap({ userId, event, years = [] }: { userId: string;
             <span data-tip="days use the cuber's local time zone">
               {data && summary.busiest ? (
                 <>
-                  <b>{formatNumber(summary.active)}</b> active {summary.active === 1 ? 'day' : 'days'} - busiest <b>{formatDayKey(summary.busiest.date, false)}</b> (
-                  {plural(summary.busiest.solves, 'solve')})
+                  <b>{formatNumber(summary.active)}</b> active {summary.active === 1 ? 'day' : 'days'} - busiest{' '}
+                  <b>{formatDayKey(summary.busiest.date, false)}</b> ({plural(summary.busiest.solves, 'solve')})
                 </>
               ) : data ? (
-                'days use the cuber\'s local time zone'
+                "days use the cuber's local time zone"
               ) : (
                 // loading: an invisible stand-in for the line above, which may wrap to two lines on a phone
                 <span className="reserve" aria-hidden="true">

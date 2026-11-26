@@ -267,7 +267,8 @@ export default function RaceRoomPage() {
   const myName = user?.username ?? state.name ?? (getGuestName() || defaultGuestName());
 
   let roundLine: string;
-  if (!round) roundLine = isHost ? 'you are the host - start the first round when everyone is here' : `waiting for ${host?.name ?? 'the host'} to start the first round`;
+  if (!round)
+    roundLine = isHost ? 'you are the host - start the first round when everyone is here' : `waiting for ${host?.name ?? 'the host'} to start the first round`;
   else if (pending) roundLine = connected ? 'sending your time...' : 'offline - your time will be sent when you reconnect';
   else if (room.status === 'finished') roundLine = isHost ? 'round finished - start the next one' : `round finished - waiting for ${host?.name ?? 'the host'}`;
   else if (myResult) roundLine = `you're done - waiting for ${waitingNames}`;
@@ -288,7 +289,11 @@ export default function RaceRoomPage() {
             {room.isPrivate && <span className="pill">private</span>}
           </h1>
           <div className="subtitle race-conn">
-            <span className={`via ${connected ? 'on' : 'off'}`} data-tip={'your websocket is served by this race pod.\nother players may be on other pods -\nthe redis adapter relays broadcasts.'} data-tip-pos="down">
+            <span
+              className={`via ${connected ? 'on' : 'off'}`}
+              data-tip={'your websocket is served by this race pod.\nother players may be on other pods -\nthe redis adapter relays broadcasts.'}
+              data-tip-pos="down"
+            >
               <Dot state={connected ? 'up' : 'down'} pulse={connected} />
               {connected ? 'connected via pod ' : 'reconnecting... last pod '}
               <b>{state.servedBy ? shortPod(state.servedBy) : '...'}</b>
@@ -316,7 +321,8 @@ export default function RaceRoomPage() {
 
       {!connected && (
         <Notice tone="error" icon={<SignalSlashIcon />}>
-          connection lost - reconnecting{state.attempt ? ` (attempt ${state.attempt})` : ''}...{pending ? ' your time is saved and will be sent once you are back.' : ' the room keeps going without you.'}
+          connection lost - reconnecting{state.attempt ? ` (attempt ${state.attempt})` : ''}...
+          {pending ? ' your time is saved and will be sent once you are back.' : ' the room keeps going without you.'}
         </Notice>
       )}
 

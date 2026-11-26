@@ -178,7 +178,8 @@ export class VirtualSession {
     }
     // start the next moves: one at a time, or several parallel ones together
     if (this.active.length === 0 && this.queue.length > 0) this.active.push({ move: this.queue.shift()!.move, progress: 0 });
-    while (this.queue.length > 0 && this.active.every((a) => m.parallel(a.move, this.queue[0].move))) this.active.push({ move: this.queue.shift()!.move, progress: 0 });
+    while (this.queue.length > 0 && this.active.every((a) => m.parallel(a.move, this.queue[0].move)))
+      this.active.push({ move: this.queue.shift()!.move, progress: 0 });
     if (this.active.length === 0) return false;
     // csTimer: quicker the more moves are waiting
     const inc = Math.min(1, Math.max(0.0001, (dt / this.speed) * ((this.queue.length + 2) / 2)));

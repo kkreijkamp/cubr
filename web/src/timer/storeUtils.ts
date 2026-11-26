@@ -231,7 +231,11 @@ export const QUEUE_KEY = 'cubr.queue.v1';
 
 export type SyncOp =
   /** keepCreatedAt: send createdAt too (a cleared session's replacement keeps the old one's place) */
-  | { kind: 'createSession'; session: { id: string; name: string; event: string; practice?: boolean; scramble?: string; createdAt: string }; keepCreatedAt?: boolean }
+  | {
+      kind: 'createSession';
+      session: { id: string; name: string; event: string; practice?: boolean; scramble?: string; createdAt: string };
+      keepCreatedAt?: boolean;
+    }
   | { kind: 'renameSession'; id: string; name: string }
   | { kind: 'setPractice'; id: string; practice: boolean }
   | { kind: 'deleteSession'; id: string }
@@ -252,8 +256,7 @@ const OP_KINDS = new Set(['createSession', 'renameSession', 'setPractice', 'dele
 export function decodeQueue(raw: unknown): QueuedOp[] {
   if (!Array.isArray(raw)) return [];
   return raw.filter(
-    (q): q is QueuedOp =>
-      !!q && typeof q === 'object' && isStr(q.opId) && isStr(q.userId) && !!q.op && typeof q.op === 'object' && OP_KINDS.has(q.op.kind),
+    (q): q is QueuedOp => !!q && typeof q === 'object' && isStr(q.opId) && isStr(q.userId) && !!q.op && typeof q.op === 'object' && OP_KINDS.has(q.op.kind),
   );
 }
 

@@ -2,7 +2,19 @@
 // (PUT /api/auth/me/settings) for logged-in users so they follow you across devices.
 import { useSyncExternalStore } from 'react';
 import { cleanKeyMaps, type KeyMaps } from '../input/virtual/keymap';
-import { applyTheme, DEFAULT_DARK_THEME, DEFAULT_THEME, getTheme, isLightTheme, randomTheme, setHighContrast, themeColors, themeLabel, THEMES, type Theme } from './themes';
+import {
+  applyTheme,
+  DEFAULT_DARK_THEME,
+  DEFAULT_THEME,
+  getTheme,
+  isLightTheme,
+  randomTheme,
+  setHighContrast,
+  themeColors,
+  themeLabel,
+  THEMES,
+  type Theme,
+} from './themes';
 import { createStore, loadJson, saveJson, useStore } from './store';
 
 export type TimerUpdate = 'realtime' | 'tenths' | 'seconds' | 'hidden';
@@ -162,7 +174,11 @@ export function sanitize(raw: Partial<Settings> | null | undefined): Settings {
   for (const key of Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[]) {
     const d: unknown = DEFAULT_SETTINGS[key];
     const v = loose[key];
-    const ok = Array.isArray(d) ? Array.isArray(v) : d !== null && typeof d === 'object' ? v !== null && typeof v === 'object' && !Array.isArray(v) : typeof v === typeof d;
+    const ok = Array.isArray(d)
+      ? Array.isArray(v)
+      : d !== null && typeof d === 'object'
+        ? v !== null && typeof v === 'object' && !Array.isArray(v)
+        : typeof v === typeof d;
     if (!ok) loose[key] = d;
   }
   // choices from another version (or a hand-edited store) fall back to the default
@@ -234,7 +250,10 @@ const THEME_KEYS = ['theme', 'autoSwitchTheme', 'themeLight', 'themeDark', 'high
 function showTheme(s: Settings): void {
   setHighContrast(s.highContrast === true);
   applyTheme(activeTheme(s));
-  saveJson('cubr.themeColors', s.autoSwitchTheme ? { light: themeColors(getTheme(s.themeLight)), dark: themeColors(getTheme(s.themeDark)) } : themeColors(getTheme(s.theme)));
+  saveJson(
+    'cubr.themeColors',
+    s.autoSwitchTheme ? { light: themeColors(getTheme(s.themeLight)), dark: themeColors(getTheme(s.themeDark)) } : themeColors(getTheme(s.theme)),
+  );
 }
 
 let followingDevice = false;

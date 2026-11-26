@@ -1,8 +1,6 @@
 import { badRequest, conflict, forbidden } from '@cubr/common';
 import { computeStandings, foldRound } from './standings.js';
-import type {
-  Identity, Penalty, PlayerStatus, Presence, RoomState, ScrambleSource, StoredRoom,
-} from './types.js';
+import type { Identity, Penalty, PlayerStatus, Presence, RoomState, ScrambleSource, StoredRoom } from './types.js';
 
 /**
  * Pure room-state transitions. Nothing here touches Redis or sockets, so all the game rules

@@ -84,7 +84,13 @@ export async function replayDeadLetters(redis: Redis, group: string, ids?: strin
   return letters.map((l) => l.id);
 }
 
-const replayBody = z.object({ ids: z.array(z.string().regex(/^\d+-\d+$/, 'expected a stream id')).min(1).max(10_000).optional() });
+const replayBody = z.object({
+  ids: z
+    .array(z.string().regex(/^\d+-\d+$/, 'expected a stream id'))
+    .min(1)
+    .max(10_000)
+    .optional(),
+});
 
 /** GET /internal/events/dead-letters and POST /internal/events/dead-letters/replay, for one consumer group. */
 export function registerDeadLetterRoutes(app: FastifyInstance, deps: { redis: Redis; group: string; internalToken: string }): void {

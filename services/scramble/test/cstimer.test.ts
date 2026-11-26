@@ -66,7 +66,7 @@ describe('the csTimer worker thread', () => {
   }, 30_000);
 });
 
-describe('the version of csTimer\'s scramblers', () => {
+describe("the version of csTimer's scramblers", () => {
   it('is pinned, the same in the package and in the image', () => {
     const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { dependencies: Record<string, string> };
     const dockerfile = readFileSync(new URL('../Dockerfile', import.meta.url), 'utf8');

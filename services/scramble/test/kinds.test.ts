@@ -79,7 +79,11 @@ describe('the scramble types the service can make', () => {
     const { deps } = fakeDeps();
     await expect(makeScramble('333', 'nope', deps)).rejects.toBeInstanceOf(ScrambleTypeUnavailableError);
     await expect(makeScramble('pyram', 'pll', deps)).rejects.toBeInstanceOf(ScrambleTypeUnavailableError);
-    for (const [event, type] of [['minx', 'mgms2l'], ['pyram', 'pyrtop'], ['skewb', 'skbll']]) {
+    for (const [event, type] of [
+      ['minx', 'mgms2l'],
+      ['pyram', 'pyrtop'],
+      ['skewb', 'skbll'],
+    ]) {
       await expect(makeScramble(event, type, deps)).rejects.toBeInstanceOf(ScrambleTypeUnavailableError);
     }
   });
@@ -99,7 +103,9 @@ describe('the scramble types the service can make', () => {
 
   it("writes relays the way csTimer's drawing wants them, and asks for any known event's type", () => {
     expect(cstimerImageRequest('r234', undefined, '2x2: R U\n3x3: F2\n4x4: Rw2 U')).toEqual({ type: 'r234w', scramble: '2) R U\n3) F2\n4) Rw2 U' });
-    expect(cstimerImageRequest('rmngf', undefined, '3x3 oh: R\npyra: U\nsq-1: (1,0) /\nmega: R++ D--\nU')?.scramble).toBe('3oh) R\npyr) U\nsq1) (1,0) /\nmgm) R++ D--\nU');
+    expect(cstimerImageRequest('rmngf', undefined, '3x3 oh: R\npyra: U\nsq-1: (1,0) /\nmega: R++ D--\nU')?.scramble).toBe(
+      '3oh) R\npyr) U\nsq1) (1,0) /\nmgm) R++ D--\nU',
+    );
     expect(cstimerImageRequest('r3', undefined, '1: R\n2: U')?.scramble).toBe('1) R\n2) U');
     expect(cstimerImageRequest('15p', '15p', 'R D L')).toEqual({ type: '15p', scramble: 'R D L' });
     // a puzzle cubing.js draws, for a scramble it can't read (csTimer's own notation)

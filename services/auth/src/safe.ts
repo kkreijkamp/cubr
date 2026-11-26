@@ -43,12 +43,7 @@ export function allowIfCounted(redis: Redis, key: string, limit: number, windowS
 }
 
 /** Publishes a domain event; Redis problems are logged, never thrown (the request still succeeds). */
-export async function publishSafely(
-  redis: Redis,
-  log: FastifyBaseLogger,
-  type: string,
-  data: Record<string, unknown>,
-): Promise<void> {
+export async function publishSafely(redis: Redis, log: FastifyBaseLogger, type: string, data: Record<string, unknown>): Promise<void> {
   const ok = await withTimeout(
     publishEvent(redis, type, { ...data, eventId: newEventId('auth') }).then(
       () => true,

@@ -16,7 +16,7 @@ describe('the timer bar', () => {
   it('says only the default scramble counts, on the bar and in the menu', () => {
     expect(barSource).toContain('practice scrambles: no pbs or leaderboards');
     expect(barSource).toContain("'counts for pbs and leaderboards'");
-    expect(barSource).toContain("practice scramble: no pbs or leaderboards");
+    expect(barSource).toContain('practice scramble: no pbs or leaderboards');
     expect(barSource).toMatch(/practice \? <BeakerIcon/);
   });
 

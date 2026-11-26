@@ -75,7 +75,12 @@ export function SignInMethods() {
         {methods.providers.map((p) => {
           const linked = methods.identities.some((i) => i.provider === p);
           return (
-            <button key={p} className={`btn${linked ? ' danger-text' : ''}`} onClick={() => void (linked ? disconnect(p) : connect(p))} disabled={busy !== null}>
+            <button
+              key={p}
+              className={`btn${linked ? ' danger-text' : ''}`}
+              onClick={() => void (linked ? disconnect(p) : connect(p))}
+              disabled={busy !== null}
+            >
               {busy === p ? <Spinner size={16} /> : <ProviderIcon provider={p} />} {linked ? 'disconnect' : 'connect'} {PROVIDER_NAMES[p]}
             </button>
           );

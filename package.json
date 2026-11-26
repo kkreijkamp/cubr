@@ -14,11 +14,14 @@
     "build:all": "for d in services/* jobs/seed; do node scripts/build-service.mjs $d || exit 1; done",
     "test": "vitest run",
     "test:integration": "bash scripts/test-integration.sh",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,cjs,css}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,cjs,css}\""
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
     "esbuild": "^0.25.12",
+    "prettier": "3.10.1",
     "socket.io-client": "^4.8.4",
     "tsx": "^4.20.0",
     "typescript": "~5.9.3",

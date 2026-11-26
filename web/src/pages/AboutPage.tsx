@@ -35,15 +35,32 @@ const REFRESH_MS = 15_000;
 // a feature with a page of its own links to it (`to`): descriptive links between pages help search
 // engines and people find them
 const FEATURES: { icon: typeof ClockIcon; t: string; d: string; to?: string }[] = [
-  { icon: ClockIcon, t: 'a timer that gets out of the way', to: '/', d: 'space to start, hold-to-ready, wca inspection with 8 s / 12 s alerts, +2 and dnf, focus mode while solving.' },
+  {
+    icon: ClockIcon,
+    t: 'a timer that gets out of the way',
+    to: '/',
+    d: 'space to start, hold-to-ready, wca inspection with 8 s / 12 s alerts, +2 and dnf, focus mode while solving.',
+  },
   { icon: ChartBarIcon, t: 'csTimer-grade stats', d: 'mo3, ao5 ... ao1000 with wca trimming, session bests, and a solve history chart on your profile.' },
-  { icon: ArrowUpTrayIcon, t: 'events & sessions', d: "every wca event and csTimer's other puzzles and relays, with its practice scrambles (pll, oll, cmll, eg...). unlimited sessions, import from csTimer and every timer it reads, json and csTimer export." },
+  {
+    icon: ArrowUpTrayIcon,
+    t: 'events & sessions',
+    d: "every wca event and csTimer's other puzzles and relays, with its practice scrambles (pll, oll, cmll, eg...). unlimited sessions, import from csTimer and every timer it reads, json and csTimer export.",
+  },
   { icon: CalendarDaysIcon, t: 'daily challenge', to: '/daily', d: 'five shared scrambles a day for everyone, ranked by ao5 on a global board.' },
   { icon: FlagIcon, t: 'live races', to: '/race', d: 'real-time multiplayer rooms over websockets - share a link and race any event.' },
   { icon: TrophyIcon, t: 'leaderboards', to: '/leaderboards', d: 'all-time, weekly and daily boards for every event, single, ao5 and ao12.' },
   { icon: GlobeAltIcon, t: 'wca comparison', to: '/wca', d: 'see where your personal bests would rank among every official wca competitor.' },
-  { icon: SwatchIcon, t: 'themes & command line', d: `${THEMES.length} cube-inspired themes with live preview, light or dark with your device. press esc and type - everything is a command.` },
-  { icon: SignalSlashIcon, t: 'an app that works offline', d: "install it on your phone or computer. the timer opens and works without a connection, and your solves sync when you're back online." },
+  {
+    icon: SwatchIcon,
+    t: 'themes & command line',
+    d: `${THEMES.length} cube-inspired themes with live preview, light or dark with your device. press esc and type - everything is a command.`,
+  },
+  {
+    icon: SignalSlashIcon,
+    t: 'an app that works offline',
+    d: "install it on your phone or computer. the timer opens and works without a connection, and your solves sync when you're back online.",
+  },
 ];
 
 // the everyday ones - csTimer's keys; settings > keyboard shortcuts lists them all
@@ -63,7 +80,11 @@ const KEYS: [string[], string][] = [
 function Counter({ label, value, decimals = 0, hint }: { label: string; value: number | null; decimals?: number; hint?: string }) {
   const animated = useCountUp(value);
   const text =
-    value === null ? '-' : decimals > 0 ? animated.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) : formatNumber(Math.round(animated));
+    value === null
+      ? '-'
+      : decimals > 0
+        ? animated.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+        : formatNumber(Math.round(animated));
   return (
     <div className="stat" data-tip={hint}>
       <span className="label">{label}</span>
@@ -226,27 +247,27 @@ export default function AboutPage() {
           <EyeIcon /> accessibility
         </h2>
         <p className="ab-p">
-          cubr aims for WCAG 2.2 at level AA, so you can time your solves however you use a computer or phone: with a keyboard, a screen reader,
-          touch or a smart cube.
+          cubr aims for WCAG 2.2 at level AA, so you can time your solves however you use a computer or phone: with a keyboard, a screen reader, touch or a
+          smart cube.
         </p>
         <p className="ab-p">
-          Every page has a skip link and headings in order. Everything works from the keyboard, menus and dialogs included (Tab, the arrow keys,
-          Esc), and the timer with space. A screen reader hears each solve&apos;s time once it ends, and nothing while it runs. The high-contrast
-          setting brings labels and links to 4.5:1 in any theme, Windows high contrast mode keeps focus and your choices visible, pages reflow
-          down to 320 px wide, and motion follows your reduced-motion setting.
+          Every page has a skip link and headings in order. Everything works from the keyboard, menus and dialogs included (Tab, the arrow keys, Esc), and the
+          timer with space. A screen reader hears each solve&apos;s time once it ends, and nothing while it runs. The high-contrast setting brings labels and
+          links to 4.5:1 in any theme, Windows high contrast mode keeps focus and your choices visible, pages reflow down to 320 px wide, and motion follows
+          your reduced-motion setting.
         </p>
         <p className="ab-p">
-          Checked in November 2026: every main page in Chrome, Firefox and Safari&apos;s engine, with the keyboard alone, at 200 % zoom, with
-          wider text spacing, in high contrast mode and with reduced motion. Not yet with every screen reader on every device.
+          Checked in November 2026: every main page in Chrome, Firefox and Safari&apos;s engine, with the keyboard alone, at 200 % zoom, with wider text
+          spacing, in high contrast mode and with reduced motion. Not yet with every screen reader on every device.
         </p>
         <p className="ab-p">
-          Not there yet: the charts on profiles are pictures (their numbers are in the summaries and tables beside them); some themes have
-          low-contrast text (turn on high contrast, or pick a high-contrast theme); smart cubes need Bluetooth, which only Chrome and Edge have;
-          the 3D previews are visual, and the scramble is always there as text.
+          Not there yet: the charts on profiles are pictures (their numbers are in the summaries and tables beside them); some themes have low-contrast text
+          (turn on high contrast, or pick a high-contrast theme); smart cubes need Bluetooth, which only Chrome and Edge have; the 3D previews are visual, and
+          the scramble is always there as text.
         </p>
         <p className="ab-p">
-          Something in your way? Tell us with the feedback form at the bottom of every page, or at <a href="mailto:hello@cubr.dev">hello@cubr.dev</a>.
-          We answer within a week, and fix what we can.
+          Something in your way? Tell us with the feedback form at the bottom of every page, or at <a href="mailto:hello@cubr.dev">hello@cubr.dev</a>. We answer
+          within a week, and fix what we can.
         </p>
       </section>
 
@@ -261,7 +282,9 @@ export default function AboutPage() {
             <a href="https://cstimer.net" target="_blank" rel="noreferrer noopener">
               csTimer
             </a>
-            <span className="d">by cs0x7f - the timer behaviour, statistics and export format cubers rely on, and the scramblers for the other puzzles and practice scrambles.</span>
+            <span className="d">
+              by cs0x7f - the timer behaviour, statistics and export format cubers rely on, and the scramblers for the other puzzles and practice scrambles.
+            </span>
           </div>
           <div className="ab-credit">
             <a href="https://monkeytype.com" target="_blank" rel="noreferrer noopener">

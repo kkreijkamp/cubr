@@ -69,10 +69,36 @@ function netFor(model: VirtualModel): NetLayout | null {
       // csTimer's qCube megaminx: the top face and the five around it
       return { pieces: [{ root: ax('U'), tree: ['F', 'R', 'BR', 'BL', 'L'].map((f) => [ax('U'), ax(f)] as [number, number]), up: [0, 0, -1] }] };
     case 'pyraminx':
-      return { pieces: [{ root: 0, tree: [[0, 1], [0, 2], [0, 3]], up: [0, 1, 0] }] };
+      return {
+        pieces: [
+          {
+            root: 0,
+            tree: [
+              [0, 1],
+              [0, 2],
+              [0, 3],
+            ],
+            up: [0, 1, 0],
+          },
+        ],
+      };
     case 'skewb':
       // faces U R F D L B: a cross round the front, the back beside the right
-      return { pieces: [{ root: 2, tree: [[2, 0], [2, 3], [2, 4], [2, 1], [1, 5]], up: [0, 1, 0] }] };
+      return {
+        pieces: [
+          {
+            root: 2,
+            tree: [
+              [2, 0],
+              [2, 3],
+              [2, 4],
+              [2, 1],
+              [1, 5],
+            ],
+            up: [0, 1, 0],
+          },
+        ],
+      };
     default:
       return null;
   }
@@ -332,55 +358,66 @@ export function VirtualInput(p: Props) {
         <canvas ref={canvasRef} aria-label={`virtual ${getEvent(p.event)?.name ?? 'puzzle'}`} role="img" />
       </div>
       <div className="tp-virtual-side">
-      <div className="tp-virtual-bar">
-        {error ? (
-          <span className="error">{error}</span>
-        ) : idle ? (
-          <>
-            {info && info.moves > 0 && (
-              <span className="sub">
-                {info.moves} moves - {((info.moves * 1000) / info.timeMs).toFixed(2)} tps
+        <div className="tp-virtual-bar">
+          {error ? (
+            <span className="error">{error}</span>
+          ) : idle ? (
+            <>
+              {info && info.moves > 0 && (
+                <span className="sub">
+                  {info.moves} moves - {((info.moves * 1000) / info.timeMs).toFixed(2)} tps
+                </span>
+              )}
+              <button className="btn-text" onClick={() => start(performance.now())} disabled={!p.scramble} {...noFocus}>
+                <kbd>space</kbd> scramble
+              </button>
+            </>
+          ) : (
+            <button className="btn-text" onClick={() => giveUp(performance.now())} {...noFocus}>
+              <kbd>esc</kbd> {phase === 'running' ? 'give up' : 'cancel'}
+            </button>
+          )}
+          <button className={`btn-text${showKeys ? ' active' : ''}`} onClick={() => setShowKeys((v) => !v)} aria-expanded={showKeys} {...noFocus}>
+            keys
+          </button>
+        </div>
+        {showKeys && (
+          <div className="tp-virtual-keys" role="note" aria-label="keys">
+            {controls(model).map((c) => (
+              <span key={c.label}>
+                {c.actions.map((a) => (
+                  <kbd key={a}>{keyLabel(keyOf(own, a), layout)}</kbd>
+                ))}{' '}
+                {c.label}
+              </span>
+            ))}
+            {!p.flat && (
+              <span>
+                <kbd>arrows</kbd> view
               </span>
             )}
-            <button className="btn-text" onClick={() => start(performance.now())} disabled={!p.scramble} {...noFocus}>
-              <kbd>space</kbd> scramble
-            </button>
-          </>
-        ) : (
-          <button className="btn-text" onClick={() => giveUp(performance.now())} {...noFocus}>
-            <kbd>esc</kbd> {phase === 'running' ? 'give up' : 'cancel'}
-          </button>
+            <Link className="tp-virtual-keys-edit" to="/settings?tab=shortcuts">
+              change the keys
+            </Link>
+          </div>
         )}
-        <button className={`btn-text${showKeys ? ' active' : ''}`} onClick={() => setShowKeys((v) => !v)} aria-expanded={showKeys} {...noFocus}>
-          keys
-        </button>
-      </div>
-      {showKeys && (
-        <div className="tp-virtual-keys" role="note" aria-label="keys">
-          {controls(model).map((c) => (
-            <span key={c.label}>
-              {c.actions.map((a) => (
-                <kbd key={a}>{keyLabel(keyOf(own, a), layout)}</kbd>
-              ))}{' '}
-              {c.label}
-            </span>
-          ))}
-          {!p.flat && (
-            <span>
-              <kbd>arrows</kbd> view
-            </span>
-          )}
-          <Link className="tp-virtual-keys-edit" to="/settings?tab=shortcuts">
-            change the keys
-          </Link>
-        </div>
-      )}
       </div>
     </div>
   );
 }
 
-function paint(ctx: CanvasRenderingContext2D, w: number, h: number, session: VirtualSession, flat: boolean, cam: Camera, palette: Palette, facelets: Map<number, number[]>, clockDials: number[], look: { float: number; outline: number }) {
+function paint(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  session: VirtualSession,
+  flat: boolean,
+  cam: Camera,
+  palette: Palette,
+  facelets: Map<number, number[]>,
+  clockDials: number[],
+  look: { float: number; outline: number },
+) {
   const model = session.model;
   const hidden = session.hidden;
   if (model.kind === 'clock') {
@@ -391,7 +428,8 @@ function paint(ctx: CanvasRenderingContext2D, w: number, h: number, session: Vir
     const state = session.shown as Sq1State;
     const pal = hidden ? { ...palette, faces: palette.faces.map(() => palette.hidden!) } : palette;
     if (flat) drawSq1Flat(ctx, w, h, session.target as Sq1State, pal);
-    else drawSq1(ctx, w, h, state, cam, pal, session.active[0] ? { move: session.active[0].move as Sq1Move, progress: smooth(session.active[0].progress) } : null);
+    else
+      drawSq1(ctx, w, h, state, cam, pal, session.active[0] ? { move: session.active[0].move as Sq1Move, progress: smooth(session.active[0].progress) } : null);
     return;
   }
   const puzzle = model.twisty.puzzle;

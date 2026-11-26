@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
-  GUEST_ID_RE, ROOM_ID_RE, defaultGuestName, generateGuestId, newRoomId, randomId, sanitizeGuestId, sanitizeName, sanitizeText,
+  GUEST_ID_RE,
+  ROOM_ID_RE,
+  defaultGuestName,
+  generateGuestId,
+  newRoomId,
+  randomId,
+  sanitizeGuestId,
+  sanitizeName,
+  sanitizeText,
 } from '../src/sanitize.js';
 
 describe('ids', () => {
@@ -29,8 +37,20 @@ describe('sanitizeGuestId', () => {
   });
 
   it.each([
-    undefined, null, 42, {}, '', 'guest-', 'guest-abc', 'guest-ABCDEF', 'guest-abc_123', 'Guest-abcdef',
-    'xguest-abcdef', 'guest-abcdef ', 'guest-' + 'a'.repeat(25), '00000000-0000-0000-0000-000000000000',
+    undefined,
+    null,
+    42,
+    {},
+    '',
+    'guest-',
+    'guest-abc',
+    'guest-ABCDEF',
+    'guest-abc_123',
+    'Guest-abcdef',
+    'xguest-abcdef',
+    'guest-abcdef ',
+    'guest-' + 'a'.repeat(25),
+    '00000000-0000-0000-0000-000000000000',
   ])('rejects %j', (raw) => {
     expect(sanitizeGuestId(raw)).toBeNull();
   });

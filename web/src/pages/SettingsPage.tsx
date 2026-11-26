@@ -1,6 +1,15 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowDownTrayIcon, ArrowPathIcon, ArrowUpRightIcon, ArrowUpTrayIcon, ArrowUturnLeftIcon, ArrowsRightLeftIcon, MagnifyingGlassIcon, PlayIcon } from '@heroicons/react/24/outline';
+import {
+  ArrowDownTrayIcon,
+  ArrowPathIcon,
+  ArrowUpRightIcon,
+  ArrowUpTrayIcon,
+  ArrowUturnLeftIcon,
+  ArrowsRightLeftIcon,
+  MagnifyingGlassIcon,
+  PlayIcon,
+} from '@heroicons/react/24/outline';
 import { CsTimerFormatError, getEvent, parseTimerFile, toCsTimerExport, type TimerImport } from '@cubr/cubestats';
 import { Modal } from '../components/Modal';
 import { csTimerFileName, prefersReducedMotion, skippedNotes } from '../components/social/util';
@@ -14,7 +23,20 @@ import { usePageMeta } from '../lib/usePageMeta';
 import { formatNumber } from '../lib/format';
 import { useKeyboardLayout } from '../lib/keyboardLayout';
 import { applyUpdate, checkForUpdate, installHint, promptInstall, usePwa } from '../lib/pwa';
-import { activeTheme, applyVisualSettings, chooseRandomTheme, chooseTheme, DEFAULT_SETTINGS, FONTS, setAutoSwitchTheme, themeWaitsNote, updateSettings, useDeviceIsDark, useSettings, type Settings } from '../lib/settings';
+import {
+  activeTheme,
+  applyVisualSettings,
+  chooseRandomTheme,
+  chooseTheme,
+  DEFAULT_SETTINGS,
+  FONTS,
+  setAutoSwitchTheme,
+  themeWaitsNote,
+  updateSettings,
+  useDeviceIsDark,
+  useSettings,
+  type Settings,
+} from '../lib/settings';
 import { SCHEMES, stickerColour, type Scheme } from '../lib/scrambleNet';
 import { clearLocalData, exportAll, forgetUser, importSessions, localDataSummary, useSolveState } from '../lib/solves';
 import { applyTheme, getTheme, isLightTheme, THEMES, themeLabel, type Theme } from '../lib/themes';
@@ -78,11 +100,24 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /** The choices as text, like the timer's config bar: the chosen one in the accent colour. */
-function Options<T extends string | number | boolean>({ value, options, onChange }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
+function Options<T extends string | number | boolean>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (v: T) => void;
+}) {
   return (
     <div className="st-options">
       {options.map((o) => (
-        <button key={String(o.value)} className={`btn-text${o.value === value ? ' active' : ''}`} onClick={() => onChange(o.value)} aria-pressed={o.value === value}>
+        <button
+          key={String(o.value)}
+          className={`btn-text${o.value === value ? ' active' : ''}`}
+          onClick={() => onChange(o.value)}
+          aria-pressed={o.value === value}
+        >
           {o.label}
         </button>
       ))}
@@ -329,7 +364,11 @@ export default function SettingsPage() {
         <Pane id="timer">
           <Group title="timer">
             <SettingRow title="hold to start" description="How long space (or your finger) is held before the timer turns green. Stops accidental starts.">
-              <Options value={s.holdMs} options={[0, 300, 550, 1000].map((v) => ({ value: v, label: v === 0 ? 'off' : `${v / 1000}s` }))} onChange={set('holdMs')} />
+              <Options
+                value={s.holdMs}
+                options={[0, 300, 550, 1000].map((v) => ({ value: v, label: v === 0 ? 'off' : `${v / 1000}s` }))}
+                onChange={set('holdMs')}
+              />
             </SettingRow>
             <SettingRow title="timer update" description="What the timer shows while you solve. Hiding it keeps your eyes off the clock.">
               <Options
@@ -356,7 +395,10 @@ export default function SettingsPage() {
           </Group>
           <InputGroup />
           <Group title="inspection">
-            <SettingRow title="WCA inspection" description="15 seconds to inspect before each solve. Starting after 15 s adds +2, after 17 s the solve is a DNF (WCA A4d).">
+            <SettingRow
+              title="WCA inspection"
+              description="15 seconds to inspect before each solve. Starting after 15 s adds +2, after 17 s the solve is a DNF (WCA A4d)."
+            >
               <Options value={s.inspection} options={onOff} onChange={set('inspection')} />
             </SettingRow>
             <SettingRow title="inspection alerts" description="Called out at 8 and 12 seconds, like a judge at a competition.">
@@ -409,7 +451,10 @@ export default function SettingsPage() {
                 onChange={set('scramblePreview')}
               />
             </SettingRow>
-            <SettingRow title="sticker colours" description="The 2D preview's colours: the standard scheme, or your own colour for each face of each puzzle. 3D always uses the standard colours.">
+            <SettingRow
+              title="sticker colours"
+              description="The 2D preview's colours: the standard scheme, or your own colour for each face of each puzzle. 3D always uses the standard colours."
+            >
               <Options
                 value={s.stickerColours}
                 options={[
@@ -442,7 +487,11 @@ export default function SettingsPage() {
 
         <Pane id="stats">
           <Group title="stats">
-            <SettingRow title="averages shown" description="Which averages the stats panel shows. Averages trim the best and worst 5 % (at least one each side); mo3 is a plain mean." wide>
+            <SettingRow
+              title="averages shown"
+              description="Which averages the stats panel shows. Averages trim the best and worst 5 % (at least one each side); mo3 is a plain mean."
+              wide
+            >
               <div className="st-options">
                 {AVG_CHOICES.map((k) => {
                   const on = s.statsShown.includes(k);
@@ -498,8 +547,8 @@ export default function SettingsPage() {
         <Pane id="shortcuts">
           <Group title="shortcuts">
             <p className="st-note">
-              All of csTimer's shortcuts work the same here, so your habits carry over. Some browsers use ctrl+1/2/3 to switch tabs and don't pass them on; the penalty buttons under the
-              timer do the same job.
+              All of csTimer's shortcuts work the same here, so your habits carry over. Some browsers use ctrl+1/2/3 to switch tabs and don't pass them on; the
+              penalty buttons under the timer do the same job.
             </p>
             <KeyList keys={CSTIMER_KEYS} />
           </Group>
@@ -542,8 +591,9 @@ export default function SettingsPage() {
                 title="delete account"
                 description={
                   <>
-                    Delete <span className="main">{user.username}</span> and everything in it: your solves and sessions, stats, leaderboard places, profile and settings. Export your
-                    solves first (data) if you want to keep them. Guest data in this browser is not affected. <span className="error">You can't undo this.</span>
+                    Delete <span className="main">{user.username}</span> and everything in it: your solves and sessions, stats, leaderboard places, profile and
+                    settings. Export your solves first (data) if you want to keep them. Guest data in this browser is not affected.{' '}
+                    <span className="error">You can't undo this.</span>
                   </>
                 }
               >
@@ -608,17 +658,27 @@ function InputGroup() {
   return (
     <>
       <Group title="input">
-        <SettingRow title="enter times with" description="Kept on this device: a stackmat or a bluetooth cube belongs to one computer. Ctrl+alt and a letter switches on the timer page, as on csTimer." wide>
+        <SettingRow
+          title="enter times with"
+          description="Kept on this device: a stackmat or a bluetooth cube belongs to one computer. Ctrl+alt and a letter switches on the timer page, as on csTimer."
+          wide
+        >
           <Options
             value={AVAILABLE_INPUTS.includes(device.mode) ? device.mode : 'timer'}
             options={INPUT_MODES.filter((m) => AVAILABLE_INPUTS.includes(m.id)).map((m) => ({ value: m.id, label: m.label }))}
             onChange={(mode) => updateInput({ mode })}
           />
         </SettingRow>
-        <SettingRow title="stackmat status" description="Use the stackmat's status signals: hands on the mat, the green light. Off, a solve is the time counting up and stopping (csTimer's option, for timers that send no status).">
+        <SettingRow
+          title="stackmat status"
+          description="Use the stackmat's status signals: hands on the mat, the green light. Off, a solve is the time counting up and stopping (csTimer's option, for timers that send no status)."
+        >
           <Options value={s.stackmatStatus} options={onOff} onChange={set('stackmatStatus')} />
         </SettingRow>
-        <SettingRow title="virtual turn speed" description="How long each turn of the virtual puzzle takes to animate (csTimer's base speed). Queued turns go quicker.">
+        <SettingRow
+          title="virtual turn speed"
+          description="How long each turn of the virtual puzzle takes to animate (csTimer's base speed). Queued turns go quicker."
+        >
           <Options
             value={s.virtualSpeed}
             options={[
@@ -631,7 +691,10 @@ function InputGroup() {
             onChange={set('virtualSpeed')}
           />
         </SettingRow>
-        <SettingRow title="virtual cube view" description="Look at the top and front faces, or at the top front right corner. The arrow keys turn the view while you solve.">
+        <SettingRow
+          title="virtual cube view"
+          description="Look at the top and front faces, or at the top front right corner. The arrow keys turn the view while you solve."
+        >
           <Options
             value={s.virtualView}
             options={[
@@ -641,17 +704,26 @@ function InputGroup() {
             onChange={set('virtualView')}
           />
         </SettingRow>
-        <SettingRow title="floating stickers" description="The virtual and smart cubes drawn as csTimer draws them: stickers floating off a hollow cube, the far side seen through the gaps. Further right they float further apart; all the way left, a solid cube.">
+        <SettingRow
+          title="floating stickers"
+          description="The virtual and smart cubes drawn as csTimer draws them: stickers floating off a hollow cube, the far side seen through the gaps. Further right they float further apart; all the way left, a solid cube."
+        >
           <CubePreview settings={s} />
           <Slider label="floating stickers" value={s.virtualFloat} zero="solid" onChange={set('virtualFloat')} />
         </SettingRow>
-        <SettingRow title="sticker outline" description="The dark edge round each sticker of the virtual and smart cubes. Halfway is the cube's own; further right it's thicker, all the way left there's none.">
+        <SettingRow
+          title="sticker outline"
+          description="The dark edge round each sticker of the virtual and smart cubes. Halfway is the cube's own; further right it's thicker, all the way left there's none."
+        >
           <CubePreview settings={s} />
           <Slider label="sticker outline" value={s.virtualOutline} zero="none" onChange={set('virtualOutline')} />
         </SettingRow>
       </Group>
       <Group title="smart cube">
-        <SettingRow title="mark scrambled" description="When the solve is ready to start: as soon as the cube matches the scramble, or that long after the last turn (scrambling it your own way), or only by key. Then the first turn starts the timer.">
+        <SettingRow
+          title="mark scrambled"
+          description="When the solve is ready to start: as soon as the cube matches the scramble, or that long after the last turn (scrambling it your own way), or only by key. Then the first turn starts the timer."
+        >
           <Options
             value={s.smartScrambled}
             options={[
@@ -665,10 +737,16 @@ function InputGroup() {
             onChange={set('smartScrambled')}
           />
         </SettingRow>
-        <SettingRow title="space marks scrambled" description="Press space when the cube is scrambled. A cube scrambled its own way gets a scramble worked out from its state.">
+        <SettingRow
+          title="space marks scrambled"
+          description="Press space when the cube is scrambled. A cube scrambled its own way gets a scramble worked out from its state."
+        >
           <Options value={s.smartSpace} options={onOff} onChange={set('smartSpace')} />
         </SettingRow>
-        <SettingRow title="turns mark scrambled" description="Or turn one face four times the same way (U U U U), or back and forth (U U' U U'), and it's marked a second later.">
+        <SettingRow
+          title="turns mark scrambled"
+          description="Or turn one face four times the same way (U U U U), or back and forth (U U' U U'), and it's marked a second later."
+        >
           <Options
             value={s.smartTurnMark}
             options={[
@@ -693,7 +771,10 @@ function InputGroup() {
             onChange={set('smartView')}
           />
         </SettingRow>
-        <SettingRow title="unsolved on connect" description="A cube that connects in a state it hasn't been marked solved in: ask whether it's solved, mark it solved, or leave it.">
+        <SettingRow
+          title="unsolved on connect"
+          description="A cube that connects in a state it hasn't been marked solved in: ask whether it's solved, mark it solved, or leave it."
+        >
           <Options
             value={s.smartReset}
             options={[
@@ -714,7 +795,17 @@ function Slider({ label, value, zero, onChange }: { label: string; value: number
   const text = value === 0 ? zero : `${value}%`;
   return (
     <>
-      <input className="st-range" type="range" min={0} max={100} step={5} value={value} onChange={(e) => onChange(Number(e.target.value))} aria-label={label} aria-valuetext={text} />
+      <input
+        className="st-range"
+        type="range"
+        min={0}
+        max={100}
+        step={5}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        aria-label={label}
+        aria-valuetext={text}
+      />
       <span className="st-range-value">{text}</span>
     </>
   );
@@ -733,7 +824,10 @@ function CubePreview({ settings: s }: { settings: Settings }) {
     const ctx = canvas.getContext('2d')!;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, size, size);
-    drawPoly(ctx, size, size, model.twisty.puzzle, model.solved(), baseCamera(model, s.virtualView), puzzlePalette('cube', s), [], { float: s.virtualFloat / 100, outline: s.virtualOutline / 50 });
+    drawPoly(ctx, size, size, model.twisty.puzzle, model.solved(), baseCamera(model, s.virtualView), puzzlePalette('cube', s), [], {
+      float: s.virtualFloat / 100,
+      outline: s.virtualOutline / 50,
+    });
   }, [s]);
   return <canvas ref={ref} className="st-float-preview" aria-hidden="true" />;
 }
@@ -770,11 +864,7 @@ function VirtualKeys({ maps }: { maps: Settings['virtualKeys'] }) {
         return;
       }
       if (e.ctrlKey || e.altKey || e.metaKey || !BINDABLE.test(e.code)) {
-        setNote(
-          <span className="error">
-            that key has a job of its own - press another for {moveOf(waiting)} (esc keeps it)
-          </span>,
-        );
+        setNote(<span className="error">that key has a job of its own - press another for {moveOf(waiting)} (esc keeps it)</span>);
         return;
       }
       const old = keyOf(map, waiting);
@@ -809,8 +899,8 @@ function VirtualKeys({ maps }: { maps: Settings['virtualKeys'] }) {
   return (
     <Group title="virtual puzzle keys">
       <p className="st-note">
-        Click a move's key, then press the key you want for it. If that key already turns something, the two swap. All cubes share one layout, named here as on a 3x3: on
-        bigger cubes the slice keys turn the second layer, and the depth keys set how many layers the outer turns take.
+        Click a move's key, then press the key you want for it. If that key already turns something, the two swap. All cubes share one layout, named here as on
+        a 3x3: on bigger cubes the slice keys turn the second layer, and the depth keys set how many layers the outer turns take.
       </p>
       <div className="st-bind-tools">
         <Options
@@ -909,7 +999,8 @@ function DeleteAccountModal({ username, onDeleted, onClose }: { username: string
         }}
       >
         <div className="dialog-message">
-          Delete <span className="main">{username}</span> with all its solves, sessions, stats and leaderboard places? <span className="error">This can't be undone.</span>
+          Delete <span className="main">{username}</span> with all its solves, sessions, stats and leaderboard places?{' '}
+          <span className="error">This can't be undone.</span>
         </div>
         <div className="field">
           <label htmlFor="delete-account-password">{byName ? 'type your username to confirm' : 'type your password to confirm'}</label>
@@ -967,7 +1058,12 @@ function StickerColours({ custom }: { custom: Settings['customStickers'] }) {
                 const colour = stickerColour(f.cubing[0], scheme, own);
                 return (
                   <label key={f.name} className="st-swatch" style={{ background: colour }} data-tip={f.name}>
-                    <input type="color" value={colour} onChange={(e) => pick(scheme, i, e.target.value)} aria-label={`${scheme.label}: ${f.name} face colour`} />
+                    <input
+                      type="color"
+                      value={colour}
+                      onChange={(e) => pick(scheme, i, e.target.value)}
+                      aria-label={`${scheme.label}: ${f.name} face colour`}
+                    />
                   </label>
                 );
               })}
@@ -1035,7 +1131,10 @@ function ThemePicker({ settings: s }: { settings: Settings }) {
   };
   const shown = useMemo(() => {
     const test = THEME_FILTERS.find((f) => f.value === filter)!.test;
-    const q = query.trim().toLowerCase().replace(/[\s-]+/g, '_');
+    const q = query
+      .trim()
+      .toLowerCase()
+      .replace(/[\s-]+/g, '_');
     return THEMES.filter((t) => test(t) && t.name.includes(q));
   }, [query, filter]);
   // following the device, both the light and the dark theme are chosen
@@ -1088,7 +1187,12 @@ function ThemePicker({ settings: s }: { settings: Settings }) {
       <div className="st-theme-tools">
         <div className="st-options" role="group" aria-label="show">
           {THEME_FILTERS.map((f) => (
-            <button key={f.value} className={`btn-text${f.value === filter ? ' active' : ''}`} onClick={() => setFilter(f.value)} aria-pressed={f.value === filter}>
+            <button
+              key={f.value}
+              className={`btn-text${f.value === filter ? ' active' : ''}`}
+              onClick={() => setFilter(f.value)}
+              aria-pressed={f.value === filter}
+            >
               {f.label}
             </button>
           ))}
@@ -1154,9 +1258,14 @@ function AppGroup() {
         title="offline"
         description="Once cubr is saved on this device, it opens and times without a connection: scrambles are made on the device, and solves in your account sync when you're back online. Leaderboards, races and profiles need a connection."
       >
-        <span className={`st-status${pwa.offline === 'ready' ? ' main' : ''}`}>{{ ready: 'ready', saving: 'saving cubr...', off: 'not available in this browser' }[pwa.offline]}</span>
+        <span className={`st-status${pwa.offline === 'ready' ? ' main' : ''}`}>
+          {{ ready: 'ready', saving: 'saving cubr...', off: 'not available in this browser' }[pwa.offline]}
+        </span>
       </SettingRow>
-      <SettingRow title="updates" description="New versions download in the background. A notice says when one is ready; it applies when you click the notice, or with the next link you follow.">
+      <SettingRow
+        title="updates"
+        description="New versions download in the background. A notice says when one is ready; it applies when you click the notice, or with the next link you follow."
+      >
         {pwa.update ? (
           <button className="btn" onClick={() => applyUpdate()}>
             <ArrowPathIcon width={16} height={16} /> reload to update
@@ -1241,8 +1350,9 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
           wide={parsed !== null}
           description={
             <>
-              A cubr export, or any file csTimer can import: csTimer (<span className="text">export -&gt; export to file</span>), Twisty Timer, Cubic Timer, Block Keeper,
-              CubeDesk, DCTimer, mateus Cubetimer or GAN CubeStation. Each session becomes a cubr session {loggedIn ? 'in your account' : 'in this browser'}.
+              A cubr export, or any file csTimer can import: csTimer (<span className="text">export -&gt; export to file</span>), Twisty Timer, Cubic Timer,
+              Block Keeper, CubeDesk, DCTimer, mateus Cubetimer or GAN CubeStation. Each session becomes a cubr session{' '}
+              {loggedIn ? 'in your account' : 'in this browser'}.
             </>
           }
         >
@@ -1257,8 +1367,8 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
                 <div>
                   <span className="text">{parsed.file}</span> ({parsed.format})
                   <br />
-                  <span className="main">{formatNumber(summary?.solves ?? 0)} solves</span> - {parsed.sessions.length} session{parsed.sessions.length === 1 ? '' : 's'} -{' '}
-                  {summary?.events.join(', ')}
+                  <span className="main">{formatNumber(summary?.solves ?? 0)} solves</span> - {parsed.sessions.length} session
+                  {parsed.sessions.length === 1 ? '' : 's'} - {summary?.events.join(', ')}
                   {skippedNotes(parsed.skipped).map((note) => (
                     <span key={note}>
                       <br />
@@ -1299,7 +1409,11 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
       <Group title="account">
         <SettingRow
           title={loggedIn ? 'account page' : 'sync and leaderboards'}
-          description={loggedIn ? 'Profile, PB history, activity and more data tools live on your account page.' : 'Sync your solves across devices, get on the leaderboards and race others.'}
+          description={
+            loggedIn
+              ? 'Profile, PB history, activity and more data tools live on your account page.'
+              : 'Sync your solves across devices, get on the leaderboards and race others.'
+          }
         >
           <Link className="btn" to={loggedIn ? '/account' : '/login'}>
             {loggedIn ? 'open account' : 'sign in'} <ArrowUpRightIcon width={16} height={16} />

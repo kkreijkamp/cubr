@@ -40,6 +40,7 @@ export function hasSlur(text: string): boolean {
  * Usernames nobody may take, so no one can pose as the site or its staff: compared without case,
  * underscores or trailing digits ("Admin_1" is "admin").
  */
+// prettier-ignore
 export const RESERVED_USERNAMES: ReadonlySet<string> = new Set([
   'admin', 'administrator', 'root', 'system', 'sysadmin', 'superuser', 'owner', 'staff', 'team', 'moderator', 'mod', 'mods',
   'support', 'help', 'helpdesk', 'contact', 'hello', 'info', 'security', 'abuse', 'privacy', 'legal', 'billing',

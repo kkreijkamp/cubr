@@ -27,7 +27,7 @@ describe('formatTime', () => {
   });
 });
 
-describe('formatAverage (every mean and average, on every page: the October review\'s #16)', () => {
+describe("formatAverage (every mean and average, on every page: the October review's #16)", () => {
   it.each([
     [12_345, 2, '12.35'], // x.xx5 rounds up
     [12_344, 2, '12.34'],

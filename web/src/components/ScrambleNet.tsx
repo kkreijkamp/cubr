@@ -149,7 +149,13 @@ async function buildNet(puzzle: string): Promise<Net> {
       for (const i of face) cells[i].points = cells[i].points.map(([x, y]) => [x + moves[f][0], y + moves[f][1]]);
     });
   }
-  const all = [...cells.flatMap((c) => c.points), ...lines.flatMap((l): Point[] => [[l.x1, l.y1], [l.x2, l.y2]])];
+  const all = [
+    ...cells.flatMap((c) => c.points),
+    ...lines.flatMap((l): Point[] => [
+      [l.x1, l.y1],
+      [l.x2, l.y2],
+    ]),
+  ];
   const [x0, y0] = [Math.min(...all.map((p) => p[0])), Math.min(...all.map((p) => p[1]))];
   const [x1, y1] = [Math.max(...all.map((p) => p[0])), Math.max(...all.map((p) => p[1]))];
   const r = (v: number) => Math.round(v * 1000) / 1000;
@@ -232,7 +238,16 @@ export function ScrambleNet({ puzzle, scramble, height, fit, onError, onUnreadab
           ))}
           {net.stickers.map((s) => {
             const fill = fills.get(s.id);
-            return <polygon key={s.id} points={s.points} fill={fill} stroke={s.stroke ? fill : undefined} strokeWidth={s.stroke || undefined} strokeLinejoin="round" />;
+            return (
+              <polygon
+                key={s.id}
+                points={s.points}
+                fill={fill}
+                stroke={s.stroke ? fill : undefined}
+                strokeWidth={s.stroke || undefined}
+                strokeLinejoin="round"
+              />
+            );
           })}
           {net.lines.map((l, i) => (
             <line key={i} className="guide" x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} strokeWidth={l.width} />

@@ -39,7 +39,15 @@ const pct = (part: number, total: number) => {
  * profile's tab) wears the accent colour, the rest are greys; a segment or legend row picks that
  * event. The middle reads out the hovered event (or the selected one).
  */
-export function EventDonut({ events, selected, onSelect }: { events: { event: string; solves: number }[]; selected: string; onSelect: (event: string) => void }) {
+export function EventDonut({
+  events,
+  selected,
+  onSelect,
+}: {
+  events: { event: string; solves: number }[];
+  selected: string;
+  onSelect: (event: string) => void;
+}) {
   const [hover, setHover] = useState<string | null>(null);
   const list = slices(events);
   const total = list.reduce((a, s) => a + s.solves, 0);
@@ -52,7 +60,9 @@ export function EventDonut({ events, selected, onSelect }: { events: { event: st
     if (e.pointerType === 'mouse') setHover(key);
   };
   // each event keeps its grey (by its place in the list) when the selection moves - only the accent moves
-  const colour = new Map(list.map((s, i) => [s.key, s.event === selected ? 'var(--main-color)' : `color-mix(in srgb, var(--sub-color) ${SHADES[i] ?? 24}%, var(--sub-alt-color))`]));
+  const colour = new Map(
+    list.map((s, i) => [s.key, s.event === selected ? 'var(--main-color)' : `color-mix(in srgb, var(--sub-color) ${SHADES[i] ?? 24}%, var(--sub-alt-color))`]),
+  );
 
   let at = 0;
   const arcs = list.map((s) => {

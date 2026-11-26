@@ -70,7 +70,9 @@
 }
 .st-rail-item:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 0.1rem var(--bg-color), 0 0 0 0.2rem var(--text-color);
+  box-shadow:
+    0 0 0 0.1rem var(--bg-color),
+    0 0 0 0.2rem var(--text-color);
 }
 .st-rail-item.danger {
   margin-top: 1.25rem;
@@ -253,10 +255,14 @@
   box-shadow: none;
 }
 .st-range:focus-visible::-webkit-slider-thumb {
-  box-shadow: 0 0 0 0.1rem var(--bg-color), 0 0 0 0.2rem var(--text-color);
+  box-shadow:
+    0 0 0 0.1rem var(--bg-color),
+    0 0 0 0.2rem var(--text-color);
 }
 .st-range:focus-visible::-moz-range-thumb {
-  box-shadow: 0 0 0 0.1rem var(--bg-color), 0 0 0 0.2rem var(--text-color);
+  box-shadow:
+    0 0 0 0.1rem var(--bg-color),
+    0 0 0 0.2rem var(--text-color);
 }
 .st-range-value {
   min-width: 2.75rem;
@@ -302,10 +308,14 @@
   transition: box-shadow var(--dur);
 }
 .st-swatch:hover {
-  box-shadow: var(--edge), 0 0 0 2px var(--text-color);
+  box-shadow:
+    var(--edge),
+    0 0 0 2px var(--text-color);
 }
 .st-swatch:focus-within {
-  box-shadow: var(--edge), 0 0 0 2px var(--main-color);
+  box-shadow:
+    var(--edge),
+    0 0 0 2px var(--main-color);
 }
 .st-swatch input {
   position: absolute;
@@ -464,7 +474,9 @@
   font-size: 0.85rem;
   text-align: left;
   cursor: pointer;
-  transition: color var(--dur), background var(--dur);
+  transition:
+    color var(--dur),
+    background var(--dur);
 }
 .st-theme:hover,
 .st-theme:focus-visible {
@@ -476,7 +488,9 @@
   color: var(--main-color);
 }
 .st-theme.active .st-theme-swatch {
-  box-shadow: 0 0 0 2px var(--bg-color), 0 0 0 3.5px var(--main-color);
+  box-shadow:
+    0 0 0 2px var(--bg-color),
+    0 0 0 3.5px var(--main-color);
 }
 .st-theme-name {
   overflow: hidden;

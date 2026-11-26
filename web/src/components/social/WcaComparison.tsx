@@ -135,11 +135,7 @@ function DistributionChart({ dist, value, official, kind, precision }: ChartProp
         onMouseMove={onMove}
         onMouseLeave={() => setHover(null)}
       >
-        <g>
-          {bars.map((b) =>
-            b.d ? <path key={b.i} d={b.d} className={`bar${b.beat ? ' beat' : ''}${hover === b.i ? ' hover' : ''}`} /> : null,
-          )}
-        </g>
+        <g>{bars.map((b) => (b.d ? <path key={b.i} d={b.d} className={`bar${b.beat ? ' beat' : ''}${hover === b.i ? ' hover' : ''}`} /> : null))}</g>
         <g className="median">
           <line x1={sx(dist.p50)} x2={sx(dist.p50)} y1={pad.t} y2={base} />
         </g>
@@ -166,11 +162,7 @@ function DistributionChart({ dist, value, official, kind, precision }: ChartProp
         ))}
       </svg>
       {hb && (
-        <div
-          className="hm-tip"
-          role="tooltip"
-          style={{ left: Math.min(Math.max(sx((hb.from + hb.to) / 2), 90), width - 90), top: sy(hb.count) }}
-        >
+        <div className="hm-tip" role="tooltip" style={{ left: Math.min(Math.max(sx((hb.from + hb.to) / 2), 90), width - 90), top: sy(hb.count) }}>
           {fmt(hb.from)} - {fmt(hb.to)}: {formatNumber(hb.count)} cubers
         </div>
       )}
@@ -324,8 +316,9 @@ export function WcaComparison({ summary, event, wcaId, country, own, onEdit, pre
         precision={precision}
         intro={
           <p className="wc-sub">
-            where {own ? 'your' : 'this'} {kindLabel} of <span className="text">{formatResult((kind === 'single' ? row.single : row.average)!, kind, precision)}</span>{' '}
-            would place among official {eventLabel(event)} {kind === 'single' ? 'singles' : 'averages'}
+            where {own ? 'your' : 'this'} {kindLabel} of{' '}
+            <span className="text">{formatResult((kind === 'single' ? row.single : row.average)!, kind, precision)}</span> would place among official{' '}
+            {eventLabel(event)} {kind === 'single' ? 'singles' : 'averages'}
             {officialPb && (
               <>
                 {' '}

@@ -28,7 +28,10 @@ export function transformPoint(m: Matrix, [x, y]: Point): Point {
 export function parseTransform(value: string | null | undefined): Matrix {
   let m = IDENTITY;
   for (const [, fn, args] of (value ?? '').matchAll(/(\w+)\s*\(([^)]*)\)/g)) {
-    const a = args.split(/[\s,]+/).filter(Boolean).map(Number);
+    const a = args
+      .split(/[\s,]+/)
+      .filter(Boolean)
+      .map(Number);
     const rad = ((a[0] ?? 0) * Math.PI) / 180;
     let t: Matrix;
     switch (fn) {
@@ -64,7 +67,10 @@ export function parseTransform(value: string | null | undefined): Matrix {
 
 /** a polygon's "points" attribute */
 export function parsePoints(value: string | null | undefined): Point[] {
-  const n = (value ?? '').split(/[\s,]+/).filter(Boolean).map(Number);
+  const n = (value ?? '')
+    .split(/[\s,]+/)
+    .filter(Boolean)
+    .map(Number);
   const out: Point[] = [];
   for (let i = 0; i + 1 < n.length; i += 2) out.push([n[i], n[i + 1]]);
   return out;
@@ -129,7 +135,7 @@ export function corners(points: Point[], eps: number): Point[] {
     const q = points[(i + 1) % points.length];
     return Math.hypot(p[0] - q[0], p[1] - q[1]) > eps;
   });
-  for (let changed = true; changed && pts.length > 3; ) {
+  for (let changed = true; changed && pts.length > 3;) {
     changed = false;
     for (let i = 0; i < pts.length; i++) {
       const prev = pts[(i + pts.length - 1) % pts.length];
@@ -401,7 +407,11 @@ export const SCHEMES: Scheme[] = [
     puzzles: ['square1'],
     faces: [
       // csTimer's square-1 greens and oranges are its own
-      ...CUBE_FACES.map((f, i) => ({ ...f, name: ['white', 'green', 'red', 'blue', 'orange', 'yellow'][i], cstimer: [['#ffffff'], ['#00ff00'], ['#ff0000'], ['#0000ff'], ['#ff8800'], ['#ffff00']][i] })),
+      ...CUBE_FACES.map((f, i) => ({
+        ...f,
+        name: ['white', 'green', 'red', 'blue', 'orange', 'yellow'][i],
+        cstimer: [['#ffffff'], ['#00ff00'], ['#ff0000'], ['#0000ff'], ['#ff8800'], ['#ffff00']][i],
+      })),
       { name: 'piece sides', cubing: ['#d8d8d8'], colour: '#a0a0a0' },
     ],
   },

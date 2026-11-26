@@ -16,10 +16,29 @@ const FIXTURES = fixtures as unknown as Record<string, { event: string; palette:
 // against cubing.js's puzzle-geometry colours); the icosahedra were lined up by their U and F faces
 const CUBE = { '#ffffff': '#ffffff', '#ff0000': '#ff0000', '#00dd00': '#44ee00', '#ffff00': '#f4f400', '#ffaa00': '#ff8000', '#0000ff': '#2266ff' };
 const DODECAHEDRON = {
-  '#ffffff': '#ffffff', '#006600': '#008800', '#dd0000': '#ff0000', '#0000bb': '#0000ff', '#ffcc00': '#f4f400', '#8811ff': '#8800dd',
-  '#999999': '#888888', '#77ee00': '#99ff00', '#ff8833': '#ff8000', '#88ddff': '#3399ff', '#ffffbb': '#e8d0a0', '#ff99ff': '#ff66cc',
+  '#ffffff': '#ffffff',
+  '#006600': '#008800',
+  '#dd0000': '#ff0000',
+  '#0000bb': '#0000ff',
+  '#ffcc00': '#f4f400',
+  '#8811ff': '#8800dd',
+  '#999999': '#888888',
+  '#77ee00': '#99ff00',
+  '#ff8833': '#ff8000',
+  '#88ddff': '#3399ff',
+  '#ffffbb': '#e8d0a0',
+  '#ff99ff': '#ff66cc',
 };
-const OCTAHEDRON = { '#ffffff': '#ffffff', '#ff0000': '#ff0000', '#880088': '#8800dd', '#00dd00': '#44ee00', '#ffff00': '#f4f400', '#ffaa00': '#ff8000', '#bbbbbb': '#888888', '#0000ff': '#2266ff' };
+const OCTAHEDRON = {
+  '#ffffff': '#ffffff',
+  '#ff0000': '#ff0000',
+  '#880088': '#8800dd',
+  '#00dd00': '#44ee00',
+  '#ffff00': '#f4f400',
+  '#ffaa00': '#ff8000',
+  '#bbbbbb': '#888888',
+  '#0000ff': '#2266ff',
+};
 const TETRAHEDRON = { '#00ff00': '#44ee00', '#ff0000': '#ff0000', '#0000ff': '#2266ff', '#ffff00': '#f4f400' };
 // the icosahedron: the map the 2D net draws in too, so this also checks that 2D and 3D colour it alike
 const ICOSAHEDRON = ICOSAMATE_COLOURS;
@@ -36,7 +55,10 @@ function load(p: Puzzle3D) {
         if ('id' in p) return { kpuzzle: await puzzles[p.id].kpuzzle(), svg: await puzzles[p.id].svg() };
         const pg = getPuzzleGeometryByDesc(p.description, { allMoves: true, orientCenters: true, addRotations: true });
         const notation = new ExperimentalPGNotation(pg, pg.getOrbitsDef(true));
-        return { kpuzzle: new KPuzzle(notation.remapKPuzzleDefinition(pg.getKPuzzleDefinition(true)), { experimentalPGNotation: notation }), svg: pg.generatesvg() };
+        return {
+          kpuzzle: new KPuzzle(notation.remapKPuzzleDefinition(pg.getKPuzzleDefinition(true)), { experimentalPGNotation: notation }),
+          svg: pg.generatesvg(),
+        };
       })(),
     );
   }
@@ -113,16 +135,20 @@ describe('preview3D', () => {
     expect(Object.keys(FIXTURES).sort()).toEqual([...PREVIEW_3D_TYPES].sort());
   });
 
-  it.each(PREVIEW_3D_TYPES)('shows %s as csTimer draws it, sticker for sticker', async (type) => {
-    const { cstimer, cubing } = await compare(type);
-    const { missing, left } = pair(cstimer, cubing);
-    expect(missing).toBe(0);
-    if (type === 'helicv') {
-      // cubing.js's curvy copter has a fixed centre on each face, which the real one hasn't
-      expect(left).toHaveLength(6);
-      for (const s of left) expect(new Set(s.split(' ')).size, s).toBe(1);
-    } else expect(left).toEqual([]);
-  }, 60_000);
+  it.each(PREVIEW_3D_TYPES)(
+    'shows %s as csTimer draws it, sticker for sticker',
+    async (type) => {
+      const { cstimer, cubing } = await compare(type);
+      const { missing, left } = pair(cstimer, cubing);
+      expect(missing).toBe(0);
+      if (type === 'helicv') {
+        // cubing.js's curvy copter has a fixed centre on each face, which the real one hasn't
+        expect(left).toHaveLength(6);
+        for (const s of left) expect(new Set(s.split(' ')).size, s).toBe(1);
+      } else expect(left).toEqual([]);
+    },
+    60_000,
+  );
 
   it('notices a move turned the wrong way', async () => {
     const flip = (alg: string) => alg.replace(/\S+/g, (m) => (m.endsWith("'") ? m.slice(0, -1) : `${m}'`));
@@ -132,7 +158,7 @@ describe('preview3D', () => {
     }
   }, 60_000);
 
-  it("reads every random-move scramble cubr makes of them, and cubing.js applies it", async () => {
+  it('reads every random-move scramble cubr makes of them, and cubing.js applies it', async () => {
     for (const type of PREVIEW_3D_TYPES) {
       const event = FIXTURES[type].event;
       for (let i = 0; i < 10; i++) {

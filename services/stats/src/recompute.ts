@@ -40,11 +40,7 @@ export interface RecomputeArgs {
  * inside the caller's transaction, under the per-user lock.
  * user_totals is refreshed by the caller once all events are done.
  */
-export async function recomputeEvent(
-  c: PoolClient,
-  deps: RecomputeDeps,
-  args: RecomputeArgs,
-): Promise<{ solves: number; pbChanges: number; queued: number }> {
+export async function recomputeEvent(c: PoolClient, deps: RecomputeDeps, args: RecomputeArgs): Promise<{ solves: number; pbChanges: number; queued: number }> {
   const { userId, username, event, tz } = args;
   const started = Date.now();
   const fetched = await fetchSolveList(deps, userId, event);
@@ -132,7 +128,10 @@ export async function recomputeEvent(
     }
     if (valueChanged) {
       await queuePbUpdated(c, {
-        userId, username, event, kind,
+        userId,
+        username,
+        event,
+        kind,
         valueMs: n.valueMs,
         previousMs: o ? o.value_ms : null,
         achievedAt: n.achievedAt,

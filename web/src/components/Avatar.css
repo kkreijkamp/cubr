@@ -17,7 +17,9 @@
   vertical-align: middle;
   overflow: hidden;
   user-select: none;
-  transition: background var(--dur), color var(--dur);
+  transition:
+    background var(--dur),
+    color var(--dur);
 }
 .avatar.has-img {
   /* placeholder tint while the image decodes (and behind transparent pixels) */

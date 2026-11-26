@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { crossMoves, decodeSolveJob, easyCrossMasks, encodeSolveJob, hexMask, jobLabel, parity, practiceJob, PRACTICE_STATE_TYPES, randomState } from '../src/practice.js';
+import {
+  crossMoves,
+  decodeSolveJob,
+  easyCrossMasks,
+  encodeSolveJob,
+  hexMask,
+  jobLabel,
+  parity,
+  practiceJob,
+  PRACTICE_STATE_TYPES,
+  randomState,
+} from '../src/practice.js';
 
 // The practice states csTimer's way: pinned pieces stay put, the rest is a random legal state.
 // cubing.js slots: edges UF UR UB UL DF DR DB DL FR FL BR BL; corners UFR UBR UBL UFL DFR DFL DBL DBR.
@@ -12,7 +23,7 @@ const D_CORNERS = [4, 5, 6, 7];
 
 function seeded(seed: number) {
   let s = seed;
-  return () => ((s = (s * 1103515245 + 12345) % 2 ** 31) / 2 ** 31);
+  return () => (s = (s * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
 }
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
@@ -40,11 +51,17 @@ describe('practice states', () => {
       for (const { state } of states(type, 25)) {
         const c = state.CORNERS;
         expect(sum(c.orientation) % 3, type).toBe(0);
-        expect([...c.pieces].sort((a, b) => a - b), type).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+        expect(
+          [...c.pieces].sort((a, b) => a - b),
+          type,
+        ).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
         if (state.EDGES) {
           const e = state.EDGES;
           expect(sum(e.orientation) % 2, type).toBe(0);
-          expect([...e.pieces].sort((a, b) => a - b), type).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+          expect(
+            [...e.pieces].sort((a, b) => a - b),
+            type,
+          ).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
           expect(parity(e.pieces), type).toBe(parity(c.pieces));
         } else {
           // 2x2: DBL never moves, as in csTimer
@@ -70,7 +87,11 @@ describe('practice states', () => {
       for (const { state } of states(type, 20)) {
         expect(solvedAt(state.EDGES!, [...D_EDGES, ...E_EDGES]), type).toBe(true);
         expect(solvedAt(state.CORNERS, D_CORNERS), type).toBe(true);
-        if (type === 'zbll' || type === 'coll') expect(state.EDGES!.orientation.every((o) => o === 0), type).toBe(true);
+        if (type === 'zbll' || type === 'coll')
+          expect(
+            state.EDGES!.orientation.every((o) => o === 0),
+            type,
+          ).toBe(true);
       }
     }
   });
@@ -121,7 +142,10 @@ describe('practice states', () => {
       expect(D_CORNERS.every((i) => c.orientation[i] === 0)).toBe(true);
       const wrong = D_CORNERS.filter((i) => c.pieces[i] !== i);
       expect(wrong.length).toBe(2);
-      expect([[4, 5], [4, 7]]).toContainEqual(wrong); // DFR with DFL or DBR: next to each other
+      expect([
+        [4, 5],
+        [4, 7],
+      ]).toContainEqual(wrong); // DFR with DFL or DBR: next to each other
     }
     for (const c of bottom('222eg2')) expect(D_CORNERS.filter((i) => c.pieces[i] !== i)).toEqual([5, 7]);
     for (const c of bottom('222tc')) {

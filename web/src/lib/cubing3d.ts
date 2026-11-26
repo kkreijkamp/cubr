@@ -66,7 +66,20 @@ const carrot: Translate = (m) => {
 };
 
 /** csTimer's dodecahedron faces by cubing.js's megaminx names: csTimer's lower ring runs DL DR DBR B DBL */
-const MINX_FACES: Readonly<Record<string, string>> = { U: 'U', F: 'F', R: 'R', L: 'L', BL: 'BL', BR: 'BR', D: 'D', B: 'B', DR: 'FR', DL: 'FL', DBR: 'DR', DBL: 'DL' };
+const MINX_FACES: Readonly<Record<string, string>> = {
+  U: 'U',
+  F: 'F',
+  R: 'R',
+  L: 'L',
+  BL: 'BL',
+  BR: 'BR',
+  D: 'D',
+  B: 'B',
+  DR: 'FR',
+  DL: 'FL',
+  DBR: 'DR',
+  DBL: 'DL',
+};
 /** face turns of a megaminx-like puzzle, by csTimer's names */
 const minxFaces: Translate = (m) => {
   const t = /^(DBR|DBL|BR|BL|DR|DL|U|F|R|L|D|B)(2)?(')?$/.exec(m);

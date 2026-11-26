@@ -167,7 +167,12 @@ const eole = (rng: Rng): Masks => {
   const eo = hexMask('0x0000000fffff', 12);
   ep[8 + skip] = -1;
   eo[8 + skip] = -1;
-  return { ep: toSlots(ep, E_SLOT, true), eo: toSlots(eo, E_SLOT, false), cp: toSlots(hexMask('0xf65fffff', 8), C_SLOT, true), co: toSlots(hexMask('0xf00fffff', 8), C_SLOT, false) };
+  return {
+    ep: toSlots(ep, E_SLOT, true),
+    eo: toSlots(eo, E_SLOT, false),
+    cp: toSlots(hexMask('0xf65fffff', 8), C_SLOT, true),
+    co: toSlots(hexMask('0xf00fffff', 8), C_SLOT, false),
+  };
 };
 
 const RECIPES_333: Record<string, Recipe333> = {
@@ -210,12 +215,33 @@ const RECIPES_222: Record<string, (rng: Rng) => Masks> = {
   '222o': () => ({ cp: [FREE, FREE, FREE, FREE, FREE, FREE, 6, FREE], co: [FREE, FREE, FREE, FREE, FREE, FREE, 0, FREE] }),
   // CLL: the bottom layer solved; EG-1: two adjacent bottom corners swapped; EG-2: two diagonal ones
   '222eg0': () => D_LAYER([4, 5, 6, 7]),
-  '222eg1': (rng) => D_LAYER(pick([[5, 4, 6, 7], [7, 5, 6, 4]], rng)),
+  '222eg1': (rng) =>
+    D_LAYER(
+      pick(
+        [
+          [5, 4, 6, 7],
+          [7, 5, 6, 4],
+        ],
+        rng,
+      ),
+    ),
   '222eg2': () => D_LAYER([4, 7, 6, 5]),
   // EG: CLL, EG-1 and EG-2 as often as the bottom layer gives them (1 : 4 : 1)
   '222eg': (rng) => {
     const r = rn(6, rng);
-    return r === 0 ? D_LAYER([4, 5, 6, 7]) : r === 5 ? D_LAYER([4, 7, 6, 5]) : D_LAYER(pick([[5, 4, 6, 7], [7, 5, 6, 4]], rng));
+    return r === 0
+      ? D_LAYER([4, 5, 6, 7])
+      : r === 5
+        ? D_LAYER([4, 7, 6, 5])
+        : D_LAYER(
+            pick(
+              [
+                [5, 4, 6, 7],
+                [7, 5, 6, 4],
+              ],
+              rng,
+            ),
+          );
   },
   // TCLL: the bottom layer solved but one corner twisted (either way)
   '222tc': (rng) => D_LAYER([4, 5, 6, 7], [1 + rn(2, rng), 0, 0, 0]),
@@ -225,6 +251,7 @@ const RECIPES_222: Record<string, (rng: Rng) => Masks> = {
 
 // ---- easy cross: every state of the four cross edges with its fewest moves (csTimer's tools/cross.js)
 /** cubing.js's edge permutation and flips for U D R L F B (piece in slot i comes from slot perm[i]) */
+// prettier-ignore
 const EDGE_MOVES: Record<string, [number[], number[]]> = {
   U: [[1, 2, 3, 0, 4, 5, 6, 7, 8, 9, 10, 11], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]],
   D: [[0, 1, 2, 3, 7, 4, 5, 6, 8, 9, 10, 11], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]],

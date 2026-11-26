@@ -4,9 +4,23 @@ import { withTimeout } from './util.js';
 
 /** Target length of `scramble:pool:<event>` (SPEC section 9.2): popular + cheap events get deeper pools. */
 export const POOL_TARGETS: Readonly<Record<string, number>> = {
-  '333': 200, '222': 200, pyram: 200, skewb: 200,
-  '444': 50, sq1: 50, clock: 50, minx: 50, '333oh': 50, '333bf': 50, '333fm': 50, fto: 50,
-  '555': 20, '666': 20, '777': 20, '444bf': 20, '555bf': 20,
+  '333': 200,
+  '222': 200,
+  pyram: 200,
+  skewb: 200,
+  '444': 50,
+  sq1: 50,
+  clock: 50,
+  minx: 50,
+  '333oh': 50,
+  '333bf': 50,
+  '333fm': 50,
+  fto: 50,
+  '555': 20,
+  '666': 20,
+  '777': 20,
+  '444bf': 20,
+  '555bf': 20,
 };
 
 export const poolKey = (event: string) => `scramble:pool:${event}`;
@@ -94,7 +108,12 @@ export class ScramblePool {
     const key = poolKey(event);
     const cap = POOL_TARGETS[event] ?? 20;
     const res = await this.call(() =>
-      this.redis.multi().rpush(key, ...scrambles).ltrim(key, 0, cap - 1).llen(key).exec(),
+      this.redis
+        .multi()
+        .rpush(key, ...scrambles)
+        .ltrim(key, 0, cap - 1)
+        .llen(key)
+        .exec(),
     );
     return Number(res?.[2]?.[1] ?? 0);
   }

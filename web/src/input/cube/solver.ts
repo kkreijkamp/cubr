@@ -97,9 +97,21 @@ function permFrom(idx: number, n: number): number[] {
   return digits.map((d) => left.splice(d, 1)[0]);
 }
 
-const getCPerm = (c: CubieCube) => permIndex(c.ca.map((x) => x & 7), 8);
-const getEPerm = (c: CubieCube) => permIndex(c.ea.slice(0, 8).map((x) => x >> 1), 8);
-const getSPerm = (c: CubieCube) => permIndex(c.ea.slice(8).map((x) => (x >> 1) - 8), 4);
+const getCPerm = (c: CubieCube) =>
+  permIndex(
+    c.ca.map((x) => x & 7),
+    8,
+  );
+const getEPerm = (c: CubieCube) =>
+  permIndex(
+    c.ea.slice(0, 8).map((x) => x >> 1),
+    8,
+  );
+const getSPerm = (c: CubieCube) =>
+  permIndex(
+    c.ea.slice(8).map((x) => (x >> 1) - 8),
+    4,
+  );
 
 interface Tables {
   twistMove: Uint16Array;
@@ -115,7 +127,13 @@ interface Tables {
 }
 
 /** a coordinate's move table: value * moves + move -> value */
-function moveTable<T extends Uint16Array | Uint8Array>(out: T, n: number, moves: number[], set: (c: CubieCube, v: number) => void, get: (c: CubieCube) => number): T {
+function moveTable<T extends Uint16Array | Uint8Array>(
+  out: T,
+  n: number,
+  moves: number[],
+  set: (c: CubieCube, v: number) => void,
+  get: (c: CubieCube) => number,
+): T {
   const c = new CubieCube();
   const d = new CubieCube();
   for (let v = 0; v < n; v++) {
@@ -156,20 +174,38 @@ function init(): Tables {
   const twistMove = moveTable(new Uint16Array(N_TWIST * 18), N_TWIST, ALL, setTwist, getTwist);
   const flipMove = moveTable(new Uint16Array(N_FLIP * 18), N_FLIP, ALL, setFlip, getFlip);
   const sliceMove = moveTable(new Uint16Array(N_SLICE * 18), N_SLICE, ALL, setSlice, getSlice);
-  const cpermMove = moveTable(new Uint16Array(N_PERM * 10), N_PERM, P2_MOVES, (c, v) => {
-    const p = permFrom(v, 8);
-    for (let i = 0; i < 8; i++) c.ca[i] = p[i];
-  }, getCPerm);
-  const epermMove = moveTable(new Uint16Array(N_PERM * 10), N_PERM, P2_MOVES, (c, v) => {
-    const p = permFrom(v, 8);
-    for (let i = 0; i < 8; i++) c.ea[i] = p[i] << 1;
-    for (let i = 8; i < 12; i++) c.ea[i] = i << 1;
-  }, getEPerm);
-  const spermMove = moveTable(new Uint8Array(N_SPERM * 10), N_SPERM, P2_MOVES, (c, v) => {
-    const p = permFrom(v, 4);
-    for (let i = 0; i < 8; i++) c.ea[i] = i << 1;
-    for (let i = 0; i < 4; i++) c.ea[8 + i] = (p[i] + 8) << 1;
-  }, getSPerm);
+  const cpermMove = moveTable(
+    new Uint16Array(N_PERM * 10),
+    N_PERM,
+    P2_MOVES,
+    (c, v) => {
+      const p = permFrom(v, 8);
+      for (let i = 0; i < 8; i++) c.ca[i] = p[i];
+    },
+    getCPerm,
+  );
+  const epermMove = moveTable(
+    new Uint16Array(N_PERM * 10),
+    N_PERM,
+    P2_MOVES,
+    (c, v) => {
+      const p = permFrom(v, 8);
+      for (let i = 0; i < 8; i++) c.ea[i] = p[i] << 1;
+      for (let i = 8; i < 12; i++) c.ea[i] = i << 1;
+    },
+    getEPerm,
+  );
+  const spermMove = moveTable(
+    new Uint8Array(N_SPERM * 10),
+    N_SPERM,
+    P2_MOVES,
+    (c, v) => {
+      const p = permFrom(v, 4);
+      for (let i = 0; i < 8; i++) c.ea[i] = i << 1;
+      for (let i = 0; i < 4; i++) c.ea[8 + i] = (p[i] + 8) << 1;
+    },
+    getSPerm,
+  );
   tables = {
     twistMove,
     flipMove,
@@ -196,7 +232,10 @@ class Search {
   private sol: number[] = [];
   private nodes = 0;
   private cube = new CubieCube();
-  constructor(private maxLen: number, private budget: number) {}
+  constructor(
+    private maxLen: number,
+    private budget: number,
+  ) {}
 
   run(c: CubieCube): number[] | null {
     this.cube = c;
@@ -306,10 +345,16 @@ let corners: { cperm: Uint16Array; prunCPerm: Int8Array; prunTwist: Int8Array } 
 export function cornersBetween(from: CubieCube, to: CubieCube): string | null {
   const { twistMove } = init();
   if (!corners) {
-    const cperm = moveTable(new Uint16Array(N_PERM * 18), N_PERM, ALL, (c, v) => {
-      const p = permFrom(v, 8);
-      for (let i = 0; i < 8; i++) c.ca[i] = p[i];
-    }, getCPerm);
+    const cperm = moveTable(
+      new Uint16Array(N_PERM * 18),
+      N_PERM,
+      ALL,
+      (c, v) => {
+        const p = permFrom(v, 8);
+        for (let i = 0; i < 8; i++) c.ca[i] = p[i];
+      },
+      getCPerm,
+    );
     const one = new Uint16Array(18);
     corners = { cperm, prunCPerm: pruneTable(N_PERM, 1, 18, cperm, one, 0), prunTwist: pruneTable(N_TWIST, 1, 18, twistMove, one, 0) };
   }

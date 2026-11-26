@@ -186,9 +186,11 @@ export default function DailyPage() {
     // the official attempts: an attempt whose solve was deleted is still used (the server refuses another
     // solve for it), so its slot shows as done rather than open (the October review's #5)
     for (const a of progress.data?.events?.[event]?.attempts ?? []) {
-      if (a.index >= 0 && a.index < ATTEMPTS && !byIndex.has(a.index)) byIndex.set(a.index, { index: a.index, timeMs: a.timeMs, penalty: a.penalty, state: 'saved', solveId: a.solveId });
+      if (a.index >= 0 && a.index < ATTEMPTS && !byIndex.has(a.index))
+        byIndex.set(a.index, { index: a.index, timeMs: a.timeMs, penalty: a.penalty, state: 'saved', solveId: a.solveId });
     }
-    for (const a of local[key] ?? []) if (!byIndex.has(a.index) || a.state !== 'saved') byIndex.set(a.index, byIndex.get(a.index)?.state === 'saved' ? byIndex.get(a.index)! : a);
+    for (const a of local[key] ?? [])
+      if (!byIndex.has(a.index) || a.state !== 'saved') byIndex.set(a.index, byIndex.get(a.index)?.state === 'saved' ? byIndex.get(a.index)! : a);
     return [...byIndex.values()]
       .map((a) => (a.solveId && penalties[a.solveId] ? { ...a, penalty: penalties[a.solveId] } : a))
       .sort((a, b) => a.index - b.index);
@@ -201,7 +203,7 @@ export default function DailyPage() {
   const done = nextIndex === null;
   const progressReady = !authed || (!!progress.data && !progress.error);
   const canStart = isToday && !!scrambles && progressReady && !done;
-  const scramble = scrambles && nextIndex !== null ? scrambles[nextIndex] ?? null : null;
+  const scramble = scrambles && nextIndex !== null ? (scrambles[nextIndex] ?? null) : null;
 
   const setLocalAttempt = useCallback((k: string, a: Attempt) => {
     setLocal((m) => ({ ...m, [k]: [...(m[k] ?? []).filter((x) => x.index !== a.index), a] }));
@@ -276,7 +278,13 @@ export default function DailyPage() {
     begun.current = null;
     if (nextIndex === null || !scramble) return;
     setPicked(null);
-    const a: Attempt = { index: nextIndex, timeMs: r.timeMs, penalty: r.penalty, state: authed ? 'saving' : 'practice', ...(authed ? { solveId: uuid() } : {}) };
+    const a: Attempt = {
+      index: nextIndex,
+      timeMs: r.timeMs,
+      penalty: r.penalty,
+      state: authed ? 'saving' : 'practice',
+      ...(authed ? { solveId: uuid() } : {}),
+    };
     if (!authed) {
       setPractice((p) => {
         const next = { ...p, [key]: [...(p[key] ?? []).filter((x) => x.index !== a.index), a] };
@@ -434,7 +442,13 @@ export default function DailyPage() {
           description, never a scramble, a time or the board */}
       <div className="daily-config fade-on-focus" data-nosnippet>
         <EventPicker events={DAILY_EVENTS} value={event} onChange={setEvent} />
-        <Segmented label="day" className="scroll" value={date} onChange={setDate} options={days.map((k) => ({ value: k, label: dayLabel(k, today), tip: k }))} />
+        <Segmented
+          label="day"
+          className="scroll"
+          value={date}
+          onChange={setDate}
+          options={days.map((k) => ({ value: k, label: dayLabel(k, today), tip: k }))}
+        />
       </div>
 
       {!authed && status !== 'loading' && isToday && (
@@ -452,11 +466,7 @@ export default function DailyPage() {
 
       <div className="daily-layout" data-nosnippet>
         <div className="daily-main">
-          {!isToday && (
-            <div className="daily-past sub small fade-on-focus">
-              viewing {date} (UTC) - past challenges are closed, leaderboard only.
-            </div>
-          )}
+          {!isToday && <div className="daily-past sub small fade-on-focus">viewing {date} (UTC) - past challenges are closed, leaderboard only.</div>}
 
           <ol className={`daily-strip fade-on-focus${isToday ? ' pickable' : ''}`} aria-label="attempts">
             {Array.from({ length: ATTEMPTS }, (_, i) => {
@@ -514,7 +524,9 @@ export default function DailyPage() {
             )
           ) : done ? (
             <div className="daily-result">
-              {isToday && <QuickActions className="daily-quick" last={selected ?? null} onPenalty={changePenalty} label={`attempt ${(selected?.index ?? 0) + 1}`} />}
+              {isToday && (
+                <QuickActions className="daily-quick" last={selected ?? null} onPenalty={changePenalty} label={`attempt ${(selected?.index ?? 0) + 1}`} />
+              )}
               <div className="stat lg">
                 <span className="label">ao5</span>
                 <span className="value">{formatAverage(ao5, settings.precision)}</span>

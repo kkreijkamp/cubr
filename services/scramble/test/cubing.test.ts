@@ -92,5 +92,4 @@ describe('practice scrambles (real cubing.js solves)', () => {
       expect(crossMoves(edges)).toBeLessThanOrEqual(3);
     }
   }, 60_000);
-
 });

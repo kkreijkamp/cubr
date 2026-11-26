@@ -90,7 +90,11 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
    * place already. If the email can't be sent, the row goes too (nothing waits for a link that never
    * came) and the error is rethrown.
    */
-  async function emailConfirmation(user: { id: string; username: string; email: string }, link: { token: string; hash: Buffer }, log: FastifyBaseLogger): Promise<void> {
+  async function emailConfirmation(
+    user: { id: string; username: string; email: string },
+    link: { token: string; hash: Buffer },
+    log: FastifyBaseLogger,
+  ): Promise<void> {
     try {
       const message = confirmAccountEmailMessage({ username: user.username, link: confirmEmailLink(mail.publicUrl, link.token), days: EMAIL_CONFIRM_TTL_DAYS });
       await sendMail(mail, { to: user.email, ...message }, log);
@@ -120,10 +124,11 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
     try {
       row = await withTx(pool, async (client) => {
         freed = await releaseUnconfirmed(client, body.email);
-        const { rows } = await client.query<UserRow>(
-          `insert into auth.users (username, email, password_hash) values ($1, $2, $3) returning ${USER_COLUMNS}`,
-          [body.username, body.email, passwordHash],
-        );
+        const { rows } = await client.query<UserRow>(`insert into auth.users (username, email, password_hash) values ($1, $2, $3) returning ${USER_COLUMNS}`, [
+          body.username,
+          body.email,
+          passwordHash,
+        ]);
         await client.query(`insert into auth.user_settings (user_id) values ($1)`, [rows[0].id]);
         if (confirmation) {
           await client.query(
@@ -168,10 +173,7 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
     // only after the password: a stranger can't tell a suspended account apart
     if (await isSuspended(pool, found.id)) throw forbidden(SUSPENDED_MESSAGE);
 
-    const updated = await pool.query<UserRow>(
-      `update auth.users set last_login_at = now() where id = $1 returning ${USER_COLUMNS}`,
-      [found.id],
-    );
+    const updated = await pool.query<UserRow>(`update auth.users set last_login_at = now() where id = $1 returning ${USER_COLUMNS}`, [found.id]);
     const user = toPrivateUser(updated.rows[0] ?? found);
     const { token } = await signToken(config.jwtSecret, user);
     return { token, user };
@@ -205,10 +207,11 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
     }
     const { token, hash } = newResetToken();
     await pool.query('delete from auth.password_resets where expires_at < now()');
-    await pool.query(
-      `insert into auth.password_resets (token_hash, user_id, expires_at) values ($1, $2, now() + make_interval(mins => $3))`,
-      [hash, user.id, RESET_TTL_MIN],
-    );
+    await pool.query(`insert into auth.password_resets (token_hash, user_id, expires_at) values ($1, $2, now() + make_interval(mins => $3))`, [
+      hash,
+      user.id,
+      RESET_TTL_MIN,
+    ]);
     const message = resetEmail({ username: user.username, link: resetLink(mail.publicUrl, token), minutes: RESET_TTL_MIN });
     await sendMail(mail, { to: user.email, ...message }, log);
     log.info({ userId: user.id }, 'password reset link sent');
@@ -232,10 +235,9 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
     const { token, password } = parse(resetSchema, req.body ?? {});
     const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
     const { row, revokedAt } = await withTx(pool, async (c) => {
-      const used = await c.query<{ user_id: string }>(
-        'delete from auth.password_resets where token_hash = $1 and expires_at > now() returning user_id',
-        [hashResetToken(token)],
-      );
+      const used = await c.query<{ user_id: string }>('delete from auth.password_resets where token_hash = $1 and expires_at > now() returning user_id', [
+        hashResetToken(token),
+      ]);
       if (!used.rows[0]) throw badRequest('This reset link is invalid or has expired');
       const userId = used.rows[0].user_id;
       // suspended since the link was sent: nothing changes (the transaction rolls back, the link stays)
@@ -249,7 +251,11 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
       );
       if (!rows[0]) throw badRequest('This reset link is invalid or has expired');
       const at = Math.floor(Date.now() / 1000);
-      const revoked = await withTimeout(redis.set(revokedUserKey(userId), String(at), 'EX', TOKEN_TTL_SEC).then(() => true), 2000, false);
+      const revoked = await withTimeout(
+        redis.set(revokedUserKey(userId), String(at), 'EX', TOKEN_TTL_SEC).then(() => true),
+        2000,
+        false,
+      );
       if (!revoked) throw unavailable('Could not reset the password right now, please retry');
       return { row: rows[0], revokedAt: at };
     });
@@ -289,7 +295,11 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
       const updated = await c.query<UserRow>(`update auth.users set password_hash = $2 where id = $1 returning ${USER_COLUMNS}`, [me.id, passwordHash]);
       await c.query('delete from auth.password_resets where user_id = $1', [me.id]);
       const at = Math.floor(Date.now() / 1000);
-      const revoked = await withTimeout(redis.set(revokedUserKey(me.id), String(at), 'EX', TOKEN_TTL_SEC).then(() => true), 2000, false);
+      const revoked = await withTimeout(
+        redis.set(revokedUserKey(me.id), String(at), 'EX', TOKEN_TTL_SEC).then(() => true),
+        2000,
+        false,
+      );
       if (!revoked) throw unavailable('Could not change the password right now, please retry');
       return { row: updated.rows[0], revokedAt: at, first: !found.password_hash, username: found.username, email: found.email, trusted: found.trusted };
     });
@@ -331,10 +341,12 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
     const { token, hash } = newResetToken();
     await withTx(pool, async (c) => {
       await c.query('delete from auth.email_changes where user_id = $1 or expires_at < now()', [me.id]);
-      await c.query(
-        `insert into auth.email_changes (token_hash, user_id, new_email, expires_at) values ($1, $2, $3, now() + make_interval(mins => $4))`,
-        [hash, me.id, email, EMAIL_CHANGE_TTL_MIN],
-      );
+      await c.query(`insert into auth.email_changes (token_hash, user_id, new_email, expires_at) values ($1, $2, $3, now() + make_interval(mins => $4))`, [
+        hash,
+        me.id,
+        email,
+        EMAIL_CHANGE_TTL_MIN,
+      ]);
     });
     try {
       const message = confirmEmailMessage({ username: user.username, link: confirmEmailLink(mail.publicUrl, token), minutes: EMAIL_CHANGE_TTL_MIN });
@@ -370,10 +382,12 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
     const link = newResetToken();
     await withTx(pool, async (c) => {
       await c.query('delete from auth.email_changes where user_id = $1 or expires_at < now()', [me.id]);
-      await c.query(
-        `insert into auth.email_changes (token_hash, user_id, new_email, expires_at) values ($1, $2, $3, now() + make_interval(mins => $4))`,
-        [link.hash, me.id, user.email, EMAIL_CONFIRM_TTL_MIN],
-      );
+      await c.query(`insert into auth.email_changes (token_hash, user_id, new_email, expires_at) values ($1, $2, $3, now() + make_interval(mins => $4))`, [
+        link.hash,
+        me.id,
+        user.email,
+        EMAIL_CONFIRM_TTL_MIN,
+      ]);
     });
     try {
       await emailConfirmation(user, link, req.log);
@@ -409,7 +423,10 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
       const freed = changed ? await releaseUnconfirmed(c, change.new_email, change.user_id) : null;
       if (freed) req.log.info({ userId: freed, newUserId: change.user_id }, 'an email never confirmed in 7 days was freed for a change of email');
       try {
-        await c.query('update auth.users set email = $2, email_verified_at = now() where id = $1', [change.user_id, changed ? change.new_email : before.rows[0].email]);
+        await c.query('update auth.users set email = $2, email_verified_at = now() where id = $1', [
+          change.user_id,
+          changed ? change.new_email : before.rows[0].email,
+        ]);
       } catch (err) {
         // someone else took the address since (the unique index): nothing changes, the link stays
         if (pgCode(err) === '23505') throw conflict('That email is now used by another account');
@@ -417,7 +434,14 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
       }
       await c.query('delete from auth.email_changes where user_id = $1', [change.user_id]);
       if (changed) await c.query('delete from auth.password_resets where user_id = $1', [change.user_id]);
-      return { userId: change.user_id, username: before.rows[0].username, oldEmail: before.rows[0].email, oldTrusted: before.rows[0].trusted, newEmail: change.new_email, changed };
+      return {
+        userId: change.user_id,
+        username: before.rows[0].username,
+        oldEmail: before.rows[0].email,
+        oldTrusted: before.rows[0].trusted,
+        newEmail: change.new_email,
+        changed,
+      };
     });
     if (!done.changed) {
       req.log.info({ userId: done.userId }, 'email confirmed');
@@ -461,7 +485,11 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
       const { rows } = await pool.query<UserRow>(`select ${USER_COLUMNS} from auth.users where id = $1`, [me.id]);
       if (!rows[0]) throw unauthorized('Account no longer exists');
       const at = Math.floor(Date.now() / 1000);
-      const revoked = await withTimeout(redis.set(revokedUserKey(me.id), String(at), 'EX', TOKEN_TTL_SEC).then(() => true), 2000, false);
+      const revoked = await withTimeout(
+        redis.set(revokedUserKey(me.id), String(at), 'EX', TOKEN_TTL_SEC).then(() => true),
+        2000,
+        false,
+      );
       if (!revoked) throw unavailable('Could not sign out the other devices right now, please retry');
       req.log.info({ userId: me.id }, 'signed out everywhere');
       const user = toPrivateUser(rows[0]);
@@ -498,10 +526,18 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
       void withTimeout(redis.srem(PRIVATE_USERS_KEY, me.id.toLowerCase()), 2000, 0); // tidy-up only: the account is gone
 
       const revokedAt = String(Math.floor(Date.now() / 1000));
-      const revoked = await withTimeout(redis.set(revokedUserKey(me.id), revokedAt, 'EX', TOKEN_TTL_SEC).then(() => true), 2000, false);
+      const revoked = await withTimeout(
+        redis.set(revokedUserKey(me.id), revokedAt, 'EX', TOKEN_TTL_SEC).then(() => true),
+        2000,
+        false,
+      );
       if (!revoked) throw unavailable('Could not delete the account right now, please retry');
       const data = { eventId: newEventId('auth'), userId: me.id, username: rows[0].username };
-      const published = await withTimeout(publishEvent(redis, 'user.deleted', data).then(() => true), 2000, false);
+      const published = await withTimeout(
+        publishEvent(redis, 'user.deleted', data).then(() => true),
+        2000,
+        false,
+      );
       if (!published) {
         // the row stays (rollback), so the tokens must keep working too
         await withTimeout(redis.del(revokedUserKey(me.id)), 2000, 0);
@@ -536,16 +572,17 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
 
     values.push(userId);
     const row = await withTx(pool, async (c) => {
-      const { rows } = await c.query<UserRow>(
-        `update auth.users set ${sets.join(', ')} where id = $${values.length} returning ${USER_COLUMNS}`,
-        values,
-      );
+      const { rows } = await c.query<UserRow>(`update auth.users set ${sets.join(', ')} where id = $${values.length} returning ${USER_COLUMNS}`, values);
       if (!rows[0]) throw unauthorized('Account no longer exists');
       if (patch.private !== undefined) {
         // Mirror the flag into the set the other services read, inside the transaction: if Redis
         // can't take it, the change rolls back rather than leaving a "private" profile readable.
         const op = patch.private ? redis.sadd(PRIVATE_USERS_KEY, userId) : redis.srem(PRIVATE_USERS_KEY, userId);
-        const mirrored = await withTimeout(op.then(() => true), 2000, false);
+        const mirrored = await withTimeout(
+          op.then(() => true),
+          2000,
+          false,
+        );
         if (!mirrored) throw unavailable('Could not change who can see your profile right now, please retry');
       }
       return rows[0];

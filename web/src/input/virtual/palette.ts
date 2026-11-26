@@ -7,7 +7,10 @@ import type { Palette } from './render3d';
 
 const HEX = /^#[0-9a-f]{6}$/i;
 
-export function stickerColors(scheme: 'cube' | 'skewb' | 'pyraminx' | 'megaminx' | 'square1', s: Pick<Settings, 'stickerColours' | 'customStickers'>): string[] {
+export function stickerColors(
+  scheme: 'cube' | 'skewb' | 'pyraminx' | 'megaminx' | 'square1',
+  s: Pick<Settings, 'stickerColours' | 'customStickers'>,
+): string[] {
   const sc = SCHEMES.find((x) => x.id === scheme)!;
   const own = s.stickerColours === 'custom' ? s.customStickers[sc.id] : undefined;
   return sc.faces.map((f, i) => {
@@ -27,7 +30,15 @@ function rgb(css: string): [number, number, number] | null {
   return null;
 }
 
-const hex = (v: [number, number, number]) => '#' + v.map((x) => Math.round(Math.max(0, Math.min(255, x))).toString(16).padStart(2, '0')).join('');
+const hex = (v: [number, number, number]) =>
+  '#' +
+  v
+    .map((x) =>
+      Math.round(Math.max(0, Math.min(255, x)))
+        .toString(16)
+        .padStart(2, '0'),
+    )
+    .join('');
 
 /** a theme colour (a CSS variable on the page) */
 export function themeColor(name: string, fallback: string): string {

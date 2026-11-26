@@ -65,11 +65,9 @@ function giikerCubie(facelet: string): CubieCube {
   const face = (idx: number) => 'URFDLB'[Math.floor(idx / 9)];
   const cc = new CubieCube();
   for (let c = 0; c < 8; c++)
-    for (let j = 0; j < 8; j++)
-      for (let o = 0; o < 3; o++) if ([0, 1, 2].every((n) => facelet[GC[c][(n + o) % 3]] === face(GC[j][n]))) cc.ca[c] = j | (o << 3);
+    for (let j = 0; j < 8; j++) for (let o = 0; o < 3; o++) if ([0, 1, 2].every((n) => facelet[GC[c][(n + o) % 3]] === face(GC[j][n]))) cc.ca[c] = j | (o << 3);
   for (let e = 0; e < 12; e++)
-    for (let j = 0; j < 12; j++)
-      for (let o = 0; o < 2; o++) if ([0, 1].every((n) => facelet[GE[e][(n + o) % 2]] === face(GE[j][n]))) cc.ea[e] = (j << 1) | o;
+    for (let j = 0; j < 12; j++) for (let o = 0; o < 2; o++) if ([0, 1].every((n) => facelet[GE[e][(n + o) % 2]] === face(GE[j][n]))) cc.ea[e] = (j << 1) | o;
   return cc;
 }
 
@@ -83,14 +81,17 @@ function giikerBytes(facelet: string, moves: [number, number][], encrypt: false 
     for (let v = 1; v <= 3; v++) if ((3 + v * coMask[i]) % 3 === cc.ca[i] >> 3) hex[i + 8] = v;
   }
   for (let i = 0; i < 12; i++) hex[i + 16] = (cc.ea[i] >> 1) + 1;
-  for (let i = 0; i < 12; i++) if (cc.ea[i] & 1) hex[28 + Math.floor(i / 4)] |= 8 >> i % 4;
+  for (let i = 0; i < 12; i++) if (cc.ea[i] & 1) hex[28 + Math.floor(i / 4)] |= 8 >> (i % 4);
   moves.forEach(([f, p], k) => {
     hex[32 + k * 2] = f;
     hex[33 + k * 2] = p;
   });
   const bytes = Array.from({ length: 20 }, (_, i) => (hex[i * 2] << 4) | hex[i * 2 + 1]);
   if (!encrypt) return bytes;
-  const KEY = [176, 81, 104, 224, 86, 137, 237, 119, 38, 26, 193, 161, 210, 126, 150, 81, 93, 13, 236, 249, 89, 235, 88, 24, 113, 81, 214, 131, 130, 199, 2, 169, 39, 165, 171, 41];
+  const KEY = [
+    176, 81, 104, 224, 86, 137, 237, 119, 38, 26, 193, 161, 210, 126, 150, 81, 93, 13, 236, 249, 89, 235, 88, 24, 113, 81, 214, 131, 130, 199, 2, 169, 39, 165,
+    171, 41,
+  ];
   const [k1, k2] = encrypt;
   const out = bytes.slice(0, 18).map((b, i) => (((b - KEY[i + k1] - KEY[i + k2]) % 256) + 256) % 256);
   return [...out, 0xa7, (k1 << 4) | k2];
@@ -177,7 +178,14 @@ describe('MoYu 32 (WCU)', () => {
     for (let i = 0; i < 6; i++) {
       const stickers = f.slice(i * 9, i * 9 + 9).split('');
       stickers.splice(4, 1);
-      byFace[faces[i]] = stickers.map((c) => 'FBUDLR'.indexOf('URFDLB'.includes(c) ? c : c).toString(2).padStart(3, '0')).join('');
+      byFace[faces[i]] = stickers
+        .map((c) =>
+          'FBUDLR'
+            .indexOf('URFDLB'.includes(c) ? c : c)
+            .toString(2)
+            .padStart(3, '0'),
+        )
+        .join('');
     }
     return byFace.join('');
   }
@@ -212,7 +220,10 @@ describe('MoYu 32 (WCU)', () => {
     let bits = (165).toString(2).padStart(8, '0');
     for (const g of gaps) bits += g.toString(2).padStart(16, '0');
     bits += (13).toString(2).padStart(8, '0');
-    for (let i = 0; i < 5; i++) bits += code(moves[i] ?? 'U ').toString(2).padStart(5, '0');
+    for (let i = 0; i < 5; i++)
+      bits += code(moves[i] ?? 'U ')
+        .toString(2)
+        .padStart(5, '0');
     read.notify(encode(aes, toBytes(bits)));
     // move counter 10 -> 13: three moves, oldest first
     expect(states.slice(1).map((s) => s.moves[0])).toEqual(['F ', 'U ', "R'"]);
@@ -281,7 +292,12 @@ describe('QiYi', () => {
     expect(battery).toEqual([88]);
     // R at t=3200, U at 4800 (its message lost), F at 6400 with U in the history
     chr.notify(change(3200, scrambled('D2 F R').toFaceCube(), 'R ', []));
-    chr.notify(change(6400, scrambled('D2 F R U F').toFaceCube(), 'F ', [['U ', 4800], ['R ', 3200]]));
+    chr.notify(
+      change(6400, scrambled('D2 F R U F').toFaceCube(), 'F ', [
+        ['U ', 4800],
+        ['R ', 3200],
+      ]),
+    );
     expect(states.slice(1).map((s) => s.moves[0])).toEqual(['R ', 'U ', 'F ']);
     expect(states.at(-1)!.facelet).toBe(scrambled('D2 F R U F').toFaceCube());
     // device time: its ticks / 1.6

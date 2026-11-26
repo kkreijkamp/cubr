@@ -53,71 +53,69 @@ export function PrivacyPage() {
   return (
     <LegalShell page={PAGE_META['/privacy']} effective={PRIVACY_EFFECTIVE} icon={<ShieldCheckIcon />}>
       <p className="legal-intro">
-        cubr (cubr.dev) is a free speedcubing timer run by Koen Kreijkamp, an individual in Queensland, Australia (&quot;cubr&quot;,
-        &quot;we&quot;). This policy explains what we collect, why, who helps us run cubr, and the choices you have. There are no ads,
-        and nothing follows you around the web: the only measurement is Cloudflare Web Analytics, which counts page views without
-        cookies.
+        cubr (cubr.dev) is a free speedcubing timer run by Koen Kreijkamp, an individual in Queensland, Australia (&quot;cubr&quot;, &quot;we&quot;). This
+        policy explains what we collect, why, who helps us run cubr, and the choices you have. There are no ads, and nothing follows you around the web: the
+        only measurement is Cloudflare Web Analytics, which counts page views without cookies.
       </p>
 
       <Section title="what we collect">
         <ul>
           <li>
-            <b>Account:</b> your username, email address (and whether you&apos;ve confirmed it) and password. The password is stored only as a bcrypt hash, so we can&apos;t
-            read it.
+            <b>Account:</b> your username, email address (and whether you&apos;ve confirmed it) and password. The password is stored only as a bcrypt hash, so
+            we can&apos;t read it.
           </li>
           <li>
-            <b>Sign-in with Google or GitHub</b> (and Apple, once it&apos;s available; if you choose it): your account&apos;s id there and
-            its verified email address.
-            When you sign up this way, your name there suggests a username and isn&apos;t kept. We never see your password for that
-            account. An account made this way has no password until you set one.
+            <b>Sign-in with Google or GitHub</b> (and Apple, once it&apos;s available; if you choose it): your account&apos;s id there and its verified email
+            address. When you sign up this way, your name there suggests a username and isn&apos;t kept. We never see your password for that account. An account
+            made this way has no password until you set one.
           </li>
           <li>
             <b>Profile</b> (all optional): display name, bio, country, WCA ID and profile picture.
           </li>
           <li>
-            <b>Your cubing:</b> solves (times, penalties, scrambles, comments and dates), sessions, daily-challenge attempts (and when
-            each started, so each scramble gets one try) and your settings.
+            <b>Your cubing:</b> solves (times, penalties, scrambles, comments and dates), sessions, daily-challenge attempts (and when each started, so each
+            scramble gets one try) and your settings.
           </li>
           <li>
-            <b>Race rooms:</b> the name you race under and the chat messages you send (the room keeps its last 50), until 2 hours after
-            the room was last active.
+            <b>Race rooms:</b> the name you race under and the chat messages you send (the room keeps its last 50), until 2 hours after the room was last
+            active.
           </li>
           <li>
-            <b>Technical data:</b> your IP address, used for the rate limits that protect sign-in and the rest of the service, and in our
-            server logs. Cloudflare, which sits in front of cubr, also handles your IP address and request details.
+            <b>Technical data:</b> your IP address, used for the rate limits that protect sign-in and the rest of the service, and in our server logs.
+            Cloudflare, which sits in front of cubr, also handles your IP address and request details.
           </li>
           <li>
-            <b>Page views:</b> Cloudflare Web Analytics records the page you open, the page that linked to it, your browser and device
-            type, your country (worked out from your IP address, which it doesn&apos;t keep) and how fast the page loaded. Cloudflare says
-            it uses no cookies or other storage in your browser for this and doesn&apos;t fingerprint visitors. We only see totals, never
-            a record of one visit. If your browser sends Global Privacy Control or Do Not Track, cubr doesn&apos;t load it.
+            <b>Page views:</b> Cloudflare Web Analytics records the page you open, the page that linked to it, your browser and device type, your country
+            (worked out from your IP address, which it doesn&apos;t keep) and how fast the page loaded. Cloudflare says it uses no cookies or other storage in
+            your browser for this and doesn&apos;t fingerprint visitors. We only see totals, never a record of one visit. If your browser sends Global Privacy
+            Control or Do Not Track, cubr doesn&apos;t load it.
           </li>
           <li>
-            <b>Error reports:</b> if something in cubr breaks while you use it, your browser sends us the error: its message and where in
-            cubr&apos;s code it happened, the kind of page (such as &quot;a profile&quot;, never which one), whether you use the installed
-            app, and your browser&apos;s name and version. Anything in it that looks personal, such as an email address or a username, is
-            taken out first. Reports aren&apos;t linked to your account, and we don&apos;t keep your IP address with them.
+            <b>Error reports:</b> if something in cubr breaks while you use it, your browser sends us the error: its message and where in cubr&apos;s code it
+            happened, the kind of page (such as &quot;a profile&quot;, never which one), whether you use the installed app, and your browser&apos;s name and
+            version. Anything in it that looks personal, such as an email address or a username, is taken out first. Reports aren&apos;t linked to your account,
+            and we don&apos;t keep your IP address with them.
           </li>
           <li>
             <b>Emails</b> you send to <Mail />, reports of a profile or a race room included.
           </li>
           <li>
-            <b>Moderation:</b> when we act on an account (a rename, a cleared display name, bio or picture, a suspension), a record of
-            what we did, when, and why. A suspended account keeps a short note on why while the suspension lasts.
+            <b>Moderation:</b> when we act on an account (a rename, a cleared display name, bio or picture, a suspension), a record of what we did, when, and
+            why. A suspended account keeps a short note on why while the suspension lasts.
           </li>
           <li>
-            <b>Feedback</b> you send with the form in the footer: what it&apos;s about, your message, the email address you give (if
-            any, so we can reply), and the line the form shows it adds: your cubr version, browser, window size and the page you were
-            on. It&apos;s emailed to our inbox through Resend, which keeps a copy for 30 days; cubr&apos;s servers don&apos;t keep one. It isn&apos;t linked to your account,
-            and we don&apos;t keep your IP address with it.
+            <b>Feedback</b> you send with the form in the footer: what it&apos;s about, your message, the email address you give (if any, so we can reply), and
+            the line the form shows it adds: your cubr version, browser, window size and the page you were on. It&apos;s emailed to our inbox through Resend,
+            which keeps a copy for 30 days; cubr&apos;s servers don&apos;t keep one. It isn&apos;t linked to your account, and we don&apos;t keep your IP
+            address with it.
           </li>
           <li>
-            <b>Supporters:</b> if you support cubr on Ko-fi, Ko-fi tells us the kind of support, when, and your name if you made your
-            support public. We keep only that; not your email, message, amount or payment details.
+            <b>Supporters:</b> if you support cubr on Ko-fi, Ko-fi tells us the kind of support, when, and your name if you made your support public. We keep
+            only that; not your email, message, amount or payment details.
           </li>
           <li>
-            <b>Guests:</b> without an account, your solves and settings stay in your browser and never reach our servers, unless you
-            sign in and choose to upload them.
+            <b>Guests:</b> without an account, your solves and settings stay in your browser and never reach our servers, unless you sign in and choose to
+            upload them.
           </li>
         </ul>
       </Section>
@@ -126,13 +124,13 @@ export function PrivacyPage() {
         <ul>
           <li>Your username and profile picture are always public: on your profile, the leaderboards, the daily-challenge board and in race rooms.</li>
           <li>
-            With a public profile (the default), anyone can also see your display name, bio, country, WCA ID, statistics, solve history,
-            activity and leaderboard ranks.
+            With a public profile (the default), anyone can also see your display name, bio, country, WCA ID, statistics, solve history, activity and
+            leaderboard ranks.
           </li>
           <li>If you support cubr on Ko-fi and make your support public, your Ko-fi name appears on the about page.</li>
           <li>
-            With a private profile, everyone else sees only your username and picture. Your times still appear on the leaderboards and the
-            daily-challenge board under your username.
+            With a private profile, everyone else sees only your username and picture. Your times still appear on the leaderboards and the daily-challenge board
+            under your username.
           </li>
           <li>
             You can switch between the two at any time: <Link to="/account">account</Link> &gt; edit profile.
@@ -144,31 +142,30 @@ export function PrivacyPage() {
       <Section title="why we use it">
         <ul>
           <li>
-            To run the service you signed up for: your account, syncing your solves, profiles, leaderboards, the daily challenge, races and
-            password-reset emails, the emails that confirm your email address (when you sign up or change it), and the notice to your old
-            address after a change. (Legal basis: performing our agreement
-            with you.)
+            To run the service you signed up for: your account, syncing your solves, profiles, leaderboards, the daily challenge, races and password-reset
+            emails, the emails that confirm your email address (when you sign up or change it), and the notice to your old address after a change. (Legal basis:
+            performing our agreement with you.)
           </li>
           <li>
-            To keep cubr safe, fair and working: rate limits, server logs, error reports, anti-cheat checks that compare times with WCA
-            records, moderation (acting on reports and on what breaks the terms) and backups. (Legal basis: our legitimate interest in
-            running a secure service that is safe to use.)
+            To keep cubr safe, fair and working: rate limits, server logs, error reports, anti-cheat checks that compare times with WCA records, moderation
+            (acting on reports and on what breaks the terms) and backups. (Legal basis: our legitimate interest in running a secure service that is safe to
+            use.)
           </li>
           <li>
-            To see which pages are used and how fast they load, so we know what to improve: page-view totals from Cloudflare Web
-            Analytics. (Legal basis: our legitimate interest in improving cubr.)
+            To see which pages are used and how fast they load, so we know what to improve: page-view totals from Cloudflare Web Analytics. (Legal basis: our
+            legitimate interest in improving cubr.)
           </li>
           <li>
-            To answer you when you contact us or send feedback, and to fix what you report. (Legal basis: our legitimate interest in
-            answering you and improving cubr.)
+            To answer you when you contact us or send feedback, and to fix what you report. (Legal basis: our legitimate interest in answering you and improving
+            cubr.)
           </li>
           <li>
-            To thank supporters by name on the about page, when they made their support public on Ko-fi. (Legal basis: our legitimate
-            interest in recognising support, as you chose to share it.)
+            To thank supporters by name on the about page, when they made their support public on Ko-fi. (Legal basis: our legitimate interest in recognising
+            support, as you chose to share it.)
           </li>
           <li>
-            To compare your times with official results: the WCA&apos;s public competition results (below). (Legal basis: our
-            legitimate interest in showing cubers where they stand, using results the WCA publishes.)
+            To compare your times with official results: the WCA&apos;s public competition results (below). (Legal basis: our legitimate interest in showing
+            cubers where they stand, using results the WCA publishes.)
           </li>
         </ul>
         <p>We don&apos;t sell your data, use it for advertising, or build profiles of you.</p>
@@ -181,12 +178,12 @@ export function PrivacyPage() {
             <b>Google Cloud:</b> our server (Sydney) and nightly backups (Melbourne), in Australia.
           </li>
           <li>
-            <b>Cloudflare:</b> our domain, security and delivery. Your traffic passes through Cloudflare&apos;s global network, where it is
-            decrypted to be protected and routed. Cloudflare also counts our page views (Web Analytics, above).
+            <b>Cloudflare:</b> our domain, security and delivery. Your traffic passes through Cloudflare&apos;s global network, where it is decrypted to be
+            protected and routed. Cloudflare also counts our page views (Web Analytics, above).
           </li>
           <li>
-            <b>Resend:</b> sends password-reset emails and the emails that confirm an email address, and brings feedback from the
-            form to our inbox. It sends from Japan, and keeps each email for 30 days.
+            <b>Resend:</b> sends password-reset emails and the emails that confirm an email address, and brings feedback from the form to our inbox. It sends
+            from Japan, and keeps each email for 30 days.
           </li>
           <li>
             <b>Apple iCloud:</b> hosts our contact inbox, <Mail />.
@@ -195,21 +192,17 @@ export function PrivacyPage() {
             <b>Ko-fi:</b> takes donations. The payment itself is between you and Ko-fi, under Ko-fi&apos;s own terms and privacy policy.
           </li>
           <li>
-            <b>Google and GitHub</b> (and Apple, once it&apos;s available): if you sign in with one of them, it confirms who you are,
-            under its own terms and privacy policy. We only receive what is listed above.
+            <b>Google and GitHub</b> (and Apple, once it&apos;s available): if you sign in with one of them, it confirms who you are, under its own terms and
+            privacy policy. We only receive what is listed above.
           </li>
         </ul>
-        <p>
-          Some of them are based in, or process data in, other countries, including the United States and Japan, under their own data
-          processing terms.
-        </p>
+        <p>Some of them are based in, or process data in, other countries, including the United States and Japan, under their own data processing terms.</p>
       </Section>
 
       <Section title="wca results">
         <p>
-          The rankings and comparisons use public competition results from the World Cube Association: competitors&apos; names, WCA IDs,
-          countries and results, updated weekly. This information is based on competition results owned and maintained by the World Cube
-          Association, published at{' '}
+          The rankings and comparisons use public competition results from the World Cube Association: competitors&apos; names, WCA IDs, countries and results,
+          updated weekly. This information is based on competition results owned and maintained by the World Cube Association, published at{' '}
           <a href="https://www.worldcubeassociation.org/results" target="_blank" rel="noreferrer noopener">
             worldcubeassociation.org/results
           </a>
@@ -219,29 +212,27 @@ export function PrivacyPage() {
 
       <Section title="cookies and local storage">
         <p>
-          cubr sets one cookie of its own, and only while you sign in with Google or GitHub (or Apple, once available): it ties that sign-in to your browser
-          and expires within minutes. Your browser&apos;s local storage keeps you signed in and holds your settings, your offline solves and the players you muted in race chat,
-          so the site works. None of it is used for tracking or advertising, which is why there is no cookie banner. Cloudflare may set a
-          strictly necessary security cookie. Cloudflare Web Analytics sets none.
+          cubr sets one cookie of its own, and only while you sign in with Google or GitHub (or Apple, once available): it ties that sign-in to your browser and
+          expires within minutes. Your browser&apos;s local storage keeps you signed in and holds your settings, your offline solves and the players you muted
+          in race chat, so the site works. None of it is used for tracking or advertising, which is why there is no cookie banner. Cloudflare may set a strictly
+          necessary security cookie. Cloudflare Web Analytics sets none.
         </p>
       </Section>
 
       <Section title="how long we keep it">
         <ul>
           <li>
-            Your account and solves: until you delete your account. Deleting removes them from the live database straight away, and from
-            backups within 30 days.
+            Your account and solves: until you delete your account. Deleting removes them from the live database straight away, and from backups within 30 days.
           </li>
           <li>
-            Password-reset links work for 1 hour, links that confirm your email for 7 days (1 hour for a change of address). Race rooms
-            and their chat are kept until 2 hours after the room was last active, and rate-limit counters for up to a day.
+            Password-reset links work for 1 hour, links that confirm your email for 7 days (1 hour for a change of address). Race rooms and their chat are kept
+            until 2 hours after the room was last active, and rate-limit counters for up to a day.
           </li>
           <li>Server logs, error reports included: at most 14 days.</li>
           <li>Supporter entries: until you ask us to remove your name.</li>
           <li>Page-view statistics: only as totals, in Cloudflare&apos;s dashboard, for as long as Cloudflare keeps them.</li>
           <li>
-            Emails to <Mail />, feedback from the form and reports included: up to 12 months, then deleted. Resend&apos;s copies of what
-            it sent: 30 days.
+            Emails to <Mail />, feedback from the form and reports included: up to 12 months, then deleted. Resend&apos;s copies of what it sent: 30 days.
           </li>
           <li>Moderation records: 2 years. A suspension&apos;s note: until the suspension ends.</li>
         </ul>
@@ -256,12 +247,11 @@ export function PrivacyPage() {
             Download all your solves: <Link to="/settings#data">settings &gt; data</Link> &gt; export.
           </li>
           <li>
-            Delete your account and solves: <Link to="/settings#danger">settings &gt; danger zone</Link>. A suspended account can&apos;t
-            sign in: email <Mail /> and we delete it.
+            Delete your account and solves: <Link to="/settings#danger">settings &gt; danger zone</Link>. A suspended account can&apos;t sign in: email <Mail />{' '}
+            and we delete it.
           </li>
           <li>
-            For anything else (a copy of your data, a correction, deletion, or an objection to how we use it), email <Mail />. We reply
-            within a month.
+            For anything else (a copy of your data, a correction, deletion, or an objection to how we use it), email <Mail />. We reply within a month.
           </li>
           <li>If you are in the EU or UK, you can also complain to your local data protection authority; in Australia, to the OAIC.</li>
         </ul>
@@ -269,15 +259,15 @@ export function PrivacyPage() {
 
       <Section title="children">
         <p>
-          cubr is for people aged 13 and over. If you are under 18, please use cubr with the permission of a parent or guardian. If we learn
-          that an account belongs to someone under 13, we will delete it. Parents can reach us at <Mail />.
+          cubr is for people aged 13 and over. If you are under 18, please use cubr with the permission of a parent or guardian. If we learn that an account
+          belongs to someone under 13, we will delete it. Parents can reach us at <Mail />.
         </p>
       </Section>
 
       <Section title="security">
         <p>
-          Traffic is encrypted (HTTPS), passwords are hashed with bcrypt, and access to our servers is restricted. No service is perfectly
-          secure; if a breach affects your data, we will tell you without undue delay.
+          Traffic is encrypted (HTTPS), passwords are hashed with bcrypt, and access to our servers is restricted. No service is perfectly secure; if a breach
+          affects your data, we will tell you without undue delay.
         </p>
       </Section>
 
@@ -297,9 +287,9 @@ export function TermsPage() {
   return (
     <LegalShell page={PAGE_META['/terms']} effective={TERMS_EFFECTIVE} icon={<DocumentTextIcon />}>
       <p className="legal-intro">
-        These terms apply when you use cubr (cubr.dev), a free speedcubing timer run by Koen Kreijkamp in Queensland, Australia
-        (&quot;cubr&quot;, &quot;we&quot;). By using cubr or creating an account, you agree to them and to our{' '}
-        <Link to="/privacy">privacy policy</Link>. If you don&apos;t agree, please don&apos;t use cubr.
+        These terms apply when you use cubr (cubr.dev), a free speedcubing timer run by Koen Kreijkamp in Queensland, Australia (&quot;cubr&quot;,
+        &quot;we&quot;). By using cubr or creating an account, you agree to them and to our <Link to="/privacy">privacy policy</Link>. If you don&apos;t agree,
+        please don&apos;t use cubr.
       </p>
 
       <Section title="who can use cubr">
@@ -309,8 +299,8 @@ export function TermsPage() {
       <Section title="your account">
         <ul>
           <li>
-            Use a real email address you control: it is how you reset your password. Confirm it within 7 days: after that, an address
-            nobody confirmed can be used by another account, and yours keeps working without one until you add another.
+            Use a real email address you control: it is how you reset your password. Confirm it within 7 days: after that, an address nobody confirmed can be
+            used by another account, and yours keeps working without one until you add another.
           </li>
           <li>Keep your password to yourself. You are responsible for what happens on your account.</li>
           <li>One person per account. Don&apos;t impersonate anyone; we may change usernames that do, or that are offensive.</li>
@@ -319,9 +309,8 @@ export function TermsPage() {
 
       <Section title="fair play">
         <p>
-          Leaderboards and the daily challenge only work if times are real. Only submit times from your own solves, without assistance,
-          editing or automation. We may remove times or accounts from the leaderboards when results look wrong; contact us if you think we
-          got it wrong.
+          Leaderboards and the daily challenge only work if times are real. Only submit times from your own solves, without assistance, editing or automation.
+          We may remove times or accounts from the leaderboards when results look wrong; contact us if you think we got it wrong.
         </p>
       </Section>
 
@@ -330,9 +319,9 @@ export function TermsPage() {
         <ul>
           <li>harass, threaten, bully or spread hate about anyone;</li>
           <li>
-            post or share child sexual exploitation or abuse material, material that promotes or instructs in terrorism, or material that
-            shows or instructs in extreme crime, violence or drug use (what Australian law calls class 1A and 1B material): we remove it at
-            once, and close the account and keep it out;
+            post or share child sexual exploitation or abuse material, material that promotes or instructs in terrorism, or material that shows or instructs in
+            extreme crime, violence or drug use (what Australian law calls class 1A and 1B material): we remove it at once, and close the account and keep it
+            out;
           </li>
           <li>post other sexual, violent or illegal content, or content that infringes someone else&apos;s rights;</li>
           <li>spam, advertise or scam;</li>
@@ -342,25 +331,24 @@ export function TermsPage() {
 
       <Section title="your content">
         <p>
-          You own what you put on cubr: your solves, profile and messages. You give cubr a worldwide, non-exclusive, free licence to store,
-          copy and show that content as needed to run the service, for example on your profile, the leaderboards and in race rooms, for as
-          long as it is on cubr. The licence ends when you delete the content or your account (copies in backups are gone within 30 days).
+          You own what you put on cubr: your solves, profile and messages. You give cubr a worldwide, non-exclusive, free licence to store, copy and show that
+          content as needed to run the service, for example on your profile, the leaderboards and in race rooms, for as long as it is on cubr. The licence ends
+          when you delete the content or your account (copies in backups are gone within 30 days).
         </p>
       </Section>
 
       <Section title="moderation">
         <p>
-          We may remove content, or suspend or close an account, that breaks these terms or the law. Where reasonable, we will tell you why,
-          and you can always contact us at <Mail />.
+          We may remove content, or suspend or close an account, that breaks these terms or the law. Where reasonable, we will tell you why, and you can always
+          contact us at <Mail />.
         </p>
         <p>
-          To report a profile, a race room or anything else on cubr, use the flag link beside it or email <Mail />. We aim to act within 24
-          hours, we tell you what we did, and we never tell the person you reported who you are.
+          To report a profile, a race room or anything else on cubr, use the flag link beside it or email <Mail />. We aim to act within 24 hours, we tell you
+          what we did, and we never tell the person you reported who you are.
         </p>
         <p>
-          If you&apos;re in Australia: the eSafety Commissioner is the independent regulator for online safety. It can help with serious
-          online abuse and with illegal or restricted content, and if you aren&apos;t happy with how we handled a report, you can complain
-          to it at{' '}
+          If you&apos;re in Australia: the eSafety Commissioner is the independent regulator for online safety. It can help with serious online abuse and with
+          illegal or restricted content, and if you aren&apos;t happy with how we handled a report, you can complain to it at{' '}
           <a href="https://www.esafety.gov.au/report" target="_blank" rel="noreferrer noopener">
             esafety.gov.au/report
           </a>
@@ -380,31 +368,30 @@ export function TermsPage() {
 
       <Section title="the service">
         <p>
-          cubr is free and provided as it is. We work to keep it running and your data safe, but we can&apos;t promise it will always be
-          available or free of errors. We may change or remove features, and if cubr ever shuts down we will give notice so you can export
-          your data. Exporting now and then is a good idea anyway.
+          cubr is free and provided as it is. We work to keep it running and your data safe, but we can&apos;t promise it will always be available or free of
+          errors. We may change or remove features, and if cubr ever shuts down we will give notice so you can export your data. Exporting now and then is a
+          good idea anyway.
         </p>
       </Section>
 
       <Section title="liability">
         <p>
-          To the extent the law allows, cubr is not liable for indirect or consequential loss, or for lost data. Nothing in these terms
-          excludes, restricts or modifies any right, remedy or guarantee you have under the Australian Consumer Law or any other law that
-          can&apos;t lawfully be excluded.
+          To the extent the law allows, cubr is not liable for indirect or consequential loss, or for lost data. Nothing in these terms excludes, restricts or
+          modifies any right, remedy or guarantee you have under the Australian Consumer Law or any other law that can&apos;t lawfully be excluded.
         </p>
       </Section>
 
       <Section title="ending">
         <p>
-          You can stop using cubr and delete your account at any time (<Link to="/settings#danger">settings &gt; danger zone</Link>). We may
-          suspend or close accounts that seriously or repeatedly break these terms.
+          You can stop using cubr and delete your account at any time (<Link to="/settings#danger">settings &gt; danger zone</Link>). We may suspend or close
+          accounts that seriously or repeatedly break these terms.
         </p>
       </Section>
 
       <Section title="changes to these terms">
         <p>
-          We may update these terms. We will change the date at the top and give notice on the site before significant changes take effect;
-          if you keep using cubr after that, the new terms apply.
+          We may update these terms. We will change the date at the top and give notice on the site before significant changes take effect; if you keep using
+          cubr after that, the new terms apply.
         </p>
       </Section>
 

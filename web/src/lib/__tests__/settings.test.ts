@@ -277,7 +277,7 @@ describe('server settings at sign-in', () => {
   });
 });
 
-describe('settings from anywhere, made safe (the October review\'s #11)', () => {
+describe("settings from anywhere, made safe (the October review's #11)", () => {
   it('gives a value of the wrong type its default, so a bad statsShown no longer breaks the timer', async () => {
     const s = await load({ statsShown: 'ao5', precision: '3', inspection: 'yes', holdMs: 'long', customStickers: [], lastEvent: 42, confirmDelete: null });
     expect(s.get()).toMatchObject({
@@ -300,21 +300,37 @@ describe('settings from anywhere, made safe (the October review\'s #11)', () => 
   });
 
   it('falls back from choices that do not exist and clamps numbers out of range', async () => {
-    const s = await load({ timerUpdate: 'sometimes', scramblePreview: '4D', stickerColours: 'neon', inspectionAlerts: 'scream', font: 'Comic Sans', timerSize: 99, holdMs: -5 });
-    expect(s.get()).toMatchObject({ timerUpdate: 'realtime', scramblePreview: '2D', stickerColours: 'default', inspectionAlerts: 'beep', font: 'Lexend Deca', timerSize: 14, holdMs: 0 });
+    const s = await load({
+      timerUpdate: 'sometimes',
+      scramblePreview: '4D',
+      stickerColours: 'neon',
+      inspectionAlerts: 'scream',
+      font: 'Comic Sans',
+      timerSize: 99,
+      holdMs: -5,
+    });
+    expect(s.get()).toMatchObject({
+      timerUpdate: 'realtime',
+      scramblePreview: '2D',
+      stickerColours: 'default',
+      inspectionAlerts: 'beep',
+      font: 'Lexend Deca',
+      timerSize: 14,
+      holdMs: 0,
+    });
     vi.resetModules();
     const t = await load({ timerSize: 8.6, holdMs: Number.NaN });
     expect(t.get()).toMatchObject({ timerSize: 9, holdMs: 300 });
   });
 
-  it('cleans the account\'s settings the same way at sign-in', async () => {
+  it("cleans the account's settings the same way at sign-in", async () => {
     const s = await load();
     s.mergeServerSettings({ statsShown: { ao5: true }, precision: 3, font: 'Georgia' }, 'u1');
     expect(s.get()).toMatchObject({ statsShown: s.DEFAULT_SETTINGS.statsShown, precision: 3, font: 'Georgia' });
   });
 });
 
-describe('syncing to the account (the October review\'s #11)', () => {
+describe("syncing to the account (the October review's #11)", () => {
   const UNSYNCED = 'cubr.settings.unsynced';
 
   it('marks a change unsynced until it lands, retrying a failed push with backoff', async () => {
@@ -355,7 +371,10 @@ describe('syncing to the account (the October review\'s #11)', () => {
 
   it('keeps an unsynced change at the next sign-in on this device, and pushes it then', async () => {
     const s = await load();
-    s.setSettingsServerSync(vi.fn(async () => Promise.reject(new Error('offline'))), 'u1');
+    s.setSettingsServerSync(
+      vi.fn(async () => Promise.reject(new Error('offline'))),
+      'u1',
+    );
     s.updateSettings({ precision: 3, holdMs: 550 });
     s.setSettingsServerSync(null); // the tab closes before it lands
     vi.resetModules();
@@ -371,7 +390,10 @@ describe('syncing to the account (the October review\'s #11)', () => {
 
   it("lets another account's settings replace a change marked for someone else", async () => {
     const s = await load();
-    s.setSettingsServerSync(vi.fn(async () => Promise.reject(new Error('offline'))), 'u1');
+    s.setSettingsServerSync(
+      vi.fn(async () => Promise.reject(new Error('offline'))),
+      'u1',
+    );
     s.updateSettings({ precision: 3 });
     s.setSettingsServerSync(null);
     s.mergeServerSettings({ precision: 2 }, 'u2');

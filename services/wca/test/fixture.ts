@@ -35,7 +35,12 @@ export function fixture(over: Partial<Pick<WcaExport, 'exportDate' | 'exportVers
     exportVersion: 'v2.0.2',
     ...over,
     // id, name, record_name
-    continents: [['_Oceania', 'Oceania', 'OcR'], ['_Europe', 'Europe', 'ER'], ['_North America', 'North America', 'NAR'], ['_Asia', 'Asia', 'AsR']],
+    continents: [
+      ['_Oceania', 'Oceania', 'OcR'],
+      ['_Europe', 'Europe', 'ER'],
+      ['_North America', 'North America', 'NAR'],
+      ['_Asia', 'Asia', 'AsR'],
+    ],
     // id, iso2, name, continent_id
     countries: [
       ['Australia', 'AU', 'Australia', '_Oceania'],
@@ -131,9 +136,26 @@ export async function importWca(databaseUrl: string, data: WcaExport): Promise<v
     await insert(c, 'countries', ['id', 'iso2', 'name', 'continent_id'], data.countries);
     await insert(c, 'events', ['id', 'format', 'name', 'rank'], data.events);
     await insert(c, 'persons', ['name', 'gender', 'wca_id', 'sub_id', 'country_id'], data.persons);
-    await insert(c, 'competitions', [
-      'id', 'name', 'city_name', 'country_id', 'cancelled', 'year', 'month', 'day', 'end_year', 'end_month', 'end_day', 'latitude_microdegrees', 'longitude_microdegrees',
-    ], data.competitions);
+    await insert(
+      c,
+      'competitions',
+      [
+        'id',
+        'name',
+        'city_name',
+        'country_id',
+        'cancelled',
+        'year',
+        'month',
+        'day',
+        'end_year',
+        'end_month',
+        'end_day',
+        'latitude_microdegrees',
+        'longitude_microdegrees',
+      ],
+      data.competitions,
+    );
     await insert(c, 'ranks_single', rankColumns, data.ranksSingle);
     await insert(c, 'ranks_average', rankColumns, data.ranksAverage);
     await c.query(keysAndIndexes());

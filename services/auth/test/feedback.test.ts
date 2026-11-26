@@ -8,7 +8,10 @@ const parse = (body: unknown) => feedbackSchema.safeParse(body);
 describe('the feedback form request', () => {
   it('takes a type, a message, and optionally an email and the details line', () => {
     expect(parse(ok)).toEqual({ success: true, data: ok });
-    expect(parse({ kind: 'idea', message: 'dark mode for the stackmat theme' })).toEqual({ success: true, data: { kind: 'idea', message: 'dark mode for the stackmat theme' } });
+    expect(parse({ kind: 'idea', message: 'dark mode for the stackmat theme' })).toEqual({
+      success: true,
+      data: { kind: 'idea', message: 'dark mode for the stackmat theme' },
+    });
     for (const kind of FEEDBACK_KINDS) expect(parse({ ...ok, kind }).success, kind).toBe(true);
   });
 
@@ -83,7 +86,7 @@ describe('the web app offers the same', () => {
   // web/src/lib/feedbackForm.ts: one { value, label, prompt } per kind, and FEEDBACK_MAX
   const src = readFileSync(new URL('../../../web/src/lib/feedbackForm.ts', import.meta.url), 'utf8');
 
-  it("types, named as the email names them", () => {
+  it('types, named as the email names them', () => {
     const offered = [...src.matchAll(/\{ value: '(\w+)', label: '([^']+)'/g)].map(([, value, label]) => [value, label]);
     expect(offered).toEqual(FEEDBACK_KINDS.map((k) => [k, FEEDBACK_KIND_NAMES[k]]));
   });

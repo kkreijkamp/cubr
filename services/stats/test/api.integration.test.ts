@@ -88,11 +88,17 @@ describeIntegration('stats API', () => {
         // most solves first; time spent counts the raw times (the DNF too), the mean the +2 but not the DNF
         events: [
           {
-            event: '333', solves: 5, totalMs: 55_000, meanMs: 12_000,
+            event: '333',
+            solves: 5,
+            totalMs: 55_000,
+            meanMs: 12_000,
             pbs: { single: pb(1, 10_000), mo3: pb(3, 11_667), ao5: pb(4, 12_667), ao12: null, ao50: null, ao100: null },
           },
           {
-            event: '222', solves: 2, totalMs: 7_000, meanMs: 3_500,
+            event: '222',
+            solves: 2,
+            totalMs: 7_000,
+            meanMs: 3_500,
             pbs: { single: pb(5, 3_000), mo3: null, ao5: null, ao12: null, ao50: null, ao100: null },
           },
         ],
@@ -106,8 +112,12 @@ describeIntegration('stats API', () => {
       const instants = [
         '2025-12-31T13:30:00Z', // 23:30 on 31 December
         '2025-12-31T14:30:00Z', // 00:30 on 1 January 2026 (still 2025 in UTC)
-        '2026-10-01T02:00:00Z', '2026-10-02T02:00:00Z', '2026-10-03T02:00:00Z',
-        '2026-10-11T02:00:00Z', '2026-10-12T02:00:00Z', '2026-10-13T02:00:00Z',
+        '2026-10-01T02:00:00Z',
+        '2026-10-02T02:00:00Z',
+        '2026-10-03T02:00:00Z',
+        '2026-10-11T02:00:00Z',
+        '2026-10-12T02:00:00Z',
+        '2026-10-13T02:00:00Z',
         '2026-10-13T15:30:00Z', // 01:30 on 14 October (13 October in UTC)
       ];
       await s.feed(...instants.map((t, i) => s.solve.solve(u, session, 10_000 + i, t).event));
@@ -157,16 +167,24 @@ describeIntegration('stats API', () => {
       );
       const activity = (q: string) => get(`/api/stats/users/${u.id}/activity?${q}`);
       expect(await activity('from=2026-03-01&to=2026-03-31')).toEqual({
-        from: '2026-03-01', to: '2026-03-31', days: [{ date: '2026-03-01', solves: 2, totalMs: 14_000 }],
+        from: '2026-03-01',
+        to: '2026-03-31',
+        days: [{ date: '2026-03-01', solves: 2, totalMs: 14_000 }],
       });
       expect(await activity('from=2026-01-01&to=2026-12-31&event=pyram')).toEqual({
-        from: '2026-01-01', to: '2026-12-31', days: [{ date: '2026-03-01', solves: 1, totalMs: 4_000 }],
+        from: '2026-01-01',
+        to: '2026-12-31',
+        days: [{ date: '2026-03-01', solves: 1, totalMs: 4_000 }],
       });
       expect(await activity('from=2026-03-02')).toEqual({
-        from: '2026-03-02', to: '2027-03-01', days: [{ date: '2026-06-01', solves: 1, totalMs: 9_000 }],
+        from: '2026-03-02',
+        to: '2027-03-01',
+        days: [{ date: '2026-06-01', solves: 1, totalMs: 9_000 }],
       });
       expect(await activity('to=2026-03-01')).toEqual({
-        from: '2025-03-02', to: '2026-03-01', days: [{ date: '2026-03-01', solves: 2, totalMs: 14_000 }],
+        from: '2025-03-02',
+        to: '2026-03-01',
+        days: [{ date: '2026-03-01', solves: 2, totalMs: 14_000 }],
       });
     });
 
@@ -461,15 +479,25 @@ describeIntegration('stats API', () => {
       const bSession = s.solve.session(b, 'sq1');
       const bSolves = [15_000, 16_000, 17_000, 18_000, 19_000].map((t, i) => s.solve.solve(b, bSession, t, `2026-10-01T11:0${i}:00.000Z`));
       await s.feed(aSolve.event, ...bSolves.map((x) => x.event));
-      const row = (u: Cuber, kind: string, valueMs: number, m: { solve: { id: string; createdAt: string } }) =>
-        ({ userId: u.id, username: u.username, event: 'sq1', kind, valueMs, solveId: m.solve.id, achievedAt: m.solve.createdAt });
+      const row = (u: Cuber, kind: string, valueMs: number, m: { solve: { id: string; createdAt: string } }) => ({
+        userId: u.id,
+        username: u.username,
+        event: 'sq1',
+        kind,
+        valueMs,
+        solveId: m.solve.id,
+        achievedAt: m.solve.createdAt,
+      });
       expect((await internal('?event=sq1&kind=single')).json()).toEqual({
         pbs: [row(b, 'single', 15_000, bSolves[0]), row(a, 'single', 20_000, aSolve)],
       });
       expect((await internal('?event=sq1&kind=ao5')).json()).toEqual({ pbs: [row(b, 'ao5', 17_000, bSolves[4])] });
       // without a kind: by kind, then fastest first
       expect((await internal('?event=sq1')).json().pbs.map((p: { kind: string; valueMs: number }) => [p.kind, p.valueMs])).toEqual([
-        ['ao5', 17_000], ['mo3', 16_000], ['single', 15_000], ['single', 20_000],
+        ['ao5', 17_000],
+        ['mo3', 16_000],
+        ['single', 15_000],
+        ['single', 20_000],
       ]);
     });
 

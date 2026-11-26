@@ -1,6 +1,16 @@
 import {
-  loadConfig, createServer, start, createPool, pingPostgres, waitForPostgres, migrate, createRedis, makeAuth, consumeEvents,
-  registerDeadLetterRoutes, type Consumer,
+  loadConfig,
+  createServer,
+  start,
+  createPool,
+  pingPostgres,
+  waitForPostgres,
+  migrate,
+  createRedis,
+  makeAuth,
+  consumeEvents,
+  registerDeadLetterRoutes,
+  type Consumer,
 } from '@cubr/common';
 import { migrations } from './migrations.js';
 import { startOutboxRelay, type Relay } from './outbox.js';

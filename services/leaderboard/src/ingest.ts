@@ -35,7 +35,16 @@ import type { AllTimeBests, PeriodBest, PeriodBests, PeriodSource } from './peri
 // All writes are idempotent (exact set / keep-best), so at-least-once redelivery is harmless.
 // ---------------------------------------------------------------------------------------------
 
-export const CONSUMED_TYPES = ['pb.updated', 'solve.created', 'periods.changed', 'daily.completed', 'daily.updated', 'user.registered', 'user.updated', 'user.deleted'];
+export const CONSUMED_TYPES = [
+  'pb.updated',
+  'solve.created',
+  'periods.changed',
+  'daily.completed',
+  'daily.updated',
+  'user.registered',
+  'user.updated',
+  'user.deleted',
+];
 
 /** A keep-best write (ZADD LT) to a period board. */
 export interface BestWrite {
@@ -70,8 +79,7 @@ export interface PbWrite {
 
 type Data = Record<string, unknown>;
 
-const positiveMs = (v: unknown): number | null =>
-  typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.round(v) : null;
+const positiveMs = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.round(v) : null);
 
 function parseTime(v: unknown): number | null {
   if (typeof v !== 'string') return null;
@@ -225,11 +233,7 @@ export function makeHandler({ redis, floors, log, periods }: IngestDeps) {
    * solve feeds both a daily and a weekly board); the caller records it on the board's flagged
    * hash for its owner.
    */
-  async function refusedBy(
-    evt: EventEnvelope,
-    w: { board: string; event: string; kind: Kind; valueMs: number },
-    flagged: Set<string>,
-  ): Promise<number | null> {
+  async function refusedBy(evt: EventEnvelope, w: { board: string; event: string; kind: Kind; valueMs: number }, flagged: Set<string>): Promise<number | null> {
     const floorMs = await floors.floor(w.event, w.kind);
     if (floorMs === null || !isBelowFloor(w.valueMs, floorMs)) return null;
     const id = `${w.event}:${w.kind}:${w.valueMs}`;
@@ -247,7 +251,11 @@ export function makeHandler({ redis, floors, log, periods }: IngestDeps) {
       eventId: evt.data.eventId,
       flaggedAt: new Date().toISOString(),
     };
-    await redis.multi().lpush(FLAGGED_KEY, JSON.stringify(entry)).ltrim(FLAGGED_KEY, 0, FLAGGED_MAX - 1).exec();
+    await redis
+      .multi()
+      .lpush(FLAGGED_KEY, JSON.stringify(entry))
+      .ltrim(FLAGGED_KEY, 0, FLAGGED_MAX - 1)
+      .exec();
     log.warn(entry, 'anti-cheat: value below world-record floor flagged');
     return floorMs;
   }
@@ -297,7 +305,18 @@ export function makeHandler({ redis, floors, log, periods }: IngestDeps) {
     for (const w of planPeriodRefresh(event, bests, live)) {
       const floorMs = (w.kind === 'single' ? minSingle : minAverage) ?? 0;
       const flag = w.flagged ? flagJson(w.flagged.valueMs, floorMs, w.flagged.achievedAt) : '';
-      await redis.lbSetPeriod(w.board, atKey(w.board), tsKey(w.board), flaggedKey(w.board), userId, w.valueMs ?? '', w.achievedAt, occurredAtMs, w.ttlSec, flag);
+      await redis.lbSetPeriod(
+        w.board,
+        atKey(w.board),
+        tsKey(w.board),
+        flaggedKey(w.board),
+        userId,
+        w.valueMs ?? '',
+        w.achievedAt,
+        occurredAtMs,
+        w.ttlSec,
+        flag,
+      );
     }
   }
 

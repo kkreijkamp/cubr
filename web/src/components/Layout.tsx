@@ -80,7 +80,6 @@ function Header() {
   );
 }
 
-
 function Footer() {
   const theme = useActiveTheme();
   const [info, setInfo] = useState<{ version: string; pod: string } | null>(null);

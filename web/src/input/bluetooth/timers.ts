@@ -36,7 +36,16 @@ export interface TimerCtx {
 const GAN_SERVICE = '0000fff0-0000-1000-8000-00805f9b34fb';
 const GAN_STATE = '0000fff5-0000-1000-8000-00805f9b34fb';
 
-const GAN_STATES = [TimerEvent.DISCONNECT, TimerEvent.GET_SET, TimerEvent.HANDS_OFF, TimerEvent.RUNNING, TimerEvent.STOPPED, TimerEvent.GAN_RESET, TimerEvent.HANDS_ON, TimerEvent.FINISHED];
+const GAN_STATES = [
+  TimerEvent.DISCONNECT,
+  TimerEvent.GET_SET,
+  TimerEvent.HANDS_OFF,
+  TimerEvent.RUNNING,
+  TimerEvent.STOPPED,
+  TimerEvent.GAN_RESET,
+  TimerEvent.HANDS_ON,
+  TimerEvent.FINISHED,
+];
 
 /** a GAN timer notification as an event (also used by the tests) */
 export function ganTimerEvent(data: number[]): TimerEventData {
@@ -96,7 +105,20 @@ const QY_CICS = [0x0504];
  * the first packet starts [0, length + 2, 0x40, 0], later ones with their block number.
  */
 export function qiyiTimerPackets(aes: Aes128, sendSN: number, ackSN: number, cmd: number, data: number[]): number[][] {
-  let msg = [(sendSN >> 24) & 0xff, (sendSN >> 16) & 0xff, (sendSN >> 8) & 0xff, sendSN & 0xff, (ackSN >> 24) & 0xff, (ackSN >> 16) & 0xff, (ackSN >> 8) & 0xff, ackSN & 0xff, (cmd >> 8) & 0xff, cmd & 0xff, (data.length >> 8) & 0xff, data.length & 0xff];
+  let msg = [
+    (sendSN >> 24) & 0xff,
+    (sendSN >> 16) & 0xff,
+    (sendSN >> 8) & 0xff,
+    sendSN & 0xff,
+    (ackSN >> 24) & 0xff,
+    (ackSN >> 16) & 0xff,
+    (ackSN >> 8) & 0xff,
+    ackSN & 0xff,
+    (cmd >> 8) & 0xff,
+    cmd & 0xff,
+    (data.length >> 8) & 0xff,
+    data.length & 0xff,
+  ];
   msg = msg.concat(data);
   const crc = crc16modbus(msg);
   msg.push(crc >> 8, crc & 0xff);
@@ -164,7 +186,15 @@ export class QiyiTimerReader {
       return { event: { state: TimerEvent.STOPPED, solveTime, inspectTime }, ack: { sendSN: ackSN + 1, ackSN: sendSN, cmd: 0x1003 } };
     }
     if (dpId === 4 && dpType === 4) {
-      const state = [TimerEvent.IDLE, TimerEvent.INSPECTION, TimerEvent.GET_SET, TimerEvent.RUNNING, TimerEvent.FINISHED, TimerEvent.STOPPED, TimerEvent.DISCONNECT][data[4]];
+      const state = [
+        TimerEvent.IDLE,
+        TimerEvent.INSPECTION,
+        TimerEvent.GET_SET,
+        TimerEvent.RUNNING,
+        TimerEvent.FINISHED,
+        TimerEvent.STOPPED,
+        TimerEvent.DISCONNECT,
+      ][data[4]];
       const solveTime = ((data[5] << 24) | (data[6] << 16) | (data[7] << 8) | data[8]) >>> 0;
       return state === undefined ? null : { event: { state, solveTime } };
     }
@@ -210,7 +240,13 @@ function qiyiTimer(): BtModel<TimerCtx> {
       let found: string | null = null;
       try {
         const view = manufacturerBytes(await group.waitForAdvertisement(), QY_CICS);
-        if (view && view.byteLength >= 6) found = Array.from({ length: 6 }, (_, i) => view.getUint8(5 - i).toString(16).padStart(2, '0')).join(':');
+        if (view && view.byteLength >= 6)
+          found = Array.from({ length: 6 }, (_, i) =>
+            view
+              .getUint8(5 - i)
+              .toString(16)
+              .padStart(2, '0'),
+          ).join(':');
       } catch {
         /* no advertisements: ask for it */
       }

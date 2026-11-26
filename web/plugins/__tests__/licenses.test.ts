@@ -42,6 +42,6 @@ describe('licenses.txt', () => {
     expect(text).toContain('GNU General Public License, version 3 (GPL-3.0-only). Its source code is at https://github.com/kkreijkamp/cubr.');
     expect(text.indexOf('  aa 2.0.0: MPL-2.0')).toBeLessThan(text.indexOf('  zz 1.0.0: MIT'));
     expect(text).toContain('zz text');
-    expect(text).toContain("No licence file in the package; its package.json says: MPL-2.0.");
+    expect(text).toContain('No licence file in the package; its package.json says: MPL-2.0.');
   });
 });

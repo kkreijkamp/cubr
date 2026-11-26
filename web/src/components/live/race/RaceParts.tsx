@@ -59,7 +59,7 @@ export function PlayersCard({ room, playerId, precision }: { room: LiveRoomState
         <tbody>
           {ordered.map(({ player: p, wins, meanMs, ao5 }, i) => {
             const pods = p.pods ?? [];
-            const status = !p.connected ? 'offline' : room.status === 'running' || p.status !== 'idle' ? STATUS_LABEL[p.status] ?? p.status : 'online';
+            const status = !p.connected ? 'offline' : room.status === 'running' || p.status !== 'idle' ? (STATUS_LABEL[p.status] ?? p.status) : 'online';
             return (
               <tr key={p.id} className={`${p.id === playerId ? 'me' : ''}${p.connected ? '' : ' offline'}`}>
                 <td className="left">
@@ -145,7 +145,8 @@ export function ResultsGrid({ room, playerId, precision }: { room: LiveRoomState
                     const r = row[p.id];
                     const isBest = r && Number.isFinite(best) && effectiveMs(r) === best;
                     let pendingLabel = '';
-                    if (!r && current) pendingLabel = !p.connected ? 'offline' : p.status === 'inspecting' ? 'inspecting' : p.status === 'solving' ? 'solving...' : '-';
+                    if (!r && current)
+                      pendingLabel = !p.connected ? 'offline' : p.status === 'inspecting' ? 'inspecting' : p.status === 'solving' ? 'solving...' : '-';
                     return (
                       <td key={p.id} className={`${isBest ? 'best' : ''}${r?.penalty === 'DNF' ? ' dnf' : ''}${!r ? ' pending' : ''}`}>
                         {r ? cellText(r, precision) : pendingLabel || '-'}

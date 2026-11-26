@@ -75,7 +75,9 @@ body {
   font-size: 16px;
   color: var(--text-color);
   background: var(--bg-color);
-  transition: background var(--dur), color var(--dur);
+  transition:
+    background var(--dur),
+    color var(--dur);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -105,7 +107,10 @@ body {
 a {
   color: var(--sub-color);
   text-decoration: none;
-  transition: color var(--dur), opacity var(--dur), background var(--dur);
+  transition:
+    color var(--dur),
+    opacity var(--dur),
+    background var(--dur);
 }
 a:hover {
   color: var(--text-color);
@@ -382,7 +387,10 @@ kbd {
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
-  transition: background var(--dur) ease-in-out, color var(--dur) ease-in-out, opacity var(--dur);
+  transition:
+    background var(--dur) ease-in-out,
+    color var(--dur) ease-in-out,
+    opacity var(--dur);
 }
 .btn {
   background: var(--sub-alt-color);
@@ -453,7 +461,9 @@ input[type='radio']:focus-visible {
      colours (Windows high contrast), which drop shadows */
   outline: 2px solid transparent;
   outline-offset: 2px;
-  box-shadow: 0 0 0 0.1rem var(--bg-color), 0 0 0 0.2rem var(--text-color);
+  box-shadow:
+    0 0 0 0.1rem var(--bg-color),
+    0 0 0 0.2rem var(--text-color);
 }
 
 /* Windows high contrast (forced colours): the theme's colours give way to the system's, so whatever only
@@ -531,7 +541,9 @@ select {
   font-size: 1em;
   line-height: 1.25em;
   caret-color: var(--main-color);
-  transition: background var(--dur), color var(--dur);
+  transition:
+    background var(--dur),
+    color var(--dur);
 }
 select {
   cursor: pointer;
@@ -866,7 +878,9 @@ table.table .secondary {
   white-space: pre;
   pointer-events: none;
   opacity: 0;
-  transition: opacity var(--dur), transform var(--dur);
+  transition:
+    opacity var(--dur),
+    transform var(--dur);
   z-index: 50;
 }
 [data-tip][data-tip-pos='down']::after {

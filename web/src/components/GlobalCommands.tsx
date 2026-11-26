@@ -20,7 +20,18 @@ import {
 } from '@heroicons/react/24/outline';
 import { useRegisterCommands, type Command } from '../lib/commands';
 import { useAuth } from '../lib/auth';
-import { activeTheme, chooseRandomTheme, chooseTheme, FONTS, setAutoSwitchTheme, themeWaitsNote, updateSettings, useDeviceIsDark, useSettings, type Settings as S } from '../lib/settings';
+import {
+  activeTheme,
+  chooseRandomTheme,
+  chooseTheme,
+  FONTS,
+  setAutoSwitchTheme,
+  themeWaitsNote,
+  updateSettings,
+  useDeviceIsDark,
+  useSettings,
+  type Settings as S,
+} from '../lib/settings';
 import { applyTheme, getTheme, isLightTheme, randomTheme, THEMES, themeLabel } from '../lib/themes';
 import { applyUpdate, checkForUpdate, promptInstall, usePwa } from '../lib/pwa';
 import { toast } from '../lib/toast';
@@ -131,11 +142,25 @@ export function GlobalCommands() {
         id: 'font',
         label: 'Font...',
         icon: <BoldIcon />,
-        children: () => FONTS.map((f) => ({ id: `font-${f.name}`, label: f.name, active: settings.font === f.name, run: () => updateSettings({ font: f.name }) })),
+        children: () =>
+          FONTS.map((f) => ({ id: `font-${f.name}`, label: f.name, active: settings.font === f.name, run: () => updateSettings({ font: f.name }) })),
       };
       const timer: Command[] = [
-        options('inspection', 'Inspection', [{ value: false, label: 'off' }, { value: true, label: 'on (WCA 15s)' }], settings.inspection),
-        options('holdMs', 'Hold to start', [0, 300, 550, 1000].map((v) => ({ value: v, label: `${v} ms` })), settings.holdMs),
+        options(
+          'inspection',
+          'Inspection',
+          [
+            { value: false, label: 'off' },
+            { value: true, label: 'on (WCA 15s)' },
+          ],
+          settings.inspection,
+        ),
+        options(
+          'holdMs',
+          'Hold to start',
+          [0, 300, 550, 1000].map((v) => ({ value: v, label: `${v} ms` })),
+          settings.holdMs,
+        ),
         options(
           'timerUpdate',
           'Timer update',
@@ -147,12 +172,74 @@ export function GlobalCommands() {
           ],
           settings.timerUpdate,
         ),
-        options('precision', 'Precision', [{ value: 2, label: '0.01 (centiseconds)' }, { value: 3, label: '0.001 (milliseconds)' }], settings.precision),
-        options('scramblePreview', 'Scramble preview', [{ value: 'off', label: 'off' }, { value: '2D', label: '2D' }, { value: '3D', label: '3D' }], settings.scramblePreview),
-        { ...options('stickerColours', 'Sticker colours', [{ value: 'default', label: 'default' }, { value: 'custom', label: 'custom (pick them in settings)' }], settings.stickerColours), icon: <SwatchIcon /> },
-        { ...options('focusMode', 'Focus mode', [{ value: true, label: 'on' }, { value: false, label: 'off' }], settings.focusMode), icon: <EyeIcon /> },
-        { ...options('highContrast', 'High contrast', [{ value: true, label: 'on' }, { value: false, label: 'off' }], settings.highContrast === true), icon: <SwatchIcon /> },
-        { ...options('inspectionAlerts', 'Inspection alerts', [{ value: 'off', label: 'off' }, { value: 'beep', label: 'beep' }, { value: 'voice', label: 'voice' }], settings.inspectionAlerts), icon: <BoltIcon /> },
+        options(
+          'precision',
+          'Precision',
+          [
+            { value: 2, label: '0.01 (centiseconds)' },
+            { value: 3, label: '0.001 (milliseconds)' },
+          ],
+          settings.precision,
+        ),
+        options(
+          'scramblePreview',
+          'Scramble preview',
+          [
+            { value: 'off', label: 'off' },
+            { value: '2D', label: '2D' },
+            { value: '3D', label: '3D' },
+          ],
+          settings.scramblePreview,
+        ),
+        {
+          ...options(
+            'stickerColours',
+            'Sticker colours',
+            [
+              { value: 'default', label: 'default' },
+              { value: 'custom', label: 'custom (pick them in settings)' },
+            ],
+            settings.stickerColours,
+          ),
+          icon: <SwatchIcon />,
+        },
+        {
+          ...options(
+            'focusMode',
+            'Focus mode',
+            [
+              { value: true, label: 'on' },
+              { value: false, label: 'off' },
+            ],
+            settings.focusMode,
+          ),
+          icon: <EyeIcon />,
+        },
+        {
+          ...options(
+            'highContrast',
+            'High contrast',
+            [
+              { value: true, label: 'on' },
+              { value: false, label: 'off' },
+            ],
+            settings.highContrast === true,
+          ),
+          icon: <SwatchIcon />,
+        },
+        {
+          ...options(
+            'inspectionAlerts',
+            'Inspection alerts',
+            [
+              { value: 'off', label: 'off' },
+              { value: 'beep', label: 'beep' },
+              { value: 'voice', label: 'voice' },
+            ],
+            settings.inspectionAlerts,
+          ),
+          icon: <BoltIcon />,
+        },
       ];
       const auth: Command[] = user
         ? [
@@ -162,7 +249,17 @@ export function GlobalCommands() {
         : [{ id: 'login', label: 'Log in / register', icon: <ArrowRightEndOnRectangleIcon />, run: go('/login') }];
       // the installable app (lib/pwa.ts)
       const app: Command[] = [
-        ...(pwa.canInstall ? [{ id: 'app-install', label: 'Install cubr as an app', icon: <ArrowDownTrayIcon />, keywords: ['pwa', 'home screen', 'offline'], run: () => void promptInstall() }] : []),
+        ...(pwa.canInstall
+          ? [
+              {
+                id: 'app-install',
+                label: 'Install cubr as an app',
+                icon: <ArrowDownTrayIcon />,
+                keywords: ['pwa', 'home screen', 'offline'],
+                run: () => void promptInstall(),
+              },
+            ]
+          : []),
         ...(pwa.update
           ? [{ id: 'app-update', label: 'Reload to update cubr', icon: <ArrowPathIcon />, keywords: ['new version', 'refresh'], run: () => applyUpdate() }]
           : pwa.offline !== 'off'
@@ -174,7 +271,10 @@ export function GlobalCommands() {
                   keywords: ['new version'],
                   run: () => {
                     void checkForUpdate().then((r) =>
-                      toast.notice(r === 'none' ? 'cubr is up to date' : r === 'found' ? 'downloading the new version...' : "couldn't check for updates - offline?", { durationMs: 2500 }),
+                      toast.notice(
+                        r === 'none' ? 'cubr is up to date' : r === 'found' ? 'downloading the new version...' : "couldn't check for updates - offline?",
+                        { durationMs: 2500 },
+                      ),
                     );
                   },
                 },

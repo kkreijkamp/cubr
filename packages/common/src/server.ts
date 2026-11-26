@@ -135,9 +135,7 @@ export function createServer(config: BaseConfig, opts: ServerOptions): Server {
   // routes traffic to ready pods.
   app.get('/readyz', { logLevel: 'warn' }, async (_req, reply) => {
     if (shuttingDown) return reply.status(503).send({ status: 'shutting-down' });
-    const entries = await Promise.all(
-      Object.entries(checks).map(async ([name, fn]) => [name, await runCheck(fn)] as const),
-    );
+    const entries = await Promise.all(Object.entries(checks).map(async ([name, fn]) => [name, await runCheck(fn)] as const));
     const deps = Object.fromEntries(entries);
     const ok = entries.every(([, s]) => s === 'ok');
     return reply.status(ok ? 200 : 503).send({ status: ok ? 'ready' : 'not-ready', deps });
@@ -180,11 +178,7 @@ export function createServer(config: BaseConfig, opts: ServerOptions): Server {
  * Starts listening and wires graceful shutdown: on SIGTERM/SIGINT readiness flips to 503,
  * in-flight requests finish, then the `onClose` hooks (pools, consumers) run.
  */
-export async function start(
-  server: Server,
-  config: BaseConfig,
-  onClose: Array<() => Promise<unknown> | unknown> = [],
-): Promise<void> {
+export async function start(server: Server, config: BaseConfig, onClose: Array<() => Promise<unknown> | unknown> = []): Promise<void> {
   const { app } = server;
   let closing = false;
   const shutdown = async (signal: string) => {
@@ -214,8 +208,5 @@ export async function start(
   process.once('SIGINT', () => void shutdown('SIGINT'));
 
   await app.listen({ host: '0.0.0.0', port: config.port });
-  app.log.info(
-    { version: config.version, node: config.nodeName },
-    `${config.serviceName} listening on :${config.port}`,
-  );
+  app.log.info({ version: config.version, node: config.nodeName }, `${config.serviceName} listening on :${config.port}`);
 }

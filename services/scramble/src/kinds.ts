@@ -3,7 +3,19 @@
 // pinned random state (practice.ts); csTimer's random-move types from its move tables
 // (randomMoves.ts); relays and cuboids from WCA scrambles; a few other puzzles from cubing.js; and
 // everything else from csTimer's own scramblers (cstimer.ts). Pending types throw.
-import { ALL_EVENTS, cuboidPrefix, defaultScrambleType, getEvent, getScrambleType, isWcaEvent, randomMoveScramble, RANDOM_MOVE_TYPES, RELAY_EVENTS, RELAY_PARTS, scrambleTypesFor } from '@cubr/cubestats';
+import {
+  ALL_EVENTS,
+  cuboidPrefix,
+  defaultScrambleType,
+  getEvent,
+  getScrambleType,
+  isWcaEvent,
+  randomMoveScramble,
+  RANDOM_MOVE_TYPES,
+  RELAY_EVENTS,
+  RELAY_PARTS,
+  scrambleTypesFor,
+} from '@cubr/cubestats';
 import { encodeSolveJob, practiceJob, PRACTICE_STATE_TYPES } from './practice.js';
 
 export interface MakeDeps {
@@ -19,9 +31,11 @@ export interface MakeDeps {
  * The 3x3 move subsets cubr can also make as random moves (offline), but which csTimer makes
  * random-state within the subgroup: on the server, csTimer's.
  */
+// prettier-ignore
 const CSTIMER_RANDOM_STATE: ReadonlySet<string> = new Set(['2gen', '2genl', 'roux', '3gen_F', '3gen_L', 'RrU', 'half', '333drud']);
 
 /** csTimer's length setting where its default isn't 0 (en-us.js `scrdata`): random-move lengths and easy xcross */
+// prettier-ignore
 export const CSTIMER_LENGTHS: Readonly<Record<string, number>> = {
   '444yj': 40, '5edge': 8, '6edge': 8, '7edge': 8, pyrm: 25, sq1h: 40, sq1t: 20, mpyr: 42, redim: 8, redi: 20, heli: 40, helicv: 40, heli2x2: 70,
   heli2x2g: 5, sq2: 20, ssq1t: 20, bsq: 25, ctico: 60, bic: 30, '15p': 80, '15pat': 80, '15pm': 80, easyxc: 4,
@@ -81,7 +95,11 @@ function ownMaker(event: string, id: string): boolean {
 
 /** The types csTimer's scramblers make: every listed, non-pending type cubr has no maker of its own for. */
 export const CSTIMER_TYPES: ReadonlySet<string> = new Set(
-  ALL_EVENTS.flatMap((e) => scrambleTypesFor(e.id).filter((t) => !t.pending && !ownMaker(e.id, t.id)).map((t) => t.id)),
+  ALL_EVENTS.flatMap((e) =>
+    scrambleTypesFor(e.id)
+      .filter((t) => !t.pending && !ownMaker(e.id, t.id))
+      .map((t) => t.id),
+  ),
 );
 
 /** Every scramble type this service can make (for the registry consistency test). */
@@ -90,6 +108,7 @@ export function canMake(event: string, id: string): boolean {
 }
 
 /** csTimer's relay labels ("2) ...", "3oh) ...") for cubr's ("2x2: ...", "3x3 oh: ...") */
+// prettier-ignore
 const CSTIMER_RELAY_LABELS: Readonly<Record<string, string>> = {
   '2x2': '2', '3x3': '3', '4x4': '4', '5x5': '5', '6x6': '6', '7x7': '7', '3x3 oh': '3oh', pyra: 'pyr', skewb: 'skb', 'sq-1': 'sq1', clock: 'clk', mega: 'mgm',
 };

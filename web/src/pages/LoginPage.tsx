@@ -1,13 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import {
-  CheckIcon,
-  CloudArrowUpIcon,
-  ExclamationCircleIcon,
-  EyeIcon,
-  EyeSlashIcon,
-  XMarkIcon,
-} from '@heroicons/react/24/outline';
+import { CheckIcon, CloudArrowUpIcon, ExclamationCircleIcon, EyeIcon, EyeSlashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Loading, Spinner } from '../components/Spinner';
 import { SsoButtons } from '../components/social/Sso';
 import { safeNext } from '../components/social/util';
@@ -196,15 +189,7 @@ function RegisterForm({ active, focusFirst }: FormProps) {
   };
 
   return (
-    <form
-      className="lg-form"
-      id="lg-panel-register"
-      role="tabpanel"
-      aria-labelledby="lg-tab-register"
-      hidden={!active}
-      onSubmit={onSubmit}
-      noValidate
-    >
+    <form className="lg-form" id="lg-panel-register" role="tabpanel" aria-labelledby="lg-tab-register" hidden={!active} onSubmit={onSubmit} noValidate>
       <Field
         name="username"
         placeholder="username"
@@ -297,15 +282,7 @@ function LoginForm({ active, focusFirst }: FormProps) {
   };
 
   return (
-    <form
-      className="lg-form"
-      id="lg-panel-login"
-      role="tabpanel"
-      aria-labelledby="lg-tab-login"
-      hidden={!active}
-      onSubmit={onSubmit}
-      noValidate
-    >
+    <form className="lg-form" id="lg-panel-login" role="tabpanel" aria-labelledby="lg-tab-login" hidden={!active} onSubmit={onSubmit} noValidate>
       <Field
         name="login"
         placeholder="username or email"
@@ -376,8 +353,7 @@ function ForgotForm() {
     return (
       <div className="lg-form lg-sent" role="status">
         <p>
-          if an account uses <span className="lg-sent-to">{sentTo}</span> and has confirmed it, a reset link is on its way. it works once, for an
-          hour.
+          if an account uses <span className="lg-sent-to">{sentTo}</span> and has confirmed it, a reset link is on its way. it works once, for an hour.
         </p>
         <p className="lg-sent-sub">
           nothing after a few minutes? check your spam folder, or{' '}
@@ -459,7 +435,9 @@ export function ResetPasswordPage() {
       <div className="lg-page">
         <h1 className="lg-title">reset password</h1>
         <p className="lg-lede">
-          {wellFormed ? 'this link has expired or was already used. links work once, for an hour.' : 'this link is incomplete. open it straight from the email.'}
+          {wellFormed
+            ? 'this link has expired or was already used. links work once, for an hour.'
+            : 'this link is incomplete. open it straight from the email.'}
         </p>
         <Link to="/login?mode=forgot" className="btn primary block">
           send a new link
@@ -497,11 +475,7 @@ export function ResetPasswordPage() {
 }
 
 type Confirming =
-  | { kind: 'working' }
-  | { kind: 'done'; email: string; changed: boolean }
-  | { kind: 'expired' }
-  | { kind: 'taken' }
-  | { kind: 'failed'; message: string };
+  { kind: 'working' } | { kind: 'done'; email: string; changed: boolean } | { kind: 'expired' } | { kind: 'taken' } | { kind: 'failed'; message: string };
 
 /**
  * /confirm-email#<token>: the page a confirmation link opens, once. The link either confirms the

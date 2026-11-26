@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { EVENT_IDS } from '@cubr/cubestats';
-import { offlineScramble, clockScramble, cubeScramble, fallbackScramble, megaminxScramble, pyraminxScramble, skewbScramble, square1Scramble } from '../fallbackScramble';
+import {
+  offlineScramble,
+  clockScramble,
+  cubeScramble,
+  fallbackScramble,
+  megaminxScramble,
+  pyraminxScramble,
+  skewbScramble,
+  square1Scramble,
+} from '../fallbackScramble';
 
 function seeded(seed: number) {
   let s = seed;

@@ -1,13 +1,5 @@
 export type ErrorCode =
-  | 'BAD_REQUEST'
-  | 'UNAUTHORIZED'
-  | 'FORBIDDEN'
-  | 'NOT_FOUND'
-  | 'CONFLICT'
-  | 'PAYLOAD_TOO_LARGE'
-  | 'RATE_LIMITED'
-  | 'UNAVAILABLE'
-  | 'INTERNAL';
+  'BAD_REQUEST' | 'UNAUTHORIZED' | 'FORBIDDEN' | 'NOT_FOUND' | 'CONFLICT' | 'PAYLOAD_TOO_LARGE' | 'RATE_LIMITED' | 'UNAVAILABLE' | 'INTERNAL';
 
 /** Throw from any handler; the shared error handler turns it into `{error:{code,message}}`. */
 export class HttpError extends Error {

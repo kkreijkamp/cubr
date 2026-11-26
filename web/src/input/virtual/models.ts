@@ -29,7 +29,16 @@ export type VirtualModel = PolyModel | Sq1Model | ClockModel;
 function poly(t: PolyTwisty): PolyModel {
   const p = t.puzzle;
   // an axis's opposite (same line, other way): its layers counted from the other end
-  const opposite = p.axes.map((a, i) => p.axes.findIndex((b, j) => j < i && b.order === a.order && Math.abs(b.n[0] + a.n[0]) + Math.abs(b.n[1] + a.n[1]) + Math.abs(b.n[2] + a.n[2]) < 1e-6 && b.cuts.length === a.cuts.length && b.cuts.every((c, k) => Math.abs(c + a.cuts[a.cuts.length - 1 - k]) < 1e-6)));
+  const opposite = p.axes.map((a, i) =>
+    p.axes.findIndex(
+      (b, j) =>
+        j < i &&
+        b.order === a.order &&
+        Math.abs(b.n[0] + a.n[0]) + Math.abs(b.n[1] + a.n[1]) + Math.abs(b.n[2] + a.n[2]) < 1e-6 &&
+        b.cuts.length === a.cuts.length &&
+        b.cuts.every((c, k) => Math.abs(c + a.cuts[a.cuts.length - 1 - k]) < 1e-6),
+    ),
+  );
   const canonical = (m: Move): Move => {
     const o = opposite[m.axis];
     if (o < 0) return m;
@@ -100,7 +109,24 @@ const clock: ClockModel = {
 
 const cache = new Map<string, VirtualModel>();
 
-const EVENT_MODEL: Record<string, string> = { '222': 'c2', '333': 'c3', '333oh': 'c3', '333bf': 'c3', '333fm': 'c3', '444': 'c4', '444bf': 'c4', '555': 'c5', '555bf': 'c5', '666': 'c6', '777': 'c7', pyram: 'pyram', skewb: 'skewb', minx: 'minx', sq1: 'sq1', clock: 'clock' };
+const EVENT_MODEL: Record<string, string> = {
+  '222': 'c2',
+  '333': 'c3',
+  '333oh': 'c3',
+  '333bf': 'c3',
+  '333fm': 'c3',
+  '444': 'c4',
+  '444bf': 'c4',
+  '555': 'c5',
+  '555bf': 'c5',
+  '666': 'c6',
+  '777': 'c7',
+  pyram: 'pyram',
+  skewb: 'skewb',
+  minx: 'minx',
+  sq1: 'sq1',
+  clock: 'clock',
+};
 
 function build(key: string): VirtualModel {
   if (/^c\d$/.test(key)) return poly(cubeTwisty(Number(key.slice(1))));

@@ -119,10 +119,10 @@ export function createRepo(pool: Pool) {
 
   /** Fine histogram counts, bucket 1..n in order. */
   async function distribution(eventId: string, kind: Kind): Promise<number[]> {
-    const { rows } = await pool.query<{ count: number }>(
-      'SELECT count FROM wca.distribution WHERE event_id = $1 AND kind = $2 ORDER BY bucket',
-      [eventId, kind],
-    );
+    const { rows } = await pool.query<{ count: number }>('SELECT count FROM wca.distribution WHERE event_id = $1 AND kind = $2 ORDER BY bucket', [
+      eventId,
+      kind,
+    ]);
     return rows.map((r) => r.count);
   }
 
@@ -168,8 +168,13 @@ export function createRepo(pool: Pool) {
 
   async function person(wcaId: string) {
     const { rows } = await pool.query<{
-      wcaId: string; name: string; countryId: string; countryIso2: string | null;
-      countryName: string; continentId: string; continentName: string;
+      wcaId: string;
+      name: string;
+      countryId: string;
+      countryIso2: string | null;
+      countryName: string;
+      continentId: string;
+      continentName: string;
     }>(
       `SELECT p.wca_id AS "wcaId", p.name, p.country_id AS "countryId", c.iso2 AS "countryIso2",
               c.name AS "countryName", c.continent_id AS "continentId", ct.name AS "continentName"
@@ -185,7 +190,12 @@ export function createRepo(pool: Pool) {
   /** All personal records of one person (both kinds) via the (person_id, event_id) primary keys. */
   async function personRanks(wcaId: string) {
     const { rows } = await pool.query<{
-      kind: Kind; eventId: string; best: number; worldRank: number; continentRank: number; countryRank: number;
+      kind: Kind;
+      eventId: string;
+      best: number;
+      worldRank: number;
+      continentRank: number;
+      countryRank: number;
     }>(
       `SELECT 'single' AS kind, event_id AS "eventId", best, world_rank AS "worldRank",
               continent_rank AS "continentRank", country_rank AS "countryRank"
@@ -212,8 +222,17 @@ export function createRepo(pool: Pool) {
   }
 
   return {
-    findCountry, worldCounts, countryCounts, neighbours, percentiles, distribution, recordHolders,
-    searchPersons, person, personRanks, countries,
+    findCountry,
+    worldCounts,
+    countryCounts,
+    neighbours,
+    percentiles,
+    distribution,
+    recordHolders,
+    searchPersons,
+    person,
+    personRanks,
+    countries,
   };
 }
 

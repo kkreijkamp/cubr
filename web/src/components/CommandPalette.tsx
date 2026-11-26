@@ -188,7 +188,7 @@ function PaletteInner({ initial }: { initial: string | null }) {
               onMouseMove={() => i !== active && setActive(i)}
               onClick={() => choose(row)}
             >
-              <span>{row.cmd.active ? <CheckIcon /> : row.cmd.icon ?? null}</span>
+              <span>{row.cmd.active ? <CheckIcon /> : (row.cmd.icon ?? null)}</span>
               <span>
                 {row.label}
                 {row.cmd.after}

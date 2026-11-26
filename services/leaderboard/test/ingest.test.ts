@@ -26,7 +26,11 @@ describe('anti-cheat floors', () => {
   it('keeps the fallback table below the WCA records', () => {
     // records (ms) in the WCA export of 2026-10-15
     const records: Record<string, [number, number]> = {
-      '222': [390, 860], '333': [2510, 3510], '444': [15180, 18560], '555': [29490, 33190], '666': [57690, 61760],
+      '222': [390, 860],
+      '333': [2510, 3510],
+      '444': [15180, 18560],
+      '555': [29490, 33190],
+      '666': [57690, 61760],
     };
     for (const [event, [single, average]] of Object.entries(records)) {
       expect(FALLBACK_FLOORS[event].single).toBeLessThan(single);
@@ -119,7 +123,7 @@ describe('planSolveCreated', () => {
     expect(planSolveCreated({ ...base, effectiveMs: null, rolling: { ao5: null } }, NOW)).toEqual([]);
     expect(planSolveCreated({ ...base, effectiveMs: 9000 }, NOW)).toHaveLength(2);
   });
-  it('skips a practice session\'s solves', () => {
+  it("skips a practice session's solves", () => {
     const solve = { ...base, effectiveMs: 6000, rolling: { ao5: 7000, ao12: null } };
     expect(planSolveCreated({ ...solve, practice: true }, NOW)).toEqual([]);
     expect(planSolveCreated({ ...solve, practice: false }, NOW)).toHaveLength(4);
@@ -235,10 +239,15 @@ describe('planPeriodRefresh (periods.changed)', () => {
   });
 });
 
-describe('parsePeriodBests (stats\' answer)', () => {
+describe("parsePeriodBests (stats' answer)", () => {
   it('keeps well-formed entries, refused values (flagged) included', () => {
     const body = {
-      days: { '2026-11-16': { single: { valueMs: 17_711, achievedAt: '2026-11-16T02:56:18.483Z' }, flagged: { single: { valueMs: 211, achievedAt: '2026-11-16T11:14:36.134Z' } } } },
+      days: {
+        '2026-11-16': {
+          single: { valueMs: 17_711, achievedAt: '2026-11-16T02:56:18.483Z' },
+          flagged: { single: { valueMs: 211, achievedAt: '2026-11-16T11:14:36.134Z' } },
+        },
+      },
       weeks: { '2026-W47': {} },
     };
     expect(parsePeriodBests(body)).toEqual(body);

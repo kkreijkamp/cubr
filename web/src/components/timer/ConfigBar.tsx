@@ -185,12 +185,22 @@ function useDismiss(open: boolean, setOpen: (o: boolean) => void, ref: RefObject
         }
         return;
       }
-      const chosen = Math.max(0, list.findIndex((x) => x.getAttribute('aria-checked') === 'true'));
+      const chosen = Math.max(
+        0,
+        list.findIndex((x) => x.getAttribute('aria-checked') === 'true'),
+      );
       const next =
-        e.key === 'Home' ? 0
-        : e.key === 'End' ? list.length - 1
-        : e.key === 'ArrowDown' ? (at < 0 ? chosen : (at + 1) % list.length)
-        : at < 0 ? list.length - 1 : (at - 1 + list.length) % list.length;
+        e.key === 'Home'
+          ? 0
+          : e.key === 'End'
+            ? list.length - 1
+            : e.key === 'ArrowDown'
+              ? at < 0
+                ? chosen
+                : (at + 1) % list.length
+              : at < 0
+                ? list.length - 1
+                : (at - 1 + list.length) % list.length;
       list[next].focus();
     };
     el.addEventListener('keydown', onKey);
@@ -205,7 +215,10 @@ function useDismiss(open: boolean, setOpen: (o: boolean) => void, ref: RefObject
     const where = focusOnOpen.current;
     focusOnOpen.current = null;
     if (!list.length) return;
-    const chosen = Math.max(0, list.findIndex((x) => x.getAttribute('aria-checked') === 'true'));
+    const chosen = Math.max(
+      0,
+      list.findIndex((x) => x.getAttribute('aria-checked') === 'true'),
+    );
     list[where === 'last' ? list.length - 1 : chosen].focus();
   }, [open, ref]);
 }
@@ -504,7 +517,19 @@ function SessionMenu({ open, setOpen, current, sessions, eventLabel, onSession, 
 }
 
 /** How times are entered: the timer, typing, or a stackmat / bluetooth / virtual puzzle (csTimer's inputs). */
-function InputMenu({ open, setOpen, value, options, onChange }: { open: boolean; setOpen: (o: boolean) => void; value: InputMode; options: InputMode[]; onChange: (m: InputMode) => void }) {
+function InputMenu({
+  open,
+  setOpen,
+  value,
+  options,
+  onChange,
+}: {
+  open: boolean;
+  setOpen: (o: boolean) => void;
+  value: InputMode;
+  options: InputMode[];
+  onChange: (m: InputMode) => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   useDismiss(open, setOpen, ref);
   const info = modeInfo(value);

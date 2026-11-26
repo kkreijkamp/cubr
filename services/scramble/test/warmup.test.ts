@@ -43,7 +43,11 @@ describe('warm-up', () => {
     await done;
     expect(state.done).toBe(true);
     expect(state.failures).toEqual(['444: no tables for 444', 'sq1: no tables for sq1']);
-    expect(Object.keys(state.timings).sort()).toEqual(WARMUP_EVENTS.filter((e) => e !== '444' && e !== 'sq1').map(jobLabel).sort());
+    expect(Object.keys(state.timings).sort()).toEqual(
+      WARMUP_EVENTS.filter((e) => e !== '444' && e !== 'sq1')
+        .map(jobLabel)
+        .sort(),
+    );
   });
 
   it('retries every 5 s while every event fails, instead of reporting ready', async () => {

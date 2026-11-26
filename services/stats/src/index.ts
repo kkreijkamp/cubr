@@ -1,5 +1,15 @@
 import {
-  consumeEvents, createPool, createRedis, createServer, loadConfig, makeAuth, migrate, pingPostgres, registerDeadLetterRoutes, start, waitForPostgres,
+  consumeEvents,
+  createPool,
+  createRedis,
+  createServer,
+  loadConfig,
+  makeAuth,
+  migrate,
+  pingPostgres,
+  registerDeadLetterRoutes,
+  start,
+  waitForPostgres,
   type Consumer,
 } from '@cubr/common';
 import { CONSUMED_TYPES } from './eventSchemas.js';

@@ -16,7 +16,13 @@ export interface EventInfo {
   kind: EventKind;
 }
 
-const wca = (id: string, name: string, short: string, puzzle: string, opts: { inspection?: boolean; unit?: 'time' | 'moves'; blind?: boolean } = {}): EventInfo => ({
+const wca = (
+  id: string,
+  name: string,
+  short: string,
+  puzzle: string,
+  opts: { inspection?: boolean; unit?: 'time' | 'moves'; blind?: boolean } = {},
+): EventInfo => ({
   id,
   name,
   short,
@@ -119,6 +125,7 @@ export const ALL_EVENTS: EventInfo[] = [...EVENTS, ...OTHER_EVENTS];
  * The relays' puzzles, in order: the label each one's scramble starts with ("2x2: ...", one line
  * per puzzle) and the WCA event it is scrambled as.
  */
+// prettier-ignore
 export const RELAY_PARTS: Readonly<Record<string, readonly (readonly [label: string, event: string])[]>> = {
   r234: [['2x2', '222'], ['3x3', '333'], ['4x4', '444']],
   r2345: [['2x2', '222'], ['3x3', '333'], ['4x4', '444'], ['5x5', '555']],

@@ -90,7 +90,7 @@ export async function registerUserRoutes(app: FastifyInstance, { pool, redis, au
     for (const r of pbs.rows) {
       line(r.event).pbs[r.kind] = { valueMs: r.value_ms, solveId: r.solve_id, achievedAt: r.achieved_at.toISOString() };
     }
-    const order = (e: string) => (EVENT_IDS.indexOf(e) + 1 || 999);
+    const order = (e: string) => EVENT_IDS.indexOf(e) + 1 || 999;
     const events = [...byEvent.values()].sort((a, b) => b.solves - a.solves || order(a.event) - order(b.event));
 
     return {

@@ -38,7 +38,8 @@ describe('changing the email', () => {
   it('takes a new address (trimmed) and the password, which an account without one leaves out', () => {
     expect(changeEmailSchema.parse({ email: '  new@example.com ', password: 'secret 1' })).toEqual({ email: 'new@example.com', password: 'secret 1' });
     expect(changeEmailSchema.parse({ email: 'new@example.com' })).toEqual({ email: 'new@example.com' });
-    for (const bad of [{ email: 'not an email' }, { email: `${'a'.repeat(250)}@x.io` }, { email: 'a@b.io', password: '' }]) expect(changeEmailSchema.safeParse(bad).success).toBe(false);
+    for (const bad of [{ email: 'not an email' }, { email: `${'a'.repeat(250)}@x.io` }, { email: 'a@b.io', password: '' }])
+      expect(changeEmailSchema.safeParse(bad).success).toBe(false);
   });
 
   it('takes only a well-formed link token', () => {

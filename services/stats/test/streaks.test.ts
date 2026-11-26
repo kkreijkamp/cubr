@@ -30,7 +30,9 @@ describe('computeStreaks', () => {
 
   it('counts a streak ending today', () => {
     expect(computeStreaks(['2026-10-12', '2026-10-13', '2026-10-14'], today)).toEqual({
-      activeDays: 3, currentStreak: 3, longestStreak: 3,
+      activeDays: 3,
+      currentStreak: 3,
+      longestStreak: 3,
     });
   });
 

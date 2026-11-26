@@ -84,9 +84,11 @@ function giga(length: number, rng: Rng): string {
   return out.join('\n');
 }
 
+// prettier-ignore
 const UDcube = [['U', "U'", 'U2'], ['D', "D'", 'D2']];
 
 /** type id -> how its scramble is made */
+// prettier-ignore
 const TABLE: Record<string, (rng: Rng) => string> = {
   '333o': (r) => mega([['U', 'D'], ['R', 'L'], ['F', 'B']], CUBE, 25, r),
   '2223': (r) => mega([['U'], ['R'], ['F']], CUBE, 25, r),
@@ -156,5 +158,14 @@ export function cuboidPrefix(id: '335' | '337', rng: Rng = Math.random): string 
     const wide = [w, `${w}'`, `${w}2`];
     return [...one, ...wide, ...one.flatMap((a) => wide.map((b) => `${a} ${b}`))];
   };
-  return mega([[layered('U', 'u'), layered('D', 'd')], ['R2', 'L2'], ['F2', 'B2']], [''], 40, rng);
+  return mega(
+    [
+      [layered('U', 'u'), layered('D', 'd')],
+      ['R2', 'L2'],
+      ['F2', 'B2'],
+    ],
+    [''],
+    40,
+    rng,
+  );
 }

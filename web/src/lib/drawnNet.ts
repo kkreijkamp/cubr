@@ -315,7 +315,13 @@ export function buildDrawnNet(drawing: Drawing, kind: DrawnKind): DrawnNet | nul
     }
     texts = drawing.texts.map((t) => ({ ...t, x: round(t.x), y: round(t.y), size: round(size * 0.46) }));
   }
-  const groups = kind === 'board' ? [cells.map((_, i) => i)] : touchingGroups(cells.map((c) => c.points), size * 0.02);
+  const groups =
+    kind === 'board'
+      ? [cells.map((_, i) => i)]
+      : touchingGroups(
+          cells.map((c) => c.points),
+          size * 0.02,
+        );
   const hulls = groups.map((g) => convexHull(g.flatMap((i) => cells[i].points)));
   const convex = groups.map((g, k) => Math.abs(signedArea(hulls[k])) <= 1.02 * g.reduce((s, i) => s + Math.abs(signedArea(cells[i].points)), 0));
   if (kind === 'net' && style.faceGap !== null && groups.length > 1 && convex.every(Boolean)) {
@@ -328,7 +334,14 @@ export function buildDrawnNet(drawing: Drawing, kind: DrawnKind): DrawnNet | nul
     });
   }
   const plates = style.plates
-    ? groups.flatMap((g, k) => (convex[k] ? [toPath(tile(hulls[k], 0, PLATE_RADIUS * size))] : outlinePlate(g.map((i) => cells[i].points), size)))
+    ? groups.flatMap((g, k) =>
+        convex[k]
+          ? [toPath(tile(hulls[k], 0, PLATE_RADIUS * size))]
+          : outlinePlate(
+              g.map((i) => cells[i].points),
+              size,
+            ),
+      )
     : [];
   // a sliding puzzle's space is a white tile in csTimer's drawing
   const stickers = cells
@@ -346,10 +359,26 @@ export function buildDrawnNet(drawing: Drawing, kind: DrawnKind): DrawnNet | nul
  * __tests__/cubing3d.test.ts checks this map against csTimer's drawings, sticker for sticker.
  */
 export const ICOSAMATE_COLOURS: Readonly<Record<string, string>> = {
-  '#ffffff': '#ffffff', '#008844': '#008800', '#bb3366': '#0000ff', '#aa8855': '#ff8000', '#008888': '#ff66cc',
-  '#881111': '#e8d0a0', '#ee7711': '#5ec4b6', '#bb99bb': '#b9a1ff', '#0055aa': '#ff0000', '#eedd11': '#5c5c5c',
-  '#888888': '#aaaaaa', '#66aa33': '#44ee00', '#ee88bb': '#3399ff', '#aa5522': '#7d3b11', '#66ccbb': '#d41f69',
-  '#cc1100': '#f4f400', '#ffaa00': '#007a89', '#553366': '#8800dd', '#4499cc': '#980000', '#eecc99': '#292929',
+  '#ffffff': '#ffffff',
+  '#008844': '#008800',
+  '#bb3366': '#0000ff',
+  '#aa8855': '#ff8000',
+  '#008888': '#ff66cc',
+  '#881111': '#e8d0a0',
+  '#ee7711': '#5ec4b6',
+  '#bb99bb': '#b9a1ff',
+  '#0055aa': '#ff0000',
+  '#eedd11': '#5c5c5c',
+  '#888888': '#aaaaaa',
+  '#66aa33': '#44ee00',
+  '#ee88bb': '#3399ff',
+  '#aa5522': '#7d3b11',
+  '#66ccbb': '#d41f69',
+  '#cc1100': '#f4f400',
+  '#ffaa00': '#007a89',
+  '#553366': '#8800dd',
+  '#4499cc': '#980000',
+  '#eecc99': '#292929',
 };
 
 /**

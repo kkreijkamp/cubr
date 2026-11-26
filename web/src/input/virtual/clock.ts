@@ -71,7 +71,7 @@ export function applyClock(s: ClockState, m: ClockMove): ClockState {
   const affect = affectedDials(s, m);
   const dials = s.dials.map((d, i) => {
     if (!affect[i]) return d;
-    const pow = (i < 9) !== s.flipped ? m.amount : -m.amount;
+    const pow = i < 9 !== s.flipped ? m.amount : -m.amount;
     return (((d + pow) % 12) + 12) % 12;
   });
   return { ...s, dials };

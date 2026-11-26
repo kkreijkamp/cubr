@@ -55,7 +55,9 @@
   max-width: 46ch;
   word-spacing: 0.15em;
   overflow-wrap: anywhere;
-  transition: color var(--dur), opacity 0.25s;
+  transition:
+    color var(--dur),
+    opacity 0.25s;
 }
 .live-scramble.minx .text {
   white-space: pre-line;
@@ -120,7 +122,9 @@
   height: 0.55rem;
   border-radius: 50%;
   background: var(--dot);
-  transition: background var(--dur), box-shadow var(--dur);
+  transition:
+    background var(--dur),
+    box-shadow var(--dur);
 }
 .live-dot.up,
 .live-dot.done {

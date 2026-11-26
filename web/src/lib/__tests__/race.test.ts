@@ -100,7 +100,10 @@ async function joined(join: Record<string, unknown> = {}) {
   const conn = new RaceConnection('room42');
   conn.connect();
   const socket = fake.last!;
-  socket.answer = (event) => (event === 'room:join' ? { ok: true, room: room(1, [player('host'), player('guest-me1234')]), playerId: 'guest-me1234', name: 'me', servedBy: 'race-a', ...join } : { ok: true });
+  socket.answer = (event) =>
+    event === 'room:join'
+      ? { ok: true, room: room(1, [player('host'), player('guest-me1234')]), playerId: 'guest-me1234', name: 'me', servedBy: 'race-a', ...join }
+      : { ok: true };
   socket.connect();
   await flush();
   return { conn, socket, state: () => conn.snapshot };
@@ -132,7 +135,7 @@ describe('room codes, invite links and guest identity', () => {
     expect(parseRoomCode(inviteLink('room42'))).toBe('room42');
   });
 
-  it('keeps one secret guest key per browser, and replaces a malformed one (the October review\'s #12)', async () => {
+  it("keeps one secret guest key per browser, and replaces a malformed one (the October review's #12)", async () => {
     local.setItem('cubr.guestId', 'guest-old123'); // an id from before keys
     const { getGuestKey, getGuestId, defaultGuestName } = await load();
     const key = getGuestKey();
@@ -212,10 +215,20 @@ describe('RaceConnection', () => {
 
   it('adds chat lines for joins, leaves, disconnects, reconnects, a new host and a new round', async () => {
     const { socket, state } = await joined();
-    socket.fire('room:state', room(2, [player('host', { connected: false }), player('carol')], { hostId: 'carol', round: { n: 1, scramble: 'R U', startedAt: NOW } }));
+    socket.fire(
+      'room:state',
+      room(2, [player('host', { connected: false }), player('carol')], { hostId: 'carol', round: { n: 1, scramble: 'R U', startedAt: NOW } }),
+    );
     socket.fire('room:state', room(3, [player('host'), player('carol')], { hostId: 'carol', round: { n: 1, scramble: 'R U', startedAt: NOW } }));
     const system = state().chat.filter((m) => m.system);
-    expect(system.map((m) => m.text)).toEqual(['host disconnected', 'carol joined', 'guest-me1234 left', 'carol is now the host', 'round 1 started', 'host reconnected']);
+    expect(system.map((m) => m.text)).toEqual([
+      'host disconnected',
+      'carol joined',
+      'guest-me1234 left',
+      'carol is now the host',
+      'round 1 started',
+      'host reconnected',
+    ]);
   });
 
   it('keeps each chat message once, in time order, and only the latest 150', async () => {
@@ -275,7 +288,10 @@ describe('RaceConnection', () => {
     flaky.connect();
     const socket = fake.last!;
     let tries = 0;
-    socket.answer = () => (++tries === 1 ? { ok: false, code: 'INTERNAL', error: 'redis hiccup' } : { ok: true, room: room(1, [player('host')]), playerId: 'u1', servedBy: 'race-a' });
+    socket.answer = () =>
+      ++tries === 1
+        ? { ok: false, code: 'INTERNAL', error: 'redis hiccup' }
+        : { ok: true, room: room(1, [player('host')]), playerId: 'u1', servedBy: 'race-a' };
     socket.connect();
     await flush();
     expect(flaky.snapshot).toMatchObject({ joinError: null, lastError: 'redis hiccup', room: null });

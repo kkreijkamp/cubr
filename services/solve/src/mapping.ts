@@ -60,8 +60,7 @@ export interface Solve {
 }
 
 /** Columns to SELECT for a full Solve (keep in sync with SolveRow). */
-export const SOLVE_COLUMNS =
-  'id, user_id, session_id, event, time_ms, penalty, scramble, comment, source, daily_date, daily_index, created_at';
+export const SOLVE_COLUMNS = 'id, user_id, session_id, event, time_ms, penalty, scramble, comment, source, daily_date, daily_index, created_at';
 
 /** pg returns timestamptz as Date; tolerate strings too (e.g. rows built in tests). */
 export function iso(v: Date | string): string {

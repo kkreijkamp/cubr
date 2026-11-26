@@ -20,7 +20,11 @@ export class FakeCharacteristic extends EventTarget {
     return this as never;
   }
   async writeValue(v: BufferSource) {
-    const bytes = Array.from(v instanceof ArrayBuffer ? new Uint8Array(v) : new Uint8Array((v as ArrayBufferView).buffer, (v as ArrayBufferView).byteOffset, (v as ArrayBufferView).byteLength));
+    const bytes = Array.from(
+      v instanceof ArrayBuffer
+        ? new Uint8Array(v)
+        : new Uint8Array((v as ArrayBufferView).buffer, (v as ArrayBufferView).byteOffset, (v as ArrayBufferView).byteLength),
+    );
     this.writes.push(bytes);
     this.onWrite?.(bytes);
   }

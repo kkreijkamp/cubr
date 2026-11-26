@@ -144,7 +144,14 @@ describeIntegration('domain event stream', () => {
     const dlq = await redis.xrange(DLQ_STREAM, '-', '+');
     expect(dlq).toHaveLength(1);
     const dead = fields(dlq[0][1]);
-    expect(dead).toEqual({ group: 'poison', type: 'bad.event', data: expect.any(String), error: 'cannot handle bad.event', attempts: '3', firstFailedAt: expect.any(String) });
+    expect(dead).toEqual({
+      group: 'poison',
+      type: 'bad.event',
+      data: expect.any(String),
+      error: 'cannot handle bad.event',
+      attempts: '3',
+      firstFailedAt: expect.any(String),
+    });
     expect(JSON.parse(dead.data)).toMatchObject({ userId: 'u9' });
     expect(await redis.hexists(attemptsKey('poison'), id)).toBe(0);
     expect(tries).toEqual([id, id, id]);
@@ -217,7 +224,9 @@ describeIntegration('domain event stream', () => {
     expect(tries).toHaveLength(3);
     expect(tries[2] - tries[1]).toBeGreaterThanOrEqual(40_000);
     const dlq = await redis.xrange(DLQ_STREAM, '-', '+');
-    expect(dlq.map(([, f]) => fields(f))).toEqual([expect.objectContaining({ group: 'patient', attempts: '3', firstFailedAt: new Date(tries[0]).toISOString() })]);
+    expect(dlq.map(([, f]) => fields(f))).toEqual([
+      expect.objectContaining({ group: 'patient', attempts: '3', firstFailedAt: new Date(tries[0]).toISOString() }),
+    ]);
     expect(await redis.hexists(attemptsKey('patient'), id)).toBe(0);
   });
 

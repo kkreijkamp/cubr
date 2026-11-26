@@ -30,14 +30,18 @@ export interface RouteDeps {
 export function registerRoutes(app: FastifyInstance, { store, redis, auth, internalToken = '', onChatCleared }: RouteDeps): void {
   // Moderation (deploy/vps/moderate.sh, from inside the container with its internal token; /internal is
   // never routed publicly): a room's chat history goes, and its players' chat empties.
-  app.post<{ Params: { id: string } }>('/internal/moderation/rooms/:id/clear-chat', { preHandler: requireInternal(internalToken, app.log) }, async (req, reply) => {
-    const id = req.params.id.toLowerCase();
-    if (!ROOM_ID_RE.test(id)) throw notFound('Room not found');
-    await store.clearChat(id);
-    onChatCleared?.(id);
-    req.log.warn({ roomId: id }, 'moderation: race chat cleared');
-    return reply.status(204).send();
-  });
+  app.post<{ Params: { id: string } }>(
+    '/internal/moderation/rooms/:id/clear-chat',
+    { preHandler: requireInternal(internalToken, app.log) },
+    async (req, reply) => {
+      const id = req.params.id.toLowerCase();
+      if (!ROOM_ID_RE.test(id)) throw notFound('Room not found');
+      await store.clearChat(id);
+      onChatCleared?.(id);
+      req.log.warn({ roomId: id }, 'moderation: race chat cleared');
+      return reply.status(204).send();
+    },
+  );
 
   // Public lobby: rooms with recent activity, newest first; players = currently connected.
   app.get('/api/race/rooms', async () => ({ rooms: await store.listPublic(50) }));

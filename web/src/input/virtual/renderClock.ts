@@ -15,7 +15,15 @@ export interface ClockColors {
 }
 
 /** how far each dial is turned right now (hours, fractional while a wheel turns) */
-export function drawClock(ctx: CanvasRenderingContext2D, width: number, height: number, state: ClockState, dials: number[], colors: ClockColors, palette: Palette) {
+export function drawClock(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  state: ClockState,
+  dials: number[],
+  colors: ClockColors,
+  palette: Palette,
+) {
   void palette;
   const big = Math.min(height * 0.96, width * 0.6);
   const small = big * 0.62;
@@ -31,7 +39,17 @@ export function drawClock(ctx: CanvasRenderingContext2D, width: number, height: 
   drawFace(ctx, gap * 2 + big, (height - small) / 2, small, dials.slice(back, back + 9), farPins, true, colors, colors.faces[state.flipped ? 0 : 1]);
 }
 
-function drawFace(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, dials: number[], pins: number[], dim: boolean, colors: ClockColors, face: string) {
+function drawFace(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  dials: number[],
+  pins: number[],
+  dim: boolean,
+  colors: ClockColors,
+  face: string,
+) {
   const r = size * 0.12;
   ctx.save();
   ctx.globalAlpha = dim ? 0.75 : 1;

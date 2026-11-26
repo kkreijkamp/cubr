@@ -1,6 +1,29 @@
 // Thin typed client for every cubr microservice. All calls are same-origin paths that the
 // Ingress (cloud) or gateway (local) routes to the right service - see docs/SPEC.md section 3.
-import type { ActivityDay, GlobalStats, Leaderboard, LbKind, PbKind, Penalty, PrivateUser, PublicUser, RaceRoomSummary, ServiceInfo, Session, Solve, StatsSummary, UserRank, WcaDistribution, WcaMeta, WcaPerson, WcaPersonSummary, WcaRank, WcaRecord, OAuthProvider, SignInMethods } from './types';
+import type {
+  ActivityDay,
+  GlobalStats,
+  Leaderboard,
+  LbKind,
+  PbKind,
+  Penalty,
+  PrivateUser,
+  PublicUser,
+  RaceRoomSummary,
+  ServiceInfo,
+  Session,
+  Solve,
+  StatsSummary,
+  UserRank,
+  WcaDistribution,
+  WcaMeta,
+  WcaPerson,
+  WcaPersonSummary,
+  WcaRank,
+  WcaRecord,
+  OAuthProvider,
+  SignInMethods,
+} from './types';
 
 export class ApiError extends Error {
   constructor(
@@ -235,14 +258,12 @@ export const api = {
     /** Always 202: the answer doesn't say whether an account uses the address. */
     forgotPassword: (email: string) => request<{ ok: true }>('POST', '/api/auth/password/forgot', { email }),
     /** Uses a reset link's token once; signs out every other session and returns a fresh one. */
-    resetPassword: (body: { token: string; password: string }) =>
-      request<{ token: string; user: PrivateUser }>('POST', '/api/auth/password/reset', body),
+    resetPassword: (body: { token: string; password: string }) => request<{ token: string; user: PrivateUser }>('POST', '/api/auth/password/reset', body),
     /** Changes the password (`password`: the current one, 403 if wrong), or sets the first one for an
      *  account without (it must have signed in in the last 10 minutes, 403 otherwise). Signs out
      *  every other session and returns a fresh token. 400 if it's the same password, 429 after 5 an
      *  hour. */
-    changePassword: (body: { newPassword: string; password?: string }) =>
-      request<{ token: string; user: PrivateUser }>('POST', '/api/auth/me/password', body),
+    changePassword: (body: { newPassword: string; password?: string }) => request<{ token: string; user: PrivateUser }>('POST', '/api/auth/me/password', body),
     me: (signal?: AbortSignal) => get<{ user: PrivateUser; settings: Record<string, unknown> }>('/api/auth/me', signal),
     /** Asks to change the email: the new address gets a link, nothing changes until it's opened. The
      *  password is asked again (403 if wrong); an account without one must have signed in in the last
@@ -269,9 +290,11 @@ export const api = {
     oauth: {
       providers: (signal?: AbortSignal) => get<{ providers: OAuthProvider[] }>('/api/auth/oauth/providers', signal),
       /** The provider's sign-in page to send the browser to; `link` connects it to this account. */
-      start: (provider: OAuthProvider, mode: 'signin' | 'link', next?: string) => request<{ url: string }>('POST', `/api/auth/oauth/${provider}/start`, { mode, next }),
+      start: (provider: OAuthProvider, mode: 'signin' | 'link', next?: string) =>
+        request<{ url: string }>('POST', `/api/auth/oauth/${provider}/start`, { mode, next }),
       exchange: (code: string) => request<{ token: string; user: PrivateUser }>('POST', '/api/auth/oauth/exchange', { code }),
-      signup: (id: string, signal?: AbortSignal) => get<{ provider: OAuthProvider; email: string; username: string | null }>(`/api/auth/oauth/signup/${enc(id)}`, signal),
+      signup: (id: string, signal?: AbortSignal) =>
+        get<{ provider: OAuthProvider; email: string; username: string | null }>(`/api/auth/oauth/signup/${enc(id)}`, signal),
       completeSignup: (id: string, username: string) => request<{ token: string; user: PrivateUser }>('POST', '/api/auth/oauth/signup', { id, username }),
       methods: () => get<SignInMethods>('/api/auth/me/sign-in'),
       disconnect: (provider: OAuthProvider) => request<void>('DELETE', `/api/auth/me/identities/${provider}`),
@@ -293,7 +316,8 @@ export const api = {
   },
   sessions: {
     list: (signal?: AbortSignal) => get<{ sessions: Session[] }>('/api/sessions', signal),
-    create: (body: { id?: string; name: string; event: string; practice?: boolean; scramble?: string; createdAt?: string }) => request<{ session: Session }>('POST', '/api/sessions', body),
+    create: (body: { id?: string; name: string; event: string; practice?: boolean; scramble?: string; createdAt?: string }) =>
+      request<{ session: Session }>('POST', '/api/sessions', body),
     rename: (id: string, name: string) => request<{ session: Session }>('PATCH', `/api/sessions/${enc(id)}`, { name }),
     /** practice: its solves count for no personal best and no leaderboard */
     setPractice: (id: string, practice: boolean) => request<{ session: Session }>('PATCH', `/api/sessions/${enc(id)}`, { practice }),
@@ -316,12 +340,12 @@ export const api = {
     create: (body: NewSolve) => request<{ solve: Solve; rolling: { ao5: number | null; ao12: number | null } }>('POST', '/api/solves', body),
     update: (id: string, body: { penalty?: Penalty; comment?: string | null }) => request<{ solve: Solve }>('PATCH', `/api/solves/${enc(id)}`, body),
     remove: (id: string) => request<void>('DELETE', `/api/solves/${enc(id)}`),
-    export: () =>
-      request<{ exportedAt: string; sessions: (Session & { solves: Solve[] })[] }>('GET', '/api/solves/export', undefined, { timeoutMs: 120_000 }),
+    export: () => request<{ exportedAt: string; sessions: (Session & { solves: Solve[] })[] }>('GET', '/api/solves/export', undefined, { timeoutMs: 120_000 }),
     daily: (date?: string) =>
-      get<{ date: string; events: Record<string, { solves: Solve[]; attempts?: { index: number; timeMs: number; penalty: Penalty; solveId: string }[]; ao5: number | null }> }>(
-        `/api/solves/daily${qs({ date })}`,
-      ),
+      get<{
+        date: string;
+        events: Record<string, { solves: Solve[]; attempts?: { index: number; timeMs: number; penalty: Penalty; solveId: string }[]; ao5: number | null }>;
+      }>(`/api/solves/daily${qs({ date })}`),
     /** an official daily attempt starts: `abandoned` = it had started before, so it's a DNF now */
     dailyStart: (body: { date: string; event: string; index: number }) =>
       request<{ abandoned: boolean; attempt?: { index: number; timeMs: number; penalty: Penalty } }>('POST', '/api/solves/daily/start', body),
@@ -340,17 +364,17 @@ export const api = {
         truncated: boolean;
         sessions?: { id: string; name: string | null; practice?: boolean; solves: number; firstAt: string; lastAt: string }[];
         solves: [number, number, number | null, number?][];
-      }>(
-        `/api/stats/users/${enc(userId)}/solves${qs({ event, limit: opts.limit })}`,
-        signal,
-      ),
+      }>(`/api/stats/users/${enc(userId)}/solves${qs({ event, limit: opts.limit })}`, signal),
     hourly: (userId: string, event: string, signal?: AbortSignal) =>
       get<{ hours: { hour: number; solves: number; meanMs: number | null }[] }>(`/api/stats/users/${enc(userId)}/hourly${qs({ event })}`, signal),
     global: (signal?: AbortSignal) => get<GlobalStats>('/api/stats/global', signal),
   },
   leaderboards: {
     get: (event: string, kind: LbKind, opts: { period?: 'all' | 'weekly' | 'daily'; page?: number; size?: number; key?: string } = {}, signal?: AbortSignal) =>
-      get<Leaderboard>(`/api/leaderboards/${enc(event)}/${kind}${qs({ period: opts.period ?? 'all', page: opts.page, size: opts.size, key: opts.key })}`, signal),
+      get<Leaderboard>(
+        `/api/leaderboards/${enc(event)}/${kind}${qs({ period: opts.period ?? 'all', page: opts.page, size: opts.size, key: opts.key })}`,
+        signal,
+      ),
     dailyChallenge: (event: string, date?: string, signal?: AbortSignal, opts: { page?: number; size?: number } = {}) =>
       get<Leaderboard>(`/api/leaderboards/daily-challenge${qs({ event, date, page: opts.page, size: opts.size })}`, signal),
     userRanks: (userId: string, signal?: AbortSignal) => get<{ ranks: UserRank[] }>(`/api/leaderboards/users/${enc(userId)}/ranks`, signal),
@@ -363,8 +387,7 @@ export const api = {
     /** The footer's feedback form (lib/feedbackForm.ts): emailed to cubr's inbox, a reply going to `email`.
      *  204; 400 a bad email or no message; 429 after 3 in 10 minutes or 10 a day from one address; 503
      *  it can't be emailed right now. */
-    send: (body: { kind: string; message: string; email?: string; details?: string }) =>
-      request<void>('POST', '/api/feedback', body, { timeoutMs: 20_000 }),
+    send: (body: { kind: string; message: string; email?: string; details?: string }) => request<void>('POST', '/api/feedback', body, { timeoutMs: 20_000 }),
   },
   race: {
     rooms: (signal?: AbortSignal) => get<{ rooms: RaceRoomSummary[] }>('/api/race/rooms', signal),
@@ -386,4 +409,3 @@ export const api = {
   /** A service's _info endpoint (the footer shows the web app's version). */
   info: (path: string, timeoutMs = 2500) => requestRaw<ServiceInfo>('GET', path, undefined, { timeoutMs }),
 };
-

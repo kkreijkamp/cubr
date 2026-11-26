@@ -105,10 +105,7 @@ export function HourlyChart({ userId, event, precision }: { userId: string; even
           },
           y: {
             beginAtZero: true,
-            ticks:
-              metric === 'solves'
-                ? { maxTicksLimit: 5, precision: 0 }
-                : { maxTicksLimit: 5, callback: (v: number | string) => formatTime(Number(v), 2) },
+            ticks: metric === 'solves' ? { maxTicksLimit: 5, precision: 0 } : { maxTicksLimit: 5, callback: (v: number | string) => formatTime(Number(v), 2) },
           },
         }),
       },

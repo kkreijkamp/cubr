@@ -41,8 +41,7 @@ export interface Mail extends Email {
   replyTo?: string;
 }
 
-export const escapeHtml = (s: string) =>
-  s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+export const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 /**
  * The emails' colours: white cross, the default theme, and white cross dark for mail apps in dark mode
@@ -124,7 +123,10 @@ export function maskEmail(email: string): string {
  * sending reputation.
  */
 export function isReservedDomain(email: string): boolean {
-  const domain = email.slice(email.lastIndexOf('@') + 1).toLowerCase().replace(/\.$/, '');
+  const domain = email
+    .slice(email.lastIndexOf('@') + 1)
+    .toLowerCase()
+    .replace(/\.$/, '');
   return /(^|\.)(example\.(com|net|org)|test|example|invalid|localhost)$/.test(domain);
 }
 

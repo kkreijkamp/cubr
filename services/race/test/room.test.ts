@@ -119,7 +119,7 @@ describe('room rules', () => {
     expect(code(() => setStatus(r, 'guest-nobody', 'idle'))).toBe('BAD_REQUEST');
   });
 
-  it('a player can only look done with a result (the October review\'s #12)', () => {
+  it("a player can only look done with a result (the October review's #12)", () => {
     const r = room();
     addPlayer(r, guest('guest-aaaaaa'), 1);
     normalize(r, new Set(['guest-aaaaaa']));

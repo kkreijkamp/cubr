@@ -46,7 +46,8 @@ export function fakeCsTimer(drawable: readonly string[] = ['15prp', 'gear', 'r23
       calls.push(`${type}:${length}`);
       return `${type} cstimer ${++n}`;
     },
-    image: async (type, scramble) => (drawable.includes(type) ? `<svg xmlns="http://www.w3.org/2000/svg"><text>${type}</text><desc>${scramble.length}</desc></svg>` : null),
+    image: async (type, scramble) =>
+      drawable.includes(type) ? `<svg xmlns="http://www.w3.org/2000/svg"><text>${type}</text><desc>${scramble.length}</desc></svg>` : null,
     stats: () => ({ requests: n, failed: 0, timeouts: 0, rejected: 0, restarts: 0, inFlight: 0 }),
     close: async () => {},
   };

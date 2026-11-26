@@ -34,7 +34,9 @@ describe('the feedback form', () => {
 
   it('says why it was not sent, and points to the email button', () => {
     expect(feedbackSendError(new ApiError(0, 'NETWORK', 'Network error'), false)).toBe("couldn't send it: no connection. try again, or use email below");
-    expect(feedbackSendError(new ApiError(429, 'RATE_LIMITED', 'Too many messages'), true)).toBe('too many messages for now. try again later, or use email below');
+    expect(feedbackSendError(new ApiError(429, 'RATE_LIMITED', 'Too many messages'), true)).toBe(
+      'too many messages for now. try again later, or use email below',
+    );
     expect(feedbackSendError(new ApiError(400, 'BAD_REQUEST', 'email: Invalid email address'), true)).toBe('check the email address');
     const later = "couldn't send it right now. try again later, or use email below";
     expect(feedbackSendError(new ApiError(400, 'BAD_REQUEST', 'message: write a message'), false)).toBe(later);

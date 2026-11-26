@@ -26,7 +26,7 @@ export const PATCH_NOTES: readonly PatchNote[] = [
         heading: 'new',
         items: [
           'change your password on your account page, or set one if you signed up with google or github. every other device is signed out, an email tells you it happened, and your password manager\'s "change password" button opens it',
-          'the screen stays on while you time, and for five minutes after a solve, so your phone doesn\'t go to sleep mid-solve or while you scramble',
+          "the screen stays on while you time, and for five minutes after a solve, so your phone doesn't go to sleep mid-solve or while you scramble",
           'on an iphone or ipad in dark mode, cubr opens from the home screen on a dark screen. added it before? remove it and add it again: ios saves the picture when the app is added',
         ],
       },
@@ -35,15 +35,12 @@ export const PATCH_NOTES: readonly PatchNote[] = [
         items: [
           'on touch screens, holding the timer starts it instead of selecting text, the line under the time starts it too, and a quick double tap no longer zooms in',
           'buttons and fields are a fingertip tall on touch screens, and a button or row you tapped no longer stays highlighted',
-          'cubr\'s emails follow your mail app\'s dark mode, and a second reset link no longer hides in the first one\'s thread in gmail',
+          "cubr's emails follow your mail app's dark mode, and a second reset link no longer hides in the first one's thread in gmail",
         ],
       },
       {
         heading: 'fixed',
-        items: [
-          'the stats rows on the timer page line up with the solves beside them',
-          'one solve is "1 solve", not "1 solves"',
-        ],
+        items: ['the stats rows on the timer page line up with the solves beside them', 'one solve is "1 solve", not "1 solves"'],
       },
       {
         heading: 'behind the scenes',
@@ -77,7 +74,7 @@ export const PATCH_NOTES: readonly PatchNote[] = [
           'every page fits small phones, phones on their side and tablets. on a phone held sideways, the timer, its time and the +2/dnf buttons fit on one screen',
           'profiles no longer jump around while they load on a phone, and their big numbers show sooner',
           'with light and dark mode on, "random" picks a new light and a new dark theme',
-          'scrollbars and dropdowns turn dark with dark themes, and the browser\'s bar takes the theme\'s colour',
+          "scrollbars and dropdowns turn dark with dark themes, and the browser's bar takes the theme's colour",
           'the daily and race pages say "hold the timer" on touch screens',
           'the about page is linked from the (i) in the header instead of the bottom of the page, and has a shorter supporters line',
           'the privacy policy now covers counting page views, error reports and the emails that confirm an address',
@@ -97,7 +94,7 @@ export const PATCH_NOTES: readonly PatchNote[] = [
         items: [
           'cubr counts page views with cloudflare web analytics: no cookies, totals only, and never when your browser sends global privacy control or do not track',
           'when something breaks in your browser, cubr sends itself a short error report so it can be fixed, with nothing personal in it',
-          'security headers on every page, a robots.txt, a sitemap and a security contact. addresses that don\'t exist answer a real 404, and each page has one address for search engines, which also learn the site\'s name and logo',
+          "security headers on every page, a robots.txt, a sitemap and a security contact. addresses that don't exist answer a real 404, and each page has one address for search engines, which also learn the site's name and logo",
           'security updates to the libraries cubr is built on',
         ],
       },
@@ -226,7 +223,7 @@ export const PATCH_NOTES: readonly PatchNote[] = [
           'session pbs are bold in the solve list',
           '"jump to my rank" on the leaderboards',
           'lexend deca is the default font, with one cleaner icon set',
-          'the tab icon takes your theme\'s colours',
+          "the tab icon takes your theme's colours",
           'no focus ring on text fields and selects',
         ],
       },

@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_DARK_THEME, DEFAULT_THEME, faviconSvg, getTheme, isLightTheme, randomTheme, READY_GREEN, readyColor, themeColors, THEMES, HIGH_CONTRAST_RATIO, highContrastTheme, setHighContrast } from '../themes';
+import {
+  DEFAULT_DARK_THEME,
+  DEFAULT_THEME,
+  faviconSvg,
+  getTheme,
+  isLightTheme,
+  randomTheme,
+  READY_GREEN,
+  readyColor,
+  themeColors,
+  THEMES,
+  HIGH_CONTRAST_RATIO,
+  highContrastTheme,
+  setHighContrast,
+} from '../themes';
 import shippedFavicon from '../../../public/favicon.svg?raw';
 import globalCss from '../../styles/global.css?raw';
 import indexHtml from '../../../index.html?raw';
@@ -26,7 +40,11 @@ function oklab(hex: string): [number, number, number] {
   const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
   const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
   const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
-  return [0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s, 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s];
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+  ];
 }
 const apart = (a: string, b: string) => Math.hypot(...oklab(a).map((v, i) => v - oklab(b)[i]));
 
@@ -187,9 +205,12 @@ describe("index.html's pre-paint script", () => {
     const metas = [new Map<string, string>(), new Map<string, string>()];
     const document = {
       documentElement: { style: { setProperty: (k: string, v: string) => void style.set(k, v) } },
-      querySelectorAll: (sel: string) => (sel === 'meta[name="theme-color"]' ? metas.map((m) => ({ setAttribute: (k: string, v: string) => void m.set(k, v) })) : []),
+      querySelectorAll: (sel: string) =>
+        sel === 'meta[name="theme-color"]' ? metas.map((m) => ({ setAttribute: (k: string, v: string) => void m.set(k, v) })) : [],
     };
-    const localStorage = { getItem: (k: string) => (k === 'cubr.themeColors' && saved !== undefined ? (typeof saved === 'string' ? saved : JSON.stringify(saved)) : null) };
+    const localStorage = {
+      getItem: (k: string) => (k === 'cubr.themeColors' && saved !== undefined ? (typeof saved === 'string' ? saved : JSON.stringify(saved)) : null),
+    };
     const matchMedia = (q: string) => ({ matches: q === '(prefers-color-scheme: dark)' && dark });
     new Function('document', 'localStorage', 'matchMedia', script)(document, localStorage, matchMedia);
     return { style, themeColors: metas.map((m) => m.get('content')) };
@@ -223,7 +244,7 @@ describe("index.html's pre-paint script", () => {
 });
 
 describe('the high-contrast setting', () => {
-  it('brings every theme\'s labels to 4.5:1 on the background and on cards, and its links and errors on the background', () => {
+  it("brings every theme's labels to 4.5:1 on the background and on cards, and its links and errors on the background", () => {
     for (const t of THEMES) {
       const hc = highContrastTheme(t);
       expect(contrast(hc.sub, t.bg), `${t.name} labels`).toBeGreaterThanOrEqual(HIGH_CONTRAST_RATIO);
@@ -246,7 +267,8 @@ describe('the high-contrast setting', () => {
     expect(Math.min(contrast(hc.sub, wc.bg), contrast(hc.sub, wc.subAlt))).toBeLessThan(HIGH_CONTRAST_RATIO + 0.4);
     // white cross dark's labels pass already
     const dark = getTheme('white_cross_dark');
-    if (contrast(dark.sub, dark.bg) >= HIGH_CONTRAST_RATIO && contrast(dark.sub, dark.subAlt) >= HIGH_CONTRAST_RATIO) expect(highContrastTheme(dark).sub).toBe(dark.sub);
+    if (contrast(dark.sub, dark.bg) >= HIGH_CONTRAST_RATIO && contrast(dark.sub, dark.subAlt) >= HIGH_CONTRAST_RATIO)
+      expect(highContrastTheme(dark).sub).toBe(dark.sub);
   });
 
   it('draws every theme with it once it is on, and without it once it is off', () => {

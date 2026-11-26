@@ -186,7 +186,10 @@ export function startOutboxRelay(opts: RelayOptions): Relay {
     // pool.query releases the client with the error on timeout, so a wedged connection is dropped.
     const query = q<{ n: number }>(pool, 'SELECT count(*) AS n FROM solve.outbox WHERE published_at IS NULL', [], 1500);
     // Overall deadline too: acquiring a fresh connection alone may take up to the 5 s connect timeout.
-    return withTimeout(query, 1500, 'backlog count').then((r) => r.rows[0].n, () => null);
+    return withTimeout(query, 1500, 'backlog count').then(
+      (r) => r.rows[0].n,
+      () => null,
+    );
   }
 
   return {

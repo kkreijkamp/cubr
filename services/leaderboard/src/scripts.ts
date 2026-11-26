@@ -144,10 +144,40 @@ return 0`;
 
 declare module 'ioredis' {
   interface RedisCommander<Context> {
-    lbBest(board: string, at: string, ts: string, score: number, userId: string, achievedAt: string, ttlSec: number, occurredAtMs: number): Result<number, Context>;
+    lbBest(
+      board: string,
+      at: string,
+      ts: string,
+      score: number,
+      userId: string,
+      achievedAt: string,
+      ttlSec: number,
+      occurredAtMs: number,
+    ): Result<number, Context>;
     lbFlagBest(flagged: string, ts: string, userId: string, valueMs: number, flag: string, occurredAtMs: number, ttlSec: number): Result<number, Context>;
-    lbSetPeriod(board: string, at: string, ts: string, flagged: string, userId: string, score: number | '', achievedAt: string, occurredAtMs: number, ttlSec: number, flag: string): Result<number, Context>;
-    lbSetPb(board: string, at: string, ts: string, flagged: string, userId: string, score: number | '', achievedAt: string, occurredAtMs: number, flag: string): Result<number, Context>;
+    lbSetPeriod(
+      board: string,
+      at: string,
+      ts: string,
+      flagged: string,
+      userId: string,
+      score: number | '',
+      achievedAt: string,
+      occurredAtMs: number,
+      ttlSec: number,
+      flag: string,
+    ): Result<number, Context>;
+    lbSetPb(
+      board: string,
+      at: string,
+      ts: string,
+      flagged: string,
+      userId: string,
+      score: number | '',
+      achievedAt: string,
+      occurredAtMs: number,
+      flag: string,
+    ): Result<number, Context>;
     lbUser(
       users: string,
       userId: string,

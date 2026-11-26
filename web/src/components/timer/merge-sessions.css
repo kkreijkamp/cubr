@@ -94,7 +94,9 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background var(--dur), color var(--dur);
+  transition:
+    background var(--dur),
+    color var(--dur);
 }
 .merge-row:hover,
 .merge-pick:hover,

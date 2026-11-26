@@ -414,12 +414,16 @@ describeIntegration('race socket protocol', () => {
 
       const acks = await Promise.all([tab1.emit('round:next'), tab2.emit('round:next')]);
       expect(acks.filter((a) => a.ok)).toHaveLength(1);
-      expectRefused(acks.find((a) => !a.ok)!, 'CONFLICT', /already advanced/);
+      expectRefused(
+        acks.find((a) => !a.ok)!,
+        'CONFLICT',
+        /already advanced/,
+      );
       await tab1.until((s) => s.round?.n === 1);
       expect(JSON.parse((await base.get(keys.room(roomId)))!).round.n).toBe(1);
     });
 
-    it('starts the round after the one the host saw, once, however often it is asked (the October review\'s #12)', async () => {
+    it("starts the round after the one the host saw, once, however often it is asked (the October review's #12)", async () => {
       const roomId = await createRoom(pod);
       const alice = await guest('Alice');
       await alice.join(roomId);
@@ -570,9 +574,21 @@ describeIntegration('race socket protocol', () => {
       const c = await guest('Cat');
       for (const p of [a, b, c]) await p.join(roomId);
       const rounds: [Player, number, string][][] = [
-        [[a, 10_000, 'OK'], [b, 9_000, '+2'], [c, 8_000, 'DNF']], // Ann wins (Ben = 11 s)
-        [[a, 12_000, 'OK'], [b, 12_000, 'OK'], [c, 11_000, '+2']], // Ann and Ben tie (Cat = 13 s)
-        [[a, 5_000, 'DNF'], [b, 5_000, 'DNF'], [c, 5_000, 'DNF']], // nobody wins
+        [
+          [a, 10_000, 'OK'],
+          [b, 9_000, '+2'],
+          [c, 8_000, 'DNF'],
+        ], // Ann wins (Ben = 11 s)
+        [
+          [a, 12_000, 'OK'],
+          [b, 12_000, 'OK'],
+          [c, 11_000, '+2'],
+        ], // Ann and Ben tie (Cat = 13 s)
+        [
+          [a, 5_000, 'DNF'],
+          [b, 5_000, 'DNF'],
+          [c, 5_000, 'DNF'],
+        ], // nobody wins
       ];
       for (const [i, round] of rounds.entries()) {
         expect((await a.emit('round:next')).round.n).toBe(i + 1);

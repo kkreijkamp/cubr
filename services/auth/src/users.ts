@@ -46,12 +46,8 @@ const blankToNull = (v: unknown) => (typeof v === 'string' && v.trim() === '' ? 
 export const patchMeSchema = z.object({
   displayName: z.preprocess(blankToNull, z.string().trim().max(40).nullable().refine(allowedText, ALLOWED_MESSAGE)).optional(),
   bio: z.preprocess(blankToNull, z.string().trim().max(280).nullable().refine(allowedText, ALLOWED_MESSAGE)).optional(),
-  country: z
-    .preprocess(blankToNull, z.string().trim().toUpperCase().regex(COUNTRY_RE, 'must be an ISO 3166-1 alpha-2 code').nullable())
-    .optional(),
-  wcaId: z
-    .preprocess(blankToNull, z.string().trim().toUpperCase().regex(WCA_ID_RE, 'must look like 2015ABCD01').nullable())
-    .optional(),
+  country: z.preprocess(blankToNull, z.string().trim().toUpperCase().regex(COUNTRY_RE, 'must be an ISO 3166-1 alpha-2 code').nullable()).optional(),
+  wcaId: z.preprocess(blankToNull, z.string().trim().toUpperCase().regex(WCA_ID_RE, 'must look like 2015ABCD01').nullable()).optional(),
   /** private profile: strangers see only the username and picture */
   private: z.boolean().optional(),
 });

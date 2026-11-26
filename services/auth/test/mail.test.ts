@@ -32,7 +32,12 @@ function webTheme(name: string): Record<string, string> {
 describe('the email page', () => {
   const href = 'https://cubr.dev/reset#a"b&c';
   const escaped = 'https://cubr.dev/reset#a&quot;b&amp;c';
-  const html = page({ title: 'Reset your <cubr> password', paragraphs: ['Hi demo,', 'Someone asked.'], button: { label: 'choose a new password', href }, footnote: 'The link works once.' });
+  const html = page({
+    title: 'Reset your <cubr> password',
+    paragraphs: ['Hi demo,', 'Someone asked.'],
+    button: { label: 'choose a new password', href },
+    footnote: 'The link works once.',
+  });
 
   it('is a whole document: in English, UTF-8, sized for phones and titled with the subject', () => {
     expect(html.startsWith('<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">')).toBe(true);
@@ -105,7 +110,17 @@ describe('sending', () => {
     expect((l as { warn: ReturnType<typeof vi.fn> }).warn).toHaveBeenCalledOnce();
   });
   it('knows the domains that can never receive mail (RFC 2606, RFC 6761)', () => {
-    for (const reserved of ['a@example.com', 'a@EXAMPLE.org', 'a@mail.example.net', 'a@x.test', 'a@foo.example', 'a@bar.invalid', 'a@localhost', 'a@me.localhost', 'a@example.com.']) {
+    for (const reserved of [
+      'a@example.com',
+      'a@EXAMPLE.org',
+      'a@mail.example.net',
+      'a@x.test',
+      'a@foo.example',
+      'a@bar.invalid',
+      'a@localhost',
+      'a@me.localhost',
+      'a@example.com.',
+    ]) {
       expect(isReservedDomain(reserved), reserved).toBe(true);
     }
     for (const real of ['a@gmail.com', 'a@cubr.dev', 'a@myexample.com', 'a@example.co', 'a@testing.dev', 'a@contest.org', 'a@example.com.au']) {

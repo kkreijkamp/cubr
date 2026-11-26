@@ -34,7 +34,9 @@ function Citation() {
         worldcubeassociation.org/results
       </a>{' '}
       as of {meta.data?.exportDate ? formatDate(meta.data.exportDate) : meta.error ? 'the last import' : '...'}.
-      {meta.data?.counts?.persons ? ` ${meta.data.counts.persons.toLocaleString('en-US')} competitors - ${(meta.data.counts.competitions ?? 0).toLocaleString('en-US')} competitions.` : ''}
+      {meta.data?.counts?.persons
+        ? ` ${meta.data.counts.persons.toLocaleString('en-US')} competitors - ${(meta.data.counts.competitions ?? 0).toLocaleString('en-US')} competitions.`
+        : ''}
     </p>
   );
 }

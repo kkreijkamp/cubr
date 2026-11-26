@@ -136,7 +136,12 @@ export function StackmatInput(p: Props) {
     void tick;
     const s = signal;
     const hard = timer.hardTime;
-    const shown = hard !== null && s?.on ? { timeMs: hard, penalty: (lastMs === hard ? lastPenalty : 'OK') ?? 'OK' } : lastMs !== undefined ? { timeMs: lastMs, penalty: lastPenalty ?? 'OK' } : null;
+    const shown =
+      hard !== null && s?.on
+        ? { timeMs: hard, penalty: (lastMs === hard ? lastPenalty : 'OK') ?? 'OK' }
+        : lastMs !== undefined
+          ? { timeMs: lastMs, penalty: lastPenalty ?? 'OK' }
+          : null;
     const hands = s?.on && s.leftHand && s.rightHand;
     if (timer.phase === 'running') return { phase: 'running', inInspection: false, startedAt: timer.startTime, inspectionStartedAt: null, result: null };
     if (timer.phase === 'inspecting') {
@@ -186,7 +191,12 @@ export function StackmatInput(p: Props) {
       <div className="tp-hardware-bar">
         {status}
         {conn.status === 'listening' && mics.length > 1 && (
-          <select className="tp-hardware-select" value={device.stackmatDevice} onChange={(e) => updateInput({ stackmatDevice: e.target.value })} aria-label="microphone input">
+          <select
+            className="tp-hardware-select"
+            value={device.stackmatDevice}
+            onChange={(e) => updateInput({ stackmatDevice: e.target.value })}
+            aria-label="microphone input"
+          >
             <option value="">default input</option>
             {mics.map((m) => (
               <option key={m.id} value={m.id}>

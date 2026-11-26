@@ -85,7 +85,7 @@ export function readSqliteTables(bytes: Uint8Array): Map<string, SqlValue[][]> {
     };
     const [headerSize, first] = local(0);
     const types: number[] = [];
-    for (let p = first; p < headerSize; ) {
+    for (let p = first; p < headerSize;) {
       const [t, next] = local(p);
       types.push(t);
       p = next;

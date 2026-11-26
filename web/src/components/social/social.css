@@ -487,7 +487,6 @@
   text-align: left;
 }
 
-
 /* wrapper around <Avatar> (components/Avatar.css draws the circle / initial) */
 .pv-avatar {
   position: relative;
@@ -510,7 +509,9 @@
 }
 .pv-avatar-btn:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 0.15rem var(--sub-alt-color), 0 0 0 0.3rem var(--text-color);
+  box-shadow:
+    0 0 0 0.15rem var(--sub-alt-color),
+    0 0 0 0.3rem var(--text-color);
 }
 .pv-avatar-overlay {
   position: absolute;
@@ -664,7 +665,6 @@
 .hm-legend span {
   margin: 0 0.25rem;
 }
-
 
 /* ---------------------------------------------------------------- charts */
 .pv-legend {
@@ -1000,7 +1000,6 @@ table.im-table label {
   font-size: 0.8rem;
 }
 
-
 /* ---------------------------------------------------------------- solve list (bottom of the profile) */
 .ps {
   display: grid;
@@ -1024,7 +1023,6 @@ table.ps-table td.dnf {
     display: none;
   }
 }
-
 
 /* ---------------------------------------------------------------- on the open page (no cards) */
 .pf .pv-avatar {

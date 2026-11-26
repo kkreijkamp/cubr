@@ -67,8 +67,7 @@ function makeCanvas(size: number): HTMLCanvasElement {
   c.height = size;
   return c;
 }
-const toBlob = (canvas: HTMLCanvasElement, type: string, quality: number) =>
-  new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality));
+const toBlob = (canvas: HTMLCanvasElement, type: string, quality: number) => new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality));
 
 /** Render the crop to OUTxOUT and encode it: webp, or jpeg where webp encoding isn't supported (Safari). */
 async function renderAvatar(img: CanvasImageSource, src: Pick<Source, 'w' | 'h'>, view: View): Promise<Blob> {
@@ -455,12 +454,7 @@ export function AvatarEditor({ onDone, onCancel }: Props) {
             </div>
             <span className="ae-hint">png, jpg, webp or gif - up&nbsp;to&nbsp;15&nbsp;mb</span>
             {hasAvatar && (
-              <button
-                type="button"
-                className={`btn-text small ae-remove${confirmRemove ? ' confirm' : ''}`}
-                onClick={remove}
-                disabled={busy !== null}
-              >
+              <button type="button" className={`btn-text small ae-remove${confirmRemove ? ' confirm' : ''}`} onClick={remove} disabled={busy !== null}>
                 {busy === 'remove' ? <Spinner size={14} /> : <TrashIcon />}
                 {confirmRemove ? 'click again to remove' : 'remove picture'}
               </button>
@@ -557,7 +551,13 @@ export function AvatarEditor({ onDone, onCancel }: Props) {
             >
               cancel
             </button>
-            <button type="button" className={`btn primary${busy === 'save' ? ' ae-saving' : ''}`} onClick={save} disabled={busy !== null} aria-busy={busy === 'save'}>
+            <button
+              type="button"
+              className={`btn primary${busy === 'save' ? ' ae-saving' : ''}`}
+              onClick={save}
+              disabled={busy !== null}
+              aria-busy={busy === 'save'}
+            >
               {busy === 'save' && <Spinner size={16} />} {busy === 'save' ? 'saving...' : 'save picture'}
             </button>
           </div>
