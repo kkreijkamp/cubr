@@ -54,7 +54,13 @@
         ]
       }
     </script>
+    <!-- the SVG first: the theme recolours it (lib/themes.ts). The PNGs, drawn on whole pixels, stay sharp
+         where the SVG blurs (16 px) and are what search results show (Google wants 48 px or more);
+         /favicon.ico (16, 32 and 48 px) answers the tools that ask for it. -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/icons/favicon-48.png" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/icons/favicon-96.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/favicon-192.png" />
     <!-- the installable app (PWA): public/manifest.webmanifest, the service worker is src/sw/ -->
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />

@@ -219,7 +219,7 @@ export function applyTheme(name: string): void {
   const root = document.documentElement;
   for (const [k, v] of Object.entries(themeColors(theme))) root.style.setProperty(k, v);
   document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => meta.setAttribute('content', theme.bg));
-  document.querySelector('link[rel="icon"]')?.setAttribute('href', `data:image/svg+xml,${encodeURIComponent(faviconSvg(theme))}`);
+  document.querySelector('link[rel="icon"][type="image/svg+xml"]')?.setAttribute('href', `data:image/svg+xml,${encodeURIComponent(faviconSvg(theme))}`);
   window.dispatchEvent(new CustomEvent('cubr:theme'));
 }
 

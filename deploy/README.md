@@ -117,11 +117,11 @@ Run `scripts/commands.sh` section by section (`scripts/commands.sh list` prints 
 
 | section  | Step |
 |---|---|
-| 0 | Variables (`PROJECT_ID=cubr-app`, `ZONE=australia-southeast1-a`, `CLUSTER=cubr`, `REPO=cubr`, `VERSION=1.6.44`) |
+| 0 | Variables (`PROJECT_ID=cubr-app`, `ZONE=australia-southeast1-a`, `CLUSTER=cubr`, `REPO=cubr`, `VERSION=1.6.45`) |
 | 1 | `gcloud auth list`, select your account (`ACCOUNT`, default: gcloud's active one), set project/region/zone |
 | 2 | Enable container, artifactregistry, cloudbuild and compute APIs |
 | 3 | Artifact Registry repo. IAM: nodes get `artifactregistry.reader` and `container.defaultNodeServiceAccount`; the build SA gets `artifactregistry.writer`, `logging.logWriter` and `storage.objectViewer`. |
-| 4 | `gcloud builds submit --config cloudbuild.yaml --substitutions _VERSION=1.6.44,...` (10 images in parallel, native amd64) |
+| 4 | `gcloud builds submit --config cloudbuild.yaml --substitutions _VERSION=1.6.45,...` (10 images in parallel, native amd64) |
 | 5 | `gcloud container clusters create` (3x e2-standard-2, autoscaling 3-5, 30 GB pd-balanced, regular channel, VPC-native) + `get-credentials` |
 | 6 | Reserve the global static IP `cubr-ip` |
 | 7 | Install CloudNativePG 1.30.1 (server-side apply) and wait for the operator |
