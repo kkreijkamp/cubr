@@ -10,11 +10,13 @@ import { PAGE_META, type PageMeta } from '../lib/pageMeta';
 import { usePageMeta } from '../lib/usePageMeta';
 
 // when each page last changed
-// v1.6.17: an address not confirmed within 7 days can be taken by another account (set this to the day it's released)
-const TERMS_EFFECTIVE = '26 November 2026';
+// v1.7.0 (27 November): an address not confirmed within 7 days can be taken by another account; class 1A and 1B
+// material named; how to report, and eSafety.
+const TERMS_EFFECTIVE = '27 November 2026';
 // v1.5.0 (18 November): sign-in with Google, Apple and GitHub; Cloudflare Web Analytics; error reports; the emails that confirm an address.
-// v1.6.9: the feedback form (set this to the day it's released)
-const PRIVACY_EFFECTIVE = '26 November 2026';
+// v1.7.0 (27 November): the feedback form, daily reminders, moderation records, profiles kept out of search, how long
+// each kind of data is kept (the record of processing), Resend in Japan.
+const PRIVACY_EFFECTIVE = '27 November 2026';
 const CONTACT = 'hello@cubr.dev';
 
 const Mail = () => <a href={`mailto:${CONTACT}`}>{CONTACT}</a>;
