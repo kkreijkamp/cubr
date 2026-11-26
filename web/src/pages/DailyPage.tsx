@@ -183,6 +183,11 @@ export default function DailyPage() {
         byIndex.set(idx, { index: idx, timeMs: s.timeMs, penalty: s.penalty, state: 'saved', solveId: s.id, sessionId: s.sessionId });
       }
     }
+    // the official attempts: an attempt whose solve was deleted is still used (the server refuses another
+    // solve for it), so its slot shows as done rather than open (the October review's #5)
+    for (const a of progress.data?.events?.[event]?.attempts ?? []) {
+      if (a.index >= 0 && a.index < ATTEMPTS && !byIndex.has(a.index)) byIndex.set(a.index, { index: a.index, timeMs: a.timeMs, penalty: a.penalty, state: 'saved', solveId: a.solveId });
+    }
     for (const a of local[key] ?? []) if (!byIndex.has(a.index) || a.state !== 'saved') byIndex.set(a.index, byIndex.get(a.index)?.state === 'saved' ? byIndex.get(a.index)! : a);
     return [...byIndex.values()]
       .map((a) => (a.solveId && penalties[a.solveId] ? { ...a, penalty: penalties[a.solveId] } : a))

@@ -317,7 +317,9 @@ export const api = {
     export: () =>
       request<{ exportedAt: string; sessions: (Session & { solves: Solve[] })[] }>('GET', '/api/solves/export', undefined, { timeoutMs: 120_000 }),
     daily: (date?: string) =>
-      get<{ date: string; events: Record<string, { solves: Solve[]; ao5: number | null }> }>(`/api/solves/daily${qs({ date })}`),
+      get<{ date: string; events: Record<string, { solves: Solve[]; attempts?: { index: number; timeMs: number; penalty: Penalty; solveId: string }[]; ao5: number | null }> }>(
+        `/api/solves/daily${qs({ date })}`,
+      ),
   },
   stats: {
     summary: (userId: string, signal?: AbortSignal) => get<StatsSummary>(`/api/stats/users/${enc(userId)}/summary`, signal),

@@ -334,6 +334,9 @@ describeIntegration('solve API', () => {
       expect((await attempt(u, sess.id, 0, 8_000)).statusCode).toBe(409);
       await as(u).del(`/api/solves/${id}`);
       expect((await attempt(u, sess.id, 0, 8_000)).statusCode).toBe(409);
+      // the overview still lists the attempt, so the page shows its slot as used (not a 409 loop)
+      const overview = (await as(u).get('/api/solves/daily')).json();
+      expect(overview.events['333']).toMatchObject({ solves: [], attempts: [{ index: 0, timeMs: 10_000, penalty: 'OK', solveId: id }] });
     });
 
     it('is open only while the day is today somewhere, and only for the daily events', async () => {

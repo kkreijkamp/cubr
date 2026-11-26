@@ -33,23 +33,40 @@ export function dailyResult(solves: SolveLike[]): { ao5: number | null; times: n
 /** A recorded daily-challenge attempt (as submitted) of one event. */
 export interface DailyAttempt extends SolveLike {
   event: string;
+  /** which of the five, and its solve (which may have been deleted since) */
+  index?: number;
+  solveId?: string;
+}
+
+/** One official attempt as GET /api/solves/daily lists it. */
+export interface OfficialAttempt {
+  index: number;
+  timeMs: number;
+  penalty: SolveLike['penalty'];
+  solveId: string;
 }
 
 /**
- * GET /api/solves/daily, per event: the user's daily solves as they are now, plus the official ao5
- * from the recorded attempts (ordered by index; null until all five exist). Events whose solves
- * were deleted still appear with their attempts' result.
+ * GET /api/solves/daily, per event: the user's daily solves as they are now, the official attempts
+ * (index, time, penalty and solve, ordered by index: what the page's five slots show, so an attempt
+ * whose solve was deleted still shows as used; the October review's #5), and the official ao5 from
+ * them (null until all five exist). Events whose solves were deleted still appear with their attempts.
  */
 export function dailyOverview<S extends { event: string }>(
   solves: S[],
   attempts: DailyAttempt[],
-): Record<string, { solves: S[]; ao5: number | null }> {
-  const events: Record<string, { solves: S[]; ao5: number | null }> = {};
-  const entry = (event: string) => (events[event] ??= { solves: [], ao5: null });
+): Record<string, { solves: S[]; attempts: OfficialAttempt[]; ao5: number | null }> {
+  const events: Record<string, { solves: S[]; attempts: OfficialAttempt[]; ao5: number | null }> = {};
+  const entry = (event: string) => (events[event] ??= { solves: [], attempts: [], ao5: null });
   for (const s of solves) entry(s.event).solves.push(s);
   const byEvent = new Map<string, DailyAttempt[]>();
   for (const a of attempts) byEvent.set(a.event, [...(byEvent.get(a.event) ?? []), a]);
-  for (const [event, list] of byEvent) entry(event).ao5 = dailyResult(list).ao5;
+  for (const [event, list] of byEvent) {
+    entry(event).ao5 = dailyResult(list).ao5;
+    entry(event).attempts = list
+      .filter((a): a is DailyAttempt & { index: number; solveId: string } => typeof a.index === 'number' && typeof a.solveId === 'string')
+      .map((a) => ({ index: a.index, timeMs: a.timeMs, penalty: a.penalty, solveId: a.solveId }));
+  }
   return events;
 }
 

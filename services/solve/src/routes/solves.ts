@@ -201,12 +201,12 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
         `SELECT ${SOLVE_COLUMNS} FROM solve.solves WHERE user_id = $1 AND daily_date = $2 ORDER BY event, daily_index`,
         [user.id, date],
       ),
-      pool.query<{ event: string; time_ms: number; penalty: Penalty }>(
-        'SELECT event, time_ms, penalty FROM solve.daily_attempts WHERE user_id = $1 AND daily_date = $2 ORDER BY event, daily_index',
+      pool.query<{ event: string; daily_index: number; solve_id: string; time_ms: number; penalty: Penalty }>(
+        'SELECT event, daily_index, solve_id, time_ms, penalty FROM solve.daily_attempts WHERE user_id = $1 AND daily_date = $2 ORDER BY event, daily_index',
         [user.id, date],
       ),
     ]);
-    const official = attempts.rows.map((a) => ({ event: a.event, timeMs: a.time_ms, penalty: a.penalty }));
+    const official = attempts.rows.map((a) => ({ event: a.event, index: a.daily_index, solveId: a.solve_id, timeMs: a.time_ms, penalty: a.penalty }));
     return { date, events: dailyOverview(solves.rows.map(toSolve), official) };
   });
 }
