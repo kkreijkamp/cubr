@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, ApiError, getToken, onUnauthorized, setToken, storedToken } from './api';
+import { clearReminder } from './reminders';
 import { mergeServerSettings, setSettingsServerSync } from './settings';
 import { loadJson, saveJson } from './store';
 import { toast } from './toast';
@@ -173,6 +174,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         applyUser(res.user);
       },
       async logout() {
+        // this browser's daily reminder belongs to the account: off with it, while the token still works
+        await clearReminder().catch(() => undefined);
         try {
           await api.auth.logout();
         } catch {

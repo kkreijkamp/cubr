@@ -102,3 +102,45 @@ self.addEventListener('message', (event) => {
   if (type === 'SKIP_WAITING') void self.skipWaiting();
   else if (type === 'GET_VERSION') event.ports[0]?.postMessage({ version: VERSION, files: __CUBR_PRECACHE__.length });
 });
+
+// ---- daily-challenge reminders (Web Push) ------------------------------------------------------------
+// The solve service sends them to browsers that turned them on in settings (lib/reminders.ts): one
+// notification, replaced by the next if unread; a click opens (or focuses) cubr on the daily page.
+const REMINDER = { title: 'cubr: daily challenge', body: "today's five scrambles are up - one try each", url: '/daily' };
+
+self.addEventListener('push', (event) => {
+  let msg = REMINDER;
+  try {
+    msg = { ...REMINDER, ...(event.data?.json() as Partial<typeof REMINDER> | undefined) };
+  } catch {
+    // not JSON: the usual words
+  }
+  event.waitUntil(
+    self.registration.showNotification(msg.title, {
+      body: msg.body,
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-monochrome-512.png',
+      tag: 'daily-reminder',
+      data: { url: msg.url },
+    }),
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  // only a page of this site, whatever the message says
+  const asked = new URL(String(event.notification.data?.url ?? REMINDER.url), self.location.origin);
+  const url = asked.origin === self.location.origin ? asked.href : new URL(REMINDER.url, self.location.origin).href;
+  event.waitUntil(
+    (async () => {
+      const open = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      const here = open.find((c) => new URL(c.url).origin === self.location.origin);
+      if (!here) {
+        await self.clients.openWindow(url);
+        return;
+      }
+      await here.focus();
+      await here.navigate(url).catch(() => undefined); // a page the worker doesn't control yet just comes forward
+    })(),
+  );
+});

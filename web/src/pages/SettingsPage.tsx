@@ -19,6 +19,7 @@ import { AVG_CHOICES, parseAvgKey } from '../components/timer/statsUtil';
 import '../components/timer/settings-page.css';
 import { ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { clearReminder, DEFAULT_REMINDER_MINUTE, getReminder, reminderSupport, setReminder, type ReminderSupport } from '../lib/reminders';
 import { usePageMeta } from '../lib/usePageMeta';
 import { formatNumber } from '../lib/format';
 import { useKeyboardLayout } from '../lib/keyboardLayout';
@@ -1265,6 +1266,7 @@ function AppGroup() {
           <span className="st-status">{installHint()}</span>
         )}
       </SettingRow>
+      <ReminderRow />
       <SettingRow
         title="offline"
         description="Once cubr is saved on this device, it opens and times without a connection: scrambles are made on the device, and solves in your account sync when you're back online. Leaderboards, races and profiles need a connection."
@@ -1293,6 +1295,85 @@ function AppGroup() {
         )}
       </SettingRow>
     </Group>
+  );
+}
+
+const clock = (minute: number) => `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
+
+/**
+ * The daily-challenge reminder for this browser (lib/reminders.ts): off, or on at an hour of the day,
+ * 10:00 unless changed. Turning it on asks for notification permission; signed-in people only.
+ */
+function ReminderRow() {
+  const { user } = useAuth();
+  const [support, setSupport] = useState<ReminderSupport>(() => reminderSupport());
+  /** its minute of the day, null when off, undefined while it's read */
+  const [minute, setMinute] = useState<number | null | undefined>(undefined);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    getReminder().then(
+      (m) => live && setMinute(m),
+      () => live && setMinute(null),
+    );
+    return () => {
+      live = false;
+    };
+  }, [user?.id]);
+  const change = async (to: number | null) => {
+    setBusy(true);
+    setError(null);
+    try {
+      if (to === null) await clearReminder();
+      else await setReminder(to);
+      setMinute(to);
+    } catch (e) {
+      setError((e as Error).message);
+      setSupport(reminderSupport());
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <SettingRow
+      title="daily reminder"
+      description="A notification at the hour you pick, your time, on days you haven't played the daily challenge yet. For this browser only; signing out turns it off."
+    >
+      {!user ? (
+        <span className="st-status">sign in to get reminders</span>
+      ) : support === 'install-first' ? (
+        <span className="st-status">on an iPhone or iPad, install cubr first (above), then turn it on there</span>
+      ) : support === 'unsupported' ? (
+        <span className="st-status">not in this browser</span>
+      ) : support === 'blocked' ? (
+        <span className="st-status">notifications are blocked for cubr in this browser&apos;s settings</span>
+      ) : (
+        <>
+          {error && <span className="st-status error">{error}</span>}
+          {minute != null && (
+            <select aria-label="reminder time" value={minute} disabled={busy} onChange={(e) => void change(Number(e.target.value))}>
+              {Array.from({ length: 24 }, (_, h) => h * 60).map((m) => (
+                <option key={m} value={m}>
+                  {clock(m)}
+                </option>
+              ))}
+            </select>
+          )}
+          <Options
+            value={minute == null ? 'off' : 'on'}
+            options={[
+              { value: 'off', label: 'off' },
+              { value: 'on', label: 'on' },
+            ]}
+            onChange={(v) => {
+              if (busy || minute === undefined || (v === 'on') === (minute !== null)) return;
+              void change(v === 'on' ? DEFAULT_REMINDER_MINUTE : null);
+            }}
+          />
+        </>
+      )}
+    </SettingRow>
   );
 }
 

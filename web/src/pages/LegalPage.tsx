@@ -77,6 +77,10 @@ export function PrivacyPage() {
             scramble gets one try) and your settings.
           </li>
           <li>
+            <b>Daily reminders</b> (if you turn them on, in a browser where you&apos;re signed in): that browser&apos;s push address and keys (an address at its
+            maker&apos;s push service, which reaches only that browser), the hour you picked and your time zone.
+          </li>
+          <li>
             <b>Race rooms:</b> the name you race under and the chat messages you send (the room keeps its last 50), until 2 hours after the room was last
             active.
           </li>
@@ -189,6 +193,10 @@ export function PrivacyPage() {
             <b>Apple iCloud:</b> hosts our contact inbox, <Mail />.
           </li>
           <li>
+            <b>Your browser maker&apos;s push service</b> (Google for Chrome and Edge, Mozilla for Firefox, Apple for Safari and the installed iPhone app):
+            delivers the daily reminders you turned on. Each one is encrypted for your browser, so the push service can&apos;t read it.
+          </li>
+          <li>
             <b>Ko-fi:</b> takes donations. The payment itself is between you and Ko-fi, under Ko-fi&apos;s own terms and privacy policy.
           </li>
           <li>
@@ -224,6 +232,7 @@ export function PrivacyPage() {
           <li>
             Your account and solves: until you delete your account. Deleting removes them from the live database straight away, and from backups within 30 days.
           </li>
+          <li>A browser&apos;s daily reminders: until you turn them off, sign out there, delete your account, or the browser drops them.</li>
           <li>
             Password-reset links work for 1 hour, links that confirm your email for 7 days (1 hour for a change of address). Race rooms and their chat are kept
             until 2 hours after the room was last active, and rate-limit counters for up to a day.

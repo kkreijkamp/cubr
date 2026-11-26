@@ -352,6 +352,13 @@ export const api = {
     /** an official daily attempt starts: `abandoned` = it had started before, so it's a DNF now */
     dailyStart: (body: { date: string; event: string; index: number }) =>
       request<{ abandoned: boolean; attempt?: { index: number; timeMs: number; penalty: Penalty } }>('POST', '/api/solves/daily/start', body),
+    /** the key browsers subscribe to daily reminders with (null: reminders aren't set up on this server) */
+    reminderKey: () => get<{ publicKey: string | null }>('/api/solves/daily/reminders/key'),
+    /** this browser's daily reminder, on at `remindMinute` of its local day (or moved there) */
+    setReminder: (body: { endpoint: string; keys: { p256dh: string; auth: string }; remindMinute: number; tz: string }) =>
+      request<{ reminder: { remindMinute: number; tz: string } }>('PUT', '/api/solves/daily/reminders', body),
+    /** this browser's daily reminder off (the endpoint travels in the body: it's a capability URL) */
+    clearReminder: (endpoint: string) => request<void>('DELETE', '/api/solves/daily/reminders', { endpoint }),
   },
   stats: {
     summary: (userId: string, signal?: AbortSignal) => get<StatsSummary>(`/api/stats/users/${enc(userId)}/summary`, signal),
