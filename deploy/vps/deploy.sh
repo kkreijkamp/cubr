@@ -45,17 +45,25 @@ gcloud artifacts docker images describe "${REGISTRY_HOST}/cubr-app/cubr/web:${VE
   || { echo "no images for ${VERSION} in Artifact Registry: build them with deploy/vps/release.sh" >&2; exit 1; }
 echo "deploying cubr ${VERSION} (${TAG} on main) to ${VM}"
 
-# 1. compose files, gateway config, backup script and systemd timers from the release tag, laid out
-#    like the repo so relative paths keep working; (re)install the timers (backup, WCA import)
-git archive --format=tar "$TAG" docker-compose.yml deploy/vps/compose.prod.yml deploy/gateway/nginx.conf \
-    deploy/vps/backup.sh deploy/vps/watch.sh deploy/vps/journald.conf deploy/vps/systemd | gzip \
+# 1. compose files, gateway config, the scripts the timers run, the timers and the journal's limits
+#    from the release tag, laid out like the repo so relative paths keep working; (re)install them.
+#    An older release (a rollback) lacks some of these files: only those its tag has are copied, and
+#    the newer ones already on the VM stay.
+present=()
+while IFS= read -r f; do present+=("$f"); done < <(git ls-tree -r --name-only "$TAG" -- docker-compose.yml \
+  deploy/vps/compose.prod.yml deploy/gateway/nginx.conf deploy/vps/backup.sh deploy/vps/watch.sh \
+  deploy/vps/journald.conf deploy/vps/systemd)
+git archive --format=tar "$TAG" "${present[@]}" | gzip \
   | on_vm 'set -e; test -f /opt/cubr/.env || { echo "no /opt/cubr/.env: run deploy.sh init first" >&2; exit 1; }
       tar -xzf - -C /opt/cubr
       sudo install -m 644 /opt/cubr/deploy/vps/systemd/cubr-* /etc/systemd/system/
       sudo systemctl daemon-reload
-      sudo systemctl enable --now cubr-backup.timer cubr-wca-import.timer cubr-watch.timer 2>/dev/null
+      for t in cubr-backup.timer cubr-wca-import.timer cubr-watch.timer; do
+        if [ -f /etc/systemd/system/$t ]; then sudo systemctl enable --now $t 2>/dev/null; fi
+      done
       # the journal keeps 14 days at most (the containers log there): only restarted when that changes
-      if ! sudo cmp -s /opt/cubr/deploy/vps/journald.conf /etc/systemd/journald.conf.d/cubr.conf; then
+      if [ -f /opt/cubr/deploy/vps/journald.conf ] &&
+        ! sudo cmp -s /opt/cubr/deploy/vps/journald.conf /etc/systemd/journald.conf.d/cubr.conf; then
         sudo install -D -m 644 /opt/cubr/deploy/vps/journald.conf /etc/systemd/journald.conf.d/cubr.conf
         sudo systemctl restart systemd-journald
       fi'
