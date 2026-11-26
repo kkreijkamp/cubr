@@ -31,6 +31,14 @@ export interface ImportPlan {
   events: string[];
 }
 
+/** A plan with what the account already has taken out (see `leaveOutExisting`). */
+export interface ImportResult extends ImportPlan {
+  /** solves the account already had (same event, time, penalty and moment), left out */
+  skipped: number;
+  /** existing sessions that the import adds solves to */
+  continued: number;
+}
+
 /** Assigns ids to every imported session and solve (pure - no I/O). */
 export function planImport(body: ImportBody, newId: () => string = randomUUID): ImportPlan {
   const sessions: ImportPlan['sessions'] = [];
@@ -56,6 +64,55 @@ export function planImport(body: ImportBody, newId: () => string = randomUUID): 
     }
   }
   return { sessions, rows, events: [...events] };
+}
+
+/**
+ * The account's sessions that already hold each planned solve: row index -> session id, for every row
+ * whose event, time, penalty and moment (to the millisecond) match a solve the user has. One query,
+ * on the (user_id, event, created_at) index.
+ */
+export async function findExisting(client: PoolClient, userId: string, rows: ImportRow[]): Promise<Map<number, string>> {
+  const found = new Map<number, string>();
+  const size = IMPORT_CHUNK_SIZE * 5;
+  for (let offset = 0; offset < rows.length; offset += size) {
+    const part = rows.slice(offset, offset + size);
+    const { rows: hits } = await client.query<{ i: number; session_id: string }>(
+      `SELECT (t.i - 1)::int AS i, min(s.session_id::text) AS session_id
+         FROM unnest($2::text[], $3::int[], $4::text[], $5::timestamptz[]) WITH ORDINALITY AS t(event, time_ms, penalty, created_at, i)
+         JOIN solve.solves s ON s.user_id = $1 AND s.event = t.event AND s.created_at = t.created_at AND s.time_ms = t.time_ms AND s.penalty = t.penalty
+        GROUP BY t.i`,
+      [userId, part.map((r) => r.event), part.map((r) => r.timeMs), part.map((r) => r.penalty), part.map((r) => r.createdAt)],
+    );
+    for (const h of hits) found.set(offset + h.i, h.session_id);
+  }
+  return found;
+}
+
+/**
+ * Leaves out the solves the account already has (`existing`, from findExisting), so importing a file
+ * again, or retrying one that failed half-way, adds only what's missing (pure - no I/O). A session whose
+ * solves are already in one of the account's sessions continues that one (the one holding most of them)
+ * with the rest; a session with none of them becomes a new session, as before.
+ */
+export function leaveOutExisting(plan: ImportPlan, existing: Map<number, string>): ImportResult {
+  if (existing.size === 0) return { ...plan, skipped: 0, continued: 0 };
+  // per planned session: how many of its solves each existing session holds
+  const holders = new Map<string, Map<string, number>>();
+  plan.rows.forEach((r, i) => {
+    const at = existing.get(i);
+    if (at === undefined) return;
+    const counts = holders.get(r.sessionId) ?? new Map<string, number>();
+    counts.set(at, (counts.get(at) ?? 0) + 1);
+    holders.set(r.sessionId, counts);
+  });
+  const target = new Map<string, string>();
+  for (const [planned, counts] of holders) target.set(planned, [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0][0]);
+  const rows = plan.rows.filter((_, i) => !existing.has(i)).map((r) => ({ ...r, sessionId: target.get(r.sessionId) ?? r.sessionId }));
+  const sessions = plan.sessions.filter((s) => !target.has(s.id));
+  const created = new Set(sessions.map((s) => s.id));
+  const events = [...new Set(rows.map((r) => r.event))];
+  const continued = new Set(rows.map((r) => r.sessionId).filter((id) => !created.has(id))).size;
+  return { sessions, rows, events, skipped: plan.rows.length - rows.length, continued };
 }
 
 /** Column-oriented arrays for `unnest()` - one array per column, same order as the SQL below. */

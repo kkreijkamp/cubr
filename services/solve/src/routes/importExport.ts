@@ -2,7 +2,7 @@ import { Readable } from 'node:stream';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { badRequest, parse, rateLimit, rateLimited, withTx, type Pool, type PoolClient } from '@cubr/common';
 import { currentUser, tzFrom, type RouteContext } from '../context.js';
-import { planImport, writeImport } from '../importer.js';
+import { findExisting, leaveOutExisting, planImport, writeImport } from '../importer.js';
 import { SOLVE_COLUMNS, toSession, toSolve, type SolveRow } from '../mapping.js';
 import { enqueue } from '../outbox.js';
 import { listSessions } from '../repo.js';
@@ -86,6 +86,8 @@ export function registerImportExportRoutes(app: FastifyInstance, { pool, redis, 
    * Bulk import (cubr, csTimer and other timers' files are converted client-side with cubestats parseTimerFile).
    * Everything happens in ONE transaction: new sessions, solves in unnest() batches, and a
    * single `solves.imported` outbox row - consumers recompute the user's affected events.
+   * Solves the account already has are left out (a second import, or a retry after a failure,
+   * adds only what's missing); a session already imported before continues where it was.
    * Auth runs onRequest, i.e. before a large body is read and parsed.
    */
   app.post('/api/sessions/import', { onRequest: [auth.requireAuth, limit('import', IMPORTS_PER_HOUR)], bodyLimit: IMPORT_BODY_LIMIT }, async (req) => {
@@ -99,19 +101,20 @@ export function registerImportExportRoutes(app: FastifyInstance, { pool, redis, 
     const nowIso = new Date().toISOString();
     for (const s of body.sessions) for (const v of s.solves) if (Date.parse(v.createdAt) > maxTs) v.createdAt = nowIso;
 
-    const plan = planImport(body);
+    const planned = planImport(body);
     const started = Date.now();
-    const solves = await withTx(pool, async (client) => {
-      // one import per account at a time, so two can't both pass the size check
+    const { plan, solves } = await withTx(pool, async (client) => {
+      // one import per account at a time, so two can't both pass the size check (or both miss the other's solves)
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`solve:import:${user.id}`]);
+      const plan = leaveOutExisting(planned, await findExisting(client, user.id, planned.rows));
       const { rows } = await client.query<{ n: number }>('SELECT count(*)::int AS n FROM solve.solves WHERE user_id = $1', [user.id]);
       assertImportFits(rows[0]?.n ?? 0, plan.rows.length);
       const n = await writeImport(client, user.id, plan);
-      await enqueue(client, 'solves.imported', { userId: user.id, username: user.username, events: plan.events, count: n, tz });
-      return n;
+      if (n > 0) await enqueue(client, 'solves.imported', { userId: user.id, username: user.username, events: plan.events, count: n, tz });
+      return { plan, solves: n };
     });
-    req.log.info({ sessions: plan.sessions.length, solves, ms: Date.now() - started }, 'import committed');
-    return { imported: { sessions: plan.sessions.length, solves } };
+    req.log.info({ sessions: plan.sessions.length, solves, skipped: plan.skipped, continued: plan.continued, ms: Date.now() - started }, 'import committed');
+    return { imported: { sessions: plan.sessions.length, solves }, skipped: plan.skipped, continued: plan.continued };
   });
 
   /** Streamed from one read-only snapshot, so a solve saved meanwhile can't appear half-way. */

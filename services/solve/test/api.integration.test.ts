@@ -449,7 +449,7 @@ describeIntegration('solve API', () => {
       };
       const res = await as(u).post('/api/sessions/import', body);
       expect(res.statusCode, res.body).toBe(200);
-      expect(res.json()).toEqual({ imported: { sessions: 2, solves: 3 } });
+      expect(res.json()).toEqual({ imported: { sessions: 2, solves: 3 }, skipped: 0, continued: 0 });
       const evt = await outbox('solves.imported', u.id);
       expect(evt).toHaveLength(1);
       expect(evt[0].payload).toMatchObject({ count: 3 });
@@ -466,6 +466,33 @@ describeIntegration('solve API', () => {
         ],
       });
       expect(byName.get('imported practice')).toMatchObject({ event: '222', practice: true, solves: [{ timeMs: 3_000, penalty: 'DNF', comment: 'pop' }] });
+    });
+
+    it('leaves out solves the account already has: a second import adds nothing, a retry continues its session', async () => {
+      const u = await newUser();
+      const solve = (i: number, penalty?: string) => ({ timeMs: 9_000 + i, ...(penalty ? { penalty } : {}), createdAt: `2026-02-0${i}T10:00:00.123Z` });
+      const first = { sessions: [{ name: 'csTimer 3x3', event: '333', solves: [solve(1), solve(2)] }] };
+      expect((await as(u).post('/api/sessions/import', first)).json()).toEqual({ imported: { sessions: 1, solves: 2 }, skipped: 0, continued: 0 });
+
+      // the same file again: nothing new, no second session, no event
+      expect((await as(u).post('/api/sessions/import', first)).json()).toEqual({ imported: { sessions: 0, solves: 0 }, skipped: 2, continued: 0 });
+      expect(await outbox('solves.imported', u.id)).toHaveLength(1);
+
+      // a later export of the same session (two more solves), and an unrelated session with the same name
+      const later = {
+        sessions: [
+          { name: 'csTimer 3x3', event: '333', solves: [solve(1), solve(2), solve(3), solve(4)] },
+          { name: 'csTimer 3x3', event: '333', solves: [solve(5)] },
+        ],
+      };
+      expect((await as(u).post('/api/sessions/import', later)).json()).toEqual({ imported: { sessions: 1, solves: 3 }, skipped: 2, continued: 1 });
+      const doc = (await as(u).get('/api/solves/export')).json();
+      const named = doc.sessions.filter((x: { name: string }) => x.name === 'csTimer 3x3');
+      expect(named.map((x: { solves: unknown[] }) => x.solves.length).sort()).toEqual([1, 4]);
+
+      // a different penalty is a different solve
+      const plus2 = { sessions: [{ name: 'csTimer 3x3', event: '333', solves: [solve(1, '+2')] }] };
+      expect((await as(u).post('/api/sessions/import', plus2)).json()).toMatchObject({ imported: { solves: 1 }, skipped: 0 });
     });
 
     it('allows 10 imports an hour per account', async () => {

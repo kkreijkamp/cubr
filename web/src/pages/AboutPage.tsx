@@ -256,8 +256,9 @@ export default function AboutPage() {
           <h3 className="ab-q">can I bring my times from csTimer?</h3>
           <p className="ab-a">
             Yes: in csTimer, export to a file, then choose it under import in <Link to="/settings?tab=data">settings &gt; data</Link>. cubr also reads Twisty
-            Timer, Cubic Timer, Block Keeper, CubeDesk, DCTimer, mateus Cubetimer and GAN CubeStation files. Each session becomes a cubr session, in your
-            account when you&apos;re signed in, in this browser when you&apos;re not. The same page exports them, as cubr&apos;s own file or for csTimer.
+            Timer, Cubic Timer, Block Keeper, CubeDesk, DCTimer, mateus Cubetimer and GAN CubeStation files. Each session becomes a cubr session (one imported
+            before carries on, and solves already there are left out), in your account when you&apos;re signed in, in this browser when you&apos;re not. The
+            same page exports them, as cubr&apos;s own file or for csTimer.
           </p>
           <h3 className="ab-q">can I install it, and does it work offline?</h3>
           <p className="ab-a">

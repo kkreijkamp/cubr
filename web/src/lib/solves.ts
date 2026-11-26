@@ -1344,8 +1344,24 @@ async function mergeCloud(target: Session, ids: string[]): Promise<{ sessions: n
   return total;
 }
 
-/** Import sessions read by parseTimerFile (cloud: POST /api/sessions/import; local: localStorage). */
-export async function importSessions(sessions: ImportedSession[]): Promise<{ sessions: number; solves: number }> {
+/** What an import did: new sessions and the solves it added, solves already there that it left out,
+ *  and existing sessions it added solves to. */
+export interface ImportOutcome {
+  sessions: number;
+  solves: number;
+  skipped: number;
+  continued: number;
+}
+
+/** A solve's identity across imports: the same event, time, penalty and moment (to the millisecond). */
+const importKey = (event: string, timeMs: number, penalty: string, createdAt: string) => `${event}|${timeMs}|${penalty}|${Date.parse(createdAt)}`;
+
+/**
+ * Import sessions read by parseTimerFile (cloud: POST /api/sessions/import; local: localStorage). Solves
+ * already there are left out, here as on the server: importing a file again, or retrying one, adds only
+ * what's missing, and a session imported before continues where it was.
+ */
+export async function importSessions(sessions: ImportedSession[]): Promise<ImportOutcome> {
   if (!solveStore.get().ready) await whenReady();
   const valid = sessions.filter((s) => isEventId(s.event) && s.solves.length > 0);
   if (scope?.mode === 'cloud') {
@@ -1356,19 +1372,57 @@ export async function importSessions(sessions: ImportedSession[]): Promise<{ ses
       ...(s.scramble ? { scramble: s.scramble } : {}),
       solves: s.solves.map((x) => ({ timeMs: x.timeMs, penalty: x.penalty, scramble: x.scramble, comment: x.comment, createdAt: x.createdAt })),
     }));
-    const total = { sessions: 0, solves: 0 };
+    const total: ImportOutcome = { sessions: 0, solves: 0, skipped: 0, continued: 0 };
     for (const chunk of planImportChunks(payload)) {
       const r = await api.sessions.import(chunk);
       total.sessions += r.imported.sessions;
       total.solves += r.imported.solves;
+      total.skipped += r.skipped ?? 0; // a server from before v1.6.72 doesn't say
+      total.continued += r.continued ?? 0;
     }
     await refreshCloud();
     return total;
   }
+  // the solves this browser already has, and the session holding each
+  const have = new Map<string, string>();
+  for (const [sessionId, list] of localDb.solves) for (const x of list) have.set(importKey(x.event, x.timeMs, x.penalty, x.createdAt), sessionId);
   const added: Session[] = [];
+  /** continued sessions as they were, to put back if the import doesn't fit */
+  const before = new Map<string, Solve[]>();
+  const sessionsBefore = localDb.sessions;
   let solves = 0;
+  let skipped = 0;
   for (const s of valid) {
     const now = new Date().toISOString();
+    const counts = new Map<string, number>();
+    const fresh = s.solves.filter((x) => {
+      const at = have.get(importKey(s.event, x.timeMs, x.penalty, x.createdAt));
+      if (at !== undefined) counts.set(at, (counts.get(at) ?? 0) + 1);
+      return at === undefined;
+    });
+    skipped += s.solves.length - fresh.length;
+    const toSolve = (x: ImportedSession['solves'][number], sessionId: string): Solve => ({
+      id: uuid(),
+      sessionId,
+      event: s.event,
+      timeMs: x.timeMs,
+      penalty: x.penalty,
+      scramble: x.scramble,
+      comment: x.comment,
+      source: 'import',
+      createdAt: x.createdAt,
+    });
+    // a session imported before: the one holding most of its solves takes the rest
+    const target = [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0];
+    if (target !== undefined && localDb.sessions.some((x) => x.id === target)) {
+      if (!fresh.length) continue;
+      if (!before.has(target)) before.set(target, localDb.solves.get(target) ?? []);
+      const list = sortChrono([...(localDb.solves.get(target) ?? []), ...fresh.map((x) => toSolve(x, target))]);
+      localDb.solves.set(target, list);
+      localDb.sessions = localDb.sessions.map((x) => (x.id === target ? { ...x, solveCount: list.length, updatedAt: now } : x));
+      solves += fresh.length;
+      continue;
+    }
     const session: Session = {
       id: uuid(),
       name: (s.name.trim() || 'import').slice(0, 40),
@@ -1377,21 +1431,9 @@ export async function importSessions(sessions: ImportedSession[]): Promise<{ ses
       ...(s.scramble ? { scramble: s.scramble } : {}),
       createdAt: now,
       updatedAt: now,
-      solveCount: s.solves.length,
+      solveCount: fresh.length,
     };
-    const list = sortChrono(
-      s.solves.map((x) => ({
-        id: uuid(),
-        sessionId: session.id,
-        event: s.event,
-        timeMs: x.timeMs,
-        penalty: x.penalty,
-        scramble: x.scramble,
-        comment: x.comment,
-        source: 'import',
-        createdAt: x.createdAt,
-      })),
-    );
+    const list = sortChrono(fresh.map((x) => toSolve(x, session.id)));
     added.push(session);
     localDb.sessions = [...localDb.sessions, session];
     localDb.solves.set(session.id, list);
@@ -1399,15 +1441,15 @@ export async function importSessions(sessions: ImportedSession[]): Promise<{ ses
   }
   localDirty = true;
   if (!flushLocal()) {
-    const ids = new Set(added.map((s) => s.id));
-    localDb.sessions = localDb.sessions.filter((s) => !ids.has(s.id));
-    ids.forEach((id) => localDb.solves.delete(id));
+    localDb.sessions = sessionsBefore;
+    added.forEach((x) => localDb.solves.delete(x.id));
+    before.forEach((list, id) => localDb.solves.set(id, list));
     localDirty = true;
     flushLocal();
     throw new Error('Not enough browser storage for this import. Sign in to import it into your cloud account instead.');
   }
   if (scope?.mode === 'local') publish();
-  return { sessions: added.length, solves };
+  return { sessions: added.length, solves, skipped, continued: before.size };
 }
 
 /** All sessions with all solves (for JSON export). */

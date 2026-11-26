@@ -744,7 +744,7 @@ describe('guest mode (localStorage)', () => {
       { name: '   ', event: '222', sourceType: '222so', practice: true, solves: [imp(1500, T(3))] },
       { name: 'n'.repeat(45), event: '333', sourceType: '333', solves: [imp(1600, T(4))] },
     ] satisfies ImportedSession[]);
-    expect(r).toEqual({ sessions: 3, solves: 4 });
+    expect(r).toEqual({ sessions: 3, solves: 4, skipped: 0, continued: 0 });
     const added = s.state().sessions.slice(2);
     expect(added.map((x) => [x.name, x.event, x.practice ?? false, x.solveCount])).toEqual([
       ['From csTimer', '444', false, 2],
@@ -757,6 +757,27 @@ describe('guest mode (localStorage)', () => {
     ]);
     expect(s.getCurrentSession()?.name).toBe('3x3');
     expect(storedGuest().sessions).toHaveLength(5); // saved at once
+  });
+
+  it('leaves out solves this browser already has: the same file again adds nothing, a later one continues its session', async () => {
+    const s = await start();
+    const first = [{ name: 'csTimer', event: '444', sourceType: '444wca', solves: [imp(3000, T(1)), imp(3100, T(2))] }] satisfies ImportedSession[];
+    expect(await s.importSessions(first)).toEqual({ sessions: 1, solves: 2, skipped: 0, continued: 0 });
+    expect(await s.importSessions(first)).toEqual({ sessions: 0, solves: 0, skipped: 2, continued: 0 });
+    const later = [
+      { name: 'csTimer', event: '444', sourceType: '444wca', solves: [imp(3000, T(1)), imp(3100, T(2)), imp(3200, T(3))] },
+      { name: 'csTimer', event: '444', sourceType: '444wca', solves: [imp(2900, T(4))] }, // none of its solves here: a session of its own
+      { name: 'plus two', event: '444', sourceType: '444wca', solves: [imp(3000, T(1), '+2')] }, // another penalty: another solve
+    ] satisfies ImportedSession[];
+    expect(await s.importSessions(later)).toEqual({ sessions: 2, solves: 3, skipped: 2, continued: 1 });
+    const fours = s.state().sessions.filter((x) => x.event === '444');
+    expect(fours.map((x) => [x.name, x.solveCount])).toEqual([
+      ['csTimer', 3],
+      ['csTimer', 1],
+      ['plus two', 1],
+    ]);
+    expect(s.getLoadedSolves(fours[0].id)!.map((x) => x.timeMs)).toEqual([3000, 3100, 3200]);
+    expect(storedGuest().sessions.filter((x) => x.event === '444')).toHaveLength(3); // saved
   });
 
   it('undoes an import that does not fit in browser storage', async () => {
@@ -1392,6 +1413,22 @@ describe('signed in (cloud)', () => {
     expect(data.sessions.map((x) => x.name)).toEqual(['3x3', '4x4']);
   });
 
+  it('adds up what the server left out and continued over all of an import’s requests', async () => {
+    const s = await start(U1, { seed: seedU1 });
+    h.api.sessions.import
+      .mockResolvedValueOnce({ imported: { sessions: 1, solves: 2 }, skipped: 3, continued: 1 })
+      .mockResolvedValueOnce({ imported: { sessions: 0, solves: 0 } }); // a server from before v1.6.72
+    const big = (name: string, n: number, from: number) => ({
+      name,
+      event: '333',
+      sourceType: '333',
+      solves: Array.from({ length: n }, (_, i) => imp(1000 + i, T(from + i))),
+    });
+    const r = await s.importSessions([big('a', 15_000, 0), big('b', 15_000, 20_000)]);
+    expect(h.api.sessions.import).toHaveBeenCalledTimes(2);
+    expect(r).toEqual({ sessions: 1, solves: 2, skipped: 3, continued: 1 });
+  });
+
   it('imports sessions in one request and shows them', async () => {
     const s = await start(U1, { seed: seedU1 });
     const r = await s.importSessions([
@@ -1399,7 +1436,7 @@ describe('signed in (cloud)', () => {
       { name: 'skip me', event: 'nope', sourceType: 'x', solves: [imp(1000, T(1))] },
       { name: '', event: '222', sourceType: '222so', practice: true, solves: [imp(1500, T(2))] },
     ]);
-    expect(r).toEqual({ sessions: 2, solves: 3 });
+    expect(r).toEqual({ sessions: 2, solves: 3, skipped: 0, continued: 0 });
     expect(h.api.sessions.import).toHaveBeenCalledTimes(1);
     expect(h.api.sessions.import.mock.calls[0][0]).toEqual({
       sessions: [

@@ -38,7 +38,7 @@ import {
   type Settings,
 } from '../lib/settings';
 import { SCHEMES, stickerColour, type Scheme } from '../lib/scrambleNet';
-import { clearLocalData, exportAll, forgetUser, importSessions, localDataSummary, useSolveState } from '../lib/solves';
+import { clearLocalData, exportAll, forgetUser, importSessions, localDataSummary, useSolveState, type ImportOutcome } from '../lib/solves';
 import { applyTheme, getTheme, isLightTheme, THEMES, themeLabel, type Theme } from '../lib/themes';
 import { toast } from '../lib/toast';
 import { AVAILABLE_INPUTS, INPUT_MODES, updateInput, useInputState } from '../input/inputMode';
@@ -87,6 +87,16 @@ function SettingRow({ title, description, children, wide }: RowProps) {
 }
 
 /** A few settings that belong together, under a quiet lowercase label. */
+/** "imported 120 solves in 2 sessions", and what was continued or left out as already there. */
+function importMessage(r: ImportOutcome): string {
+  if (r.solves === 0) return r.skipped ? `nothing new: all ${formatNumber(r.skipped)} solves are already here` : 'nothing to import';
+  const plural = (n: number, word: string) => `${formatNumber(n)} ${word}${n === 1 ? '' : 's'}`;
+  const parts = [`imported ${plural(r.solves, 'solve')}${r.sessions ? ` in ${plural(r.sessions, r.continued ? 'new session' : 'session')}` : ''}`];
+  if (r.continued) parts.push(`${plural(r.continued, 'session')} continued`);
+  if (r.skipped) parts.push(`${formatNumber(r.skipped)} already here left out`);
+  return parts.join(', ');
+}
+
 /** A group of settings under its heading; `name` names it to a screen reader when the heading alone is shared. */
 function Group({ title, name, children }: { title: string; name?: string; children: ReactNode }) {
   const id = useId();
@@ -1319,7 +1329,7 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
     setError(null);
     try {
       const r = await importSessions(parsed.sessions);
-      toast.success(`imported ${formatNumber(r.solves)} solves in ${r.sessions} session${r.sessions === 1 ? '' : 's'}`);
+      toast.success(importMessage(r));
       setParsed(null);
     } catch (e) {
       setError((e as Error).message || 'import failed');
@@ -1353,7 +1363,7 @@ function DataTools({ loggedIn }: { loggedIn: boolean }) {
             <>
               A cubr export, or any file csTimer can import: csTimer (<span className="text">export -&gt; export to file</span>), Twisty Timer, Cubic Timer,
               Block Keeper, CubeDesk, DCTimer, mateus Cubetimer or GAN CubeStation. Each session becomes a cubr session{' '}
-              {loggedIn ? 'in your account' : 'in this browser'}.
+              {loggedIn ? 'in your account' : 'in this browser'}; solves already there are left out, so importing a file again adds only what&apos;s new.
             </>
           }
         >

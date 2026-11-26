@@ -326,7 +326,9 @@ export const api = {
     solves: (id: string, signal?: AbortSignal) =>
       request<{ solves: Solve[] }>('GET', `/api/sessions/${enc(id)}/solves`, undefined, { signal, timeoutMs: 60_000 }),
     import: (payload: ImportPayload) =>
-      request<{ imported: { sessions: number; solves: number } }>('POST', '/api/sessions/import', payload, { timeoutMs: 120_000 }),
+      request<{ imported: { sessions: number; solves: number }; skipped?: number; continued?: number }>('POST', '/api/sessions/import', payload, {
+        timeoutMs: 120_000,
+      }),
     /** Moves every solve of `sourceIds` (1-50, same event, not the target) into `targetId` and
      *  deletes the sources, atomically. 404 = unknown session, 409 = different event. */
     merge: (targetId: string, sourceIds: string[]) =>

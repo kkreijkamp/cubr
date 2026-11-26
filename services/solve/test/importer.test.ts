@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chunk, IMPORT_CHUNK_SIZE, planImport, toColumns } from '../src/importer.js';
+import { chunk, IMPORT_CHUNK_SIZE, leaveOutExisting, planImport, toColumns } from '../src/importer.js';
 import type { ImportBody } from '../src/schemas.js';
 
 describe('chunk', () => {
@@ -87,5 +87,62 @@ describe('toColumns', () => {
     expect(c.createdAt).toEqual(['T1', 'T2']);
     expect(c.id).toEqual(plan.rows.map((r) => r.id));
     expect(new Set(c.sessionId).size).toBe(1);
+  });
+});
+
+describe('leaveOutExisting', () => {
+  let n = 0;
+  const ids = () => `id-${++n}`;
+  const body: ImportBody = {
+    sessions: [
+      {
+        name: 'main',
+        event: '333',
+        practice: false,
+        solves: [1, 2, 3, 4].map((i) => ({ timeMs: i * 1000, penalty: 'OK' as const, scramble: '', createdAt: `2026-01-0${i}T00:00:00Z` })),
+      },
+      { name: 'oh', event: '333oh', practice: false, solves: [{ timeMs: 20_000, penalty: 'OK' as const, scramble: '', createdAt: '2026-01-05T00:00:00Z' }] },
+    ],
+  };
+
+  it('changes nothing when the account has none of the solves', () => {
+    const plan = planImport(body, ids);
+    expect(leaveOutExisting(plan, new Map())).toEqual({ ...plan, skipped: 0, continued: 0 });
+  });
+
+  it("continues the session that already holds some of a session's solves, with only the rest", () => {
+    const plan = planImport(body, ids);
+    // the account has main's first two solves, in its session "old"
+    const out = leaveOutExisting(
+      plan,
+      new Map([
+        [0, 'old'],
+        [1, 'old'],
+      ]),
+    );
+    expect(out.skipped).toBe(2);
+    expect(out.continued).toBe(1);
+    expect(out.sessions.map((x) => x.name)).toEqual(['oh']); // main isn't created again
+    expect(out.rows.map((r) => [r.timeMs, r.sessionId === 'old'])).toEqual([
+      [3000, true],
+      [4000, true],
+      [20_000, false],
+    ]);
+    expect(out.events.sort()).toEqual(['333', '333oh']);
+  });
+
+  it('adds nothing for a file imported before, and goes with the session holding most of the solves', () => {
+    const plan = planImport(body, ids);
+    const all = leaveOutExisting(plan, new Map(plan.rows.map((_, i) => [i, i === 0 ? 'b' : 'a'])));
+    expect(all).toMatchObject({ sessions: [], rows: [], events: [], skipped: 5, continued: 0 });
+    const split = leaveOutExisting(
+      plan,
+      new Map([
+        [0, 'b'],
+        [1, 'a'],
+        [2, 'a'],
+      ]),
+    );
+    expect(split.rows).toEqual([expect.objectContaining({ timeMs: 4000, sessionId: 'a' }), expect.objectContaining({ timeMs: 20_000 })]);
   });
 });
