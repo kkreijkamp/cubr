@@ -5,26 +5,12 @@ import { errorMessage, sleep } from './util.js';
 
 /**
  * Events whose first scramble is slow because cubing.js builds search tables (4x4x4 ~1-3 s,
- * 333fm/sq1 up to ~2 s, kilominx ~4.5 s). The other events reuse these tables or are random-move
- * scramblers. The two practice solves warm the 3x3 and 2x2 solvers (practice.ts).
+ * 333fm/sq1 up to ~2 s, FTO ~1 s). The other events reuse these tables or are random-move
+ * scramblers. The two practice solves warm the 3x3 and 2x2 solvers (practice.ts). cubing.js keeps
+ * every table in its one search worker, which has production's heap cap (192 MB): what's listed here
+ * has to fit there together (CI's "Scramble image" job checks it under that cap).
  */
-export const WARMUP_EVENTS = [
-  '333',
-  '222',
-  '444',
-  'sq1',
-  '333fm',
-  'pyram',
-  'skewb',
-  'clock',
-  'minx',
-  'fto',
-  'kilominx',
-  'master_tetraminx',
-  'redi_cube',
-  warmupSolve('pll'),
-  warmupSolve('222eg0'),
-];
+export const WARMUP_EVENTS = ['333', '222', '444', 'sq1', '333fm', 'pyram', 'skewb', 'clock', 'minx', 'fto', warmupSolve('pll'), warmupSolve('222eg0')];
 
 function warmupSolve(type: string): string {
   const job = practiceJob(type);

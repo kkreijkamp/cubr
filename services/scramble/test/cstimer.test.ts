@@ -30,6 +30,19 @@ describe("csTimer's scramblers", () => {
     expect(host.stats()).toMatchObject({ failed: 0, timeouts: 0 });
   }, 120_000);
 
+  it('stops an idle thread and starts a fresh one for the next request', async () => {
+    const idle = createCsTimerHost({ timeoutMs: 30_000, maxQueue: 10, idleMs: 300 });
+    try {
+      expect((await idle.scramble('klmso', 0)).length).toBeGreaterThan(10);
+      await new Promise((r) => setTimeout(r, 900));
+      expect(idle.stats()).toMatchObject({ idleStops: 1, failed: 0, restarts: 0, inFlight: 0 });
+      expect((await idle.scramble('rediso', 0)).length).toBeGreaterThan(10); // a fresh thread
+      expect(idle.stats()).toMatchObject({ requests: 2, idleStops: 1, failed: 0 });
+    } finally {
+      await idle.close();
+    }
+  }, 60_000);
+
   it('makes the move subsets in their own moves only', async () => {
     for (let i = 0; i < 5; i++) {
       for (const m of (await host.scramble('2gen', 0)).split(' ')) expect(m).toMatch(/^[RU]['2]?$/);

@@ -402,6 +402,68 @@
    ]
   ]
  },
+ "mpyrso": {
+  "event": "mpyr",
+  "palette": [
+   "#ffff00",
+   "#ff0000",
+   "#0000ff",
+   "#00ff00"
+  ],
+  "drawings": [
+   [
+    "",
+    "0000000000000000111111111111111122222222222222223333333333333333"
+   ],
+   [
+    "B' Lw U Rw L' Uw' Lw U' Uw B R Lw' Bw' Lw' Bw Lw' Bw' Uw l b' u",
+    "1121113103331223303210203232301002101333031030010232020221221201"
+   ],
+   [
+    "U B R Rw' U' Bw Rw Uw B' R' L Bw' Uw Lw Bw Uw Rw' Uw' Bw' l r u'",
+    "0220030100311001103101103322213323323021213130023323221112120230"
+   ],
+   [
+    "Rw B Bw' Rw' U' L' Uw' B L' Uw Lw' Rw Bw Lw' Rw Lw Rw' Uw' Bw' r b'",
+    "0200111333221120101102032333220122203003111013303222133102231003"
+   ]
+  ]
+ },
+ "klmso": {
+  "event": "klm",
+  "palette": [
+   "#ffffff",
+   "#006600",
+   "#dd0000",
+   "#0000bb",
+   "#ffcc00",
+   "#8811ff",
+   "#999999",
+   "#77ee00",
+   "#ff8833",
+   "#88ddff",
+   "#ffffbb",
+   "#ff99ff"
+  ],
+  "drawings": [
+   [
+    "",
+    "00000111112222233333444445555566666777778888899999aaaaabbbbb"
+   ],
+   [
+    "BL2' DBL DL B L2' DBL F R2 DR2' F2' R' DBR D2' DL2' F2 R2' F' DR2' R DR2 F2' DR2 R' F2 R2 F2'",
+    "701859b281190925b2aa3044635a50b2b48782794337b647a0356196186a"
+   ],
+   [
+    "DBL DR2' DL' R2' DR F2' BR2 D2' B2' DBR' BL D2 DBL2' B2' DBR B2' DBR2' BR DBR BR2' DBR2 BR2' DBR2 B2 BR2",
+    "a710923a5168253478876965ab62a027311b915380264b3080b54ba44997"
+   ],
+   [
+    "R2' F2 L' DBL2 DL2 DBR2 U2' F2' BR2 BL' L U BR U F R U2 R' F2' U R2' F2 R U2 R'",
+    "5b706404816773a1970b6a0204658a539a3828269413b19825395b74a1b2"
+   ]
+  ]
+ },
  "giga": {
   "event": "giga",
   "palette": [

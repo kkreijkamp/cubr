@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import type { TwistyPlayer } from 'cubing/twisty';
 import { getEvent, splitRelay } from '@cubr/cubestats';
-import { preview3D, type Puzzle3D } from '../lib/cubing3d';
+import { inCsTimerNotation, preview3D, type Puzzle3D } from '../lib/cubing3d';
 import { cuboidDrawing } from '../lib/cuboid';
 import { redrawable, relayColumns } from '../lib/drawnNet';
 import { CuboidNet, DrawnNet } from './DrawnNet';
@@ -67,7 +67,10 @@ export function TwistyPreview(props: Props) {
       />
     );
   }
-  if (puzzle === null || unreadable === `${puzzle}\n${scramble}`) {
+  // a scramble in csTimer's notation is csTimer's drawing (unless translated for 3D above): cubing.js
+  // could read some of them as the wrong turns
+  const csTimers = event !== undefined && inCsTimerNotation(event, scrambleType);
+  if (puzzle === null || csTimers || unreadable === `${puzzle}\n${scramble}`) {
     const relay = puzzle === null && event ? splitRelay(event, scramble) : null;
     if (relay) return <RelayPreview parts={relay} height={height} visualization={visualization} />;
     // a cuboid: worked out here, as nothing else draws it (in 3D too: there's no model of one)

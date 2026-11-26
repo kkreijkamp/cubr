@@ -1,7 +1,10 @@
 // csTimer's own scramblers and puzzle drawings (npm `cstimer_module`, GPL-3.0 like cubr, by Chen
 // Shuang, csTimer's author) for the scramble types cubing.js and cubr's own code don't make
 // (packages/cubestats/src/scrambleTypes.ts). The module runs in a worker thread of its own: a slow
-// or stuck scrambler never holds up the HTTP event loop, and a stuck one is killed and replaced.
+// or stuck scrambler never holds up the HTTP event loop, and a stuck one is killed and replaced. A
+// thread left idle is stopped too (idleMs): it keeps every table its scramblers built, about 70 MB
+// once a few dozen types were asked for (measured under production's 192 MB heap cap), which the
+// 2 GB VM does better without; the next request starts a fresh one in well under a second.
 import { createRequire } from 'node:module';
 import { Worker } from 'node:worker_threads';
 import { GenerationTimeoutError, QueueFullError } from './errors.js';
@@ -29,6 +32,8 @@ export interface CsTimerStats {
   timeouts: number;
   rejected: number;
   restarts: number;
+  /** threads stopped after idleMs without a request */
+  idleStops: number;
   inFlight: number;
 }
 
@@ -47,13 +52,32 @@ interface Pending {
   timer: NodeJS.Timeout;
 }
 
-export function createCsTimerHost(opts: { timeoutMs: number; maxQueue: number; path?: string }): CsTimerHost {
+export function createCsTimerHost(opts: { timeoutMs: number; maxQueue: number; path?: string; idleMs?: number }): CsTimerHost {
   const path = opts.path ?? createRequire(import.meta.url).resolve('cstimer_module');
+  const idleMs = opts.idleMs ?? 10 * 60_000;
   let worker: Worker | null = null;
+  let idleTimer: NodeJS.Timeout | null = null;
   let closing = false;
   let seq = 0;
   const pending = new Map<number, Pending>();
-  const stats: CsTimerStats = { requests: 0, failed: 0, timeouts: 0, rejected: 0, restarts: 0, inFlight: 0 };
+  const stats: CsTimerStats = { requests: 0, failed: 0, timeouts: 0, rejected: 0, restarts: 0, idleStops: 0, inFlight: 0 };
+
+  const stopIdleTimer = () => {
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = null;
+  };
+  // once nothing is waiting on `w`, it stops after idleMs unless a request comes first
+  const armIdle = (w: Worker) => {
+    stopIdleTimer();
+    idleTimer = setTimeout(() => {
+      idleTimer = null;
+      if (worker !== w || pending.size > 0) return;
+      worker = null; // its exit isn't a failure: nothing was waiting
+      stats.idleStops++;
+      void w.terminate();
+    }, idleMs);
+    idleTimer.unref();
+  };
 
   const failAll = (err: Error) => {
     for (const [id, p] of pending) {
@@ -75,6 +99,7 @@ export function createCsTimerHost(opts: { timeoutMs: number; maxQueue: number; p
         stats.failed++;
         p.reject(new Error(`csTimer: ${m.error}`));
       } else p.resolve(m.out);
+      if (pending.size === 0) armIdle(w);
     });
     const gone = (why: string) => {
       if (worker !== w) return;
@@ -92,6 +117,7 @@ export function createCsTimerHost(opts: { timeoutMs: number; maxQueue: number; p
       stats.rejected++;
       return Promise.reject(new QueueFullError());
     }
+    stopIdleTimer();
     if (!worker) worker = spawn();
     const w = worker;
     const id = ++seq;
@@ -124,6 +150,7 @@ export function createCsTimerHost(opts: { timeoutMs: number; maxQueue: number; p
     stats: () => ({ ...stats, inFlight: pending.size }),
     close: async () => {
       closing = true;
+      stopIdleTimer();
       failAll(new Error('csTimer host closed'));
       await worker?.terminate();
       worker = null;

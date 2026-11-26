@@ -165,13 +165,19 @@ uses. How each is made (services/scramble/src/kinds.ts): a WCA event's default f
 cubing.js; the 3x3 and 2x2 practice types from a random state with pinned pieces (csTimer's
 masks, practice.ts) solved by cubing.js and given backwards; csTimer's random-move types from its
 move tables (cubestats randomMoves.ts, also the web app's offline fallback); relays, cuboids and
-mirror blocks from WCA scrambles; kilominx, redi cube and master pyraminx from cubing.js; and
-everything else from csTimer's own scramblers, npm `cstimer_module` (GPL-3.0, by csTimer's
+mirror blocks from WCA scrambles; and everything else from csTimer's own scramblers, kilominx, redi
+cube and master pyraminx random state included (cubing.js's kilominx needed about 800 MB of tables and
+14 s, more than production's 192 MB heaps allow; csTimer's makes one in under half a second), npm
+`cstimer_module` (GPL-3.0, by csTimer's
 author, pinned to 0.1.5 in package.json and the Dockerfile), at csTimer's default lengths
 (`CSTIMER_LENGTHS`). The 3x3 move subsets (`2gen`, `roux`, `half`...) come from csTimer too, random
 state within the subgroup (offline, the web app makes them as random moves). The module runs in a
 worker thread of its own (cstimer.ts: one request at a time, the scramble timeout per request, a
-runaway scrambler's thread killed and replaced, at most `SCRAMBLE_MAX_QUEUE` waiting).
+runaway scrambler's thread killed and replaced, at most `SCRAMBLE_MAX_QUEUE` waiting, and a thread
+idle for 10 minutes stopped, giving back the tables its scramblers built). cubing.js keeps every
+table in its one search worker, under production's 192 MB heap cap: the warm-up list
+(`WARMUP_EVENTS`) is what has to fit there together, and CI's "Scramble image" job runs the image
+under that cap through its warm-up.
 
 ## 7. Database design (PostgreSQL, schema-per-service)
 
@@ -775,8 +781,9 @@ and under, the inspection toggle (it's in settings and the command line too); th
 Scramble previews look the same for every puzzle: cubr's flat net (`ScrambleNet`), rounded stickers
 on a dark plate per face, in cubr's colours or your own (settings: sticker colours, one scheme per
 kind of puzzle: kilominx and gigaminx take the megaminx's, master pyraminx the pyraminx's, redi cube
-and csTimer's cube-shaped puzzles the cubes', and FTO has its own). A puzzle cubing.js can't draw, or a scramble it can't read (a type in csTimer's own
-notation), shows csTimer's drawing from the scramble service (`scrambleImageUrl`) redrawn the same
+and csTimer's cube-shaped puzzles the cubes', and FTO has its own). A puzzle cubing.js can't draw, or a scramble in csTimer's own
+notation (`inCsTimerNotation`, lib/cubing3d: never read by cubing.js as it is, which would turn other
+faces for some, e.g. csTimer's kilominx DR is cubing.js's FR), shows csTimer's drawing from the scramble service (`scrambleImageUrl`) redrawn the same
 way (`DrawnNet`, `lib/drawnNet`): its shapes are read from the SVG, stickers that meet make a face
 with a plate behind it (a jagged face, as a mirror block's, follows its outline), the faces are
 drawn closer, and csTimer's colours become the scheme's. Square-1's relatives are drawn flat, as

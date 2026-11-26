@@ -69,10 +69,11 @@ describe('the scramble types the service can make', () => {
     expect(await makeScramble('mrbl', undefined, deps)).toBe('<333>');
   });
 
-  it('asks cubing.js for the other puzzles it scrambles', async () => {
+  it("asks csTimer for kilominx, redi cube and master pyraminx random state (cubing.js's kilominx needs ~800 MB)", async () => {
     const { deps, calls } = fakeDeps();
     for (const event of ['klm', 'redi', 'mpyr']) await makeScramble(event, undefined, deps);
-    expect(calls).toEqual(['kilominx', 'redi_cube', 'master_tetraminx']);
+    expect(calls).toEqual(['cstimer:klmso:0', 'cstimer:rediso:0', 'cstimer:mpyrso:0']);
+    for (const t of ['klmso', 'rediso', 'mpyrso']) expect(CSTIMER_TYPES.has(t), t).toBe(true);
   });
 
   it('refuses types an event does not have, and the ones newer than the csTimer scramblers cubr has', async () => {
@@ -98,7 +99,7 @@ describe('the scramble types the service can make', () => {
     // the 3x3 move subsets: csTimer's random state on the server (cubr's random moves only offline)
     for (const t of ['2gen', 'roux', 'half', '333drud']) expect(CSTIMER_TYPES.has(t), t).toBe(true);
     // and never what cubr makes: wca scrambles, pinned states, relays
-    for (const t of ['333', 'pll', '222eg1', 'r234w', '333o', 'klmso']) expect(CSTIMER_TYPES.has(t), t).toBe(false);
+    for (const t of ['333', 'pll', '222eg1', 'r234w', '333o']) expect(CSTIMER_TYPES.has(t), t).toBe(false);
   });
 
   it("writes relays the way csTimer's drawing wants them, and asks for any known event's type", () => {
