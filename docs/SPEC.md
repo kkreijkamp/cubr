@@ -924,6 +924,9 @@ The web container's nginx (`web/nginx/default.conf.template`) serves the app and
     `/login*`, `/reset`, `/race/<id>`, and people's profiles (`/profile/<name>`, decided 2026-11-26:
     on cubr, not in search results; the page adds the meta tag too). They aren't blocked in
     robots.txt, or crawlers couldn't see the tag.
+- **licenses.txt** at `/licenses.txt`, linked from About: cubr's own licence (GPL-3.0-only) and where
+  its source is, then the licence of every package the web app ships, with its full text. The build
+  writes it from what actually ended up in the bundle, plus the fonts (`web/plugins/licenses.ts`).
 - **security.txt** (RFC 9116) at `/.well-known/security.txt`: contact `hello@cubr.dev`, the policy
   in `SECURITY.md`. `/security.txt` redirects to it. Its `Expires` must stay under a year ahead; a
   test fails 30 days before it passes.

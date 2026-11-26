@@ -198,6 +198,7 @@ describe('the app\'s pages and real 404s', () => {
 
   it('serves the site\'s files as files, and keeps the API, assets and icons plain 404s', () => {
     expect(isFileOr404(locationFor('/robots.txt'))).toBe(true);
+    expect(isFileOr404(locationFor('/licenses.txt'))).toBe(true); // written by the build (plugins/licenses.ts)
     expect(isFileOr404(locationFor('/sitemap.xml'))).toBe(true);
     expect(locationFor('/.well-known/security.txt')).toMatchObject({ mod: '^~', pattern: '/.well-known/' });
     expect(locationFor('/security.txt').body).toMatch(/return 301 \/\.well-known\/security\.txt;/);

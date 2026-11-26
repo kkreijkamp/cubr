@@ -23,7 +23,7 @@ import { formatDate, formatNumber } from '../lib/format';
 import { useCanonical } from '../lib/canonical';
 import { PAGE_META } from '../lib/pageMeta';
 import { usePageMeta } from '../lib/usePageMeta';
-import { DONATE_URL } from '../lib/links';
+import { DONATE_URL, REPO_URL } from '../lib/links';
 import { THEMES } from '../lib/themes';
 import type { GlobalStats } from '../lib/types';
 import { useAsync } from '../lib/useAsync';
@@ -251,6 +251,13 @@ export default function AboutPage() {
           </div>
         </div>
         <WcaCitation />
+        <div className="ab-citation">
+          cubr is free software under the GNU GPL v3: its source is on{' '}
+          <a href={REPO_URL} target="_blank" rel="noreferrer noopener">
+            github
+          </a>
+          , and the licences of everything the app includes are in <a href="/licenses.txt">licenses.txt</a>.
+        </div>
       </section>
     </div>
   );
