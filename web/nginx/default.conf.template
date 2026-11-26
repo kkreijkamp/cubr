@@ -95,10 +95,11 @@ server {
     return 301 $cubr_canonical$is_args$args;
   }
 
-  gzip on;
-  gzip_comp_level 5;
-  gzip_min_length 1024;
-  gzip_types text/css application/javascript application/json application/manifest+json image/svg+xml text/plain text/xml;
+  # No compression here: Cloudflare compresses what it gets uncompressed, with Brotli for the browsers that
+  # take it (about 15 % less JavaScript than gzip) and gzip for the rest, but it passes gzip from the
+  # origin through as it is (checked 2026-11-26). Static files are cached at its edge, so the VM's
+  # extra outbound bytes are few. (Decided 2026-11-26.)
+  gzip off;
 
   # ---- security headers (every response, errors included) ----------------------------------------
   # Content-Security-Policy: only cubr.dev's own scripts (plus the inline theme script in index.html,

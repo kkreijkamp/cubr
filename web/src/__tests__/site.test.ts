@@ -250,6 +250,11 @@ describe('security headers', () => {
     expect(csp['script-src']).toEqual(["'self'", ...hashes, 'https://static.cloudflareinsights.com']);
   });
 
+  it('leaves compression to Cloudflare, which serves Brotli only when the origin sends nothing compressed', () => {
+    expect(webConf).toMatch(/^\s*gzip off;/m);
+    expect(webConf).not.toMatch(/^\s*gzip on;/m);
+  });
+
   it("gives an SVG file a policy of its own: no scripts or outside loads, but its own styles (the favicon's dark mode, in Safari)", () => {
     expect(serverHeaders['Content-Security-Policy']).toBe('$cubr_csp');
     for (const uri of ['/favicon.svg', '/icons/x.SVG']) {
