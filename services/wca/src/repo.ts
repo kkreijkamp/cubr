@@ -82,23 +82,23 @@ export function createRepo(pool: Pool) {
    * instead of a range scan per request). WCA results fit in 32 bits (multi-blind's encoded ones too).
    */
   async function sortedBests(kind: Kind, eventId: string): Promise<Int32Array> {
-    const { rows } = await pool.query<[number]>({
-      text: `SELECT best FROM ${RANKS[kind]} WHERE event_id = $1 ORDER BY best`,
-      values: [eventId],
-      rowMode: 'array',
-    });
-    return Int32Array.from(rows, (r) => r[0]);
+    // one int[] from Postgres rather than a row per person: a single array to read, not ~250k small ones
+    const { rows } = await pool.query<{ bests: number[] }>(
+      `SELECT coalesce(array_agg(best ORDER BY best), '{}') AS bests FROM ${RANKS[kind]} WHERE event_id = $1`,
+      [eventId],
+    );
+    return Int32Array.from(rows[0].bests);
   }
 
   /** The same within one country (each person's current country). */
   async function sortedCountryBests(kind: Kind, eventId: string, countryId: string): Promise<Int32Array> {
-    const { rows } = await pool.query<[number]>({
-      text: `SELECT r.best FROM wca.persons p JOIN ${RANKS[kind]} r ON r.person_id = p.wca_id AND r.event_id = $1
-              WHERE p.country_id = $2 AND p.sub_id = 1 ORDER BY r.best`,
-      values: [eventId, countryId],
-      rowMode: 'array',
-    });
-    return Int32Array.from(rows, (r) => r[0]);
+    const { rows } = await pool.query<{ bests: number[] }>(
+      `SELECT coalesce(array_agg(r.best ORDER BY r.best), '{}') AS bests
+         FROM wca.persons p JOIN ${RANKS[kind]} r ON r.person_id = p.wca_id AND r.event_id = $1
+        WHERE p.country_id = $2 AND p.sub_id = 1`,
+      [eventId, countryId],
+    );
+    return Int32Array.from(rows[0].bests);
   }
 
   /** Same counts within one country (current country of each person) plus the country total. */
