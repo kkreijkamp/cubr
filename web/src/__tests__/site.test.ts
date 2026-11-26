@@ -357,6 +357,23 @@ describe('security headers', () => {
     expect(Number(timeout)).toBeGreaterThan(90);
   });
 
+  it('limits each visitor on every API route (30 a second, bursts of 300), answering 429 in the API envelope', () => {
+    const http = blocks(gatewayConf).blocks.find((b) => b.head[0] === 'http')!;
+    expect(http.body).toMatch(/limit_req_zone \$binary_remote_addr zone=api:\d+m rate=30r\/s;/);
+    expect(http.body).toMatch(/real_ip_header\s+CF-Connecting-IP;/); // keyed on the visitor, not the tunnel
+    const server = blocks(http.body).blocks.find((b) => b.head[0] === 'server')!;
+    const locations = blocks(server.body).blocks.filter((b) => b.head[0] === 'location');
+    const api = locations.filter((l) => /^\^?\/api\//.test(l.head[l.head.length - 1]));
+    expect(api.length).toBeGreaterThanOrEqual(9);
+    for (const l of api) expect(l.body, l.head.join(' ')).toContain('limit_req zone=api burst=300 nodelay;');
+    // the race's websocket (one long connection) and the web app's files aren't limited here
+    for (const l of locations.filter((x) => /socket|^\/$/.test(x.head[x.head.length - 1]))) expect(l.body).not.toContain('limit_req');
+    expect(server.body).toMatch(/error_page 429 @too_many_requests;/);
+    const tooMany = locations.find((l) => l.head.includes('@too_many_requests'))!;
+    expect(tooMany.body).toContain('"code":"RATE_LIMITED"');
+    expect(tooMany.body).toMatch(/add_header Retry-After "1" always;/);
+  });
+
   it('never say which container, version or internal address answered (web or gateway)', () => {
     for (const conf of [webConf, gatewayConf]) expect(conf).not.toMatch(/add_header\s+X-(?:Served-By|Service|Upstream)/i);
   });
