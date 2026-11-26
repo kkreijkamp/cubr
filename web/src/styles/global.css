@@ -115,6 +115,10 @@ a {
 a:hover {
   color: var(--text-color);
 }
+/* a link in running text (no class: not a button, tab or nav item) is underlined with high contrast */
+a:not([class]) {
+  text-decoration-line: var(--hc-link-decoration, none);
+}
 a.link-main {
   color: var(--main-color);
 }

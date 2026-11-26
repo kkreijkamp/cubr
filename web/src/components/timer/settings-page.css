@@ -185,6 +185,7 @@
 }
 .st-options .btn-text {
   padding: 0.4em 0.5em;
+  min-width: 1.5rem; /* one-letter options ("s", "l") stay 24 px targets */
 }
 .st-row.wide .st-options,
 .st-theme-tools .st-options {

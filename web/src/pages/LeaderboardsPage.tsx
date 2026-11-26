@@ -540,7 +540,7 @@ export default function LeaderboardsPage() {
                 <button className="btn" onClick={() => goPage(sel.page - 1)} disabled={sel.page === 1} data-tip="previous page <-" aria-label="previous page">
                   <ChevronLeftIcon />
                 </button>
-                <button className="btn" onClick={() => setGotoOpen(true)} data-tip="go to page" aria-label={`page ${sel.page} of ${pages}, go to page`}>
+                <button className="btn" onClick={() => setGotoOpen(true)} data-tip="go to page" aria-label={`page ${sel.page} / ${pages}, go to page`}>
                   {sel.page} / {pages}
                 </button>
                 <button className="btn" onClick={() => goPage(sel.page + 1)} disabled={sel.page >= pages} data-tip="next page ->" aria-label="next page">

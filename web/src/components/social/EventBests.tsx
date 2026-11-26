@@ -18,20 +18,20 @@ const pbText = (pb: PB | null | undefined, kind: PbKind, precision: 2 | 3) =>
 function RankLink({ rank, full, shownMs, precision }: { rank: UserRank; full?: boolean; shownMs: number | null | undefined; precision: 2 | 3 }) {
   const top = rank.total > 0 ? (rank.rank / rank.total) * 100 : 100;
   const other = shownMs != null && shownMs !== rank.valueMs ? formatResult(rank.valueMs, rank.kind, precision) : null;
+  const shown = `#${formatNumber(rank.rank)}${full ? ' on cubr' : ''}${other ? ` (${other})` : ''}`;
   return (
     <Link
       className="pf-rank"
       to={`/leaderboards?event=${rank.event}&kind=${rank.kind}&period=all&page=${Math.ceil(rank.rank / 50)}`}
-      aria-label={`rank ${rank.rank} of ${rank.total} on the ${rank.kind} leaderboard${other ? `, with ${other}` : ''}`}
+      // the name starts with what the link shows (speech input says what it sees)
+      aria-label={`${shown}: ${rank.rank} of ${rank.total} on the ${rank.kind} leaderboard`}
       data-tip={
         other
           ? `the leaderboard has your ${other}: a faster time was left off it`
           : `top ${formatPercent(top)} of ${formatNumber(rank.total)} on the leaderboard`
       }
     >
-      #{formatNumber(rank.rank)}
-      {full && ' on cubr'}
-      {other && ` (${other})`}
+      {shown}
     </Link>
   );
 }

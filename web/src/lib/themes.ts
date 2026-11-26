@@ -152,8 +152,9 @@ export function highContrastTheme(theme: Theme): Theme {
   return {
     ...theme,
     sub: lift(theme.sub, theme.text, [theme.bg, theme.subAlt], HIGH_CONTRAST_RATIO),
-    main: lift(theme.main, theme.text, [theme.bg], HIGH_CONTRAST_RATIO),
-    error: lift(theme.error, theme.text, [theme.bg], HIGH_CONTRAST_RATIO),
+    // main and error text sits on the panels too (active tabs, links, the danger buttons)
+    main: lift(theme.main, theme.text, [theme.bg, theme.subAlt], HIGH_CONTRAST_RATIO),
+    error: lift(theme.error, theme.text, [theme.bg, theme.subAlt], HIGH_CONTRAST_RATIO),
   };
 }
 
@@ -218,6 +219,10 @@ export function themeColors(theme: Theme, highContrast = highContrastOn): Record
   const colors: Record<string, string> = {};
   for (const [k, v] of VARS) colors[v] = shown[k];
   colors['--timer-ready'] = readyColor(theme);
+  // what high contrast changes besides colours (global.css): links in running text are underlined, as
+  // colour alone doesn't set them apart from the text around them, and dimmed hints aren't dimmed
+  colors['--hc'] = highContrast ? '1' : '0';
+  colors['--hc-link-decoration'] = highContrast ? 'underline' : 'none';
   colors['color-scheme'] = isLightTheme(theme) ? 'light' : 'dark';
   return colors;
 }

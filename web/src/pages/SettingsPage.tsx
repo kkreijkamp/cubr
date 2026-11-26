@@ -87,10 +87,11 @@ function SettingRow({ title, description, children, wide }: RowProps) {
 }
 
 /** A few settings that belong together, under a quiet lowercase label. */
-function Group({ title, children }: { title: string; children: ReactNode }) {
+/** A group of settings under its heading; `name` names it to a screen reader when the heading alone is shared. */
+function Group({ title, name, children }: { title: string; name?: string; children: ReactNode }) {
   const id = useId();
   return (
-    <section className="st-group" aria-labelledby={id}>
+    <section className="st-group" aria-labelledby={name ? undefined : id} aria-label={name}>
       <h2 className="st-label" id={id}>
         {title}
       </h2>
@@ -1239,7 +1240,7 @@ function AppGroup() {
     setCheck(await checkForUpdate());
   };
   return (
-    <Group title="app">
+    <Group title="app" name="app: install and updates">
       <SettingRow
         title="install"
         description="Install cubr as an app: it gets its own window and an icon on your home screen, dock or start menu, and opens without the browser around it. Chrome, Edge and Safari can install it."

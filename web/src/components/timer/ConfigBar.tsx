@@ -253,7 +253,7 @@ function EventMenu({ open, setOpen, event, sessions, onEvent }: EventMenuProps) 
         onClick={() => setOpen(!open)}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={`event: ${getEvent(event)?.name ?? event}`}
+        aria-label={`${shortLabel(event)}: event, ${getEvent(event)?.name ?? event}`}
         {...noFocus}
       >
         <span className="tp-event-label">{shortLabel(event)}</span>

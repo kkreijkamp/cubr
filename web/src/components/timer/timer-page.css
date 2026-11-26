@@ -719,7 +719,7 @@
 }
 .tp-empty span {
   font-size: 0.75rem;
-  opacity: 0.8;
+  opacity: max(0.8, var(--hc, 0)); /* not dimmed with high contrast */
 }
 
 /* stats table */

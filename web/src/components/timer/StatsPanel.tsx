@@ -38,7 +38,9 @@ export const StatsPanel = memo(function StatsPanel({ stats, ns, solves, precisio
       <table className="tp-stats">
         <thead>
           <tr>
-            <th />
+            <th>
+              <span className="sr-only">stat</span>
+            </th>
             <th>current</th>
             <th>best</th>
           </tr>

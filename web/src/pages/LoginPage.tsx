@@ -189,55 +189,57 @@ function RegisterForm({ active, focusFirst }: FormProps) {
   };
 
   return (
-    <form className="lg-form" id="lg-panel-register" role="tabpanel" aria-labelledby="lg-tab-register" hidden={!active} onSubmit={onSubmit} noValidate>
-      <Field
-        name="username"
-        placeholder="username"
-        autoComplete="username"
-        inputRef={usernameRef}
-        maxLength={20}
-        value={username}
-        onChange={(v) => {
-          setUsername(v);
-          if (serverField?.field === 'username') setServerField(null);
-        }}
-        error={errors.username}
-        show={submitted || serverField?.field === 'username'}
-      />
-      <Field
-        type="email"
-        name="email"
-        placeholder="email"
-        autoComplete="email"
-        maxLength={254}
-        value={email}
-        onChange={(v) => {
-          setEmail(v);
-          if (serverField?.field === 'email') setServerField(null);
-        }}
-        error={errors.email}
-        show={submitted || serverField?.field === 'email'}
-      />
-      <Field
-        type="password"
-        name="new-password"
-        placeholder="password (8+ characters)"
-        autoComplete="new-password"
-        maxLength={128}
-        value={password}
-        onChange={setPassword}
-        error={errors.password}
-        show={submitted}
-        revealable
-      />
-      {formError && <FormError shakeKey={errorTick}>{formError}</FormError>}
-      <button type="submit" className="btn primary block" disabled={busy}>
-        {busy && <Spinner size={16} />} create account
-      </button>
-      <p className="lg-agree">
-        by signing up you agree to the <Link to="/terms">terms</Link> and <Link to="/privacy">privacy policy</Link>.
-      </p>
-    </form>
+    <div id="lg-panel-register" role="tabpanel" aria-labelledby="lg-tab-register" hidden={!active}>
+      <form className="lg-form" onSubmit={onSubmit} noValidate>
+        <Field
+          name="username"
+          placeholder="username"
+          autoComplete="username"
+          inputRef={usernameRef}
+          maxLength={20}
+          value={username}
+          onChange={(v) => {
+            setUsername(v);
+            if (serverField?.field === 'username') setServerField(null);
+          }}
+          error={errors.username}
+          show={submitted || serverField?.field === 'username'}
+        />
+        <Field
+          type="email"
+          name="email"
+          placeholder="email"
+          autoComplete="email"
+          maxLength={254}
+          value={email}
+          onChange={(v) => {
+            setEmail(v);
+            if (serverField?.field === 'email') setServerField(null);
+          }}
+          error={errors.email}
+          show={submitted || serverField?.field === 'email'}
+        />
+        <Field
+          type="password"
+          name="new-password"
+          placeholder="password (8+ characters)"
+          autoComplete="new-password"
+          maxLength={128}
+          value={password}
+          onChange={setPassword}
+          error={errors.password}
+          show={submitted}
+          revealable
+        />
+        {formError && <FormError shakeKey={errorTick}>{formError}</FormError>}
+        <button type="submit" className="btn primary block" disabled={busy}>
+          {busy && <Spinner size={16} />} create account
+        </button>
+        <p className="lg-agree">
+          by signing up you agree to the <Link to="/terms">terms</Link> and <Link to="/privacy">privacy policy</Link>.
+        </p>
+      </form>
+    </div>
   );
 }
 
@@ -282,37 +284,39 @@ function LoginForm({ active, focusFirst }: FormProps) {
   };
 
   return (
-    <form className="lg-form" id="lg-panel-login" role="tabpanel" aria-labelledby="lg-tab-login" hidden={!active} onSubmit={onSubmit} noValidate>
-      <Field
-        name="login"
-        placeholder="username or email"
-        autoComplete="username"
-        inputRef={identityRef}
-        value={identity}
-        onChange={setIdentity}
-        error={errors.identity}
-        show={submitted}
-      />
-      <Field
-        type="password"
-        name="password"
-        placeholder="password"
-        autoComplete="current-password"
-        inputRef={passwordRef}
-        value={password}
-        onChange={setPassword}
-        error={errors.password}
-        show={submitted && !formError}
-        revealable
-      />
-      {formError && <FormError shakeKey={errorTick}>{formError}</FormError>}
-      <button type="submit" className="btn primary block" disabled={busy}>
-        {busy && <Spinner size={16} />} sign in
-      </button>
-      <Link to="/login?mode=forgot" state={{ email: EMAIL_RE.test(identity.trim()) ? identity.trim() : '' }} className="lg-forgot">
-        forgot password?
-      </Link>
-    </form>
+    <div id="lg-panel-login" role="tabpanel" aria-labelledby="lg-tab-login" hidden={!active}>
+      <form className="lg-form" onSubmit={onSubmit} noValidate>
+        <Field
+          name="login"
+          placeholder="username or email"
+          autoComplete="username"
+          inputRef={identityRef}
+          value={identity}
+          onChange={setIdentity}
+          error={errors.identity}
+          show={submitted}
+        />
+        <Field
+          type="password"
+          name="password"
+          placeholder="password"
+          autoComplete="current-password"
+          inputRef={passwordRef}
+          value={password}
+          onChange={setPassword}
+          error={errors.password}
+          show={submitted && !formError}
+          revealable
+        />
+        {formError && <FormError shakeKey={errorTick}>{formError}</FormError>}
+        <button type="submit" className="btn primary block" disabled={busy}>
+          {busy && <Spinner size={16} />} sign in
+        </button>
+        <Link to="/login?mode=forgot" state={{ email: EMAIL_RE.test(identity.trim()) ? identity.trim() : '' }} className="lg-forgot">
+          forgot password?
+        </Link>
+      </form>
+    </div>
   );
 }
 

@@ -234,6 +234,7 @@
   list-style: none;
 }
 .pf-donut-legend button {
+  min-height: 1.5rem; /* a 24 px target */
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;

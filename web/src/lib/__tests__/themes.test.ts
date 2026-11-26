@@ -168,15 +168,19 @@ describe('themes', () => {
     expect(themeColors(getTheme('white_cross_dark'))).toMatchObject({ '--bg-color': '#1d2024', 'color-scheme': 'dark' });
     expect(themeColors(getTheme('stackmat'))['color-scheme']).toBe('light'); // a mid-tone background with dark text
     expect(themeColors(getTheme('stackmat'))['--timer-ready']).toBe(readyColor(getTheme('stackmat')));
-    // the ten colours, the ready green and the color-scheme
-    for (const t of THEMES) expect(Object.keys(themeColors(t))).toHaveLength(COLORS.length + 2);
+    // the ten colours, the ready green, high contrast's two switches and the color-scheme
+    for (const t of THEMES) expect(Object.keys(themeColors(t))).toHaveLength(COLORS.length + 4);
+    expect(themeColors(getTheme('white_cross'), false)).toMatchObject({ '--hc': '0', '--hc-link-decoration': 'none' });
+    expect(themeColors(getTheme('white_cross'), true)).toMatchObject({ '--hc': '1', '--hc-link-decoration': 'underline' });
   });
 
   it('starts the page in white cross, or white cross dark in dark mode, before the app runs', () => {
     const vars = (block: string) => Object.fromEntries([...block.matchAll(/(--[a-z-]+):\s*(#[0-9a-f]{6});/g)].map((m) => [m[1], m[2]]));
     const root = /^:root \{([\s\S]*?)\n\}/m.exec(globalCss)![1];
     const darkRoot = /@media \(prefers-color-scheme: dark\) \{\s*:root \{([\s\S]*?)\}/.exec(globalCss)![1];
-    const expected = (name: string) => Object.fromEntries(Object.entries(themeColors(getTheme(name))).filter(([k]) => k.startsWith('--')));
+    // the colours (high contrast's switches have their defaults where they are used: var(--hc, 0))
+    const expected = (name: string) =>
+      Object.fromEntries(Object.entries(themeColors(getTheme(name))).filter(([k, v]) => k.startsWith('--') && v.startsWith('#')));
     expect(vars(root)).toMatchObject(expected('white_cross'));
     expect(root).toContain('color-scheme: light;');
     expect(vars(darkRoot)).toEqual(expected('white_cross_dark'));
@@ -244,13 +248,15 @@ describe("index.html's pre-paint script", () => {
 });
 
 describe('the high-contrast setting', () => {
-  it("brings every theme's labels to 4.5:1 on the background and on cards, and its links and errors on the background", () => {
+  it("brings every theme's labels, links and errors to 4.5:1 on the background and on cards", () => {
     for (const t of THEMES) {
       const hc = highContrastTheme(t);
       expect(contrast(hc.sub, t.bg), `${t.name} labels`).toBeGreaterThanOrEqual(HIGH_CONTRAST_RATIO);
       if (hc.sub !== t.text) expect(contrast(hc.sub, t.subAlt), `${t.name} labels on cards`).toBeGreaterThanOrEqual(HIGH_CONTRAST_RATIO);
       expect(contrast(hc.main, t.bg), `${t.name} accent`).toBeGreaterThanOrEqual(HIGH_CONTRAST_RATIO);
+      if (hc.main !== t.text) expect(contrast(hc.main, t.subAlt), `${t.name} accent on cards`).toBeGreaterThanOrEqual(HIGH_CONTRAST_RATIO);
       expect(contrast(hc.error, t.bg), `${t.name} errors`).toBeGreaterThanOrEqual(HIGH_CONTRAST_RATIO);
+      if (hc.error !== t.text) expect(contrast(hc.error, t.subAlt), `${t.name} errors on cards`).toBeGreaterThanOrEqual(HIGH_CONTRAST_RATIO);
       // labels stay quieter than the text, or at most as loud
       expect(contrast(hc.sub, t.bg), t.name).toBeLessThanOrEqual(contrast(t.text, t.bg) + 1e-9);
       // nothing else changes

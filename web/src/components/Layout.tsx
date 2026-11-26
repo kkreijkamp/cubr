@@ -118,7 +118,7 @@ function Footer() {
         <Link to="/privacy" className="btn-text">
           privacy
         </Link>
-        <button className="btn-text" onClick={() => openPalette('theme')} data-tip="change theme" aria-label="change theme">
+        <button className="btn-text" onClick={() => openPalette('theme')} data-tip="change theme" aria-label={`${themeLabel(theme)}: change theme`}>
           <SwatchIcon width={14} height={14} /> {themeLabel(theme)}
         </button>
         <button className="btn-text" onClick={() => setNotesOpen(true)} data-tip="patch notes" aria-haspopup="dialog">

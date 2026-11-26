@@ -54,7 +54,7 @@ function RoomsTable({ onJoin }: { onJoin: (id: string) => void }) {
         <h2 className="h3" id="rooms-title">
           <FlagIcon /> public rooms
         </h2>
-        <button className="btn-text small race-refresh" onClick={load} aria-label="refresh">
+        <button className="btn-text small race-refresh" onClick={load} aria-label={`${rooms ? `${rooms.length} open, ` : ''}refresh`}>
           {loading ? <Spinner size={14} /> : <ArrowPathIcon width={14} height={14} />} {rooms ? `${rooms.length} open` : ''}
         </button>
       </div>
@@ -74,7 +74,9 @@ function RoomsTable({ onJoin }: { onJoin: (id: string) => void }) {
                 <th>players</th>
                 <th className="center hide-xs">status</th>
                 <th className="hide-sm">created</th>
-                <th className="hide-sm" aria-label="join" />
+                <th className="hide-sm">
+                  <span className="sr-only">join</span>
+                </th>
               </tr>
             </thead>
             <tbody>

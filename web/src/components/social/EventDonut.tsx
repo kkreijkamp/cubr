@@ -115,8 +115,7 @@ export function EventDonut({
               aria-label={`${s.label}: ${pct(s.solves, total)} (${formatNumber(s.solves)} solves)`}
             >
               <i style={{ background: colour.get(s.key) }} />
-              <span className="l">{s.label}</span>
-              <span className="p">{pct(s.solves, total)}</span>
+              <span className="l">{s.label}</span> <span className="p">{pct(s.solves, total)}</span>
             </button>
           </li>
         ))}
