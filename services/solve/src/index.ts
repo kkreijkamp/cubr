@@ -28,7 +28,7 @@ const server = createServer(config, {
   info: async () => ({ outbox: relay ? await relay.info() : null }),
 });
 const { app } = server;
-const auth = makeAuth(config.jwtSecret, redis);
+const auth = makeAuth(config.jwtSecret, redis, config.jwtSecretPrevious);
 
 await registerRoutes(app, { config, pool, redis, auth });
 registerDeadLetterRoutes(app, { redis, group: 'solve', internalToken: config.internalToken });

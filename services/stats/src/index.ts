@@ -33,7 +33,7 @@ const server = createServer(config, {
 const { app } = server;
 const relay = createPbRelay(pool, redis, app.log);
 
-await registerRoutes(app, { pool, redis, internalToken: config.internalToken, auth: makeAuth(config.jwtSecret, redis) });
+await registerRoutes(app, { pool, redis, internalToken: config.internalToken, auth: makeAuth(config.jwtSecret, redis, config.jwtSecretPrevious) });
 registerDeadLetterRoutes(app, { redis, group: 'stats', internalToken: config.internalToken });
 
 // Listen first so liveness passes while Postgres boots; readiness stays 503 until migrated.

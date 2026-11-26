@@ -66,6 +66,41 @@ works over SSH. Docker restarts crashed containers and starts the stack on boot
   Trivy scans the scramble and auth images (it reports without failing until its first reports are
   clean, then drop `continue-on-error`).
 
+## Rotating keys
+
+The VM's secrets are in `/opt/cubr/.env` (mode 600; edit with `sudo -e` or `nano` on the VM); the
+Mac keeps copies in the keychain (`cubr-...` items). After a change, recreate what reads it:
+`$C up -d <services>` (compose reads `.env` again). Rotate after anyone else had access, after a
+leak, and otherwise about once a year.
+
+- **JWT_SECRET** (signs sign-in tokens; every service checks them), without signing anyone out:
+  1. `openssl rand -base64 48` for the new key.
+  2. In `.env`: `JWT_SECRET_PREVIOUS=` the current key, `JWT_SECRET=` the new one.
+  3. `$C up -d auth solve stats leaderboard race`. New tokens use the new key; old ones still work.
+  4. 30 days later (a token's lifetime), remove `JWT_SECRET_PREVIOUS` and recreate the same services.
+  - **Leaked?** Skip step 2's `JWT_SECRET_PREVIOUS`: everyone is signed out at once and signs in again.
+  - Race guests' ids are made with it too: guests in a room during the switch come back as new players.
+- **INTERNAL_API_TOKEN** (service to service, never public): `openssl rand -hex 32`, then `$C up -d`
+  (every service at once; calls between them fail for the seconds they restart).
+- **POSTGRES_PASSWORD:** `$C exec postgres psql -U cubr -c "ALTER USER cubr PASSWORD '<new>'"`, then
+  set it in `.env` and `$C up -d` (everything with a `DATABASE_URL`, the backup timer's job included).
+- **Google and GitHub client secrets** (no sign-out: each provider keeps the old secret until you delete
+  it). Google Cloud console > APIs & Services > Credentials > cubr's OAuth client > Add secret; GitHub >
+  Settings > Developer settings > OAuth Apps > cubr > Generate a new client secret. Put it in `.env`
+  (`GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_SECRET`) and the keychain (`cubr-google-client-secret`,
+  `cubr-github-client-secret`), `$C up -d auth`, sign in with it once, then delete the old secret.
+- **RESEND_API_KEY:** Resend > API Keys > Create, with sending access for cubr.dev only. Put it in
+  `.env` and the keychain (`cubr-resend-api`), `$C up -d auth`, send yourself a reset email, then
+  delete the old key.
+- **KOFI_VERIFICATION_TOKEN:** Ko-fi > Settings > API > the webhook's token: new one into `.env` and the
+  keychain (`cubr-kofi-token`), `$C up -d auth`.
+- **CLOUDFLARE_TUNNEL_TOKEN:** Zero Trust > Networks > Tunnels > cubr > refresh its token (or by API: a
+  new `tunnel_secret` with `PATCH /accounts/<account>/cfd_tunnel/<id>`, then
+  `GET .../cfd_tunnel/<id>/token`). Into `.env`, then `$C up -d cloudflared`; the site is away for the
+  seconds it reconnects (the down page covers it).
+- **The Cloudflare API token on the Mac** (`cubr-cloudflare-api`): My Profile > API Tokens > Roll, then
+  `security add-generic-password -U -s cubr-cloudflare-api -a cubr -w` (it asks for the value).
+
 ## Security headers and crawler files
 
 The web container sends a Content-Security-Policy and the other security headers on every page, and
@@ -233,7 +268,7 @@ day of retries. `--local` first runs a command on the local stack.
 
 - **Secrets** live only in `/opt/cubr/.env` (mode 600): `deploy.sh init` generated the Postgres
   password, JWT secret and internal token on the VM; the tunnel token comes from Cloudflare's API.
-  Changing `JWT_SECRET` signs everyone out. `RESEND_API_KEY` (only the auth container gets it)
+  Changing `JWT_SECRET` alone signs everyone out ("Rotating keys" keeps the old one valid meanwhile). `RESEND_API_KEY` (only the auth container gets it)
   sends the account emails (password resets, email confirmations, change notices) from
   `cubr <no-reply@cubr.dev>`, with replies going to `hello@cubr.dev`, and the feedback form's messages
   to `hello@cubr.dev`, with replies going to the sender; without it they are only logged.

@@ -108,6 +108,7 @@ JSON 404 instead of the SPA's `index.html`.
 | `DATABASE_URL` | `postgres://cubr:cubr@postgres:5432/cubr` | |
 | `REDIS_URL` | `redis://redis:6379` | |
 | `JWT_SECRET` | `dev-secret-change-me` | shared by all services (K8s Secret) |
+| `JWT_SECRET_PREVIOUS` | (empty) | the key before a rotation: tokens it signed still verify until they expire (30 days; the runbook's "Rotating keys"); new tokens use `JWT_SECRET` |
 | `AUTH_URL` `SCRAMBLE_URL` `SOLVE_URL` `STATS_URL` `LEADERBOARD_URL` `WCA_URL` `RACE_URL` | `http://<name>:8080` | internal base URLs |
 | `LOG_LEVEL` | `info` | |
 | `INTERNAL_API_TOKEN` | empty | shared secret for service-to-service calls (K8s Secret): `/internal/*` routes require it in `X-Internal-Token` (403 otherwise) and callers send it; auth also exempts such callers (the seed job) from its per-IP rate limits. Empty = not enforced, with a warning at startup (local development). |

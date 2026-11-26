@@ -19,6 +19,11 @@ export interface BaseConfig {
   databaseUrl: string;
   redisUrl: string;
   jwtSecret: string;
+  /**
+   * The signing key before the last rotation (JWT_SECRET_PREVIOUS): tokens it signed still verify, so a
+   * rotation signs nobody out; empty once they have all expired (the runbook's "Rotating keys").
+   */
+  jwtSecretPrevious: string;
   /** Shared secret for /internal/* routes (X-Internal-Token); empty = not enforced (local development). */
   internalToken: string;
   logLevel: string;
@@ -41,6 +46,7 @@ export function loadConfig(serviceName: string): BaseConfig {
     databaseUrl: env('DATABASE_URL', 'postgres://cubr:cubr@postgres:5432/cubr'),
     redisUrl: env('REDIS_URL', 'redis://redis:6379'),
     jwtSecret: env('JWT_SECRET', 'dev-secret-change-me'),
+    jwtSecretPrevious: env('JWT_SECRET_PREVIOUS', ''),
     internalToken: env('INTERNAL_API_TOKEN', ''),
     logLevel: env('LOG_LEVEL', 'info'),
     urls: {

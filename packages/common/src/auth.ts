@@ -56,8 +56,20 @@ export async function signToken(
   return { token, jti, exp };
 }
 
-export async function verifyToken(secret: string, token: string): Promise<AuthUser> {
-  const { payload } = await jwtVerify(token, key(secret), { issuer: ISSUER, algorithms: ['HS256'] });
+/**
+ * Verifies a token with the signing key or, while a rotation is under way, with the previous one
+ * (JWT_SECRET_PREVIOUS, kept for TOKEN_TTL_SEC after the switch so nobody is signed out). Only a token
+ * whose signature doesn't match falls through to the previous key: an expired token stays expired.
+ */
+export async function verifyToken(secret: string, token: string, previous = ''): Promise<AuthUser> {
+  const options = { issuer: ISSUER, algorithms: ['HS256'] };
+  let payload;
+  try {
+    ({ payload } = await jwtVerify(token, key(secret), options));
+  } catch (err) {
+    if (!previous || previous === secret || (err as { code?: string }).code !== 'ERR_JWS_SIGNATURE_VERIFICATION_FAILED') throw err;
+    ({ payload } = await jwtVerify(token, key(previous), options));
+  }
   if (!payload.sub || typeof payload.username !== 'string' || !payload.jti || !payload.exp) {
     throw new Error('malformed token');
   }
@@ -112,12 +124,12 @@ function bearer(req: FastifyRequest): string | null {
  * Returns Fastify preHandlers: `requireAuth` (401 without a valid token) and `optionalAuth`
  * (sets req.user when a valid token is present, otherwise continues anonymously).
  */
-export function makeAuth(secret: string, redis?: Redis) {
+export function makeAuth(secret: string, redis?: Redis, previous = '') {
   async function resolve(req: FastifyRequest): Promise<AuthUser | null> {
     const token = bearer(req);
     if (!token) return null;
     try {
-      const user = await verifyToken(secret, token);
+      const user = await verifyToken(secret, token, previous);
       if (await isTokenRevoked(redis, user)) return null;
       return user;
     } catch {

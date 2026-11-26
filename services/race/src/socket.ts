@@ -87,6 +87,8 @@ export interface SocketDeps {
   scrambles: ScrambleFetcher;
   redis: Redis;
   jwtSecret: string;
+  /** the signing key before the last rotation: its tokens still sign players in */
+  jwtSecretPrevious?: string;
   pod: string;
   log: FastifyBaseLogger;
 }
@@ -186,7 +188,7 @@ export function registerSocketHandlers(deps: SocketDeps) {
 
   // Handshake: resolve who this is (JWT user or guest). Never rejects - guests are welcome.
   io.use((socket, next) => {
-    resolveIdentity(socket.handshake.auth, deps.jwtSecret, redis)
+    resolveIdentity(socket.handshake.auth, deps.jwtSecret, redis, deps.jwtSecretPrevious)
       .then((identity) => {
         socket.data.identity = identity;
         socket.data.roomId = null;

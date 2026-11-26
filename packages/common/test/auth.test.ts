@@ -47,3 +47,34 @@ describe('token revocation', () => {
     expect((await makeAuth(SECRET, fakeRedis({}, { fail: true })).resolve(request(token)))?.id).toBe(USER.id);
   });
 });
+
+describe('rotating the signing key (JWT_SECRET_PREVIOUS)', () => {
+  const OLD = 'the-old-secret-also-32-characters-long!';
+  const req = (token: string) => ({ headers: { authorization: `Bearer ${token}` } }) as unknown as FastifyRequest;
+
+  it('verifies a token signed with the previous key while it is given, and not once it is gone', async () => {
+    const { token } = await signToken(OLD, USER);
+    await expect(verifyToken(SECRET, token, OLD)).resolves.toMatchObject({ id: USER.id, username: USER.username });
+    await expect(verifyToken(SECRET, token)).rejects.toThrow();
+    const fresh = await signToken(SECRET, USER); // new tokens: the new key, whichever is given as previous
+    await expect(verifyToken(SECRET, fresh.token, OLD)).resolves.toMatchObject({ id: USER.id });
+  });
+
+  it('keeps an expired token expired, and a token of some other key refused', async () => {
+    const expired = await signToken(SECRET, USER, -60); // expired a minute ago
+    await expect(verifyToken(SECRET, expired.token, OLD)).rejects.toThrow(/exp/);
+    const oldExpired = await signToken(OLD, USER, -60);
+    await expect(verifyToken(SECRET, oldExpired.token, OLD)).rejects.toThrow(/exp/);
+    const stranger = await signToken('some-other-secret-of-32-characters!!', USER);
+    await expect(verifyToken(SECRET, stranger.token, OLD)).rejects.toThrow();
+  });
+
+  it('signs in with a previous-key token through makeAuth too', async () => {
+    const { token } = await signToken(OLD, USER);
+    const withPrevious = makeAuth(SECRET, undefined, OLD);
+    const r = req(token);
+    await withPrevious.requireAuth(r, {} as never);
+    expect(r.user).toMatchObject({ id: USER.id });
+    await expect(makeAuth(SECRET).requireAuth(req(token), {} as never)).rejects.toThrow();
+  });
+});

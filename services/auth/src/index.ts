@@ -30,7 +30,7 @@ const server = createServer(config, {
 const { app } = server;
 const pool = createPool(config.databaseUrl, { log: app.log });
 const redis = createRedis(config.redisUrl, app.log);
-const auth = makeAuth(config.jwtSecret, redis);
+const auth = makeAuth(config.jwtSecret, redis, config.jwtSecretPrevious);
 
 await registerRoutes(app, { config, pool, redis, auth });
 

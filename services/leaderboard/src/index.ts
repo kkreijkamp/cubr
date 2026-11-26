@@ -33,7 +33,7 @@ const server = createServer(config, {
 const { app } = server;
 const redis = createRedis(config.redisUrl, app.log);
 defineScripts(redis);
-const auth = makeAuth(config.jwtSecret, redis);
+const auth = makeAuth(config.jwtSecret, redis, config.jwtSecretPrevious);
 const floors = new FloorProvider(config.urls.wca, config.internalToken, app.log);
 const periods = statsPeriodSource(config.urls.stats, config.internalToken);
 

@@ -25,11 +25,11 @@ export function guestIdFor(key: string, secret: string): string {
  * - The previous release's tabs send `guestId`, the id itself: still accepted in its old "guest-" form,
  *   until the release after this one (remove it then). Anyone else gets a fresh id nobody can claim.
  */
-export async function resolveIdentity(auth: unknown, jwtSecret: string, redis: Redis): Promise<Identity> {
+export async function resolveIdentity(auth: unknown, jwtSecret: string, redis: Redis, jwtSecretPrevious = ''): Promise<Identity> {
   const a = (auth && typeof auth === 'object' ? auth : {}) as Record<string, unknown>;
   if (typeof a.token === 'string' && a.token.length > 0 && a.token.length < 4096) {
     try {
-      const user = await verifyToken(jwtSecret, a.token);
+      const user = await verifyToken(jwtSecret, a.token, jwtSecretPrevious);
       if (!(await isTokenRevoked(redis, user))) {
         return { playerId: user.id, name: user.username, userId: user.id, guest: false };
       }

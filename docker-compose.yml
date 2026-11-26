@@ -25,6 +25,7 @@ x-service-env: &service-env
   DATABASE_URL: postgres://cubr:cubr@postgres:5432/cubr
   REDIS_URL: redis://redis:6379
   JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}   # override with JWT_SECRET=... docker compose up
+  JWT_SECRET_PREVIOUS: ${JWT_SECRET_PREVIOUS:-}     # the key before a rotation: its tokens still verify (runbook)
   # Shared secret for /internal/* calls between services (X-Internal-Token); auth also lets the
   # seed job, which sends it too, skip its per-IP rate limits.
   INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-dev-internal-token-0123456789}
