@@ -74,6 +74,8 @@ jobs:
         run: npm test
       - name: Production build
         run: npx vite build
+      - name: First-load JavaScript under its budget (200 KB gzipped)
+        run: node scripts/size-budget.mjs
 
   manifests:
     name: Kubernetes manifests

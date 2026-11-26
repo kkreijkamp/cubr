@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { lazy, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowPathIcon,
@@ -36,10 +36,7 @@ import { SolveModal } from '../components/timer/SolveModal';
 import { AverageModal } from '../components/timer/AverageModal';
 import { QuickActions } from '../components/timer/QuickActions';
 import { ManualEntry } from '../components/timer/ManualEntry';
-import { VirtualInput } from '../components/timer/inputs/VirtualInput';
-import { StackmatInput } from '../components/timer/inputs/StackmatInput';
-import { BtTimerInput } from '../components/timer/inputs/BtTimerInput';
-import { SmartCubeInput } from '../components/timer/inputs/SmartCubeInput';
+import { Loading } from '../components/Spinner';
 import type { ScrambleHint } from '../input/bluetooth/smartSession';
 import { AVAILABLE_INPUTS, INPUT_MODES, modeInfo, updateInput, useInputState, type InputMode } from '../input/inputMode';
 import { ConfirmModal, PromptModal } from '../components/timer/Dialogs';
@@ -120,6 +117,14 @@ function isTyping(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
   return el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName);
 }
+
+// The other ways to time load when you pick them: most people time with the keyboard or a touch screen,
+// and the virtual cube, smart cubes and stackmats were a third of the page's first download
+// (scripts/size-budget.mjs keeps it under its budget).
+const VirtualInput = lazy(() => import('../components/timer/inputs/VirtualInput').then((m) => ({ default: m.VirtualInput })));
+const StackmatInput = lazy(() => import('../components/timer/inputs/StackmatInput').then((m) => ({ default: m.StackmatInput })));
+const BtTimerInput = lazy(() => import('../components/timer/inputs/BtTimerInput').then((m) => ({ default: m.BtTimerInput })));
+const SmartCubeInput = lazy(() => import('../components/timer/inputs/SmartCubeInput').then((m) => ({ default: m.SmartCubeInput })));
 
 /** A control that has keyboard focus (it matches :focus-visible): Tab moves on from it instead of giving a new scramble. */
 function isKeyboardOnControl(el: Element | null): boolean {
@@ -591,90 +596,92 @@ export default function TimerPage() {
         />
 
         <div className={`tp-timer-area input-${input}`} {...(input === 'timer' ? engine.touchHandlers : {})} aria-label={input !== 'timer' ? undefined : touch ? 'timer: hold to get ready, release to start' : 'timer'}>
-          {manual ? (
-            <ManualEntry onSubmit={(r) => record(r, 'manual')} disabled={modal !== null || paletteOpen} />
-          ) : input === 'stackmat' || input === 'moyu' ? (
-            <StackmatInput
-              key={input}
-              kind={input}
-              enabled={inputsEnabled}
-              inspection={settings.inspection && eventInfo.inspection}
-              alerts={settings.inspectionAlerts}
-              useStatus={settings.stackmatStatus}
-              last={lastResult}
-              precision={settings.precision}
-              timerUpdate={settings.timerUpdate}
-              sizeRem={settings.timerSize}
-              pb={pb && isIdle}
-              onState={setAltState}
-              onSolve={(r) => {
-                lastStopAt.current = performance.now();
-                record(r, 'timer');
-              }}
-            />
-          ) : input === 'bttimer' ? (
-            <BtTimerInput
-              enabled={inputsEnabled}
-              inspection={settings.inspection && eventInfo.inspection}
-              alerts={settings.inspectionAlerts}
-              last={lastResult}
-              precision={settings.precision}
-              timerUpdate={settings.timerUpdate}
-              sizeRem={settings.timerSize}
-              pb={pb && isIdle}
-              onState={setAltState}
-              onSolve={(r) => {
-                lastStopAt.current = performance.now();
-                record(r, 'timer');
-              }}
-            />
-          ) : input === 'smartcube' ? (
-            <SmartCubeInput
-              event={event}
-              scramble={scr.current?.text ?? null}
-              enabled={inputsEnabled}
-              inspection={settings.inspection && eventInfo.inspection}
-              alerts={settings.inspectionAlerts}
-              last={lastResult}
-              precision={settings.precision}
-              timerUpdate={settings.timerUpdate}
-              sizeRem={settings.timerSize}
-              pb={pb && isIdle}
-              settings={settings}
-              onState={setAltState}
-              onSolve={(r, own) => {
-                lastStopAt.current = performance.now();
-                record(r, 'timer', own);
-              }}
-              onScramble={scr.setFromCube}
-              onHint={setSmartHint}
-            />
-          ) : input === 'virtual' || input === 'qcube' ? (
-            <VirtualInput
-              key={input}
-              event={event}
-              flat={input === 'qcube'}
-              scramble={scr.current?.text ?? null}
-              enabled={inputsEnabled}
-              inspection={settings.inspection && eventInfo.inspection}
-              alerts={settings.inspectionAlerts}
-              last={lastResult}
-              precision={settings.precision}
-              timerUpdate={settings.timerUpdate}
-              sizeRem={settings.timerSize}
-              pb={pb && isIdle}
-              settings={settings}
-              onState={setAltState}
-              onSolve={(r) => {
-                lastStopAt.current = performance.now();
-                record(r, 'timer');
-              }}
-            />
-          ) : (
-            <div key={pbKey}>
-              <TimerDisplay state={displayState} precision={settings.precision} timerUpdate={settings.timerUpdate} sizeRem={settings.timerSize} pb={pb && isIdle} />
-            </div>
-          )}
+          <Suspense fallback={<Loading label="loading the input" />}>
+            {manual ? (
+              <ManualEntry onSubmit={(r) => record(r, 'manual')} disabled={modal !== null || paletteOpen} />
+            ) : input === 'stackmat' || input === 'moyu' ? (
+              <StackmatInput
+                key={input}
+                kind={input}
+                enabled={inputsEnabled}
+                inspection={settings.inspection && eventInfo.inspection}
+                alerts={settings.inspectionAlerts}
+                useStatus={settings.stackmatStatus}
+                last={lastResult}
+                precision={settings.precision}
+                timerUpdate={settings.timerUpdate}
+                sizeRem={settings.timerSize}
+                pb={pb && isIdle}
+                onState={setAltState}
+                onSolve={(r) => {
+                  lastStopAt.current = performance.now();
+                  record(r, 'timer');
+                }}
+              />
+            ) : input === 'bttimer' ? (
+              <BtTimerInput
+                enabled={inputsEnabled}
+                inspection={settings.inspection && eventInfo.inspection}
+                alerts={settings.inspectionAlerts}
+                last={lastResult}
+                precision={settings.precision}
+                timerUpdate={settings.timerUpdate}
+                sizeRem={settings.timerSize}
+                pb={pb && isIdle}
+                onState={setAltState}
+                onSolve={(r) => {
+                  lastStopAt.current = performance.now();
+                  record(r, 'timer');
+                }}
+              />
+            ) : input === 'smartcube' ? (
+              <SmartCubeInput
+                event={event}
+                scramble={scr.current?.text ?? null}
+                enabled={inputsEnabled}
+                inspection={settings.inspection && eventInfo.inspection}
+                alerts={settings.inspectionAlerts}
+                last={lastResult}
+                precision={settings.precision}
+                timerUpdate={settings.timerUpdate}
+                sizeRem={settings.timerSize}
+                pb={pb && isIdle}
+                settings={settings}
+                onState={setAltState}
+                onSolve={(r, own) => {
+                  lastStopAt.current = performance.now();
+                  record(r, 'timer', own);
+                }}
+                onScramble={scr.setFromCube}
+                onHint={setSmartHint}
+              />
+            ) : input === 'virtual' || input === 'qcube' ? (
+              <VirtualInput
+                key={input}
+                event={event}
+                flat={input === 'qcube'}
+                scramble={scr.current?.text ?? null}
+                enabled={inputsEnabled}
+                inspection={settings.inspection && eventInfo.inspection}
+                alerts={settings.inspectionAlerts}
+                last={lastResult}
+                precision={settings.precision}
+                timerUpdate={settings.timerUpdate}
+                sizeRem={settings.timerSize}
+                pb={pb && isIdle}
+                settings={settings}
+                onState={setAltState}
+                onSolve={(r) => {
+                  lastStopAt.current = performance.now();
+                  record(r, 'timer');
+                }}
+              />
+            ) : (
+              <div key={pbKey}>
+                <TimerDisplay state={displayState} precision={settings.precision} timerUpdate={settings.timerUpdate} sizeRem={settings.timerSize} pb={pb && isIdle} />
+              </div>
+            )}
+          </Suspense>
         </div>
 
         {/* on a touch screen the line under the time starts the timer too: a thumb aimed a little low lands here */}
