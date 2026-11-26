@@ -51,13 +51,25 @@ export async function ensureDefaultSession(pool: Pool, userId: string): Promise<
   });
 }
 
-/** The session's current ao5/ao12 from its latest 12 solves (sees uncommitted rows of `db`'s transaction). */
-export async function sessionRolling(db: Db, sessionId: string): Promise<Rolling> {
-  const { rows } = await db.query<{ time_ms: number; penalty: Penalty }>(
-    `SELECT time_ms, penalty FROM solve.solves WHERE session_id = $1
-      ORDER BY created_at DESC, id DESC LIMIT ${ROLLING_WINDOW}`,
-    [sessionId],
-  );
+/**
+ * The session's ao5/ao12 from its 12 solves up to and including `upTo` (by created_at, then id), or its
+ * latest 12 (sees uncommitted rows of `db`'s transaction). A new solve passes itself: for the newest one
+ * that is the session's current ao5, and a back-dated (manual, offline, imported later) one gets the
+ * window ending at it, so the boards don't credit today's ao5 to its older day (the October review's
+ * leftovers).
+ */
+export async function sessionRolling(db: Db, sessionId: string, upTo?: { createdAt: Date; id: string }): Promise<Rolling> {
+  const { rows } = upTo
+    ? await db.query<{ time_ms: number; penalty: Penalty }>(
+        `SELECT time_ms, penalty FROM solve.solves WHERE session_id = $1 AND (created_at, id) <= ($2, $3)
+          ORDER BY created_at DESC, id DESC LIMIT ${ROLLING_WINDOW}`,
+        [sessionId, upTo.createdAt, upTo.id],
+      )
+    : await db.query<{ time_ms: number; penalty: Penalty }>(
+        `SELECT time_ms, penalty FROM solve.solves WHERE session_id = $1
+          ORDER BY created_at DESC, id DESC LIMIT ${ROLLING_WINDOW}`,
+        [sessionId],
+      );
   return rollingFromSolves(rows.reverse().map((r) => ({ timeMs: r.time_ms, penalty: r.penalty })));
 }
 

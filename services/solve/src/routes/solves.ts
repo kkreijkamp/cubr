@@ -128,12 +128,12 @@ export function registerSolveRoutes(app: FastifyInstance, { pool, auth }: RouteC
         const existing = await client.query<SolveRow>(`SELECT ${SOLVE_COLUMNS} FROM solve.solves WHERE id = $1`, [id]);
         const row = existing.rows[0];
         if (!row || row.user_id !== user.id) throw conflict('solve id already in use');
-        return { created: false, row, rolling: await sessionRolling(client, row.session_id) };
+        return { created: false, row, rolling: await sessionRolling(client, row.session_id, { createdAt: row.created_at, id: row.id }) };
       }
 
       const row = ins.rows[0];
       const newAttempt = daily ? await recordDailyAttempt(client, user, row) : false;
-      const rolling = await sessionRolling(client, row.session_id);
+      const rolling = await sessionRolling(client, row.session_id, { createdAt: row.created_at, id: row.id });
       // sessionName lets read models (stats) label sessions without querying this service;
       // practice keeps the solve off personal bests (stats) and the boards (leaderboard)
       await enqueue(client, 'solve.created', {

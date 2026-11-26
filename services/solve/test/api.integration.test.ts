@@ -226,6 +226,20 @@ describeIntegration('solve API', () => {
       expect(created.at(-1)?.payload).toMatchObject({ event: '222', sessionName: sess.name, practice: false, rolling: { ao5: 5000 } });
     });
 
+    it('gives a back-dated solve the ao5 ending at it, not the session\'s latest, so its day\'s board gets its own', async () => {
+      const u = await newUser();
+      const sess = await newSession(u);
+      const at = (min: number) => new Date(Date.now() - (60 - min) * 60_000).toISOString();
+      for (const [i, ms] of [10_000, 11_000, 12_000, 13_000, 14_000].entries()) await addSolve(u, sess.id, ms, { createdAt: at(i + 10) });
+      for (const [i, ms] of [20_000, 21_000, 22_000, 23_000, 24_000].entries()) await addSolve(u, sess.id, ms, { createdAt: at(i + 30) });
+      const back = await addSolve(u, sess.id, 9_000, { createdAt: at(15) }); // entered later, solved between the two runs
+      expect(back.rolling.ao5).toBe(12_000); // 10-14 s and itself: the window ending at it (the session's latest is 22 s)
+      const created = await outbox('solve.created', u.id);
+      expect(created.at(-1)?.payload).toMatchObject({ rolling: { ao5: 12_000 } });
+      const newest = await addSolve(u, sess.id, 25_000);
+      expect(newest.rolling.ao5).toBe(23_000); // the newest solve: the session's current ao5, as before
+    });
+
     it('takes a retry of the same id once (one row, one event) and refuses an id that someone else used', async () => {
       const [u, other] = [await newUser(), await newUser()];
       const sess = await newSession(u);
