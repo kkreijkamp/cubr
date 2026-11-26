@@ -346,6 +346,25 @@
   white-space: pre-line;
   overflow-wrap: anywhere;
   animation: fadeIn 0.15s ease-out;
+  /* A long scramble (relays, gigaminx) scrolls inside its box, so the stats and the preview stay in view.
+     The cap is just above a megaminx's seven lines, which never scroll. */
+  max-height: max(11rem, 22vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+/* the end where lines are out of sight fades out */
+.tp-scramble.more-below {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 2rem), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 2rem), transparent);
+}
+.tp-scramble.more-above {
+  -webkit-mask-image: linear-gradient(to top, #000 calc(100% - 2rem), transparent);
+  mask-image: linear-gradient(to top, #000 calc(100% - 2rem), transparent);
+}
+.tp-scramble.more-above.more-below {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 2rem, #000 calc(100% - 2rem), transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 2rem, #000 calc(100% - 2rem), transparent);
 }
 .tp-scramble-loading {
   color: var(--sub-color);
@@ -1208,6 +1227,10 @@
   }
   .tp-under {
     min-height: 0;
+  }
+  /* a long scramble takes less of the short screen */
+  .tp-scramble {
+    max-height: max(6rem, 30vh);
   }
   /* the bar's menus scroll inside themselves rather than running past the bottom of the screen
      (the screen as it is now: a phone's browser bars take some of 100vh) */

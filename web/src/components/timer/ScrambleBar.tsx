@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { ArrowPathIcon, CheckIcon, ChevronLeftIcon, PencilIcon, SignalSlashIcon, Square2StackIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import type { ScrambleItem } from '../../timer/useScrambleQueue';
 import type { ScrambleHint } from '../../input/bluetooth/smartSession';
@@ -20,7 +20,7 @@ interface Props {
   lines?: boolean;
 }
 
-/** Font size steps by scramble length: 2x2/3x3 large, big cubes & megaminx smaller. */
+/** Font size steps by scramble length: 2x2/3x3 large, big cubes & megaminx smaller, relays and gigaminx smallest. */
 function sizeFor(text: string): string {
   const n = text.length;
   if (n <= 50) return '1.75rem';
@@ -28,12 +28,44 @@ function sizeFor(text: string): string {
   if (n <= 160) return '1.25rem';
   if (n <= 320) return '1.05rem';
   if (n <= 600) return '0.95rem';
-  return '0.85rem';
+  if (n <= 900) return '0.85rem';
+  return '0.8rem';
+}
+
+/**
+ * Whether a scramble that scrolls inside its box (relays, gigaminx: timer-page.css caps its height) has
+ * lines out of sight above or below, where the box fades out. `key` is the scramble, whose element is
+ * new for each one.
+ */
+function useHiddenEdges(ref: RefObject<HTMLElement | null>, key: unknown): { above: boolean; below: boolean } {
+  const [edges, setEdges] = useState({ above: false, below: false });
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const check = () => {
+      const above = el.scrollTop > 1;
+      const below = el.scrollHeight - el.scrollTop - el.clientHeight > 1;
+      setEdges((e) => (e.above === above && e.below === below ? e : { above, below }));
+    };
+    check();
+    const resized = new ResizeObserver(check);
+    resized.observe(el);
+    el.addEventListener('scroll', check, { passive: true });
+    // the app's font arriving can make the text taller without changing the box
+    void document.fonts?.ready.then(check);
+    return () => {
+      resized.disconnect();
+      el.removeEventListener('scroll', check);
+    };
+  }, [ref, key]);
+  return edges;
 }
 
 export function ScrambleBar({ scramble, onNext, onPrev, hasPrev, onCustom, editing, setEditing, hint, lines = false }: Props) {
   const [draft, setDraft] = useState('');
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const hidden = useHiddenEdges(boxRef, editing ? null : scramble?.text);
 
   useEffect(() => {
     if (editing) {
@@ -99,7 +131,8 @@ export function ScrambleBar({ scramble, onNext, onPrev, hasPrev, onCustom, editi
         </div>
       ) : scramble ? (
         <div
-          className={`tp-scramble${hint?.pending ? ' off' : ''}${lines ? ' tp-scramble-lines' : ''}`}
+          ref={boxRef}
+          className={`tp-scramble${hint?.pending ? ' off' : ''}${lines ? ' tp-scramble-lines' : ''}${hidden.above ? ' more-above' : ''}${hidden.below ? ' more-below' : ''}`}
           style={{ ['--scramble-size' as string]: sizeFor(scramble.text) }}
           key={scramble.text}
         >
