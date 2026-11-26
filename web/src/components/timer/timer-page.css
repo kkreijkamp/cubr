@@ -895,14 +895,21 @@
 .tp-solve-row .time.dnf {
   color: var(--error-color);
 }
-.tp-solve-row:hover {
+.tp-solve-row:hover,
+.tp-solve-row.cursor {
   background: var(--text-color);
+}
+/* the list takes focus as a whole; the row the keyboard is on (.cursor) shows where it is */
+.tp-solve-scroll:focus {
+  outline: none;
 }
 .tp-solve-row:focus {
   outline: none;
 }
 .tp-solve-row:hover > span,
-.tp-solve-row:hover .time {
+.tp-solve-row:hover .time,
+.tp-solve-row.cursor > span,
+.tp-solve-row.cursor .time {
   color: var(--bg-color) !important;
 }
 .tp-comment-mark {

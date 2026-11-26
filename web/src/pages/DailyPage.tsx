@@ -473,27 +473,39 @@ export default function DailyPage() {
               const a = attempts.find((x) => x.index === i);
               const current = isToday && i === nextIndex;
               const paren = done && (i === bestIdx || i === worstIdx);
+              const time = a ? (
+                <>
+                  {paren ? '(' : ''}
+                  {formatSolve(a.timeMs, a.penalty, settings.precision)}
+                  {paren ? ')' : ''}
+                </>
+              ) : current ? (
+                'now'
+              ) : (
+                '-'
+              );
+              const timeClass = `t${a?.penalty === 'DNF' ? ' dnf' : ''}`;
               return (
-                // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- TEMPORARY: picking from the keyboard comes next
+                // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- a pointer picks anywhere on the attempt; the keyboard picks with its time, a button
                 <li
                   key={i}
                   className={`${current ? 'current' : ''}${a ? ' filled' : ''}${a?.state === 'failed' ? ' failed' : ''}${a && picked === i && isToday ? ' picked' : ''}`}
                   onClick={a && isToday ? () => setPicked(i) : undefined}
                 >
                   <span className="n">{i + 1}</span>
-                  <span className={`t${a?.penalty === 'DNF' ? ' dnf' : ''}`}>
-                    {a ? (
-                      <>
-                        {paren ? '(' : ''}
-                        {formatSolve(a.timeMs, a.penalty, settings.precision)}
-                        {paren ? ')' : ''}
-                      </>
-                    ) : current ? (
-                      'now'
-                    ) : (
-                      '-'
-                    )}
-                  </span>
+                  {a && isToday ? (
+                    // its click reaches the attempt's own (Enter gives one too)
+                    <button
+                      type="button"
+                      className={timeClass}
+                      aria-pressed={picked === i}
+                      aria-label={`attempt ${i + 1}: ${formatSolve(a.timeMs, a.penalty, settings.precision)} (pick it for ok / +2 / dnf)`}
+                    >
+                      {time}
+                    </button>
+                  ) : (
+                    <span className={timeClass}>{time}</span>
+                  )}
                   <span className="s">
                     {a?.state === 'saving' && <Spinner size={12} />}
                     {a?.state === 'failed' && (
