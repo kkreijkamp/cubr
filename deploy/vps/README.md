@@ -210,6 +210,16 @@ Restore: copy a dump to the VM, then
 `$C exec -T postgres pg_restore -U cubr -d cubr --clean --if-exists < cubr-<date>.dump`,
 and run the WCA import.
 
+**The restore drill, every three months** (`deploy/vps/restore-drill.sh`, run from the Mac over SSH; it
+only reads production): last night's backup into a throwaway Postgres with no network, timed, row
+counts beside the live ones, then removed.
+```sh
+gcloud compute ssh cubr-1 --zone australia-southeast1-a --configuration=cubr --tunnel-through-iap --command 'bash -s' < deploy/vps/restore-drill.sh
+```
+- **2026-11-26:** the 2026-11-25 16:30 UTC backup (396 KB): fetched in 2 s, Postgres up in 3 s,
+  restored in 1 s, no errors; users, sign-in links and sessions equal to live, solves and daily
+  attempts short by exactly those made since. Next: about 2027-02-26.
+
 ## Alerts and logs
 
 - **Site down:** an uptime check emails you ("cubr.dev is down").
