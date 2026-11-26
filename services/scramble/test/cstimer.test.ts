@@ -19,9 +19,12 @@ describe("csTimer's scramblers", () => {
   });
 
   it('makes a scramble of every one of them', async () => {
+    // the floppy cube's random state is now and then one move from solved ("R", 22 in 1,000):
+    // a fair scramble there, which failed CI on 26 November 2026
+    const tiny = new Set(['133']);
     for (const t of CSTIMER_TYPES) {
       const s = await host.scramble(t, CSTIMER_LENGTHS[t] ?? 0);
-      expect(s.length, t).toBeGreaterThan(2);
+      expect(s.trim().length, t).toBeGreaterThan(tiny.has(t) ? 0 : 2);
       expect(s, t).not.toMatch(/undefined|NaN|N\/A/);
     }
     expect(host.stats()).toMatchObject({ failed: 0, timeouts: 0 });
