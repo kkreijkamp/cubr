@@ -21,6 +21,7 @@ import {
   type ProviderIdentity,
 } from '../oauth.js';
 import { USERNAME_RE, USER_COLUMNS, UUID_RE, conflictMessage, toPrivateUser, toPublicUser, userEventData, type UserRow } from '../users.js';
+import { HOLDS_EMAIL, releaseUnconfirmed } from '../unconfirmed.js';
 
 /**
  * Sign-in with Google, Apple and GitHub (OAuth 2 authorization code flow; the providers in oauth.ts).
@@ -206,9 +207,10 @@ export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, 
       return toSpa(reply, '/login/sso', { code, next: flow.next }, [code, LOGIN_CODE_TTL_SEC]);
     }
 
-    // a new account: it needs a verified email (password resets) that no account uses yet
+    // a new account: it needs a verified email (password resets) that no account uses yet (an
+    // unconfirmed one past its 7 days doesn't count: it's freed when the account is made)
     if (!identity.email) return fail(reply, flow, provider, 'no_email');
-    const taken = await pool.query('select 1 from auth.users where lower(email) = lower($1)', [identity.email]);
+    const taken = await pool.query(`select 1 from auth.users u where lower(u.email) = lower($1) and ${HOLDS_EMAIL}`, [identity.email]);
     if (taken.rowCount) return fail(reply, flow, provider, 'email_taken');
     const id = randomToken();
     const pending: PendingSignup = { provider, subject: identity.subject, email: identity.email, name: identity.name, login: identity.login };
@@ -270,6 +272,8 @@ export async function registerOAuthRoutes(app: FastifyInstance, { config, pool, 
     let row: UserRow;
     try {
       row = await withTx(pool, async (c) => {
+        const freed = await releaseUnconfirmed(c, pending.email);
+        if (freed) req.log.info({ userId: freed, provider: pending.provider }, 'an email never confirmed in 7 days was freed for a new account');
         // the provider verified the address, so it starts confirmed
         const { rows } = await c.query<UserRow>(`insert into auth.users (username, email, password_hash, email_verified_at) values ($1, $2, null, now()) returning ${USER_COLUMNS}`, [
           username,

@@ -55,6 +55,7 @@ import {
   isFreshSignIn,
 } from '../emailChange.js';
 import { changePasswordSchema, passwordChangedNotice, signInUrl } from '../passwordChange.js';
+import { HOLDS_EMAIL, isReleasedEmail, releaseUnconfirmed } from '../unconfirmed.js';
 
 const BCRYPT_COST = 10;
 
@@ -102,7 +103,8 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
 
   // ---- POST /api/auth/register ----------------------------------------------------------------
   // The account works at once; its email gets a link that confirms it (password-reset links only go
-  // to a confirmed address). The seed job's accounts (internal token) get none.
+  // to a confirmed address). The seed job's accounts (internal token) get none. An address another
+  // account never confirmed within its link's 7 days is freed for it (unconfirmed.ts).
   app.post('/api/auth/register', async (req, reply) => {
     const internal = isInternalCaller(config.internalToken, req.headers[INTERNAL_TOKEN_HEADER]);
     if (!internal && !(await allow(redis, `register:${req.ip}`, 20, 3600))) {
@@ -113,8 +115,10 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
     const confirmation = internal ? null : newResetToken();
 
     let row: UserRow;
+    let freed: string | null = null;
     try {
       row = await withTx(pool, async (client) => {
+        freed = await releaseUnconfirmed(client, body.email);
         const { rows } = await client.query<UserRow>(
           `insert into auth.users (username, email, password_hash) values ($1, $2, $3) returning ${USER_COLUMNS}`,
           [body.username, body.email, passwordHash],
@@ -133,6 +137,7 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
       throw err;
     }
 
+    if (freed) req.log.info({ userId: freed, newUserId: row.id }, 'an email never confirmed in 7 days was freed for a new account');
     const user = toPrivateUser(row);
     const { token } = await signToken(config.jwtSecret, user);
     await publishSafely(redis, req.log, 'user.registered', userEventData(toPublicUser(row)));
@@ -311,7 +316,8 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
     } else if (!isFreshSignIn(me.iat)) {
       throw forbidden('Sign in again to change your email');
     }
-    const taken = await pool.query('select 1 from auth.users where lower(email) = lower($1) and id <> $2', [email, me.id]);
+    // taken only by an address that still counts (an unconfirmed one past its 7 days is freed on confirming)
+    const taken = await pool.query(`select 1 from auth.users u where lower(u.email) = lower($1) and u.id <> $2 and ${HOLDS_EMAIL}`, [email, me.id]);
     if (taken.rowCount) throw conflict('That email is already in use');
     const { token, hash } = newResetToken();
     await withTx(pool, async (c) => {
@@ -348,6 +354,7 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
     const user = rows[0];
     if (!user) throw unauthorized('Account no longer exists');
     if (user.verified) throw badRequest('Your email is already confirmed');
+    if (isReleasedEmail(user.email)) throw badRequest('Your account has no email: add one');
     if (!(await allow(redis, `email-confirm:${me.id}`, 3, 3600)) || !(await allow(redis, `email-confirm-day:${me.id}`, 5, 86_400))) {
       throw rateLimited('Too many links, try again later');
     }
@@ -390,6 +397,8 @@ export async function registerAuthRoutes(app: FastifyInstance, { config, pool, r
       );
       if (!before.rows[0]) throw badRequest('This link is invalid or has expired');
       const changed = before.rows[0].email.toLowerCase() !== change.new_email.toLowerCase();
+      const freed = changed ? await releaseUnconfirmed(c, change.new_email, change.user_id) : null;
+      if (freed) req.log.info({ userId: freed, newUserId: change.user_id }, 'an email never confirmed in 7 days was freed for a change of email');
       try {
         await c.query('update auth.users set email = $2, email_verified_at = now() where id = $1', [change.user_id, changed ? change.new_email : before.rows[0].email]);
       } catch (err) {

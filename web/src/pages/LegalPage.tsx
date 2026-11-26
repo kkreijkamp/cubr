@@ -10,7 +10,8 @@ import { PAGE_META, type PageMeta } from '../lib/pageMeta';
 import { usePageMeta } from '../lib/usePageMeta';
 
 // when each page last changed
-const TERMS_EFFECTIVE = '16 November 2026';
+// v1.6.17: an address not confirmed within 7 days can be taken by another account (set this to the day it's released)
+const TERMS_EFFECTIVE = '26 November 2026';
 // v1.5.0 (18 November): sign-in with Google, Apple and GitHub; Cloudflare Web Analytics; error reports; the emails that confirm an address.
 // v1.6.9: the feedback form (set this to the day it's released)
 const PRIVACY_EFFECTIVE = '26 November 2026';
@@ -283,7 +284,10 @@ export function TermsPage() {
 
       <Section title="your account">
         <ul>
-          <li>Use a real email address you control: it is how you reset your password.</li>
+          <li>
+            Use a real email address you control: it is how you reset your password. Confirm it within 7 days: after that, an address
+            nobody confirmed can be used by another account, and yours keeps working without one until you add another.
+          </li>
           <li>Keep your password to yourself. You are responsible for what happens on your account.</li>
           <li>One person per account. Don&apos;t impersonate anyone; we may change usernames that do, or that are offensive.</li>
         </ul>

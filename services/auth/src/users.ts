@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isReleasedEmail } from './unconfirmed.js';
 
 // ---------------------------------------------------------------------------------------------
 // Pure domain helpers for the auth service: request schemas, row -> API mapping, small parsers.
@@ -103,6 +104,8 @@ export interface PrivateUser extends PublicUser {
   hasPassword: boolean;
   /** the email is confirmed (a link sent to it was opened, or a provider vouched for it) */
   emailVerified: boolean;
+  /** the account never confirmed its address in time and another account took it: it has none (unconfirmed.ts) */
+  emailReleased?: true;
 }
 
 const iso = (v: Date | string): string => (v instanceof Date ? v.toISOString() : new Date(v).toISOString());
@@ -147,7 +150,14 @@ export function avatarUrl(userId: string, version: string | null | undefined): s
 
 /** The owner's own view: everything, plus the email, whether it's confirmed and whether there's a password. */
 export function toPrivateUser(row: UserRow): PrivateUser {
-  return { ...toPublicUser(row, row.id), email: row.email, hasPassword: row.has_password !== false, emailVerified: row.email_verified === true };
+  return {
+    ...toPublicUser(row, row.id),
+    email: row.email,
+    hasPassword: row.has_password !== false,
+    emailVerified: row.email_verified === true,
+    // its address was never confirmed and another account took it (unconfirmed.ts): it has none
+    ...(isReleasedEmail(row.email) && { emailReleased: true }),
+  };
 }
 
 /** Columns selected everywhere a user is returned (never includes password_hash). */

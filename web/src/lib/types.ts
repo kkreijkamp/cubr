@@ -25,6 +25,9 @@ export interface PrivateUser extends PublicUser {
   /** false: the email isn't confirmed yet, so password-reset links don't go to it. Absent in a user
    *  cached by an older version: treat it as unknown, not as unconfirmed. */
   emailVerified?: boolean;
+  /** true: the address was never confirmed within its link's 7 days and another account took it, so
+   *  this account has none until it adds one (its `email` is a placeholder no mail goes to) */
+  emailReleased?: boolean;
 }
 
 /** Sign-in with a provider (services/auth/src/routes/oauth.ts) */

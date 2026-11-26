@@ -220,6 +220,16 @@ describeIntegration('sign-in with Google, Apple and GitHub', () => {
       expect(r.fragment.get('provider')).toBe('google');
       expect((await s.pool.query('select 1 from auth.user_identities where user_id = $1', [existing.user.id])).rowCount).toBe(0);
     });
+
+    it('takes an address another account never confirmed within its 7 days (the provider vouches for it)', async () => {
+      const stale = await passwordAccount();
+      await s.pool.query("update auth.users set created_at = now() - interval '8 days' where id = $1", [stale.user.id]);
+      await s.pool.query("update auth.email_changes set expires_at = now() - interval '1 minute' where user_id = $1", [stale.user.id]);
+      const made = await signUpWith('google', person({ email: stale.user.email }));
+      expect(made.user).toMatchObject({ email: stale.user.email, emailVerified: true });
+      const { rows } = await s.pool.query('select email from auth.users where id = $1', [stale.user.id]);
+      expect(rows[0].email).toBe(`released-${stale.user.id}@cubr.invalid`);
+    });
   });
 
   describe('what a callback must not get away with', () => {

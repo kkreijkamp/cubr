@@ -20,31 +20,31 @@ resources:
 images:
   - name: cubr/auth
     newName: australia-southeast1-docker.pkg.dev/cubr-app/cubr/auth
-    newTag: "1.6.16"
+    newTag: "1.6.17"
   - name: cubr/scramble
     newName: australia-southeast1-docker.pkg.dev/cubr-app/cubr/scramble
-    newTag: "1.6.16"
+    newTag: "1.6.17"
   - name: cubr/solve
     newName: australia-southeast1-docker.pkg.dev/cubr-app/cubr/solve
-    newTag: "1.6.16"
+    newTag: "1.6.17"
   - name: cubr/stats
     newName: australia-southeast1-docker.pkg.dev/cubr-app/cubr/stats
-    newTag: "1.6.16"
+    newTag: "1.6.17"
   - name: cubr/leaderboard
     newName: australia-southeast1-docker.pkg.dev/cubr-app/cubr/leaderboard
-    newTag: "1.6.16"
+    newTag: "1.6.17"
   - name: cubr/race
     newName: australia-southeast1-docker.pkg.dev/cubr-app/cubr/race
-    newTag: "1.6.16"
+    newTag: "1.6.17"
   - name: cubr/wca
     newName: australia-southeast1-docker.pkg.dev/cubr-app/cubr/wca
-    newTag: "1.6.16"
+    newTag: "1.6.17"
   - name: cubr/web
     newName: australia-southeast1-docker.pkg.dev/cubr-app/cubr/web
-    newTag: "1.6.16"
+    newTag: "1.6.17"
   - name: cubr/wca-import
     newName: australia-southeast1-docker.pkg.dev/cubr-app/cubr/wca-import
-    newTag: "1.6.16"
+    newTag: "1.6.17"
 
 patches:
   # Behind the Google load balancer X-Forwarded-For is "<client-ip>, <lb-ip>" -> trust 2 hops.

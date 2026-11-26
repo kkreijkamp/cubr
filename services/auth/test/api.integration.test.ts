@@ -619,6 +619,70 @@ describeIntegration('auth API', () => {
     });
   });
 
+  describe('an address never confirmed within its 7 days', () => {
+    /** Ages an account's sign-up past the 7 days, and its link that confirms the address with it. */
+    async function expire(userId: string) {
+      await s.pool.query("update auth.users set created_at = now() - interval '8 days' where id = $1", [userId]);
+      await s.pool.query("update auth.email_changes set expires_at = now() - interval '1 minute' where user_id = $1", [userId]);
+    }
+    const register = (username: string, email: string) => s.request('POST', '/api/auth/register', { body: { username, email, password: PASSWORD }, ip: freshIp() });
+    const emailOf = async (userId: string) => (await s.pool.query<{ email: string }>('select email from auth.users where id = $1', [userId])).rows[0].email;
+
+    it('stays taken for 7 days, while a new link for it is open, once confirmed, and from before confirmation existed', async () => {
+      const fresh = await signUp({ email: 'fresh-hold@example.com' });
+      expect((await register('fresh_taker', 'FRESH-HOLD@example.com')).statusCode).toBe(409);
+      // past the 7 days, but a new link asked for since is still open
+      const relinked = await signUp({ email: 'relinked@example.com' });
+      await expire(relinked.user.id);
+      expect((await s.request('POST', '/api/auth/me/email/confirmation', { token: relinked.token, ip: freshIp() })).statusCode).toBe(202);
+      expect((await register('relinked_taker', 'relinked@example.com')).statusCode).toBe(409);
+      // confirmed, or from before confirmation: never freed
+      const confirmed = await signUp({ email: 'confirmed-hold@example.com' });
+      await expire(confirmed.user.id);
+      await confirmEmailOf(confirmed.user.id);
+      expect((await register('confirmed_taker', 'confirmed-hold@example.com')).statusCode).toBe(409);
+      const old = await signUp({ email: 'old-hold@example.com' });
+      await expire(old.user.id);
+      await s.pool.query('update auth.users set predates_email_confirmation = true where id = $1', [old.user.id]);
+      expect((await register('old_taker', 'old-hold@example.com')).statusCode).toBe(409);
+      expect(await emailOf(fresh.user.id)).toBe('fresh-hold@example.com');
+    });
+
+    it('is freed for a new account after that; the old account keeps working, without an email', async () => {
+      const stale = await signUp({ username: 'stale_holder', email: 'stale@example.com' });
+      await expire(stale.user.id);
+      const taker = await register('real_owner', 'Stale@example.com');
+      expect(taker.statusCode, taker.body).toBe(201);
+      expect(taker.json().user).toMatchObject({ email: 'Stale@example.com', emailVerified: false });
+      expect(taker.json().user.emailReleased).toBeUndefined();
+      // the old account: a placeholder that never receives mail, signs in by username, told it has no email
+      expect(await emailOf(stale.user.id)).toBe(`released-${stale.user.id}@cubr.invalid`);
+      const back = await login('stale_holder');
+      expect(back.statusCode).toBe(200);
+      expect((await me(back.json().token)).json().user).toMatchObject({ emailReleased: true, emailVerified: false });
+      // it can't ask for a link to an address it doesn't have, and gets no reset link for it
+      const link = await s.request('POST', '/api/auth/me/email/confirmation', { token: back.json().token, ip: freshIp() });
+      expect(link.statusCode).toBe(400);
+      expect(link.json().error.message).toBe('Your account has no email: add one');
+    });
+
+    it('is freed by a change of email to it, once that change is confirmed', async () => {
+      const stale = await signUp({ email: 'stale-change@example.com' });
+      await expire(stale.user.id);
+      const mover = await signUp();
+      expect((await s.request('POST', '/api/auth/me/email', { token: mover.token, body: { email: 'stale-change@example.com', password: PASSWORD }, ip: freshIp() })).statusCode).toBe(202);
+      expect(await emailOf(stale.user.id)).toBe('stale-change@example.com'); // nothing changes before the link is opened
+      // the pending change's link, as if its email had arrived
+      const { token, hash } = newResetToken();
+      await s.pool.query('update auth.email_changes set token_hash = $1 where user_id = $2', [hash, mover.user.id]);
+      const res = await s.request('POST', '/api/auth/email/confirm', { body: { token }, ip: freshIp() });
+      expect(res.statusCode, res.body).toBe(200);
+      expect(res.json()).toEqual({ email: 'stale-change@example.com', changed: true });
+      expect(await emailOf(mover.user.id)).toBe('stale-change@example.com');
+      expect(await emailOf(stale.user.id)).toBe(`released-${stale.user.id}@cubr.invalid`);
+    });
+  });
+
   describe('changing the password', () => {
     const changePassword = (token: string, body: Record<string, unknown>) => s.request('POST', '/api/auth/me/password', { token, body, ip: freshIp() });
 

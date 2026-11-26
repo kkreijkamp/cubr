@@ -46,7 +46,7 @@ export function ChangeEmailModal({ user, onSent, onClose }: { user: PrivateUser;
 
   if (signInAgain) {
     return (
-      <Modal title="change email" onClose={onClose} center>
+      <Modal title={user.emailReleased ? 'add an email' : 'change email'} onClose={onClose} center>
         <div className="stack">
           <div className="dialog-message">
             Your account signs in with Google or GitHub, so to keep it safe, sign in again first. Then change your email within 10 minutes.
@@ -65,7 +65,7 @@ export function ChangeEmailModal({ user, onSent, onClose }: { user: PrivateUser;
   }
 
   return (
-    <Modal title="change email" onClose={onClose} center>
+    <Modal title={user.emailReleased ? 'add an email' : 'change email'} onClose={onClose} center>
       <form
         className="stack"
         onSubmit={(e) => {
@@ -74,7 +74,13 @@ export function ChangeEmailModal({ user, onSent, onClose }: { user: PrivateUser;
         }}
       >
         <div className="dialog-message">
-          We&apos;ll send a link to the new address. Your email stays <span className="main">{user.email}</span> until you open it.
+          {user.emailReleased ? (
+            <>We&apos;ll send a link to the address. Nothing changes until you open it.</>
+          ) : (
+            <>
+              We&apos;ll send a link to the new address. Your email stays <span className="main">{user.email}</span> until you open it.
+            </>
+          )}
         </div>
         <div className="field">
           <label htmlFor="change-email-new">new email</label>
