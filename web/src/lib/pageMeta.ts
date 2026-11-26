@@ -6,8 +6,10 @@
 // before and after the app runs. The home page's are also in index.html, which the tests compare.
 //
 // The words to rank for are cubers' own: speedcube, cube and timer, and their family (speedcubing,
-// speedcubers, cubing, cubers). Titles and descriptions use them where they read naturally, never as a
-// list: search engines discount stuffing, and people skip it. No imports, so the build can read it.
+// speedcubers, cubing, cubers), plus "rubik's cube" in the home and About descriptions (the most common
+// way people search for a cube timer; Koen, 2026-11-26), never in a title: it's a trademark, named only
+// to say what cubr times. They're used where they read naturally, never as a list: search engines
+// discount stuffing, and people skip it. No imports, so the build can read it.
 
 export interface PageMeta {
   /** the tab and the search result's title: at most 60 characters, the brand last (the home page's: first) */
@@ -21,7 +23,7 @@ export interface PageMeta {
 /** The home page: the timer. Its heading is read by screen readers and search engines, not shown. */
 export const HOME: PageMeta = {
   title: 'cubr | a minimalist cube timer for speedcubers',
-  description: 'a minimalist speedcube timer for cubers: scrambles for every wca event, csTimer-grade stats, a daily challenge and live races with other speedcubers.',
+  description: "a minimalist speedcube timer for cubers, from the rubik's cube to every wca event: csTimer-grade stats, a daily challenge and live races with other speedcubers.",
   heading: 'cubr: a minimalist speedcube timer',
 };
 
@@ -51,7 +53,7 @@ export const PAGE_META = {
   },
   '/about': {
     title: 'about cubr, a minimalist speedcube timer',
-    description: 'cubr is a minimalist speedcube timer: csTimer-grade stats and import, wca inspection, a daily challenge, live races, themes and an app that works offline.',
+    description: "cubr is a minimalist speedcube timer for the rubik's cube and other puzzles: csTimer-grade stats, a daily challenge, live races and an app that works offline.",
     heading: 'about cubr',
   },
   '/terms': {
