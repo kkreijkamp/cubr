@@ -10,9 +10,9 @@
   "dependencies": {
     "@cubr/common": "*",
     "bcryptjs": "^3.0.3",
-    "fastify": "^5.12.7",
+    "fastify": "^5.12.8",
     "ioredis": "^5.11.1",
-    "jose": "^6.2.12",
+    "jose": "^6.2.18",
     "pg": "^8.23.1",
     "sharp": "^0.35.5",
     "zod": "^4.6.7"
