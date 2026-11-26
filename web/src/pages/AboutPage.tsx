@@ -11,6 +11,7 @@ import {
   GiftIcon,
   GlobeAltIcon,
   HeartIcon,
+  QuestionMarkCircleIcon,
   SignalSlashIcon,
   Square3Stack3DIcon,
   SwatchIcon,
@@ -237,6 +238,51 @@ export default function AboutPage() {
               <span className="v">{label}</span>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* the questions people ask, answered where the answer lives: links go to the setting itself */}
+      <section aria-labelledby="ab-help" id="help">
+        <h2 className="ab-h" id="ab-help">
+          <QuestionMarkCircleIcon /> help
+        </h2>
+        <div className="ab-faq">
+          <h3 className="ab-q">how does inspection work?</h3>
+          <p className="ab-a">
+            Turn on WCA inspection in <Link to="/settings?tab=timer">settings &gt; timer</Link>. Space then starts 15 seconds to inspect; hold space and release
+            to start the solve (on a phone, tap the timer, then hold it and release). Starting after 15 seconds adds +2, after 17 the solve is a DNF, as at a
+            competition, and the timer can call out 8 and 12 seconds. Esc stops an inspection; on the daily challenge that attempt is a DNF.
+          </p>
+          <h3 className="ab-q">can I bring my times from csTimer?</h3>
+          <p className="ab-a">
+            Yes: in csTimer, export to a file, then choose it under import in <Link to="/settings?tab=data">settings &gt; data</Link>. cubr also reads Twisty
+            Timer, Cubic Timer, Block Keeper, CubeDesk, DCTimer, mateus Cubetimer and GAN CubeStation files. Each session becomes a cubr session, in your
+            account when you&apos;re signed in, in this browser when you&apos;re not. The same page exports them, as cubr&apos;s own file or for csTimer.
+          </p>
+          <h3 className="ab-q">can I install it, and does it work offline?</h3>
+          <p className="ab-a">
+            Yes. In Chrome or Edge, install it from <Link to="/settings?tab=app">settings &gt; app</Link> or the browser&apos;s menu; on an iPhone or iPad, use
+            Safari&apos;s share button, then &quot;Add to Home Screen&quot;. It opens in its own window, the timer works without a connection, and your solves
+            sync when you&apos;re back online.
+          </p>
+          <h3 className="ab-q">why isn&apos;t my time on the leaderboard?</h3>
+          <p className="ab-a">
+            The boards rank signed-in cubers (a guest&apos;s solves stay in their browser, and signing in offers to bring them along). A time stays off them
+            when it&apos;s in a practice session or from a practice scramble (only an event&apos;s default scramble counts), when it&apos;s faster than the WCA
+            world record for that event (the anti-cheat: your profile says when a faster time was left off), when an average is a DNF, or when your profile is
+            private. The daily board ranks a full ao5 of the day&apos;s five scrambles.
+          </p>
+          <h3 className="ab-q">what happens to my data?</h3>
+          <p className="ab-a">
+            When you&apos;re signed in, your account, solves and settings are kept on cubr&apos;s server in Sydney, with nightly backups in Melbourne, until you
+            delete your account in <Link to="/settings?tab=danger">settings &gt; danger zone</Link>: that removes them at once, and from the backups within 30
+            days. Export your solves any time in <Link to="/settings?tab=data">settings &gt; data</Link>. cubr doesn&apos;t sell your data or show ads, and
+            counts page views without cookies. The <Link to="/privacy">privacy policy</Link> has the rest.
+          </p>
+          <p className="ab-a">
+            The keys are above, and <Link to="/settings?tab=shortcuts">settings</Link> lists them all. Anything else: the feedback form at the bottom of every
+            page, or <a href="mailto:hello@cubr.dev">hello@cubr.dev</a>.
+          </p>
         </div>
       </section>
 
