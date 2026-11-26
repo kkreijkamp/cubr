@@ -7,4 +7,4 @@ resources:
 images:
   - name: cubr/seed
     newName: australia-southeast1-docker.pkg.dev/cubr-app/cubr/seed
-    newTag: "1.6.57"
+    newTag: "1.6.58"

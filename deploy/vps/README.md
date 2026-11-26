@@ -306,7 +306,9 @@ day of retries. `--local` first runs a command on the local stack.
   The sign-in providers' client secrets and Apple's key are there too ("Sign-in providers").
 - **Email DNS** (Cloudflare): `cubr.dev` MX to iCloud+ (`hello@cubr.dev`, a custom-domain address),
   SPF for iCloud, Apple's domain TXT and DKIM CNAME (`sig1._domainkey`), `_dmarc` (report-only for
-  now), and Resend's records (`resend._domainkey`, `send` MX/TXT, `rsend` CNAME).
+  now: `p=none`, with Cloudflare's DMARC Management address as `rua` since 2026-11-26, so receivers'
+  aggregate reports show under Email > DMARC Management), and Resend's records (`resend._domainkey`,
+  `send` MX/TXT, `rsend` CNAME). Tighten `p=` once the reports show only iCloud and Resend passing.
 - **www.cubr.dev** redirects to `https://cubr.dev` at Cloudflare's edge, with the same path and query
   (301): a proxied `AAAA www 100::` record (no origin) and a Redirect Rule (Rules > Redirect Rules,
   `http.host eq "www.cubr.dev"`). Its requests never reach the VM; the HTTPS certificate covers it as
